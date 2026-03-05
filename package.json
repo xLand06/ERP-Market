@@ -1,30 +1,21 @@
 {
   "name": "erp-market",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "version": "1.0.0",
+  "description": "Un moderno sistema ERP diseñado específicamente para bodegones y minimarkets. Facilita la gestión integral del negocio: desde el ingreso de productos y seguimiento Kanban, hasta el control de inventario, finanzas multimoneda y cálculo de comisiones.",
+  "main": "index.js",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "dev": "pnpm --filter ** dev",
+    "build": "pnpm --filter ** build",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "dependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xLand06/ERP-Market.git"
   },
-  "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@types/node": "^24.10.1",
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react-swc": "^4.2.2",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "globals": "^16.5.0",
-    "typescript": "~5.9.3",
-    "typescript-eslint": "^8.48.0",
-    "vite": "^7.3.1"
-  }
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/xLand06/ERP-Market/issues"
+  },
+  "homepage": "https://github.com/xLand06/ERP-Market#readme"
 }
