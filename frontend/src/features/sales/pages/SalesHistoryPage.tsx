@@ -1,12 +1,10 @@
-import { Title, Card, Text } from '@mantine/core';
-
 export default function SalesHistoryPage() {
     return (
-        <div>
-            <Title order={2} mb="md">Historial de Ventas</Title>
-            <Card shadow="sm" p="lg" radius="md" withBorder>
-                <Text c="dimmed">Listado de tickets/facturas, filtros por fecha y cajero...</Text>
-            </Card>
+        <div className="flex flex-col gap-4 max-w-[1400px] mx-auto">
+            <h1 className="text-xl font-bold text-slate-900">Historial de Ventas</h1>
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                <p className="text-sm text-slate-400">Tabla de ventas y tickets...</p>
+            </div>
         </div>
     );
 }
