@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeftRight, Bell, ChevronDown, LogOut, Settings, User } from 'lucide-react';
+import { ArrowLeftRight, Bell, ChevronDown, LogOut, Settings, User, Menu, Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 
@@ -8,7 +8,12 @@ const SYMBOLS: Record<string, string> = { USD: '$', VES: 'Bs.', COP: '$' };
 type Currency = 'USD' | 'VES' | 'COP';
 const CURRENCIES: Currency[] = ['USD', 'VES', 'COP'];
 
-export function TopBar() {
+interface TopBarProps {
+    onToggleSidebar?: () => void;
+    collapsed?: boolean;
+}
+
+export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     const [base, setBase] = useState<Currency>('USD');
     const [profileOpen, setProfileOpen] = useState(false);
     const navigate = useNavigate();
@@ -23,44 +28,57 @@ export function TopBar() {
     const others = CURRENCIES.filter(c => c !== base);
 
     return (
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-5 gap-4">
-            {/* Left – Logo */}
-            <div className="flex items-center gap-2 shrink-0">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-900 to-blue-900 flex items-center justify-center">
-                    <span className="text-[10px] font-black text-white">EM</span>
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-3 sm:px-5 gap-2 sm:gap-4 transition-all duration-300">
+            {/* Left – Toggle + Logo */}
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+                <button 
+                    onClick={onToggleSidebar}
+                    className="p-1.5 sm:p-2 -ml-1 sm:-ml-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all active:scale-95"
+                    aria-label={collapsed ? 'Abrir menú' : 'Cerrar menú'}
+                >
+                    <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
+
+                <div className="flex items-center gap-2 shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md">
+                        <Store className="w-4 h-4 text-white" />
+                    </div>
+                    {/* Hide text on tablet/mobile screens to provide space for widgets */}
+                    <span className="font-black text-sm text-slate-900 tracking-tight hidden lg:block uppercase">Abastos sofimar</span>
                 </div>
-                <span className="font-bold text-sm text-slate-900 tracking-tight hidden sm:block">ERP-Market</span>
             </div>
 
             {/* Center – Exchange Rate Widget */}
-            <div className="flex items-center gap-0 bg-slate-50 border border-slate-200 rounded-xl p-1 text-xs shrink-0">
+            <div className="flex items-center gap-0 bg-slate-50 border border-slate-200 rounded-xl p-1 text-xs shrink-0 max-w-[140px] sm:max-w-none overflow-x-auto min-[400px]:flex hidden no-scrollbar">
                 {/* Label */}
-                <div className="flex items-center gap-1.5 px-2 text-slate-400">
+                <div className="hidden sm:flex items-center gap-1.5 px-2 text-slate-400">
                     <ArrowLeftRight className="w-3 h-3" />
                     <span className="font-medium hidden md:block">Tasa</span>
                 </div>
-                <div className="w-px h-5 bg-slate-200 mx-1" />
+                <div className="hidden sm:block w-px h-5 bg-slate-200 mx-1" />
 
                 {/* Currency tabs */}
-                {CURRENCIES.map(cur => (
-                    <button
-                        key={cur}
-                        onClick={() => setBase(cur)}
-                        className={cn(
-                            'px-2.5 py-1 rounded-lg font-semibold transition-all duration-150',
-                            base === cur
-                                ? 'bg-white shadow-sm text-slate-900'
-                                : 'text-slate-400 hover:text-slate-700'
-                        )}
-                    >
-                        {cur}
-                    </button>
-                ))}
+                <div className="flex items-center">
+                    {CURRENCIES.map(cur => (
+                        <button
+                            key={cur}
+                            onClick={() => setBase(cur)}
+                            className={cn(
+                                'px-2 py-1 sm:px-2.5 rounded-lg font-semibold transition-all duration-150',
+                                base === cur
+                                    ? 'bg-white shadow-sm text-slate-900'
+                                    : 'text-slate-400 hover:text-slate-700'
+                            )}
+                        >
+                            {cur}
+                        </button>
+                    ))}
+                </div>
 
-                <div className="w-px h-5 bg-slate-200 mx-1" />
+                <div className="w-px h-5 bg-slate-200 mx-1 hidden lg:block" />
 
                 {/* Rates display */}
-                <div className="hidden md:flex items-center">
+                <div className="hidden lg:flex items-center">
                     {others.map((cur, i) => (
                         <div key={cur} className="flex items-center">
                             {i > 0 && <div className="w-px h-4 bg-slate-200 mx-2" />}
@@ -77,9 +95,9 @@ export function TopBar() {
             </div>
 
             {/* Right – Notifications + Profile */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 {/* Bell */}
-                <button className="relative w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors" aria-label="Notificaciones">
+                <button className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors" aria-label="Notificaciones">
                     <Bell className="w-4.5 h-4.5" />
                     <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white" />
                 </button>
@@ -88,16 +106,16 @@ export function TopBar() {
                 <div className="relative">
                     <button
                         onClick={() => setProfileOpen(!profileOpen)}
-                        className="flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-slate-100 transition-colors"
+                        className="flex items-center gap-2 py-1.5 px-1.5 sm:px-2 rounded-xl hover:bg-slate-100 transition-colors"
                     >
-                        <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center shadow-sm">
                             <User className="w-4 h-4 text-white" />
                         </div>
-                        <div className="hidden sm:block text-left">
+                        <div className="hidden md:block text-left">
                             <p className="text-xs font-semibold text-slate-900 leading-none">Admin</p>
                             <p className="text-[10px] text-slate-400 mt-0.5">Administrador</p>
                         </div>
-                        <ChevronDown className="w-3 h-3 text-slate-400" />
+                        <ChevronDown className="w-3 h-3 text-slate-400 hidden sm:block" />
                     </button>
 
                     {profileOpen && (

@@ -1,6 +1,6 @@
 import {
     LayoutDashboard, Package, ShoppingCart, Receipt,
-    Coins, BarChart3, Users, Truck, Tag, Store, ChevronRight,
+    Coins, BarChart3, Users, Truck, Tag, Store, ChevronRight, X
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -14,33 +14,62 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-    { label: 'Dashboard',      icon: LayoutDashboard, href: '/dashboard', section: 'Principal' },
-    { label: 'Punto de Venta', icon: ShoppingCart,    href: '/pos',       badge: 'F1' },
-    { label: 'Inventario',     icon: Package,         href: '/inventory', section: 'Gestión' },
-    { label: 'Proveedores',    icon: Truck,           href: '/suppliers' },
-    { label: 'Productos',      icon: Store,           href: '/products' },
-    { label: 'Lotes',          icon: Tag,             href: '/inventory/batches' },
-    { label: 'Ventas',         icon: Receipt,         href: '/sales',     section: 'Finanzas' },
-    { label: 'Finanzas',       icon: Coins,           href: '/finance' },
-    { label: 'Reportes',       icon: BarChart3,        href: '/reports' },
-    { label: 'Usuarios',       icon: Users,           href: '/users',     section: 'Admin' },
+    { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard', section: 'Principal' },
+    { label: 'Punto de Venta', icon: ShoppingCart, href: '/pos', badge: 'F1' },
+    { label: 'Inventario', icon: Package, href: '/inventory', section: 'Gestión' },
+    { label: 'Reportes', icon: BarChart3, href: '/reports' },
+    { label: 'Usuarios', icon: Users, href: '/users', section: 'Admin' },
+
+    { label: 'Finanzas', icon: Coins, href: '/finance', section: 'Pro' },
+
+    { label: 'Productos', icon: Store, href: '/products' },
+    { label: 'Lotes', icon: Tag, href: '/inventory/batches' },
+    { label: 'Ventas', icon: Receipt, href: '/sales', section: 'Pro Max' },
+
+    { label: 'Proveedores', icon: Truck, href: '/suppliers' },
 ];
 
-export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
+interface SidebarProps {
+    collapsed?: boolean;
+    onCloseMobile?: () => void;
+}
+
+export function Sidebar({ collapsed = false, onCloseMobile }: SidebarProps) {
     const navigate = useNavigate();
     const location = useLocation();
     let lastSection = '';
 
     return (
         <div className="flex flex-col h-full gap-0.5">
-            {/* Brand mark (collapsed) */}
-            {collapsed && (
-                <div className="flex justify-center mb-2">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-700 to-blue-900 flex items-center justify-center">
-                        <span className="text-[10px] font-black text-white">EM</span>
+            {/* Header / Brand Mark */}
+            <div className={cn(
+                "mb-6 px-3 flex flex-col transition-all duration-300",
+                collapsed ? "items-center" : "items-start"
+            )}>
+                <div className="flex items-center justify-between w-full mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 active:scale-95 transition-transform">
+                            <Store className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                        </div>
+                        {!collapsed && (
+                            <div className="flex flex-col">
+                                <span className="text-white font-black text-sm tracking-tight leading-none uppercase">Abastos sofimar</span>
+                                <span className="text-slate-500 font-medium text-[10px] tracking-widest uppercase mt-1">sistema de gestion</span>
+                            </div>
+                        )}
                     </div>
+                    {!collapsed && onCloseMobile && (
+                        <button 
+                            onClick={onCloseMobile}
+                            className="md:hidden p-1.5 -mr-1.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+                            aria-label="Cerrar menú"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    )}
                 </div>
-            )}
+                {!collapsed && <div className="h-px w-full bg-gradient-to-r from-slate-800 via-slate-800 to-transparent mb-2" />}
+            </div>
 
             {NAV_ITEMS.map((item) => {
                 const isActive = location.pathname === item.href ||
@@ -66,7 +95,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                             <>
                                 <span className="flex-1 text-left">{item.label}</span>
                                 {item.badge && (
-                                    <span className="text-[10px] font-mono bg-blue-900/60 text-blue-300 rounded px-1.5 py-0.5">
+                                    <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 rounded px-1.5 py-0.5">
                                         {item.badge}
                                     </span>
                                 )}
@@ -79,7 +108,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                 return (
                     <div key={item.href}>
                         {showSection && (
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 px-3 pt-3 pb-1">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 pt-4 pb-2">
                                 {item.section}
                             </p>
                         )}
@@ -91,7 +120,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
             {/* Footer */}
             {!collapsed && (
                 <div className="mt-auto pt-4 border-t border-slate-800">
-                    <p className="text-[10px] text-slate-600 text-center">ERP-Market v2.0</p>
+                    <p className="text-[10px] text-slate-500 text-center font-bold tracking-widest uppercase opacity-50">Sofimar v2.0</p>
                 </div>
             )}
         </div>

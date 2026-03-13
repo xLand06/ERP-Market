@@ -59,19 +59,19 @@ export default function InventoryPage() {
     };
 
     return (
-        <div className="flex flex-col gap-5 max-w-[1400px] mx-auto">
+        <div className="flex flex-col gap-6 max-w-[1400px] mx-auto pb-8">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-xl font-bold text-slate-900 tracking-tight">Gestión de Inventario</h1>
-                    <p className="text-xs text-slate-400 mt-1">1,248 productos registrados</p>
+                    <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Gestión de Inventario</h1>
+                    <p className="text-xs text-slate-400 mt-1 font-medium">1,248 productos registrados</p>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                        <Download className="w-4 h-4" /> Exportar Excel
+                <div className="flex flex-col xs:flex-row gap-2.5 w-full sm:w-auto">
+                    <Button variant="outline" size="lg" className="h-11 sm:h-10 text-slate-700 font-bold sm:px-4">
+                        <Download className="w-4.5 h-4.5 mr-2" /> Exportar Excel
                     </Button>
-                    <Button size="sm">
-                        <Plus className="w-4 h-4" /> Nuevo Producto
+                    <Button size="lg" className="h-11 sm:h-10 font-bold shadow-lg shadow-emerald-500/10 sm:px-4">
+                        <Plus className="w-4.5 h-4.5 mr-2" /> Nuevo Producto
                     </Button>
                 </div>
             </div>
