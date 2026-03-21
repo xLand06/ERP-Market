@@ -1,128 +1,145 @@
-import {
-    LayoutDashboard, Package, ShoppingCart, Receipt,
-    Coins, BarChart3, Users, Truck, Tag, Store, ChevronRight, X
+import { NavLink } from 'react-router-dom';
+import { 
+    LayoutDashboard, Package, ShoppingCart, 
+    Coins, Users, Truck, ShieldCheck, Store, PanelLeftClose, PanelLeftOpen, X
 } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
-    label: string;
+    name: string;
+    path: string;
     icon: React.ElementType;
-    href: string;
-    badge?: string;
-    section?: string;
 }
 
-const NAV_ITEMS: NavItem[] = [
-    { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard', section: 'Principal' },
-    { label: 'Punto de Venta', icon: ShoppingCart, href: '/pos', badge: 'F1' },
-    { label: 'Inventario', icon: Package, href: '/inventory', section: 'Gestión' },
-    { label: 'Reportes', icon: BarChart3, href: '/reports' },
-    { label: 'Usuarios', icon: Users, href: '/users', section: 'Admin' },
-
-    { label: 'Finanzas', icon: Coins, href: '/finance', section: 'Pro' },
-
-    { label: 'Productos', icon: Store, href: '/products' },
-    { label: 'Lotes', icon: Tag, href: '/inventory/batches' },
-    { label: 'Ventas', icon: Receipt, href: '/sales', section: 'Pro Max' },
-
-    { label: 'Proveedores', icon: Truck, href: '/suppliers' },
+const navItems: NavItem[] = [
+    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { name: 'Punto de Venta', path: '/pos', icon: ShoppingCart },
+    { name: 'Inventario', path: '/inventory', icon: Package },
+    { name: 'Compras', path: '/purchases', icon: Truck },
+    { name: 'Flujo de Caja', path: '/finance/cash-register', icon: Coins },
+    { name: 'Directorio', path: '/directory', icon: Users },
+    { name: 'Auditoría', path: '/audit', icon: ShieldCheck },
 ];
 
-interface SidebarProps {
+export interface SidebarProps {
     collapsed?: boolean;
     onCloseMobile?: () => void;
+    onToggleDesktop?: () => void;
 }
 
-export function Sidebar({ collapsed = false, onCloseMobile }: SidebarProps) {
-    const navigate = useNavigate();
-    const location = useLocation();
-    let lastSection = '';
-
+export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: SidebarProps) {
     return (
-        <div className="flex flex-col h-full gap-0.5">
-            {/* Header / Brand Mark */}
-            <div className={cn(
-                "mb-6 px-3 flex flex-col transition-all duration-300",
-                collapsed ? "items-center" : "items-start"
-            )}>
-                <div className="flex items-center justify-between w-full mb-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 active:scale-95 transition-transform">
-                            <Store className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                        </div>
-                        {!collapsed && (
-                            <div className="flex flex-col">
-                                <span className="text-white font-black text-sm tracking-tight leading-none uppercase">Abastos sofimar</span>
-                                <span className="text-slate-500 font-medium text-[10px] tracking-widest uppercase mt-1">sistema de gestion</span>
-                            </div>
-                        )}
+        <div className="flex flex-col h-full w-full bg-slate-900 border-r border-slate-800 z-10 transition-all duration-300 relative">
+            {/* Branding Header */}
+            <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800 mb-4 overflow-hidden shrink-0">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md">
+                       <Store className="w-4 h-4 text-white" />
                     </div>
-                    {!collapsed && onCloseMobile && (
-                        <button 
-                            onClick={onCloseMobile}
-                            className="md:hidden p-1.5 -mr-1.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
-                            aria-label="Cerrar menú"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
+                    {!collapsed && (
+                        <span className="font-bold text-white text-lg tracking-tight whitespace-nowrap animate-in fade-in duration-300 delay-150">
+                            ABASTOS SOFIMAR
+                        </span>
                     )}
                 </div>
-                {!collapsed && <div className="h-px w-full bg-gradient-to-r from-slate-800 via-slate-800 to-transparent mb-2" />}
+                {!collapsed && (
+                    <button 
+                        onClick={onToggleDesktop || onCloseMobile}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors hidden md:block"
+                    >
+                        <PanelLeftClose className="w-5 h-5" />
+                    </button>
+                )}
+                {!collapsed && onCloseMobile && (
+                    <button 
+                        onClick={onCloseMobile}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors md:hidden"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                )}
             </div>
 
-            {NAV_ITEMS.map((item) => {
-                const isActive = location.pathname === item.href ||
-                    (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
-                const showSection = !collapsed && item.section && item.section !== lastSection;
-                if (showSection) lastSection = item.section!;
-
-                const NavBtn = () => (
-                    <button
-                        onClick={() => navigate(item.href)}
-                        className={cn(
-                            'flex items-center gap-2.5 w-full rounded-lg transition-all duration-150 text-sm relative',
-                            collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5',
-                            isActive
-                                ? 'bg-emerald-500/10 text-emerald-400 font-semibold border-l-2 border-emerald-500'
-                                : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-200 border-l-2 border-transparent'
-                        )}
-                        aria-label={item.label}
-                        aria-current={isActive ? 'page' : undefined}
-                    >
-                        <item.icon className={cn('shrink-0', collapsed ? 'w-5 h-5' : 'w-4 h-4')} />
-                        {!collapsed && (
-                            <>
-                                <span className="flex-1 text-left">{item.label}</span>
-                                {item.badge && (
-                                    <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 rounded px-1.5 py-0.5">
-                                        {item.badge}
-                                    </span>
-                                )}
-                                {isActive && <ChevronRight className="w-3 h-3 opacity-70" />}
-                            </>
-                        )}
-                    </button>
-                );
-
-                return (
-                    <div key={item.href}>
-                        {showSection && (
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 pt-4 pb-2">
-                                {item.section}
-                            </p>
-                        )}
-                        <NavBtn />
+            {/* Navigation */}
+            <div className="px-3 flex-1 overflow-y-auto override-scrollbar overflow-x-hidden pb-4">
+                {!collapsed ? (
+                    <div className="px-3 mb-3 mt-2 text-[11px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">
+                        Principal
                     </div>
-                );
-            })}
-
-            {/* Footer */}
-            {!collapsed && (
-                <div className="mt-auto pt-4 border-t border-slate-800">
-                    <p className="text-[10px] text-slate-500 text-center font-bold tracking-widest uppercase opacity-50">Sofimar v2.0</p>
+                ) : (
+                    <div className="w-full h-8 mb-3 flex items-center justify-center">
+                        <button 
+                            onClick={onToggleDesktop}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0 hidden md:flex"
+                            title="Expandir"
+                        >
+                            <PanelLeftOpen className="w-5 h-5" />
+                        </button>
+                    </div>
+                )}
+                
+                <nav className="flex flex-col space-y-1.5">
+                    {navItems.map((item) => (
+                        <NavLink
+                            key={item.path}
+                            to={item.path}
+                            title={collapsed ? item.name : undefined}
+                            className={({ isActive }) =>
+                                cn(
+                                    "group flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative overflow-hidden",
+                                    collapsed ? "px-0 justify-center h-10" : "px-3",
+                                    isActive 
+                                        ? "bg-slate-800/80 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ring-1 ring-white/5" 
+                                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                                )
+                            }
+                        >
+                            {({ isActive }) => (
+                                <>
+                                    {/* Active Indicator Line */}
+                                    {isActive && (
+                                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-emerald-500 rounded-r-full shadow-[0_0_8px_rgba(16,183,127,0.4)]" />
+                                    )}
+                                    
+                                    <item.icon 
+                                        className={cn(
+                                            "w-4.5 h-4.5 shrink-0 transition-colors duration-200",
+                                            isActive ? "text-emerald-400" : "text-slate-400 group-hover:text-emerald-400"
+                                        )} 
+                                        strokeWidth={isActive ? 2 : 1.5} 
+                                    />
+                                    
+                                    {!collapsed && (
+                                        <span className="tracking-wide relative z-10 whitespace-nowrap">{item.name}</span>
+                                    )}
+                                </>
+                            )}
+                        </NavLink>
+                    ))}
+                </nav>
+            </div>
+            
+            {/* User / Status Panel at Bottom */}
+            <div className={cn("p-4 mb-4 mt-auto shrink-0", collapsed ? "px-2" : "mx-3 rounded-xl bg-slate-800/50 border border-slate-700/50")}>
+                <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
+                    <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-700 text-white font-bold border border-slate-600 shadow-sm">
+                        AD
+                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-slate-800"></span>
+                    </div>
+                    {!collapsed && (
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-semibold text-slate-200 truncate">Administrador</span>
+                            <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                                <span className="relative flex h-1.5 w-1.5 shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                                </span>
+                                <span className="truncate">Sistema en línea</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
         </div>
     );
 }

@@ -43,12 +43,16 @@ export function AppShellLayout() {
             {/* Sidebar */}
             <aside
                 className={cn(
-                    'fixed left-0 top-0 h-dvh z-50 bg-[#0F172A] flex flex-col transition-all duration-300 ease-in-out shadow-2xl md:shadow-none',
-                    collapsed ? '-translate-x-full md:translate-x-0 md:w-16' : 'translate-x-0 w-[260px] md:w-60'
+                    'fixed left-0 top-0 h-dvh z-50 bg-slate-900 flex flex-col transition-all duration-300 ease-in-out shadow-2xl md:shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)] border-r border-slate-800',
+                    collapsed ? '-translate-x-full md:translate-x-0 md:w-20' : 'translate-x-0 w-65'
                 )}
             >
-                <div className={cn('flex-1 overflow-y-auto overflow-x-hidden pt-4 md:pt-16', collapsed ? 'px-2 py-2' : 'px-3 py-2')}>
-                    <Sidebar collapsed={collapsed} onCloseMobile={() => setCollapsed(true)} />
+                <div className="flex-1 w-full h-full overflow-hidden">
+                    <Sidebar 
+                        collapsed={collapsed} 
+                        onCloseMobile={() => setCollapsed(true)} 
+                        onToggleDesktop={() => setCollapsed(!collapsed)} 
+                    />
                 </div>
             </aside>
 
@@ -56,14 +60,14 @@ export function AppShellLayout() {
             <div
                 className={cn(
                     'flex flex-col flex-1 min-w-0 transition-all duration-300 ease-in-out',
-                    collapsed ? 'md:ml-16' : 'md:ml-60' // Always 0 on mobile implicitly
+                    collapsed ? 'md:ml-20' : 'md:ml-65' // Always 0 on mobile implicitly
                 )}
             >
                 {/* Topbar – Fixed */}
                 <div
                     className={cn(
                         'fixed top-0 right-0 z-30 transition-all duration-300 ease-in-out',
-                        collapsed ? 'left-0 md:left-16' : 'left-0 md:left-60'
+                        collapsed ? 'left-0 md:left-20' : 'left-0 md:left-65'
                     )}
                 >
                     <TopBar onToggleSidebar={() => setCollapsed(!collapsed)} collapsed={collapsed} />

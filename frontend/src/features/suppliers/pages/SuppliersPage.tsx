@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { SupplierFormModal } from '../components/SupplierFormModal';
+
 
 interface Supplier {
     id: string; name: string; rif: string; category: string;
@@ -47,26 +49,33 @@ const STATUS_COLORS: Record<Supplier['owedStatus'], string> = {
 export default function SuppliersPage() {
     const [selected, setSelected] = useState<Supplier>(SUPPLIERS[2]);
     const [search, setSearch]     = useState('');
+    const [modalOpen, setModalOpen] = useState(false);
 
     const filtered = SUPPLIERS.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
     const overdue  = INVOICES.filter(i => i.status === 'overdue').reduce((s, i) => s + i.amount, 0);
     const pending  = INVOICES.filter(i => i.status !== 'paid' && i.status !== 'overdue').reduce((s, i) => s + i.amount, 0);
 
     return (
-        <div className="flex flex-col gap-5 max-w-[1400px] mx-auto">
+        <>
+        <SupplierFormModal
+            open={modalOpen}
+            onClose={() => setModalOpen(false)}
+            onSave={data => { console.log('New supplier:', data); setModalOpen(false); }}
+        />
+        <div className="flex flex-col gap-5 max-w-350 mx-auto">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-xl font-bold text-slate-900 tracking-tight">Control de Proveedores</h1>
                     <p className="text-xs text-slate-400 mt-1">{SUPPLIERS.filter(s => s.active).length} proveedores activos</p>
                 </div>
-                <Button size="sm"><Plus className="w-4 h-4" /> Agregar Proveedor</Button>
+                <Button size="sm" onClick={() => setModalOpen(true)}><Plus className="w-4 h-4" /> Agregar Proveedor</Button>
             </div>
 
             {/* Split panel */}
-            <div className="flex gap-4 min-h-[600px]">
+            <div className="flex gap-4 min-h-150">
                 {/* LEFT: Supplier List */}
-                <div className="w-[340px] shrink-0 flex flex-col gap-3">
+                <div className="w-85 shrink-0 flex flex-col gap-3">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <Input placeholder="Buscar proveedor..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
@@ -225,5 +234,6 @@ export default function SuppliersPage() {
                 </div>
             </div>
         </div>
+        </>
     );
 }
