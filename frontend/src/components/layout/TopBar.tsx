@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeftRight, Bell, ChevronDown, LogOut, Settings, User } from 'lucide-react';
+import { ArrowLeftRight, Bell, ChevronDown, LogOut, Settings, User, Menu, Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 
@@ -8,7 +8,12 @@ const SYMBOLS: Record<string, string> = { USD: '$', VES: 'Bs.', COP: '$' };
 type Currency = 'USD' | 'VES' | 'COP';
 const CURRENCIES: Currency[] = ['USD', 'VES', 'COP'];
 
-export function TopBar() {
+interface TopBarProps {
+    onToggleSidebar?: () => void;
+    collapsed?: boolean;
+}
+
+export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     const [base, setBase] = useState<Currency>('USD');
     const [profileOpen, setProfileOpen] = useState(false);
     const navigate = useNavigate();
@@ -30,34 +35,36 @@ export function TopBar() {
             </div>
 
             {/* Center – Exchange Rate Widget */}
-            <div className="flex items-center gap-0 bg-slate-50 border border-slate-200 rounded-xl p-1 text-xs shrink-0">
+            <div className="flex items-center gap-0 bg-slate-50 border border-slate-200 rounded-xl p-1 text-xs shrink-0 max-w-[140px] sm:max-w-none overflow-x-auto min-[400px]:flex hidden no-scrollbar">
                 {/* Label */}
-                <div className="flex items-center gap-1.5 px-2 text-slate-400">
+                <div className="hidden sm:flex items-center gap-1.5 px-2 text-slate-400">
                     <ArrowLeftRight className="w-3 h-3" />
                     <span className="font-medium hidden md:block">Tasa</span>
                 </div>
-                <div className="w-px h-5 bg-slate-200 mx-1" />
+                <div className="hidden sm:block w-px h-5 bg-slate-200 mx-1" />
 
                 {/* Currency tabs */}
-                {CURRENCIES.map(cur => (
-                    <button
-                        key={cur}
-                        onClick={() => setBase(cur)}
-                        className={cn(
-                            'px-2.5 py-1 rounded-lg font-semibold transition-all duration-150',
-                            base === cur
-                                ? 'bg-white shadow-sm text-slate-900'
-                                : 'text-slate-400 hover:text-slate-700'
-                        )}
-                    >
-                        {cur}
-                    </button>
-                ))}
+                <div className="flex items-center">
+                    {CURRENCIES.map(cur => (
+                        <button
+                            key={cur}
+                            onClick={() => setBase(cur)}
+                            className={cn(
+                                'px-2 py-1 sm:px-2.5 rounded-lg font-semibold transition-all duration-150',
+                                base === cur
+                                    ? 'bg-white shadow-sm text-slate-900'
+                                    : 'text-slate-400 hover:text-slate-700'
+                            )}
+                        >
+                            {cur}
+                        </button>
+                    ))}
+                </div>
 
-                <div className="w-px h-5 bg-slate-200 mx-1" />
+                <div className="w-px h-5 bg-slate-200 mx-1 hidden lg:block" />
 
                 {/* Rates display */}
-                <div className="hidden md:flex items-center">
+                <div className="hidden lg:flex items-center">
                     {others.map((cur, i) => (
                         <div key={cur} className="flex items-center">
                             {i > 0 && <div className="w-px h-4 bg-slate-200 mx-2" />}
@@ -95,16 +102,16 @@ export function TopBar() {
                 <div className="relative">
                     <button
                         onClick={() => setProfileOpen(!profileOpen)}
-                        className="flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-slate-100 transition-colors"
+                        className="flex items-center gap-2 py-1.5 px-1.5 sm:px-2 rounded-xl hover:bg-slate-100 transition-colors"
                     >
-                        <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center shadow-sm">
                             <User className="w-4 h-4 text-white" />
                         </div>
-                        <div className="hidden sm:block text-left">
+                        <div className="hidden md:block text-left">
                             <p className="text-xs font-semibold text-slate-900 leading-none">Admin</p>
                             <p className="text-[10px] text-slate-400 mt-0.5">Administrador</p>
                         </div>
-                        <ChevronDown className="w-3 h-3 text-slate-400" />
+                        <ChevronDown className="w-3 h-3 text-slate-400 hidden sm:block" />
                     </button>
 
                     {profileOpen && (

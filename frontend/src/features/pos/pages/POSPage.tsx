@@ -61,20 +61,27 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product)
             onClick={handle}
             disabled={product.stock === 0}
             className={cn(
-                'flex flex-col gap-2 p-3 rounded-xl border text-left transition-all duration-150',
-                'hover:border-emerald-400 hover:shadow-md active:scale-[0.97]',
-                flash ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white',
-                product.stock === 0 && 'opacity-40 cursor-not-allowed hover:border-slate-200 hover:shadow-none'
+                'flex flex-row sm:flex-col gap-3 p-3.5 rounded-xl border text-left transition-all duration-200 group relative',
+                'hover:border-emerald-400 hover:shadow-lg sm:hover:-translate-y-1 active:scale-[0.97]',
+                flash ? 'border-emerald-500 bg-emerald-50 shadow-inner' : 'border-slate-200 bg-white',
+                product.stock === 0 && 'opacity-40 cursor-not-allowed hover:border-slate-200 hover:shadow-none sm:hover:translate-y-0'
             )}
         >
-            <span className="text-2xl leading-none">{product.emoji}</span>
-            <p className="text-xs font-semibold text-slate-800 line-clamp-2 leading-snug">{product.name}</p>
-            <div className="flex items-end justify-between mt-auto">
-                <div>
-                    <p className="text-sm font-bold text-slate-900 tabular-nums">${product.price.toFixed(2)}</p>
-                    <p className="text-[10px] text-slate-400 tabular-nums">Bs. {(product.price * VES_RATE).toFixed(0)}</p>
+            <div className="w-12 h-12 sm:w-auto sm:h-auto rounded-lg bg-slate-50 sm:bg-transparent flex items-center justify-center shrink-0 group-hover:bg-white transition-colors">
+                <span className="text-3xl sm:text-2xl leading-none transition-transform group-hover:scale-110 duration-300">{product.emoji}</span>
+            </div>
+            
+            <div className="flex flex-col flex-1 min-w-0 justify-center sm:justify-start">
+                <p className="text-[13px] sm:text-xs font-bold text-slate-800 line-clamp-2 leading-snug mb-1">{product.name}</p>
+                <div className="flex flex-col sm:flex-row sm:items-end justify-between mt-auto gap-2">
+                    <div>
+                        <p className="text-sm font-black text-slate-900 tabular-nums leading-none">${product.price.toFixed(2)}</p>
+                        <p className="text-[11px] font-medium text-slate-400 tabular-nums mt-0.5 sm:hidden lg:block">Bs. {(product.price * VES_RATE).toFixed(0)}</p>
+                    </div>
+                    <div className="sm:opacity-80 group-hover:opacity-100 transition-opacity">
+                        <StockBadge stock={product.stock} />
+                    </div>
                 </div>
-                <StockBadge stock={product.stock} />
             </div>
         </button>
     );
@@ -250,9 +257,9 @@ export default function POSPage() {
     };
 
     return (
-        <div className="flex gap-4 h-[calc(100dvh-64px-48px)] overflow-hidden">
+        <div className="flex flex-col lg:flex-row gap-4 h-full lg:h-[calc(100dvh-64px-48px)] overflow-y-auto lg:overflow-hidden pb-6 lg:pb-0 scroll-smooth">
             {/* ── LEFT: Product search ── */}
-            <div className="flex-[6] flex flex-col gap-3 bg-white rounded-xl border border-slate-200 p-4 shadow-sm overflow-hidden">
+            <div className="flex-[6] flex flex-col gap-4 bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-sm overflow-hidden min-h-[500px] lg:min-h-0">
                 {/* Search */}
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -261,20 +268,20 @@ export default function POSPage() {
                         placeholder="Buscar por nombre, código o escanear... [F2]"
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        className="pl-9 pr-10"
+                        className="pl-9 pr-10 h-11"
                         aria-label="Buscar productos"
                     />
                     <Barcode className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 </div>
 
                 {/* Category pills */}
-                <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
                     {CATEGORIES.map(cat => (
                         <button
                             key={cat}
                             onClick={() => setCategory(cat)}
                             className={cn(
-                                'px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap border transition-all',
+                                'px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap border transition-all',
                                 category === cat
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
                                     : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
@@ -286,7 +293,7 @@ export default function POSPage() {
                 </div>
 
                 {/* Product grid */}
-                <div className="flex-1 overflow-y-auto grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2.5 content-start">
+                <div className="flex-1 overflow-y-auto grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 sm:gap-4 content-start">
                     {filtered.length === 0 ? (
                         <div className="col-span-full flex flex-col items-center justify-center py-16 gap-2 text-slate-400">
                             <span className="text-4xl">🔍</span>
@@ -295,21 +302,21 @@ export default function POSPage() {
                     ) : filtered.map(p => <ProductCard key={p.id} product={p} onAdd={addToCart} />)}
                 </div>
 
-                <p className="text-[10px] text-slate-400 flex items-center gap-1.5">
-                    <Keyboard className="w-3 h-3" /> [F2] Buscar · [Ctrl+Enter] Cobrar · [Esc] Cerrar
+                <p className="text-[11px] text-slate-400 lg:flex hidden items-center gap-1.5">
+                    <Keyboard className="w-3.5 h-3.5" /> [F2] Buscar · [Ctrl+Enter] Cobrar · [Esc] Cerrar
                 </p>
             </div>
 
             {/* ── RIGHT: Ticket ── */}
-            <div className="flex-[4] flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="flex-[4] flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[600px] lg:min-h-0">
                 {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <div className="flex items-center justify-between px-5 py-5 border-b border-slate-100">
                     <div>
                         <p className="text-sm font-bold text-slate-900">Ticket #0342</p>
                         <p className="text-[11px] text-slate-400">Cajera: María González</p>
                     </div>
                     {cart.length > 0 && (
-                        <button onClick={clearCart} className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700">
+                        <button onClick={clearCart} className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">
                             <Trash2 className="w-3.5 h-3.5" /> Limpiar
                         </button>
                     )}
@@ -318,72 +325,94 @@ export default function POSPage() {
                 {/* Items */}
                 <div className="flex-1 overflow-y-auto">
                     {cart.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center gap-2 text-slate-400">
-                            <span className="text-4xl opacity-30">🛒</span>
-                            <p className="text-sm">Carrito vacío</p>
-                            <p className="text-xs">Selecciona productos</p>
+                        <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-400 py-12">
+                            <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center">
+                                <span className="text-4xl opacity-30">🛒</span>
+                            </div>
+                            <div className="text-center">
+                                <p className="text-sm font-semibold">Carrito vacío</p>
+                                <p className="text-xs text-slate-400 px-8">Selecciona productos a la izquierda para empezar la venta</p>
+                            </div>
                         </div>
                     ) : cart.map(item => (
-                        <div key={item.id} className="flex items-center gap-2.5 px-5 py-3 border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
-                            <span className="text-lg">{item.emoji}</span>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold text-slate-800 truncate">{item.name}</p>
-                                <p className="text-[10px] text-slate-400 tabular-nums">${item.price.toFixed(2)} c/u</p>
+                        <div key={item.id} className="flex items-center gap-3 px-5 py-4 border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
+                            <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center shrink-0">
+                                <span className="text-xl">{item.emoji}</span>
                             </div>
-                            <div className="flex items-center gap-1.5">
-                                <button onClick={() => updateQty(item.id, -1)} className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100 transition-colors">
-                                    <Minus className="w-3 h-3" />
+                            <div className="flex-1 min-w-0">
+                                <p className="text-xs font-bold text-slate-800 truncate">{item.name}</p>
+                                <p className="text-[10px] text-slate-400 tabular-nums font-medium">${item.price.toFixed(2)} c/u</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => updateQty(item.id, -1)} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100 transition-colors active:scale-95 text-slate-600">
+                                    <Minus className="w-3.5 h-3.5" />
                                 </button>
                                 <span className="w-6 text-center text-sm font-bold text-slate-900 tabular-nums">{item.qty}</span>
-                                <button onClick={() => updateQty(item.id, 1)} className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100 transition-colors">
-                                    <Plus className="w-3 h-3" />
+                                <button onClick={() => updateQty(item.id, 1)} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100 transition-colors active:scale-95 text-slate-600">
+                                    <Plus className="w-3.5 h-3.5" />
                                 </button>
                             </div>
-                            <p className="w-14 text-right text-sm font-bold text-slate-900 tabular-nums">
-                                ${(item.price * item.qty).toFixed(2)}
-                            </p>
-                            <button onClick={() => removeItem(item.id)} className="text-slate-300 hover:text-slate-500 transition-colors ml-1">
-                                <X className="w-3.5 h-3.5" />
+                            <div className="w-16 text-right">
+                                <p className="text-sm font-black text-slate-900 tabular-nums">
+                                    ${(item.price * item.qty).toFixed(2)}
+                                </p>
+                            </div>
+                            <button onClick={() => removeItem(item.id)} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors ml-1 active:scale-90">
+                                <X className="w-4 h-4" />
                             </button>
                         </div>
                     ))}
                 </div>
 
                 {/* Summary */}
-                <div className="px-5 py-4 bg-slate-50 border-t border-slate-100">
+                <div className="px-6 py-5 bg-slate-50/80 border-t border-slate-100 backdrop-blur-sm">
                     {[['Subtotal', subtotal], ['IVA (16%)', iva]].map(([l, v]) => (
                         <div key={l as string} className="flex justify-between mb-2">
-                            <span className="text-sm text-slate-500">{l}</span>
-                            <span className="text-sm text-slate-700 tabular-nums">${(v as number).toFixed(2)}</span>
+                            <span className="text-sm text-slate-500 font-medium">{l}</span>
+                            <span className="text-sm text-slate-800 font-bold tabular-nums">${(v as number).toFixed(2)}</span>
                         </div>
                     ))}
-                    <div className="mt-2 pt-3 border-t border-slate-200 flex justify-between items-baseline">
-                        <span className="text-base font-bold text-slate-900">TOTAL</span>
+                    <div className="mt-3 pt-4 border-t border-slate-200/60 flex justify-between items-center">
+                        <span className="text-sm font-black text-slate-400 uppercase tracking-wider">TOTAL</span>
                         <div className="text-right">
-                            <p className="text-2xl font-black text-slate-900 tabular-nums leading-none">${total.toFixed(2)}</p>
-                            <p className="text-[10px] text-slate-400 tabular-nums mt-0.5">Bs. {(total * VES_RATE).toFixed(2)} VES</p>
+                            <p className="text-3xl font-black text-slate-900 tabular-nums leading-none tracking-tight">${total.toFixed(2)}</p>
+                            <p className="text-[11px] font-bold text-emerald-600 tabular-nums mt-1.5 bg-emerald-50 px-2 py-0.5 rounded-md inline-block">
+                                Bs. {(total * VES_RATE).toFixed(2)} VES
+                            </p>
                         </div>
                     </div>
                 </div>
 
                 {/* Actions */}
-                <div className="px-5 pb-5 pt-3 flex flex-col gap-2">
+                <div className="px-5 pb-6 pt-4 flex flex-col gap-3">
                     <Button
                         size="lg"
                         onClick={() => setPayOpen(true)}
                         disabled={cart.length === 0}
-                        className="w-full font-bold"
+                        className="w-full h-14 font-black text-base shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition-all"
                     >
-                        <ArrowRight className="w-4 h-4" /> Cobrar [Ctrl+Enter]
+                        <ArrowRight className="w-5 h-5" /> Cobrar [Ctrl+Enter]
                     </Button>
-                    <div className="grid grid-cols-2 gap-2">
-                        <Button variant="outline" size="sm" onClick={clearCart} className="text-red-500 border-red-200 hover:bg-red-50">
+                    <div className="flex flex-col sm:grid sm:grid-cols-2 gap-2">
+                        <Button 
+                            variant="outline" 
+                            size="lg" 
+                            onClick={clearCart} 
+                            className="text-red-500 border-red-100 hover:bg-red-50 hover:text-red-600 h-12 font-bold"
+                        >
                             Cancelar
                         </Button>
-                        <Button variant="outline" size="sm">% Descuento</Button>
+                        <Button 
+                            variant="outline" 
+                            size="lg" 
+                            className="h-12 font-bold bg-white text-slate-600"
+                        >
+                            % Descuento
+                        </Button>
                     </div>
                 </div>
             </div>
+
 
             {/* Hybrid Payment Dialog */}
             <HybridPaymentDialog
