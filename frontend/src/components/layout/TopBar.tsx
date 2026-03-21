@@ -24,12 +24,9 @@ export function TopBar() {
 
     return (
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-5 gap-4">
-            {/* Left – Logo */}
+            {/* Left - Spacer or Breadcrumbs could go here */}
             <div className="flex items-center gap-2 shrink-0">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-900 to-blue-900 flex items-center justify-center">
-                    <span className="text-[10px] font-black text-white">EM</span>
-                </div>
-                <span className="font-bold text-sm text-slate-900 tracking-tight hidden sm:block">ERP-Market</span>
+                {/* Empty for now to let Sidebar handle branding */}
             </div>
 
             {/* Center – Exchange Rate Widget */}
@@ -77,9 +74,19 @@ export function TopBar() {
             </div>
 
             {/* Right – Notifications + Profile */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-3 shrink-0">
+                {/* Branch Selector (Global) */}
+                <div className="hidden md:flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 focus-within:ring-2 focus-within:ring-blue-600 transition-all">
+                    <span className="text-xs font-medium text-slate-500 ml-1">Sucursal:</span>
+                    <select className="bg-transparent border-none text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0 cursor-pointer pr-1">
+                        <option>Central (A)</option>
+                        <option>Norte (B)</option>
+                    </select>
+                </div>
+                <div className="w-px h-5 bg-slate-200 mx-1 hidden md:block" />
+
                 {/* Bell */}
-                <button className="relative w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors" aria-label="Notificaciones">
+                <button className="relative w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600" aria-label="Notificaciones">
                     <Bell className="w-4.5 h-4.5" />
                     <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white" />
                 </button>

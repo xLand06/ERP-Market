@@ -25,8 +25,15 @@ dist-ssr
 *.sln
 *.sw?
 
-ui-ux-pro-max-temp
+/ui-ux-pro-max-temp
+
 
 generate_skill.py
 
 SKILL.md
+
+DESIGN.md       
+
+out.json
+tmp_db.json
+run_notion.js
