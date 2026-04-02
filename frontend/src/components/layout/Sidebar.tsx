@@ -19,6 +19,14 @@ const navItems: NavItem[] = [
     { name: 'Flujo de Caja', path: '/finance/cash-register', icon: Coins },
     { name: 'Directorio', path: '/directory', icon: Users },
     { name: 'Auditoría', path: '/audit', icon: ShieldCheck },
+    { name: 'Directorio', path: '/directory', icon: CompassIcon },
+
+
+    { name: 'Usuarios', path: '/users', icon: Users },
+    { name: 'Compras', path: '/purchases', icon: Truck },
+    { name: 'Finanzas', path: '/finance', icon: Coins },
+    { name: 'Reportes', path: '/reports', icon: BarChart2 },
+    { name: 'Proveedores', path: '/suppliers', icon: Users },
 ];
 
 export interface SidebarProps {
