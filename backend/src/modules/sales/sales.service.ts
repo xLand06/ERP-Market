@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 
 interface SalePayload {
@@ -8,7 +9,7 @@ interface SalePayload {
 }
 
 export const processSale = async (payload: SalePayload) => {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const subtotal = payload.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
         const sale = await tx.sale.create({
             data: {

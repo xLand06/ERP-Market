@@ -1,7 +1,9 @@
 import { NavLink } from 'react-router-dom';
-import { 
-    LayoutDashboard, Package, ShoppingCart, 
-    Coins, Users, Truck, ShieldCheck, Store, PanelLeftClose, PanelLeftOpen, X
+import {
+    LayoutDashboard, Package, ShoppingCart,
+    Coins, Users, Truck, BarChart2, ShieldCheck, Store, PanelLeftClose, PanelLeftOpen, X,
+
+    CompassIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,10 +17,16 @@ const navItems: NavItem[] = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Punto de Venta', path: '/pos', icon: ShoppingCart },
     { name: 'Inventario', path: '/inventory', icon: Package },
-    { name: 'Compras', path: '/purchases', icon: Truck },
     { name: 'Flujo de Caja', path: '/finance/cash-register', icon: Coins },
-    { name: 'Directorio', path: '/directory', icon: Users },
     { name: 'Auditoría', path: '/audit', icon: ShieldCheck },
+    { name: 'Directorio', path: '/directory', icon: CompassIcon },
+
+
+    { name: 'Usuarios', path: '/users', icon: Users },
+    { name: 'Compras', path: '/purchases', icon: Truck },
+    { name: 'Finanzas', path: '/finance', icon: Coins },
+    { name: 'Reportes', path: '/reports', icon: BarChart2 },
+    { name: 'Proveedores', path: '/suppliers', icon: Users },
 ];
 
 export interface SidebarProps {
@@ -34,7 +42,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
             <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800 mb-4 overflow-hidden shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md">
-                       <Store className="w-4 h-4 text-white" />
+                        <Store className="w-4 h-4 text-white" />
                     </div>
                     {!collapsed && (
                         <span className="font-bold text-white text-lg tracking-tight whitespace-nowrap animate-in fade-in duration-300 delay-150">
@@ -43,7 +51,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                     )}
                 </div>
                 {!collapsed && (
-                    <button 
+                    <button
                         onClick={onToggleDesktop || onCloseMobile}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors hidden md:block"
                     >
@@ -51,7 +59,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                     </button>
                 )}
                 {!collapsed && onCloseMobile && (
-                    <button 
+                    <button
                         onClick={onCloseMobile}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors md:hidden"
                     >
@@ -68,7 +76,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                     </div>
                 ) : (
                     <div className="w-full h-8 mb-3 flex items-center justify-center">
-                        <button 
+                        <button
                             onClick={onToggleDesktop}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0 hidden md:flex"
                             title="Expandir"
@@ -77,7 +85,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                         </button>
                     </div>
                 )}
-                
+
                 <nav className="flex flex-col space-y-1.5">
                     {navItems.map((item) => (
                         <NavLink
@@ -88,8 +96,8 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                                 cn(
                                     "group flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative overflow-hidden",
                                     collapsed ? "px-0 justify-center h-10" : "px-3",
-                                    isActive 
-                                        ? "bg-slate-800/80 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ring-1 ring-white/5" 
+                                    isActive
+                                        ? "bg-slate-800/80 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ring-1 ring-white/5"
                                         : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
                                 )
                             }
@@ -100,15 +108,15 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                                     {isActive && (
                                         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-emerald-500 rounded-r-full shadow-[0_0_8px_rgba(16,183,127,0.4)]" />
                                     )}
-                                    
-                                    <item.icon 
+
+                                    <item.icon
                                         className={cn(
                                             "w-4.5 h-4.5 shrink-0 transition-colors duration-200",
                                             isActive ? "text-emerald-400" : "text-slate-400 group-hover:text-emerald-400"
-                                        )} 
-                                        strokeWidth={isActive ? 2 : 1.5} 
+                                        )}
+                                        strokeWidth={isActive ? 2 : 1.5}
                                     />
-                                    
+
                                     {!collapsed && (
                                         <span className="tracking-wide relative z-10 whitespace-nowrap">{item.name}</span>
                                     )}
@@ -118,7 +126,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                     ))}
                 </nav>
             </div>
-            
+
             {/* User / Status Panel at Bottom */}
             <div className={cn("p-4 mb-4 mt-auto shrink-0", collapsed ? "px-2" : "mx-3 rounded-xl bg-slate-800/50 border border-slate-700/50")}>
                 <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
