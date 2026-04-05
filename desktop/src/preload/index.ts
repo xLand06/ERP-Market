@@ -32,4 +32,11 @@ contextBridge.exposeInMainWorld('erpApi', {
     isElectron: true,
     platform: process.platform,
     version: process.env.npm_package_version ?? '1.0.0',
+
+    // ── Store persistente (Electron Store) ─────────────────────
+    store: {
+        get: (key: string): Promise<any> => ipcRenderer.invoke('store-get', key),
+        set: (key: string, value: any): Promise<void> => ipcRenderer.invoke('store-set', key, value),
+        delete: (key: string): Promise<void> => ipcRenderer.invoke('store-delete', key),
+    },
 });

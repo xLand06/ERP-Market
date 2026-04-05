@@ -11,8 +11,15 @@ import posRouter from './modules/pos/pos.routes';
 import cashFlowRouter from './modules/cashFlow/cashFlow.routes';
 import auditRouter from './modules/audit/audit.routes';
 import dashboardRouter from './modules/dashboard/dashboard.routes';
+import syncRouter from './modules/sync/sync.routes';
+import { startSyncWorker } from './modules/sync/sync-worker';
 
 const app = express();
+
+// ─── BACKGROUND SYNC (Electron Only) ─────────────────────────────────────────
+if (process.env.ELECTRON === 'true') {
+    startSyncWorker(300000); // 5 minutes
+}
 
 // ─── MIDDLEWARES GLOBALES ───────────────────────────────────────────────────
 app.use(cors({
@@ -36,6 +43,7 @@ app.use('/api/pos',        posRouter);
 app.use('/api/cash-flow',  cashFlowRouter);
 app.use('/api/audit',      auditRouter);
 app.use('/api/dashboard',  dashboardRouter);
+app.use('/api/sync',       syncRouter);
 
 // ─── 404 ────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {

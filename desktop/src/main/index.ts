@@ -22,6 +22,15 @@ const store = new Store<{ token: string | null; branchId: string | null }>({
 // Exponemos el store globalmente para que IPC handlers lo usen
 (global as Record<string, unknown>).erpStore = store;
 
+import { ipcMain } from 'electron';
+
+// IPC Handlers para el Store
+ipcMain.handle('store-get', (_event, key: string) => store.get(key));
+ipcMain.handle('store-set', (_event, key: string, value: any) => store.set(key, value));
+ipcMain.handle('store-delete', (_event, key: string) => store.delete(key));
+ipcMain.handle('get-app-path', () => app.getAppPath());
+ipcMain.handle('get-user-data-path', () => app.getPath('userData'));
+
 // ── Ventana principal ───────────────────────────────────────
 let mainWindow: BrowserWindow | null = null;
 

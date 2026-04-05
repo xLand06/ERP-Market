@@ -31,6 +31,30 @@ export const useAuthStore = create<AuthState>()(
             setSelectedBranch: (branchId) => set({ selectedBranch: branchId }),
             logout: () => set({ token: null, user: null, selectedBranch: null }),
         }),
-        { name: 'erp-market-auth' }
+        { 
+            name: 'erp-market-auth',
+            // Custom storage for Electron persistence
+            storage: {
+                getItem: (name) => {
+                    if ((window as any).erpApi?.isElectron) {
+                        return (window as any).erpApi.store.get(name);
+                    }
+                    const value = localStorage.getItem(name);
+                    return value ? JSON.parse(value) : null;
+                },
+                setItem: (name, value) => {
+                    if ((window as any).erpApi?.isElectron) {
+                        return (window as any).erpApi.store.set(name, value);
+                    }
+                    localStorage.setItem(name, JSON.stringify(value));
+                },
+                removeItem: (name) => {
+                    if ((window as any).erpApi?.isElectron) {
+                        return (window as any).erpApi.store.delete(name);
+                    }
+                    localStorage.removeItem(name);
+                }
+            }
+        }
     )
 );

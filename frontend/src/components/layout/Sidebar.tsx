@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useAuthStore } from '@/features/auth/store/authStore';
 import {
     LayoutDashboard, Package, ShoppingCart,
     Coins, Users, Truck, BarChart2, ShieldCheck, Store, PanelLeftClose, PanelLeftOpen, X,
@@ -12,6 +13,7 @@ interface NavItem {
     name: string;
     path: string;
     icon: React.ElementType;
+    roles?: string[];
 }
 
 const navItems: NavItem[] = [
@@ -19,11 +21,9 @@ const navItems: NavItem[] = [
     { name: 'Punto de Venta', path: '/pos', icon: ShoppingCart },
     { name: 'Inventario', path: '/inventory', icon: Package },
     { name: 'Flujo de Caja', path: '/finance/cash-register', icon: Coins },
-    { name: 'Auditoría', path: '/audit', icon: ShieldCheck },
+    { name: 'Auditoría', path: '/audit', icon: ShieldCheck, roles: ['OWNER'] },
     { name: 'Directorio', path: '/directory', icon: CompassIcon },
-
-
-    { name: 'Usuarios', path: '/users', icon: Users },
+    { name: 'Usuarios', path: '/users', icon: Users, roles: ['OWNER'] },
     { name: 'Compras', path: '/purchases', icon: Truck },
     { name: 'Finanzas', path: '/finance', icon: Coins },
     { name: 'Reportes', path: '/reports', icon: BarChart2 },
@@ -35,8 +35,9 @@ export interface SidebarProps {
     onCloseMobile?: () => void;
     onToggleDesktop?: () => void;
 }
-
 export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: SidebarProps) {
+    const { user } = useAuthStore();
+
     return (
         <div className="flex flex-col h-full w-full bg-slate-900 border-r border-slate-800 z-10 transition-all duration-300 relative">
             {/* Branding Header */}
@@ -88,7 +89,10 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                 )}
 
                 <nav className="flex flex-col space-y-1.5">
-                    {navItems.filter(item => isPathAllowed(item.path)).map((item) => (
+                    {navItems
+                        .filter(item => isPathAllowed(item.path))
+                        .filter(item => !item.roles || (user && item.roles.includes(user.role)))
+                        .map((item) => (
                         <NavLink
                             key={item.path}
                             to={item.path}

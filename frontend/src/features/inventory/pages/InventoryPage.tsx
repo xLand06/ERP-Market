@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { ProductFormModal, type ProductForm } from '../components/ProductFormModal';
+import { ProductFormModal } from '../components/ProductFormModal';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
@@ -37,6 +37,7 @@ export default function InventoryPage() {
     const tableId     = useId();
 
     const selectedBranch = useAuthStore(s => s.selectedBranch);
+
 
     // 1. Fetching inventory from local express API
     const { data: rawItems, isLoading, refetch } = useQuery({
@@ -129,7 +130,7 @@ export default function InventoryPage() {
         <ProductFormModal
             open={createOpen}
             onClose={() => setCreateOpen(false)}
-            onSave={(data: ProductForm) => {
+            onSave={() => {
                 // TODO: connect new product
                 setCreateOpen(false);
                 refetch();
@@ -139,7 +140,7 @@ export default function InventoryPage() {
         <ProductFormModal
             open={!!editTarget}
             onClose={() => setEditTarget(null)}
-            onSave={(data: ProductForm) => {
+            onSave={() => {
                 // TODO: connect edit product
                 setEditTarget(null);
                 refetch();

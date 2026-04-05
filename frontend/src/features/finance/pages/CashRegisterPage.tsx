@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
     TrendingUp, TrendingDown, DollarSign, ArrowUpCircle, ArrowDownCircle,
-    Plus, Lock, CheckCircle, Circle, Play
+    Plus, Lock, Circle, Play
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
