@@ -6,6 +6,7 @@ import {
     CompassIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isPathAllowed } from '@/lib/planConfig';
 
 interface NavItem {
     name: string;
@@ -87,7 +88,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                 )}
 
                 <nav className="flex flex-col space-y-1.5">
-                    {navItems.map((item) => (
+                    {navItems.filter(item => isPathAllowed(item.path)).map((item) => (
                         <NavLink
                             key={item.path}
                             to={item.path}

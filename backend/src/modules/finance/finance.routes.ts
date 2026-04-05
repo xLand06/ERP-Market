@@ -2,18 +2,22 @@ import { Router } from 'express';
 import { authMiddleware } from '../../core/middlewares/auth.middleware';
 import { roleGuard } from '../../core/middlewares/roleGuard';
 import {
-    openCashRegister, closeCashRegister,
-    getDailySummary, getIncomeExpenseReport,
-    getAccountsPayable, getAccountsReceivable,
+    getOpenRegister, openCashRegister, closeCashRegister, addCashMovement
 } from './finance.controller';
 
 const router = Router();
 router.use(authMiddleware);
-router.post('/sessions/open', roleGuard('ADMIN', 'CAJERO'), openCashRegister);
-router.post('/sessions/:sessionId/close', roleGuard('ADMIN', 'CAJERO'), closeCashRegister);
-router.get('/daily-summary', roleGuard('ADMIN'), getDailySummary);
-router.get('/report', roleGuard('ADMIN'), getIncomeExpenseReport);
-router.get('/accounts-payable', roleGuard('ADMIN'), getAccountsPayable);
-router.get('/accounts-receivable', roleGuard('ADMIN'), getAccountsReceivable);
+
+// Get current open register info for a branch (includes transactions)
+router.get('/registers/open/:branchId', roleGuard('OWNER', 'SELLER'), getOpenRegister);
+
+// Open new register
+router.post('/registers/open', roleGuard('OWNER', 'SELLER'), openCashRegister);
+
+// Close register
+router.post('/registers/:registerId/close', roleGuard('OWNER', 'SELLER'), closeCashRegister);
+
+// Add manual expense or income to register
+router.post('/registers/:registerId/movement', roleGuard('OWNER', 'SELLER'), addCashMovement);
 
 export default router;

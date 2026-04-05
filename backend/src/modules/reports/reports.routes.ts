@@ -4,7 +4,7 @@ import { roleGuard } from '../../core/middlewares/roleGuard';
 import { prisma } from '../../config/prisma';
 
 const router = Router();
-router.use(authMiddleware, roleGuard('ADMIN'));
+router.use(authMiddleware, roleGuard('OWNER'));
 
 router.get('/sales-by-day', async (req: Request, res: Response) => {
     const { startDate, endDate } = req.query as Record<string, string>;

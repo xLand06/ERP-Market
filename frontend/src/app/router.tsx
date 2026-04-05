@@ -1,6 +1,7 @@
 import { createBrowserRouter, redirect } from 'react-router-dom';
 import { AppShellLayout } from '../components/layout/AppShell';
 import { PrivateRoute } from '../components/guards/PrivateRoute';
+import { PlanGuard } from '../components/guards/PlanGuard';
 
 // Lazy-loaded feature pages
 import { lazy, Suspense } from 'react';
@@ -35,7 +36,7 @@ export const router = createBrowserRouter([
     { path: '/login', element: wrap(LoginPage) },
     {
         path: '/',
-        element: <PrivateRoute><AppShellLayout /></PrivateRoute>,
+        element: <PrivateRoute><PlanGuard><AppShellLayout /></PlanGuard></PrivateRoute>,
         children: [
             { index: true, loader: () => redirect('/dashboard') },
             { path: 'dashboard',           element: wrap(DashboardPage) },

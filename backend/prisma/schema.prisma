@@ -1,0 +1,319 @@
+// =============================================================================
+// ERP-MARKET — PRISMA SCHEMA
+// Arquitectura: Multi-sede | POS Dual | Auditoría (Caja Negra)
+// Generador: Prisma 6.x + PostgreSQL (Neon)
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum Role {
+  OWNER   // Acceso total: configuración, precios, usuarios
+  SELLER  // Acceso operativo: POS, inventario de consulta
+}
+
+enum TransactionType {
+  SALE          // Venta realizada en el POS
+  INVENTORY_IN  // Entrada de mercancía (recepción de stock)
+}
+
+enum TransactionStatus {
+  COMPLETED
+  CANCELLED
+  PENDING
+}
+
+enum CashRegisterStatus {
+  OPEN
+  CLOSED
+}
+
+// =============================================================================
+// MÓDULO: USUARIOS Y AUTENTICACIÓN
+// =============================================================================
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(SELLER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  transactions  Transaction[]
+  cashRegisters CashRegister[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+// =============================================================================
+// MÓDULO: SEDES (MULTI-SEDE)
+// =============================================================================
+
+model Branch {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  inventory     BranchInventory[]
+  transactions  Transaction[]
+  cashRegisters CashRegister[]
+
+  @@map("branches")
+}
+
+// =============================================================================
+// MÓDULO: CATÁLOGO MAESTRO (PRODUCTOS)
+// Los precios y datos base se sincronizan para todas las sedes.
+// El stock físico vive en BranchInventory, no aquí.
+// =============================================================================
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  barcode     String?  @unique
+  price       Decimal  @db.Decimal(10, 2)
+  cost        Decimal? @db.Decimal(10, 2)
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relaciones
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  inventory        BranchInventory[]
+  transactionItems TransactionItem[]
+
+  @@map("products")
+}
+
+// =============================================================================
+// MÓDULO: INVENTARIO POR SEDE
+// Relación Producto <-> Sede para stock físico diferenciado por local.
+// =============================================================================
+
+model BranchInventory {
+  id        String   @id @default(cuid())
+  stock     Int      @default(0)
+  minStock  Int      @default(0)  // Alerta de stock mínimo
+  updatedAt DateTime @updatedAt
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  @@unique([productId, branchId]) // Un producto = un registro por sede
+  @@map("branch_inventory")
+}
+
+// =============================================================================
+// MÓDULO: POS DUAL — TRANSACCIONES
+// Una misma estructura maneja SALE e INVENTORY_IN.
+// El campo `type` determina el comportamiento del sistema:
+//   - SALE        → descuenta stock, registra en caja
+//   - INVENTORY_IN → suma stock, no afecta caja de ventas
+// =============================================================================
+
+model Transaction {
+  id         String            @id @default(cuid())
+  type       TransactionType
+  status     TransactionStatus @default(COMPLETED)
+  total      Decimal           @db.Decimal(10, 2)
+  notes      String?
+  ipAddress  String?           // IP del terminal POS (para auditoría)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  // ¿Qué usuario realizó la transacción?
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  // ¿En qué sede ocurrió?
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  // ¿A qué arqueo de caja pertenece? (solo SALE)
+  cashRegisterId String?
+  cashRegister   CashRegister? @relation(fields: [cashRegisterId], references: [id])
+
+  // Líneas de detalle
+  items TransactionItem[]
+
+  @@map("transactions")
+}
+
+model TransactionItem {
+  id        String  @id @default(cuid())
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(10, 2)
+
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@map("transaction_items")
+}
+
+// =============================================================================
+// MÓDULO: FLUJO DE CAJA (ARQUEOS)
+// Registra aperturas y cierres de caja. Vincula transacciones de SALE.
+// =============================================================================
+
+model CashRegister {
+  id              String             @id @default(cuid())
+  status          CashRegisterStatus @default(OPEN)
+  openingAmount   Decimal            @db.Decimal(10, 2)
+  closingAmount   Decimal?           @db.Decimal(10, 2)
+  expectedAmount  Decimal?           @db.Decimal(10, 2) // Total teórico de ventas
+  difference      Decimal?           @db.Decimal(10, 2) // closingAmount - expectedAmount
+  notes           String?
+  openedAt        DateTime           @default(now())
+  closedAt        DateTime?
+
+  // ¿Quién abrió/cerró?
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  // ¿En qué sede?
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  // Transacciones asociadas a este turno
+  transactions Transaction[]
+
+  @@map("cash_registers")
+}
+
+// =============================================================================
+// MÓDULO: AUDITORÍA — CAJA NEGRA
+// Middleware genérico registra automáticamente acciones críticas.
+// Campo `details` almacena JSON con el estado anterior/nuevo del recurso.
+// =============================================================================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String   // Ej: "PRICE_CHANGE", "INVOICE_DELETE", "USER_CREATE"
+  module    String   // Ej: "inventory", "pos", "auth"
+  details   Json     // { before: {...}, after: {...}, reason: "..." }
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  // ¿Quién lo hizo?
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// =============================================================================
+// ██████████████████████████████████████████████████████████████████████████
+// MODELOS PARA PLAN SUPERIOR — SOLO ESTRUCTURA, SIN ENDPOINTS ACTIVOS
+// Estos modelos están listos para activarse sin migraciones destructivas.
+// ██████████████████████████████████████████████████████████████████████████
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// FUTURO: Directorio de Proveedores
+// -----------------------------------------------------------------------------
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  rut       String?  @unique
+  email     String?
+  phone     String?
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relación futura con órdenes de compra
+  purchaseOrders PurchaseOrder[]
+
+  @@map("suppliers")
+}
+
+// -----------------------------------------------------------------------------
+// FUTURO: Órdenes de Compra / Gestión de Pedidos a Proveedores
+// -----------------------------------------------------------------------------
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  RECEIVED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id         String              @id @default(cuid())
+  status     PurchaseOrderStatus @default(DRAFT)
+  total      Decimal             @db.Decimal(10, 2)
+  notes      String?
+  expectedAt DateTime?
+  receivedAt DateTime?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+
+  items PurchaseOrderItem[]
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String  @id @default(cuid())
+  quantity        Int
+  quantityReceived Int    @default(0)
+  unitCost        Decimal @db.Decimal(10, 2)
+  subtotal        Decimal @db.Decimal(10, 2)
+
+  // Producto del catálogo maestro (referencia sin FK forzada para flexibilidad)
+  productId String
+
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@map("purchase_order_items")
+}

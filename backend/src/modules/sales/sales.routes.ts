@@ -7,7 +7,7 @@ const router = Router();
 router.use(authMiddleware);
 router.get('/', getSales);
 router.get('/:id', getSaleById);
-router.post('/', roleGuard('ADMIN', 'CAJERO'), createSale);
-router.post('/:id/void', roleGuard('ADMIN'), voidSale);
+router.post('/', roleGuard('OWNER', 'SELLER'), createSale);
+router.post('/:id/void', roleGuard('OWNER'), voidSale);
 
 export default router;

@@ -1,0 +1,20 @@
+src/modules/cashRegister/cashRegister.routes.ts(11,39): error TS2339: Property 'cashSession' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+src/modules/cashRegister/cashRegister.routes.ts(16,27): error TS2339: Property 'cashSession' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+src/modules/cashRegister/cashRegister.routes.ts(25,27): error TS2339: Property 'cashSession' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+src/modules/finance/finance.service.ts(4,12): error TS2339: Property 'cashSession' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+src/modules/finance/finance.service.ts(7,12): error TS2339: Property 'cashSession' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+src/modules/finance/finance.service.ts(16,32): error TS2339: Property 'sale' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+src/modules/finance/finance.service.ts(25,12): error TS2339: Property 'financialMovement' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+src/modules/finance/finance.service.ts(31,12): error TS2339: Property 'accountPayable' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+src/modules/finance/finance.service.ts(34,12): error TS2339: Property 'accountReceivable' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+src/modules/products/products.service.ts(9,36): error TS2353: Object literal may only specify known properties, and 'batches' does not exist in type 'ProductInclude<DefaultArgs>'.
+src/modules/products/products.service.ts(14,75): error TS2353: Object literal may only specify known properties, and 'batches' does not exist in type 'ProductInclude<DefaultArgs>'.
+src/modules/reports/reports.routes.ts(11,34): error TS2339: Property 'sale' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+src/modules/reports/reports.routes.ts(21,34): error TS2339: Property 'saleItem' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+src/modules/reports/reports.routes.ts(32,34): error TS2339: Property 'payment' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+src/modules/sales/sales.service.ts(14,31): error TS2339: Property 'sale' does not exist on type 'TransactionClient'.
+src/modules/sales/sales.service.ts(30,25): error TS2353: Object literal may only specify known properties, and 'currentStock' does not exist in type '(Without<ProductUpdateInput, ProductUncheckedUpdateInput> & ProductUncheckedUpdateInput) | (Without<...> & ProductUpdateInput)'.
+src/modules/sales/sales.service.ts(38,19): error TS2339: Property 'sale' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+src/modules/sales/sales.service.ts(52,19): error TS2339: Property 'sale' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+src/modules/sales/sales.service.ts(59,19): error TS2339: Property 'sale' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+src/modules/suppliers/suppliers.routes.ts(11,58): error TS2353: Object literal may only specify known properties, and 'products' does not exist in type 'SupplierInclude<DefaultArgs>'.

@@ -30,3 +30,9 @@ ui-ux-pro-max-temp
 generate_skill.py
 
 SKILL.md
+
+.agent
+
+##Electron
+out/
+dist/

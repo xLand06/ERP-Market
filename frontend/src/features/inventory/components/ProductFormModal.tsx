@@ -433,9 +433,6 @@ export function ProductFormModal({
                                         ? 'bg-amber-50 text-amber-700'
                                         : 'bg-red-50 text-red-700'
                             )}>
-                                <span className="text-base">
-                                    {parseFloat(margin) >= 20 ? '✅' : parseFloat(margin) >= 0 ? '⚠️' : '❌'}
-                                </span>
                                 Margen bruto estimado: <strong>{margin}%</strong>
                                 {parseFloat(margin) < 0 && ' · El costo supera el precio de venta'}
                             </div>

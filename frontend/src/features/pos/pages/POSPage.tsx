@@ -1,7 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
-    Search, Barcode, Minus, Plus, Trash2, ArrowRight,
-    X, Check, DollarSign, Smartphone, Keyboard, CreditCard,
+    Search, Barcode, Package, DollarSign, Smartphone, CreditCard, X, Check, Loader2, ShoppingCart, PackagePlus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,33 +10,17 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import { useAuthStore } from '../../auth/store/authStore';
 
 // ─── Types ─────────────────────────────────────────────────────────
-interface Product { id: string; name: string; price: number; stock: number; category: string; code: string; emoji: string; }
+interface Product { id: string; name: string; price: number; stock: number; category: string; code: string; }
 interface CartItem extends Product { qty: number; }
 
 // ─── Constants ─────────────────────────────────────────────────────
-const VES_RATE = 36.50;
+const VES_RATE = 36.50; // TODO: Esto debería venir de config
 const IVA = 0.16;
-const CATEGORIES = ['Todos','Abarrotes','Lácteos','Bebidas','Limpieza','Electrónica','Varios'];
-
-const PRODUCTS: Product[] = [
-    { id:'1',  code:'HPAN001',       name:'Harina PAN 1kg',         price:1.20, stock:3,  category:'Abarrotes',   emoji:'🌽' },
-    { id:'2',  code:'ACEL002',       name:'Aceite Mazola 1L',       price:2.50, stock:15, category:'Abarrotes',   emoji:'🫙' },
-    { id:'3',  code:'LCHE003',       name:'Leche Completa 1L',      price:1.40, stock:8,  category:'Lácteos',     emoji:'🥛' },
-    { id:'4',  code:'ARRO004',       name:'Arroz Cristal 1kg',      price:0.95, stock:45, category:'Abarrotes',   emoji:'🍚' },
-    { id:'5',  code:'CAFE005',       name:'Café Fama 500g',         price:2.90, stock:2,  category:'Bebidas',     emoji:'☕' },
-    { id:'6',  code:'MAYO006',       name:'Mayonesa Mavesa 445g',   price:1.75, stock:22, category:'Abarrotes',   emoji:'🫙' },
-    { id:'7',  code:'DTRG007',       name:'Detergente Ariel 1kg',   price:3.40, stock:7,  category:'Limpieza',    emoji:'🧴' },
-    { id:'8',  code:'AZUC008',       name:'Azúcar Montalbán 1kg',   price:1.00, stock:38, category:'Abarrotes',   emoji:'🧂' },
-    { id:'9',  code:'SARD009',       name:'Sardinas Corona',        price:1.80, stock:24, category:'Abarrotes',   emoji:'🐟' },
-    { id:'10', code:'MANT010',       name:'Mantequilla Planta',     price:2.20, stock:11, category:'Lácteos',     emoji:'🧈' },
-    { id:'11', code:'PPAN011',       name:'Papel Sanitario 12R',    price:4.50, stock:20, category:'Limpieza',    emoji:'🧻' },
-    { id:'12', code:'QESO012',       name:'Queso Blanco 500g',      price:3.80, stock:6,  category:'Lácteos',     emoji:'🧀' },
-    // PRODUCTOS ESCANEADOS REALES
-    { id:'13', code:'2039840100562', name:'Audífonos Movisun T19',  price:15.00, stock:10, category:'Electrónica', emoji:'🎧' },
-    { id:'14', code:'7596658000057', name:'Jabón Calysol 500ml',    price:1.80,  stock:20, category:'Limpieza',    emoji:'🧼' },
-];
 
 const PAYMENT_OPTIONS = [
     { id:'cash_usd',  label:'Efectivo USD',     icon:DollarSign, currency:'USD' as const },
@@ -72,7 +55,7 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product)
             )}
         >
             <div className="w-12 h-12 sm:w-auto sm:h-auto rounded-lg bg-slate-50 sm:bg-transparent flex items-center justify-center shrink-0 group-hover:bg-white transition-colors">
-                <span className="text-3xl sm:text-2xl leading-none transition-transform group-hover:scale-110 duration-300">{product.emoji}</span>
+                <Package className="w-6 h-6 text-slate-400 group-hover:text-emerald-500 transition-all group-hover:scale-110" />
             </div>
             <div className="flex flex-col flex-1 min-w-0 justify-center sm:justify-start">
                 <p className="text-[13px] sm:text-xs font-bold text-slate-800 line-clamp-2 leading-snug mb-1">{product.name}</p>
@@ -90,14 +73,19 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product)
     );
 }
 
-function HybridPaymentDialog({ open, total, onClose, onConfirm }: {
-    open: boolean; total: number; onClose: () => void; onConfirm: () => void;
+function HybridPaymentDialog({ open, total, onClose, onConfirm, isSubmitting }: {
+    open: boolean; total: number; onClose: () => void; onConfirm: () => void; isSubmitting: boolean;
 }) {
     type PaymentRow = { methodId: string; amount: number; currency: 'USD' | 'VES' };
     const [rows, setRows] = useState<PaymentRow[]>([{ methodId: 'cash_usd', amount: total, currency: 'USD' }]);
     const paidTotal = rows.reduce((s, r) => s + (r.currency === 'VES' ? r.amount / VES_RATE : r.amount), 0);
     const change = paidTotal - total;
-    const canPay = paidTotal >= (total - 0.01); // Tolerancia de decimales
+    const canPay = paidTotal >= (total - 0.01) && !isSubmitting; // Tolerancia de decimales
+
+    // Reset when opened
+    useEffect(() => {
+        if (open) setRows([{ methodId: 'cash_usd', amount: total, currency: 'USD' }]);
+    }, [open, total]);
 
     const addRow = () => setRows(p => [...p, { methodId: 'pagomovil', amount: 0, currency: 'VES' }]);
     const updateRow = (i: number, field: string, val: any) =>
@@ -153,12 +141,17 @@ function HybridPaymentDialog({ open, total, onClose, onConfirm }: {
                     </span>
                 </div>
                 <div className="px-6 pb-6 flex gap-3">
-                    <Button variant="outline" className="flex-1" onClick={onClose}>Cancelar</Button>
+                    <Button variant="outline" className="flex-1" onClick={onClose} disabled={isSubmitting}>Cancelar</Button>
                     <button
                         onClick={canPay ? onConfirm : undefined}
-                        className={cn('flex-[2] h-11 rounded-lg font-bold text-white transition-all', canPay ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-slate-200 cursor-not-allowed')}
+                        disabled={!canPay}
+                        className={cn(
+                            'flex-[2] h-11 rounded-lg font-bold text-white transition-all flex items-center justify-center', 
+                            canPay ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-slate-200 cursor-not-allowed'
+                        )}
                     >
-                        <Check className="inline w-4 h-4 mr-2" /> Confirmar
+                        {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />} 
+                        {isSubmitting ? 'Procesando...' : 'Confirmar'}
                     </button>
                 </div>
             </DialogContent>
@@ -166,13 +159,13 @@ function HybridPaymentDialog({ open, total, onClose, onConfirm }: {
     );
 }
 
-function Toast({ message, visible }: { message: string; visible: boolean }) {
+function Toast({ message, visible, isError }: { message: string; visible: boolean; isError?: boolean }) {
     return (
         <div className={cn(
             'fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-2 px-5 py-3 rounded-xl bg-slate-900 text-white text-sm shadow-2xl transition-all duration-300',
             visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6 pointer-events-none'
         )}>
-            <Check className="w-4 h-4 text-emerald-400" /> {message}
+            {isError ? <X className="w-4 h-4 text-red-400" /> : <Check className="w-4 h-4 text-emerald-400" />} {message}
         </div>
     );
 }
@@ -183,18 +176,57 @@ export default function POSPage() {
     const [category, setCategory]   = useState('Todos');
     const [cart, setCart]           = useState<CartItem[]>([]);
     const [payOpen, setPayOpen]     = useState(false);
+    const [isSaleMode, setIsSaleMode] = useState(true);
     const [toastMsg, setToastMsg]   = useState('');
     const [toastVis, setToastVis]   = useState(false);
+    const [toastErr, setToastErr]   = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const searchRef = useRef<HTMLInputElement>(null);
 
-    const toast = (msg: string) => {
-        setToastMsg(msg); setToastVis(true);
+    const selectedBranch = useAuthStore(s => s.selectedBranch);
+
+    // 1. Fetching inventory from local express API
+    const { data: rawItems, isLoading, refetch } = useQuery({
+        queryKey: ['stock', selectedBranch],
+        queryFn: async () => {
+            if (!selectedBranch) return [];
+            const res = await api.get(`/inventory/stock/branch/${selectedBranch}`);
+            return res.data.data;
+        },
+        enabled: !!selectedBranch
+    });
+
+    const PRODUCTS: Product[] = useMemo(() => {
+        return (rawItems || []).map((item: any) => ({
+            id: item.product.id,
+            code: item.product.barcode || '',
+            name: item.product.name,
+            price: Number(item.product.price),
+            stock: item.stock,
+            category: item.product.category?.name || 'Varios',
+        }));
+    }, [rawItems]);
+
+    const CATEGORIES = useMemo(() => {
+        const cats = new Set(PRODUCTS.map(p => p.category));
+        return ['Todos', ...Array.from(cats)].sort();
+    }, [PRODUCTS]);
+
+    const showToast = (msg: string, err = false) => {
+        setToastMsg(msg); 
+        setToastErr(err);
+        setToastVis(true);
         setTimeout(() => setToastVis(false), 3000);
     };
 
     const addToCart = useCallback((p: Product) => {
         setCart(prev => {
             const ex = prev.find(i => i.id === p.id);
+            // Validar que no se exceda el stock si ya está en el carrito
+            if (ex && ex.qty >= p.stock) {
+                showToast(`Stock máximo alcanzado para ${p.name}`, true);
+                return prev;
+            }
             return ex ? prev.map(i => i.id === p.id ? { ...i, qty: i.qty + 1 } : i) : [...prev, { ...p, qty: 1 }];
         });
     }, []);
@@ -205,9 +237,9 @@ export default function POSPage() {
         if (product) {
             addToCart(product);
             setSearch(''); // Limpiar si el usuario estaba escribiendo
-            toast(`✓ ${product.name} añadido`);
+            showToast(`✓ ${product.name} añadido`);
         } else {
-            toast(`⚠️ Código ${barcode} no encontrado`);
+            showToast(`⚠️ Código ${barcode} no encontrado en stock`, true);
         }
     });
 
@@ -220,6 +252,38 @@ export default function POSPage() {
         return () => window.removeEventListener('keydown', h);
     }, [cart]);
 
+    const handleCheckout = async () => {
+        if (!selectedBranch) {
+            showToast('No hay una sede seleccionada', true);
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            const items = cart.map(c => ({
+                productId: c.id,
+                quantity: c.qty,
+                unitPrice: c.price,
+            }));
+
+            await api.post('/pos/transactions', {
+                type: isSaleMode ? 'SALE' : 'INVENTORY_IN',
+                branchId: selectedBranch,
+                items,
+            });
+
+            setCart([]);
+            setPayOpen(false);
+            showToast(isSaleMode ? '✓ Venta registrada exitosamente' : '✓ Entrada registrada exitosamente');
+            refetch(); // Refrescar inventario local
+        } catch (error: any) {
+            console.error(error);
+            showToast(error.response?.data?.error || `Error al procesar la ${isSaleMode ? 'venta' : 'entrada'}`, true);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const filtered = PRODUCTS.filter(p =>
         (category === 'Todos' || p.category === category) &&
         (p.name.toLowerCase().includes(search.toLowerCase()) || p.code.includes(search))
@@ -228,10 +292,32 @@ export default function POSPage() {
     const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
     const total = subtotal + (subtotal * IVA);
 
+    if (!selectedBranch) {
+        return <div className="h-full flex items-center justify-center text-slate-500">Por favor, seleccione una sede en la configuración.</div>;
+    }
+
     return (
         <div className="flex flex-col lg:flex-row gap-4 h-full lg:h-[calc(100dvh-112px)] overflow-hidden">
             {/* LADO IZQUIERDO: PRODUCTOS */}
             <div className="flex-[6] flex flex-col gap-4 bg-white rounded-xl border p-4 shadow-sm overflow-hidden">
+                <div className="flex border border-slate-200 p-1 rounded-lg w-fit mb-1">
+                    <button 
+                        onClick={() => setIsSaleMode(true)}
+                        className={cn(
+                            "px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2",
+                            isSaleMode ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                        )}>
+                        <ShoppingCart className="w-4 h-4"/> Venta
+                    </button>
+                    <button 
+                        onClick={() => setIsSaleMode(false)}
+                        className={cn(
+                            "px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2",
+                            !isSaleMode ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                        )}>
+                        <PackagePlus className="w-4 h-4"/> Entrada / Restock
+                    </button>
+                </div>
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <Input
@@ -250,7 +336,7 @@ export default function POSPage() {
                             key={cat}
                             onClick={() => setCategory(cat)}
                             className={cn(
-                                'px-4 py-1.5 rounded-full text-xs font-semibold border transition-all',
+                                'px-4 py-1.5 rounded-full text-xs font-semibold border transition-all whitespace-nowrap',
                                 category === cat ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-white text-slate-500 border-slate-200'
                             )}
                         >
@@ -260,7 +346,15 @@ export default function POSPage() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-4 content-start">
-                    {filtered.map(p => <ProductCard key={p.id} product={p} onAdd={addToCart} />)}
+                    {isLoading ? (
+                        <div className="col-span-full h-32 flex items-center justify-center">
+                            <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
+                        </div>
+                    ) : filtered.length === 0 ? (
+                        <div className="col-span-full text-center text-slate-400 mt-10">No se encontraron productos.</div>
+                    ) : (
+                        filtered.map(p => <ProductCard key={p.id} product={p} onAdd={addToCart} />)
+                    )}
                 </div>
             </div>
 
@@ -274,7 +368,9 @@ export default function POSPage() {
                 <div className="flex-1 overflow-y-auto">
                     {cart.map(item => (
                         <div key={item.id} className="flex items-center gap-3 px-5 py-4 border-b">
-                            <span className="text-xl">{item.emoji}</span>
+                            <div className="w-8 h-8 rounded bg-slate-50 flex items-center justify-center shrink-0">
+                                <Package className="w-4 h-4 text-slate-300" />
+                            </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-xs font-bold truncate">{item.name}</p>
                                 <p className="text-[10px] text-slate-400">${item.price.toFixed(2)} x {item.qty}</p>
@@ -282,6 +378,12 @@ export default function POSPage() {
                             <p className="text-sm font-black">${(item.price * item.qty).toFixed(2)}</p>
                         </div>
                     ))}
+                    {cart.length === 0 && (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-3">
+                            <Package className="w-12 h-12" />
+                            <p className="text-sm">Carrito vacío</p>
+                        </div>
+                    )}
                 </div>
 
                 <div className="px-6 py-5 bg-slate-50 border-t">
@@ -306,8 +408,14 @@ export default function POSPage() {
                 </div>
             </div>
 
-            <HybridPaymentDialog open={payOpen} total={total} onClose={() => setPayOpen(false)} onConfirm={() => {setCart([]); setPayOpen(false); toast('✓ Venta Exitosa');}} />
-            <Toast message={toastMsg} visible={toastVis} />
+            <HybridPaymentDialog 
+                open={payOpen} 
+                total={total} 
+                onClose={() => setPayOpen(false)} 
+                isSubmitting={isSubmitting}
+                onConfirm={handleCheckout} 
+            />
+            <Toast message={toastMsg} visible={toastVis} isError={toastErr} />
         </div>
     );
 }

@@ -1,25 +1,40 @@
-import { Router, Request, Response } from 'express';
+// ============================
+// DASHBOARD MODULE — ROUTES
+// ============================
+
+import { Router } from 'express';
 import { authMiddleware } from '../../core/middlewares/auth.middleware';
-import { roleGuard } from '../../core/middlewares/roleGuard';
-import { prisma } from '../../config/prisma';
+import * as ctrl from './dashboard.controller';
 
 const router = Router();
-router.use(authMiddleware, roleGuard('ADMIN'));
+router.use(authMiddleware);
 
-router.get('/', async (_req: Request, res: Response) => {
-    const [totalRevenue, totalSalesCount, lowStock, expiringSoon] = await Promise.all([
-        prisma.sale.aggregate({ where: { status: 'COMPLETED' }, _sum: { total: true } }),
-        prisma.sale.count({ where: { status: 'COMPLETED' } }),
-        prisma.product.count({ where: { currentStock: { lte: 5 } } }),
-        prisma.productBatch.count({
-            where: {
-                expirationDate: { lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
-                remainingQty: { gt: 0 },
-            },
-        }),
-    ]);
+/**
+ * GET /api/dashboard/kpis
+ * KPIs generales: ventas hoy, mes, stock bajo, caja abierta
+ * Query: ?branchId=
+ */
+router.get('/kpis', ctrl.getKPIs);
 
-    res.json({ totalRevenue: totalRevenue._sum.total, totalSalesCount, lowStockCount: lowStock, expiringSoonCount: expiringSoon });
-});
+/**
+ * GET /api/dashboard/sales-trend
+ * Ventas por día (gráfica de líneas)
+ * Query: ?branchId=&days=30
+ */
+router.get('/sales-trend', ctrl.getSalesTrend);
+
+/**
+ * GET /api/dashboard/top-products
+ * Productos estrella (por unidades vendidas)
+ * Query: ?branchId=&limit=10
+ */
+router.get('/top-products', ctrl.getTopProducts);
+
+/**
+ * GET /api/dashboard/sales-by-branch
+ * Comparativo de ventas por sede
+ * Query: ?from=&to=
+ */
+router.get('/sales-by-branch', ctrl.getSalesByBranch);
 
 export default router;

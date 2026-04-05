@@ -1,0 +1,306 @@
+// =============================================================================
+// ERP-MARKET — SCHEMA LOCAL (SQLite — Desktop Offline)
+// Diferencias vs schema.prisma (cloud):
+//   ✦ provider = "sqlite"
+//   ✦ Decimal → Float (SQLite no tiene tipo Decimal nativo)
+//   ✦ Json → String (serializado como texto)
+//   ✦ SIN @db.* decorators
+//   ✦ Campos syncStatus/cloudId en modelos que se sincronizan UP (ventas, caja, auditoría)
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client-local"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("LOCAL_DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS — mismos valores que el schema cloud
+// =============================================================================
+
+enum Role {
+  OWNER
+  SELLER
+}
+
+enum TransactionType {
+  SALE
+  INVENTORY_IN
+}
+
+enum TransactionStatus {
+  COMPLETED
+  CANCELLED
+  PENDING
+}
+
+enum CashRegisterStatus {
+  OPEN
+  CLOSED
+}
+
+// =============================================================================
+// USUARIO
+// syncStatus = SYNCED porque usuarios solo vienen de la nube (pull-only)
+// =============================================================================
+
+model User {
+  id         String   @id @default(cuid())
+  name       String
+  email      String   @unique
+  password   String
+  role       Role     @default(SELLER)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  syncStatus String   @default("SYNCED") // Solo cabe de la nube
+
+  transactions  Transaction[]
+  cashRegisters CashRegister[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+// =============================================================================
+// SEDE (Branch)
+// Viene de la nube via pull-catalog
+// =============================================================================
+
+model Branch {
+  id         String   @id @default(cuid())
+  name       String
+  address    String?
+  phone      String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  syncStatus String   @default("SYNCED")
+
+  inventory     BranchInventory[]
+  transactions  Transaction[]
+  cashRegisters CashRegister[]
+
+  @@map("branches")
+}
+
+// =============================================================================
+// CATÁLOGO MAESTRO
+// =============================================================================
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  syncStatus  String   @default("SYNCED")
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  barcode     String?  @unique
+  price       Float                       // ← Float (era Decimal)
+  cost        Float?                      // ← Float?
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  syncStatus  String   @default("SYNCED") // Solo baja de la nube
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  inventory        BranchInventory[]
+  transactionItems TransactionItem[]
+
+  @@map("products")
+}
+
+// =============================================================================
+// INVENTARIO POR SEDE (solo local, no se sincroniza directamente)
+// El stock se recalcula en la nube a partir de las transacciones subidas
+// =============================================================================
+
+model BranchInventory {
+  id        String   @id @default(cuid())
+  stock     Int      @default(0)
+  minStock  Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  branchId  String
+  branch    Branch  @relation(fields: [branchId], references: [id])
+
+  @@unique([productId, branchId])
+  @@map("branch_inventory")
+}
+
+// =============================================================================
+// POS DUAL — TRANSACCIONES
+// syncStatus: PENDING → se sube a Neon | SYNCED → ya subió
+// cloudId: ID asignado por Neon al recibir la transacción (para dedup)
+// =============================================================================
+
+model Transaction {
+  id         String   @id @default(cuid())
+  type       TransactionType
+  status     TransactionStatus @default(COMPLETED)
+  total      Float                         // ← Float
+  notes      String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Campos de sincronización
+  syncStatus String   @default("PENDING")  // PENDING | SYNCED | CONFLICT
+  syncedAt   DateTime?
+  cloudId    String?  @unique              // ID en Neon (dedup)
+
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  branchId       String
+  branch         Branch        @relation(fields: [branchId], references: [id])
+  cashRegisterId String?
+  cashRegister   CashRegister? @relation(fields: [cashRegisterId], references: [id])
+
+  items TransactionItem[]
+
+  @@map("transactions")
+}
+
+model TransactionItem {
+  id        String @id @default(cuid())
+  quantity  Int
+  unitPrice Float                          // ← Float
+  subtotal  Float                          // ← Float
+
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id])
+
+  @@map("transaction_items")
+}
+
+// =============================================================================
+// FLUJO DE CAJA
+// =============================================================================
+
+model CashRegister {
+  id             String             @id @default(cuid())
+  status         CashRegisterStatus @default(OPEN)
+  openingAmount  Float                        // ← Float
+  closingAmount  Float?
+  expectedAmount Float?
+  difference     Float?
+  notes          String?
+  openedAt       DateTime           @default(now())
+  closedAt       DateTime?
+
+  syncStatus String  @default("PENDING")
+  syncedAt   DateTime?
+  cloudId    String? @unique
+
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  transactions Transaction[]
+
+  @@map("cash_registers")
+}
+
+// =============================================================================
+// AUDITORÍA — CAJA NEGRA LOCAL
+// details almacenado como JSON string (SQLite no tiene tipo Json)
+// =============================================================================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  module    String
+  details   String                          // ← String (JSON.stringify)
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  syncStatus String  @default("PENDING")
+  syncedAt   DateTime?
+  cloudId    String? @unique
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// =============================================================================
+// FUTURO (misma estructura que el cloud, sin activar endpoints)
+// =============================================================================
+
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  rut       String?  @unique
+  email     String?
+  phone     String?
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+
+  @@map("suppliers")
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  RECEIVED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id         String              @id @default(cuid())
+  status     PurchaseOrderStatus @default(DRAFT)
+  total      Float
+  notes      String?
+  expectedAt DateTime?
+  receivedAt DateTime?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  items      PurchaseOrderItem[]
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id               String @id @default(cuid())
+  quantity         Int
+  quantityReceived Int    @default(0)
+  unitCost         Float
+  subtotal         Float
+  productId        String
+
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@map("purchase_order_items")
+}
