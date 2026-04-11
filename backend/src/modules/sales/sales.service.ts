@@ -2,59 +2,102 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 
 interface SalePayload {
-    cashierId: string;
-    customerId?: string;
+    userId: string;
+    branchId: string;
+    cashRegisterId?: string;
     items: { productId: string; quantity: number; unitPrice: number }[];
-    payments: { method: 'CASH_USD' | 'CASH_VES' | 'TRANSFER' | 'CARD'; amount: number; currency: string }[];
+    notes?: string;
 }
 
 export const processSale = async (payload: SalePayload) => {
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        const subtotal = payload.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
-        const sale = await tx.sale.create({
+        const total = payload.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+
+        const transaction = await tx.transaction.create({
             data: {
-                cashierId: payload.cashierId,
-                customerId: payload.customerId,
-                subtotal,
-                total: subtotal,
+                type: 'SALE',
                 status: 'COMPLETED',
-                items: { create: payload.items },
-                payments: { create: payload.payments },
+                total,
+                notes: payload.notes,
+                userId: payload.userId,
+                branchId: payload.branchId,
+                cashRegisterId: payload.cashRegisterId,
+                items: {
+                    create: payload.items.map(item => ({
+                        productId: item.productId,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice,
+                        subtotal: item.quantity * item.unitPrice,
+                    })),
+                },
             },
-            include: { items: true, payments: true },
+            include: {
+                items: { include: { product: true } },
+                user: { select: { id: true, nombre: true, username: true } },
+                branch: { select: { id: true, name: true } },
+            },
         });
-        // Decrement stock for each product sold
+
         for (const item of payload.items) {
-            await tx.product.update({
-                where: { id: item.productId },
-                data: { currentStock: { decrement: item.quantity } },
+            const inventory = await tx.branchInventory.findUnique({
+                where: { productId_branchId: { productId: item.productId, branchId: payload.branchId } },
             });
+            if (inventory) {
+                await tx.branchInventory.update({
+                    where: { id: inventory.id },
+                    data: { stock: { decrement: item.quantity } },
+                });
+            }
         }
-        return sale;
+
+        return transaction;
     });
 };
 
-export const getSales = async (filters: { startDate?: string; endDate?: string; cashierId?: string }) => {
-    return prisma.sale.findMany({
+interface GetSalesFilters {
+    startDate?: string;
+    endDate?: string;
+    userId?: string;
+    branchId?: string;
+    type?: 'SALE' | 'INVENTORY_IN';
+}
+
+export const getSales = async (filters: GetSalesFilters) => {
+    return prisma.transaction.findMany({
         where: {
-            cashierId: filters.cashierId,
+            type: filters.type || 'SALE',
+            userId: filters.userId,
+            branchId: filters.branchId,
             createdAt: {
                 gte: filters.startDate ? new Date(filters.startDate) : undefined,
                 lte: filters.endDate ? new Date(filters.endDate) : undefined,
             },
+            status: 'COMPLETED',
         },
-        include: { items: true, payments: true, cashier: true },
+        include: {
+            items: { include: { product: true } },
+            user: { select: { id: true, nombre: true, username: true } },
+            branch: { select: { id: true, name: true } },
+        },
         orderBy: { createdAt: 'desc' },
     });
 };
 
 export const getSaleById = async (id: string) => {
-    return prisma.sale.findUnique({
+    return prisma.transaction.findUnique({
         where: { id },
-        include: { items: { include: { product: true } }, payments: true, cashier: true },
+        include: {
+            items: { include: { product: true } },
+            user: { select: { id: true, nombre: true, username: true } },
+            branch: { select: { id: true, name: true } },
+            cashRegister: true,
+        },
     });
 };
 
 export const voidSale = async (id: string, reason: string) => {
-    return prisma.sale.update({ where: { id }, data: { status: 'VOIDED', voidReason: reason } });
+    return prisma.transaction.update({
+        where: { id },
+        data: { status: 'CANCELLED', notes: reason },
+    });
 };

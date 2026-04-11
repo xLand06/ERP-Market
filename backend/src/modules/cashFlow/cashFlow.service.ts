@@ -1,12 +1,4 @@
-// ============================
-// CASH FLOW MODULE — SERVICE
-// Arqueos de caja: aperturas, cierres y historial de ventas
-// ============================
-
 import { prisma } from '../../config/prisma';
-import { Decimal } from '@prisma/client/runtime/library';
-
-// ─── APERTURA DE CAJA ──────────────────────────────────────────────────────
 
 export const openCashRegister = async (data: {
     branchId: string;
@@ -14,7 +6,6 @@ export const openCashRegister = async (data: {
     openingAmount: number;
     notes?: string;
 }) => {
-    // Verificar que no haya una caja abierta en esta sede
     const existing = await prisma.cashRegister.findFirst({
         where: { branchId: data.branchId, status: 'OPEN' },
     });
@@ -24,14 +15,12 @@ export const openCashRegister = async (data: {
         data: {
             branchId: data.branchId,
             userId: data.userId,
-            openingAmount: new Decimal(data.openingAmount),
+            openingAmount: data.openingAmount,
             notes: data.notes,
             status: 'OPEN',
         },
     });
 };
-
-// ─── CIERRE DE CAJA ────────────────────────────────────────────────────────
 
 export const closeCashRegister = async (
     cashRegisterId: string,
@@ -51,34 +40,31 @@ export const closeCashRegister = async (
     if (!cashRegister) throw new Error('Caja no encontrada');
     if (cashRegister.status === 'CLOSED') throw new Error('Esta caja ya está cerrada');
 
-    // Calcular monto esperado: apertura + suma de ventas
     const salesTotal = cashRegister.transactions.reduce(
-        (sum: number, tx: { total: { toString: () => string } }) => sum + parseFloat(tx.total.toString()),
+        (sum: number, tx) => sum + tx.total,
         0
     );
-    const expectedAmount = parseFloat(cashRegister.openingAmount.toString()) + salesTotal;
+    const expectedAmount = cashRegister.openingAmount + salesTotal;
     const difference = closingAmount - expectedAmount;
 
     return prisma.cashRegister.update({
         where: { id: cashRegisterId },
         data: {
             status: 'CLOSED',
-            closingAmount: new Decimal(closingAmount),
-            expectedAmount: new Decimal(expectedAmount),
-            difference: new Decimal(difference),
+            closingAmount: closingAmount,
+            expectedAmount: expectedAmount,
+            difference: difference,
             closedAt: new Date(),
             ...(notes && { notes }),
         },
     });
 };
 
-// ─── CONSULTAS ─────────────────────────────────────────────────────────────
-
 export const getCurrentOpenRegister = (branchId: string) =>
     prisma.cashRegister.findFirst({
         where: { branchId, status: 'OPEN' },
         include: {
-            user: { select: { id: true, name: true } },
+            user: { select: { id: true, nombre: true, username: true } },
             branch: { select: { id: true, name: true } },
             _count: { select: { transactions: true } },
         },
@@ -105,7 +91,7 @@ export const getCashRegisterHistory = (filters: {
                 : {}),
         },
         include: {
-            user: { select: { id: true, name: true } },
+            user: { select: { id: true, nombre: true, username: true } },
             branch: { select: { id: true, name: true } },
             _count: { select: { transactions: true } },
         },
@@ -119,7 +105,7 @@ export const getCashRegisterById = (id: string) =>
     prisma.cashRegister.findUnique({
         where: { id },
         include: {
-            user: { select: { id: true, name: true } },
+            user: { select: { id: true, nombre: true, username: true } },
             branch: { select: { id: true, name: true } },
             transactions: {
                 where: { status: 'COMPLETED' },
@@ -131,7 +117,6 @@ export const getCashRegisterById = (id: string) =>
         },
     });
 
-/** Resumen diario de ventas para una sede */
 export const getDailySalesSummary = async (branchId: string, date?: string) => {
     const targetDate = date ? new Date(date) : new Date();
     const start = new Date(targetDate);
@@ -149,7 +134,7 @@ export const getDailySalesSummary = async (branchId: string, date?: string) => {
         include: { items: { include: { product: { select: { name: true } } } } },
     });
 
-    const total = transactions.reduce((sum: number, tx: { total: { toString: () => string } }) => sum + parseFloat(tx.total.toString()), 0);
+    const total = transactions.reduce((sum: number, tx) => sum + tx.total, 0);
 
     return {
         date: targetDate.toISOString().split('T')[0],

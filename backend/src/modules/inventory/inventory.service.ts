@@ -1,12 +1,4 @@
-// ============================
-// INVENTORY MODULE — SERVICE
-// Catálogo Maestro + Stock por Sede
-// ============================
-
 import { prisma } from '../../config/prisma';
-import { Decimal } from '@prisma/client/runtime/library';
-
-// ─── CATÁLOGO MAESTRO ──────────────────────────────────────────────────────
 
 export const getAllProducts = (query?: string) =>
     prisma.product.findMany({
@@ -53,8 +45,6 @@ export const createProduct = async (data: {
     prisma.product.create({
         data: {
             ...data,
-            price: new Decimal(data.price),
-            cost: data.cost ? new Decimal(data.cost) : undefined,
         },
         include: { category: true },
     });
@@ -72,14 +62,9 @@ export const updateProduct = async (
         isActive: boolean;
     }>
 ) => {
-    const { price, cost, ...rest } = data;
     return prisma.product.update({
         where: { id },
-        data: {
-            ...rest,
-            ...(price !== undefined && { price: new Decimal(price) }),
-            ...(cost !== undefined && { cost: new Decimal(cost) }),
-        },
+        data,
         include: { category: true },
     });
 };
@@ -87,15 +72,11 @@ export const updateProduct = async (
 export const deleteProduct = (id: string) =>
     prisma.product.update({ where: { id }, data: { isActive: false } });
 
-// ─── CATEGORÍAS ────────────────────────────────────────────────────────────
-
 export const getAllCategories = () =>
     prisma.category.findMany({ orderBy: { name: 'asc' }, include: { _count: { select: { products: true } } } });
 
 export const createCategory = (data: { name: string; description?: string }) =>
     prisma.category.create({ data });
-
-// ─── STOCK POR SEDE ────────────────────────────────────────────────────────
 
 export const getStockByBranch = (branchId: string) =>
     prisma.branchInventory.findMany({
@@ -124,7 +105,7 @@ export const upsertStock = async (productId: string, branchId: string, stock: nu
 export const adjustStock = async (
     productId: string,
     branchId: string,
-    delta: number // positivo = suma, negativo = resta
+    delta: number
 ) => {
     const existing = await prisma.branchInventory.findUnique({
         where: { productId_branchId: { productId, branchId } },
@@ -147,7 +128,7 @@ export const getLowStockAlerts = async (branchId?: string) => {
         return prisma.branchInventory.findMany({
             where: {
                 branchId,
-                stock: { lte: prisma.raw('minStock') },
+                stock: { lte: prisma.branchInventory.fields.minStock as any },
             },
             include: {
                 product: { select: { id: true, name: true, barcode: true } },
@@ -158,7 +139,7 @@ export const getLowStockAlerts = async (branchId?: string) => {
     }
     return prisma.branchInventory.findMany({
         where: {
-            stock: { lte: prisma.raw('minStock') },
+            stock: { lte: prisma.branchInventory.fields.minStock as any },
         },
         include: {
             product: { select: { id: true, name: true, barcode: true } },

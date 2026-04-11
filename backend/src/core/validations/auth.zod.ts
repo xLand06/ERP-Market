@@ -1,6 +1,6 @@
 // =============================================================================
 // AUTH VALIDATIONS — Zod Schemas
-// Validaciones para el módulo de autenticación
+// Login por username/cedula Venezuela
 // =============================================================================
 
 import { z } from 'zod';
@@ -24,16 +24,39 @@ const passwordStrengthSchema = z.string()
         { message: 'Debe tener al menos un carácter especial (!@#$%^&*...)' }
     );
 
-const emailSchema = z.string().email('Email inválido');
+const usernameSchema = z.string()
+    .min(3, 'El usuario debe tener al menos 3 caracteres')
+    .max(20, 'El usuario debe tener máximo 20 caracteres')
+    .regex(/^[a-zA-Z0-9_]+$/, 'Solo letras, números y guiones bajos');
+
+const cedulaSchema = z.string()
+    .regex(/^[VE]-[0-9]{6,8}$/, 'Formato: V-12345678 o E-12345678')
+    .min(8, 'Cédula inválida')
+    .max(10, 'Cédula inválida');
+
+const nombreSchema = z.string()
+    .min(2, 'El nombre debe tener al menos 2 caracteres')
+    .max(100, 'El nombre es muy largo');
+
+const telefonoSchema = z.string()
+    .regex(/^[0-9]{10,15}$/, 'Teléfono inválido')
+    .optional();
+
+const emailSchema = z.string().email('Email inválido').optional();
 
 const loginSchemaBase = z.object({
-    email: emailSchema,
-    password: passwordStrengthSchema,
+    username: usernameSchema,
+    password: z.string().min(1, 'La contraseña es requerida'),
 });
 
 const registerSchemaBase = z.object({
-    name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100, 'El nombre es muy largo'),
+    username: usernameSchema,
+    cedula: cedulaSchema,
+    cedulaType: z.enum(['V', 'E']).default('V'),
+    nombre: nombreSchema,
+    apellido: z.string().max(100).optional(),
     email: emailSchema,
+    telefono: telefonoSchema,
     password: passwordStrengthSchema,
     role: z.enum(['OWNER', 'SELLER']).optional(),
 });
@@ -74,49 +97,57 @@ export const updateUserSchema = {
         const obj = data as Record<string, unknown>;
         const result: Record<string, unknown> = {};
         
-        if (obj.name !== undefined) {
-            const name = obj.name as string;
-            if (name.length < 2) {
+        if (obj.username !== undefined) {
+            const username = obj.username as string;
+            if (username.length < 3 || username.length > 20) {
                 return { 
                     success: false as const, 
                     error: { 
                         flatten: () => ({ 
                             formErrors: { formErrors: [] }, 
-                            fieldErrors: { name: ['El nombre debe tener al menos 2 caracteres'] } 
+                            fieldErrors: { username: ['Usuario debe tener entre 3 y 20 caracteres'] } 
                         }) 
                     } 
                 };
             }
-            if (name.length > 100) {
-                return { 
-                    success: false as const, 
-                    error: { 
-                        flatten: () => ({ 
-                            formErrors: { formErrors: [] }, 
-                            fieldErrors: { name: ['El nombre es muy largo'] } 
-                        }) 
-                    } 
-                };
-            }
-            result.name = name;
+            result.username = username.toLowerCase();
         }
         
-        if (obj.email !== undefined) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(obj.email as string)) {
+        if (obj.cedula !== undefined) {
+            const cedulaRegex = /^[VE]-[0-9]{6,8}$/;
+            if (!cedulaRegex.test(obj.cedula as string)) {
                 return { 
                     success: false as const, 
                     error: { 
                         flatten: () => ({ 
                             formErrors: { formErrors: [] }, 
-                            fieldErrors: { email: ['Email inválido'] } 
+                            fieldErrors: { cedula: ['Formato: V-12345678 o E-12345678'] } 
                         }) 
                     } 
                 };
             }
-            result.email = (obj.email as string).toLowerCase();
+            result.cedula = (obj.cedula as string).toUpperCase();
         }
         
+        if (obj.nombre !== undefined) {
+            const nombre = obj.nombre as string;
+            if (nombre.length < 2 || nombre.length > 100) {
+                return { 
+                    success: false as const, 
+                    error: { 
+                        flatten: () => ({ 
+                            formErrors: { formErrors: [] }, 
+                            fieldErrors: { nombre: ['Nombre debe tener entre 2 y 100 caracteres'] } 
+                        }) 
+                    } 
+                };
+            }
+            result.nombre = nombre;
+        }
+        
+        if (obj.apellido !== undefined) result.apellido = obj.apellido;
+        if (obj.email !== undefined) result.email = (obj.email as string)?.toLowerCase();
+        if (obj.telefono !== undefined) result.telefono = obj.telefono;
         if (obj.role !== undefined && !['OWNER', 'SELLER'].includes(obj.role as string)) {
             return { 
                 success: false as const, 
@@ -139,8 +170,12 @@ export const updateUserSchema = {
 export type LoginInput = z.infer<typeof loginSchemaBase>;
 export type RegisterInput = z.infer<typeof registerSchemaBase>;
 export type UpdateUserInput = {
-    name?: string;
+    username?: string;
+    cedula?: string;
+    nombre?: string;
+    apellido?: string;
     email?: string;
+    telefono?: string;
     role?: 'OWNER' | 'SELLER';
     isActive?: boolean;
 };

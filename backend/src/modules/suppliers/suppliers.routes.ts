@@ -1,27 +1,17 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../core/middlewares/auth.middleware';
 import { roleGuard } from '../../core/middlewares/roleGuard';
-import { Request, Response } from 'express';
-import { prisma } from '../../config/prisma';
+import * as ctrl from './suppliers.controller';
 
 const router = Router();
 router.use(authMiddleware);
 
-router.get('/', async (_req: Request, res: Response) =>
-    res.json(await prisma.supplier.findMany({ include: { products: { take: 5 } } }))
-);
+router.get('/', ctrl.getSuppliers);
+router.get('/:id', ctrl.getSupplierById);
+router.get('/:id/stats', ctrl.getSupplierStats);
 
-router.post('/', roleGuard('OWNER', 'SELLER'), async (req: Request, res: Response) =>
-    res.status(201).json(await prisma.supplier.create({ data: req.body }))
-);
-
-router.put('/:id', roleGuard('OWNER', 'SELLER'), async (req: Request, res: Response) =>
-    res.json(await prisma.supplier.update({ where: { id: req.params.id }, data: req.body }))
-);
-
-router.delete('/:id', roleGuard('OWNER'), async (req: Request, res: Response) => {
-    await prisma.supplier.delete({ where: { id: req.params.id } });
-    res.status(204).send();
-});
+router.post('/', roleGuard('OWNER'), ctrl.createSupplier);
+router.patch('/:id', roleGuard('OWNER'), ctrl.updateSupplier);
+router.delete('/:id', roleGuard('OWNER'), ctrl.deleteSupplier);
 
 export default router;

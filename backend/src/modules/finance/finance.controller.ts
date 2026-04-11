@@ -4,7 +4,7 @@ import * as financeService from './finance.service';
 export const getOpenRegister = async (req: Request, res: Response) => {
     try {
         const { branchId } = req.params;
-        const register = await financeService.getOpenRegister(branchId, (req as any).user!.id);
+        const register = await financeService.getOpenRegister(branchId);
         res.json({ success: true, data: register });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });
@@ -41,11 +41,11 @@ export const closeCashRegister = async (req: Request, res: Response) => {
 export const addCashMovement = async (req: Request, res: Response) => {
     try {
         const { registerId } = req.params;
-        const { branchId, subType, amount, notes } = req.body;
+        const { branchId, type, amount, notes } = req.body;
         const movement = await financeService.addCashMovement(registerId, {
             branchId,
             userId: (req as any).user!.id,
-            subType,
+            type,
             amount: Number(amount),
             notes
         });

@@ -62,18 +62,21 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
             await localPrisma.user.upsert({
                 where: { id: user.id },
                 update: { 
-                    name: user.name, 
+                    nombre: user.nombre, 
                     email: user.email, 
                     password: user.password, 
-                    role: user.role as any,
+                    role: user.role,
                     isActive: user.isActive 
                 },
                 create: { 
                     id: user.id, 
-                    name: user.name, 
+                    username: user.username,
+                    cedula: user.cedula,
+                    cedulaType: user.cedulaType,
+                    nombre: user.nombre, 
                     email: user.email, 
                     password: user.password, 
-                    role: user.role as any,
+                    role: user.role,
                     isActive: user.isActive 
                 }
             });

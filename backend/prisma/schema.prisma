@@ -1,7 +1,6 @@
 // =============================================================================
-// ERP-MARKET — PRISMA SCHEMA
-// Arquitectura: Multi-sede | POS Dual | Auditoría (Caja Negra)
-// Generador: Prisma 6.x + PostgreSQL (Neon)
+// ERP-MARKET - SCHEMA COMPLETO (Prisma 7.x + Supabase)
+// Login by username + Venezuela cedula (V/E)
 // =============================================================================
 
 generator client {
@@ -17,13 +16,13 @@ datasource db {
 // =============================================================================
 
 enum Role {
-  OWNER   // Acceso total: configuración, precios, usuarios
-  SELLER  // Acceso operativo: POS, inventario de consulta
+  OWNER
+  SELLER
 }
 
 enum TransactionType {
-  SALE          // Venta realizada en el POS
-  INVENTORY_IN  // Entrada de mercancía (recepción de stock)
+  SALE
+  INVENTORY_IN
 }
 
 enum TransactionStatus {
@@ -37,259 +36,6 @@ enum CashRegisterStatus {
   CLOSED
 }
 
-// =============================================================================
-// MÓDULO: USUARIOS Y AUTENTICACIÓN
-// =============================================================================
-
-model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      Role     @default(SELLER)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relaciones
-  transactions  Transaction[]
-  cashRegisters CashRegister[]
-  auditLogs     AuditLog[]
-
-  // Índices
-  @@index([role])
-  @@index([isActive])
-  @@map("users")
-}
-
-// =============================================================================
-// MÓDULO: SEDES (MULTI-SEDE)
-// =============================================================================
-
-model Branch {
-  id        String   @id @default(cuid())
-  name      String
-  address   String?
-  phone     String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relaciones
-  inventory     BranchInventory[]
-  transactions  Transaction[]
-  cashRegisters CashRegister[]
-
-  @@map("branches")
-}
-
-// =============================================================================
-// MÓDULO: CATÁLOGO MAESTRO (PRODUCTOS)
-// Los precios y datos base se sincronizan para todas las sedes.
-// El stock físico vive en BranchInventory, no aquí.
-// =============================================================================
-
-model Category {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  products Product[]
-
-  @@map("categories")
-}
-
-model Product {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  barcode     String?  @unique
-  price       Decimal  @db.Decimal(10, 2)
-  cost        Decimal? @db.Decimal(10, 2)
-  imageUrl    String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relaciones
-  categoryId String?
-  category   Category? @relation(fields: [categoryId], references: [id])
-
-  inventory        BranchInventory[]
-  transactionItems TransactionItem[]
-
-  // Índices para optimize queries
-  @@index([name])
-  @@index([categoryId])
-  @@index([isActive])
-  @@map("products")
-}
-
-// =============================================================================
-// MÓDULO: INVENTARIO POR SEDE
-// Relación Producto <-> Sede para stock físico diferenciado por local.
-// =============================================================================
-
-model BranchInventory {
-  id        String   @id @default(cuid())
-  stock     Int      @default(0)
-  minStock  Int      @default(0)  // Alerta de stock mínimo
-  updatedAt DateTime @updatedAt
-
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
-
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id])
-
-  @@unique([productId, branchId]) // Un producto = un registro por sede
-  @@index([branchId])
-  @@index([stock])
-  @@index([branchId, stock])
-  @@map("branch_inventory")
-}
-
-// =============================================================================
-// MÓDULO: POS DUAL — TRANSACCIONES
-// Una misma estructura maneja SALE e INVENTORY_IN.
-// El campo `type` determina el comportamiento del sistema:
-//   - SALE        → descuenta stock, registra en caja
-//   - INVENTORY_IN → suma stock, no afecta caja de ventas
-// =============================================================================
-
-model Transaction {
-  id         String            @id @default(cuid())
-  type       TransactionType
-  status     TransactionStatus @default(COMPLETED)
-  total      Decimal           @db.Decimal(10, 2)
-  notes      String?
-  ipAddress  String?           // IP del terminal POS (para auditoría)
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
-
-  // ¿Qué usuario realizó la transacción?
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
-  // ¿En qué sede ocurrió?
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id])
-
-  // ¿A qué arqueo de caja pertenece? (solo SALE)
-  cashRegisterId String?
-  cashRegister   CashRegister? @relation(fields: [cashRegisterId], references: [id])
-
-  // Líneas de detalle
-  items TransactionItem[]
-
-  // Índices para queries frecuentes
-  @@index([branchId, createdAt])
-  @@index([userId])
-  @@index([type, status])
-  @@index([createdAt])
-  @@map("transactions")
-}
-
-model TransactionItem {
-  id        String  @id @default(cuid())
-  quantity  Int
-  unitPrice Decimal @db.Decimal(10, 2)
-  subtotal  Decimal @db.Decimal(10, 2)
-
-  transactionId String
-  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
-
-  @@map("transaction_items")
-}
-
-// =============================================================================
-// MÓDULO: FLUJO DE CAJA (ARQUEOS)
-// Registra aperturas y cierres de caja. Vincula transacciones de SALE.
-// =============================================================================
-
-model CashRegister {
-  id              String             @id @default(cuid())
-  status          CashRegisterStatus @default(OPEN)
-  openingAmount   Decimal            @db.Decimal(10, 2)
-  closingAmount   Decimal?           @db.Decimal(10, 2)
-  expectedAmount  Decimal?           @db.Decimal(10, 2) // Total teórico de ventas
-  difference      Decimal?           @db.Decimal(10, 2) // closingAmount - expectedAmount
-  notes           String?
-  openedAt        DateTime           @default(now())
-  closedAt        DateTime?
-
-  // ¿Quién abrió/cerró?
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
-  // ¿En qué sede?
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id])
-
-  // Transacciones asociadas a este turno
-  transactions Transaction[]
-
-  @@map("cash_registers")
-}
-
-// =============================================================================
-// MÓDULO: AUDITORÍA — CAJA NEGRA
-// Middleware genérico registra automáticamente acciones críticas.
-// Campo `details` almacena JSON con el estado anterior/nuevo del recurso.
-// =============================================================================
-
-model AuditLog {
-  id        String   @id @default(cuid())
-  action    String   // Ej: "PRICE_CHANGE", "INVOICE_DELETE", "USER_CREATE"
-  module    String   // Ej: "inventory", "pos", "auth"
-  details   Json     // { before: {...}, after: {...}, reason: "..." }
-  ipAddress String?
-  userAgent String?
-  createdAt DateTime @default(now())
-
-  // ¿Quién lo hizo?
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
-  @@map("audit_logs")
-}
-
-// =============================================================================
-// ██████████████████████████████████████████████████████████████████████████
-// MODELOS PARA PLAN SUPERIOR — SOLO ESTRUCTURA, SIN ENDPOINTS ACTIVOS
-// Estos modelos están listos para activarse sin migraciones destructivas.
-// ██████████████████████████████████████████████████████████████████████████
-// =============================================================================
-
-// -----------------------------------------------------------------------------
-// FUTURO: Directorio de Proveedores
-// -----------------------------------------------------------------------------
-model Supplier {
-  id        String   @id @default(cuid())
-  name      String
-  rut       String?  @unique
-  email     String?
-  phone     String?
-  address   String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relación futura con órdenes de compra
-  purchaseOrders PurchaseOrder[]
-
-  @@map("suppliers")
-}
-
-// -----------------------------------------------------------------------------
-// FUTURO: Órdenes de Compra / Gestión de Pedidos a Proveedores
-// -----------------------------------------------------------------------------
-
 enum PurchaseOrderStatus {
   DRAFT
   SENT
@@ -297,15 +43,272 @@ enum PurchaseOrderStatus {
   CANCELLED
 }
 
+enum SyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+enum CedulaType {
+  V
+  E
+}
+
+// =============================================================================
+// USERS (AUTH)
+// =============================================================================
+
+model User {
+  id         String    @id @default(cuid())
+  username   String    @unique
+  cedula     String
+  cedulaType  CedulaType @default(V)
+  nombre     String
+  apellido   String?
+  email      String?
+  password   String
+  telefono   String?
+  role       Role      @default(SELLER)
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+  updatedAt  DateTime  @updatedAt    @db.Timestamptz
+
+  transactions  Transaction[]
+  cashRegisters CashRegister[]
+  auditLogs     AuditLog[]
+
+  @@index([username])
+  @@index([cedula])
+  @@index([role])
+  @@index([isActive])
+  @@map("users")
+}
+
+// =============================================================================
+// BRANCHES
+// =============================================================================
+
+model Branch {
+  id        String    @id @default(cuid())
+  name      String
+  address   String?
+  phone     String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now()) @db.Timestamptz
+  updatedAt DateTime  @updatedAt    @db.Timestamptz
+
+  inventory     BranchInventory[]
+  transactions  Transaction[]
+  cashRegisters CashRegister[]
+
+  @@index([isActive])
+  @@map("branches")
+}
+
+// =============================================================================
+// CATEGORIES
+// =============================================================================
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now()) @db.Timestamptz
+  updatedAt   DateTime  @updatedAt    @db.Timestamptz
+
+  products Product[]
+
+  @@map("categories")
+}
+
+// =============================================================================
+// PRODUCTS
+// =============================================================================
+
+model Product {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  barcode    String?   @unique
+  price Float
+  cost Float?
+  imageUrl    String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @db.Timestamptz
+  updatedAt   DateTime  @updatedAt     @db.Timestamptz
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  inventory        BranchInventory[]
+  transactionItems TransactionItem[]
+
+  @@index([name])
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([barcode])
+  @@map("products")
+}
+
+// =============================================================================
+// INVENTORY BY BRANCH
+// =============================================================================
+
+model BranchInventory {
+  id        String   @id @default(cuid())
+  stock     Int      @default(0)
+  minStock  Int      @default(0)
+  updatedAt DateTime @updatedAt @db.Timestamptz
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  @@unique([productId, branchId])
+  @@index([branchId])
+  @@index([stock])
+  @@index([branchId, stock])
+  @@map("branch_inventory")
+}
+
+// =============================================================================
+// TRANSACTIONS
+// =============================================================================
+
+model Transaction {
+  id         String            @id @default(cuid())
+  type       TransactionType
+  status     TransactionStatus @default(COMPLETED)
+  total      Float
+  notes      String?
+  ipAddress  String?
+  syncStatus SyncStatus        @default(PENDING)
+  syncedAt   DateTime?         @db.Timestamptz
+  createdAt  DateTime          @default(now()) @db.Timestamptz
+  updatedAt  DateTime          @updatedAt    @db.Timestamptz
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  cashRegisterId String?
+  cashRegister  CashRegister? @relation(fields: [cashRegisterId], references: [id])
+
+  items TransactionItem[]
+
+  @@index([branchId, createdAt])
+  @@index([userId])
+  @@index([type, status])
+  @@index([syncStatus])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+model TransactionItem {
+  id        String  @id @default(cuid())
+  quantity  Int
+  unitPrice Float
+  subtotal  Float
+
+  transactionId String
+  transaction  Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  productId String
+  product  Product @relation(fields: [productId], references: [id])
+
+  @@map("transaction_items")
+}
+
+// =============================================================================
+// CASH REGISTER
+// =============================================================================
+
+model CashRegister {
+  id             String             @id @default(cuid())
+  status         CashRegisterStatus @default(OPEN)
+  openingAmount  Float
+  closingAmount  Float?
+  expectedAmount Float?
+  difference     Float?
+  notes          String?
+  syncStatus     SyncStatus        @default(PENDING)
+  syncedAt       DateTime?         @db.Timestamptz
+  openedAt       DateTime          @default(now()) @db.Timestamptz
+  closedAt       DateTime?
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  transactions Transaction[]
+
+  @@index([branchId])
+  @@index([status])
+  @@index([syncStatus])
+  @@map("cash_registers")
+}
+
+// =============================================================================
+// AUDIT LOGS
+// =============================================================================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  module    String
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now()) @db.Timestamptz
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([module])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// =============================================================================
+// SUPPLIERS
+// =============================================================================
+
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  rut       String?  @unique
+  email     String?
+  telefono  String?
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt    @db.Timestamptz
+
+  purchaseOrders PurchaseOrder[]
+
+  @@map("suppliers")
+}
+
+// =============================================================================
+// PURCHASE ORDERS
+// =============================================================================
+
 model PurchaseOrder {
   id         String              @id @default(cuid())
   status     PurchaseOrderStatus @default(DRAFT)
-  total      Decimal             @db.Decimal(10, 2)
+  total      Float
   notes      String?
   expectedAt DateTime?
   receivedAt DateTime?
-  createdAt  DateTime            @default(now())
-  updatedAt  DateTime            @updatedAt
+  createdAt  DateTime            @default(now()) @db.Timestamptz
+  updatedAt  DateTime            @updatedAt    @db.Timestamptz
 
   supplierId String
   supplier   Supplier @relation(fields: [supplierId], references: [id])
@@ -318,15 +321,14 @@ model PurchaseOrder {
 model PurchaseOrderItem {
   id              String  @id @default(cuid())
   quantity        Int
-  quantityReceived Int    @default(0)
-  unitCost        Decimal @db.Decimal(10, 2)
-  subtotal        Decimal @db.Decimal(10, 2)
+  quantityReceived Int   @default(0)
+  unitCost        Float
+  subtotal        Float
 
-  // Producto del catálogo maestro (referencia sin FK forzada para flexibilidad)
   productId String
 
   purchaseOrderId String
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrder  PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
 
   @@map("purchase_order_items")
 }

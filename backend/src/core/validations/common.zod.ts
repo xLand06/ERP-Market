@@ -172,3 +172,21 @@ export type DateRangeInput = {
     from?: string;
     to?: string;
 };
+
+// =============================================================================
+// SUPPLIER SCHEMAS
+// =============================================================================
+
+import { z } from 'zod';
+
+export const createSupplierSchema = z.object({
+    name: z.string().min(1, 'El nombre es requerido'),
+    rut: z.string().optional(),
+    email: z.string().email('Email inválido').optional().or(z.literal('')),
+    telefono: z.string().optional(),
+    address: z.string().optional(),
+});
+
+export const updateSupplierSchema = createSupplierSchema.partial().extend({
+    isActive: z.boolean().optional(),
+});

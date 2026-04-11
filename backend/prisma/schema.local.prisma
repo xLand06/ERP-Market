@@ -49,15 +49,20 @@ enum CashRegisterStatus {
 // =============================================================================
 
 model User {
-  id         String   @id @default(cuid())
-  name       String
-  email      String   @unique
+  id         String    @id @default(cuid())
+  username   String    @unique
+  cedula     String
+  cedulaType String    @default("V")
+  nombre     String
+  apellido   String?
+  email      String?
   password   String
-  role       Role     @default(SELLER)
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  syncStatus String   @default("SYNCED") // Solo cabe de la nube
+  telefono   String?
+  role       Role      @default(SELLER)
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  syncStatus String    @default("SYNCED")
 
   transactions  Transaction[]
   cashRegisters CashRegister[]

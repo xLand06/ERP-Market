@@ -1,7 +1,3 @@
-// ============================
-// USERS MODULE — CONTROLLER
-// ============================
-
 import { Request, Response } from 'express';
 import * as usersService from './users.service';
 import { AuthRequest } from '../../core/middlewares/auth.middleware';
@@ -19,15 +15,15 @@ export const getOne = async (req: Request, res: Response): Promise<void> => {
 };
 
 export const create = async (req: AuthRequest, res: Response): Promise<void> => {
-    const { name, email, password, role } = req.body;
-    if (!name || !email || !password) {
-        res.status(400).json({ error: 'Nombre, email y contraseña son requeridos' });
+    const { username, cedula, nombre, email, password, role } = req.body;
+    if (!username || !cedula || !nombre || !password) {
+        res.status(400).json({ error: 'username, cedula, nombre y contraseña son requeridos' });
         return;
     }
-    const user = await usersService.createUser({ name, email, password, role: role || 'SELLER' });
+    const user = await usersService.createUser({ username, cedula, nombre, email, password, role: role || 'SELLER' });
     await logAudit({
         action: 'USER_CREATE', module: 'users',
-        details: { email, role: role || 'SELLER' },
+        details: { username, role: role || 'SELLER' },
         userId: req.user!.id, ipAddress: extractIp(req),
     });
     res.status(201).json({ success: true, data: user });

@@ -1,48 +1,46 @@
-/**
- * SEED SCRIPT — ERP-MARKET
- * Popula la base de datos con datos iniciales:
- * - Usuario OWNER por defecto
- * - 2 Sedes de ejemplo
- * - Categorías de productos
- * - Productos de ejemplo con stock
- *
- * Ejecutar: npx ts-node prisma/seed.ts
- */
-
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../node_modules/.prisma/client-local';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+    adapter: new PrismaBetterSqlite3({ url: 'file:./prisma/erp-market-dev.db' }),
+});
 
 async function main() {
-    console.log('🌱 Iniciando seed de ERP-MARKET...\n');
+    console.log('🌱 Iniciando seed de ERP-MARKET (SQLite)...\n');
 
     // ── 1. USUARIO OWNER ──────────────────────────────────────────────────
-    const hashedPassword = await bcrypt.hash('admin123', 10);
+    const hashedPassword = await bcrypt.hash('admin', 10);
 
     const owner = await prisma.user.upsert({
-        where: { email: 'owner@erp-market.com' },
+        where: { username: 'admin' },
         update: {},
         create: {
-            name: 'Administrador',
-            email: 'owner@erp-market.com',
+            username: 'admin',
+            cedula: '12345678',
+            cedulaType: 'V',
+            nombre: 'Administrador',
+            email: 'admin@erp-market.com',
             password: hashedPassword,
             role: 'OWNER',
         },
     });
-    console.log(`✅ Usuario OWNER: ${owner.email}`);
+    console.log(`✅ Usuario OWNER: ${owner.username}`);
 
     const seller = await prisma.user.upsert({
-        where: { email: 'seller@erp-market.com' },
+        where: { username: 'vendedor' },
         update: {},
         create: {
-            name: 'Vendedor Demo',
-            email: 'seller@erp-market.com',
-            password: await bcrypt.hash('seller123', 10),
+            username: 'vendedor',
+            cedula: '87654321',
+            cedulaType: 'V',
+            nombre: 'Vendedor Demo',
+            email: 'vendedor@erp-market.com',
+            password: await bcrypt.hash('vendedor123', 10),
             role: 'SELLER',
         },
     });
-    console.log(`✅ Usuario SELLER: ${seller.email}`);
+    console.log(`✅ Usuario SELLER: ${seller.username}`);
 
     // ── 2. SEDES ─────────────────────────────────────────────────────────
     const branchA = await prisma.branch.upsert({
@@ -99,27 +97,24 @@ async function main() {
     ];
 
     for (const p of products) {
-        const { Decimal } = await import('@prisma/client/runtime/library');
         const product = await prisma.product.upsert({
             where: { barcode: p.barcode },
             update: {},
             create: {
                 name: p.name,
                 barcode: p.barcode,
-                price: new Decimal(p.price),
-                cost: new Decimal(p.cost),
+                price: p.price,
+                cost: p.cost,
                 categoryId: categories[p.categoryIndex].id,
             },
         });
 
-        // Stock en Sede A
         await prisma.branchInventory.upsert({
             where: { productId_branchId: { productId: product.id, branchId: branchA.id } },
             update: {},
             create: { productId: product.id, branchId: branchA.id, stock: 50, minStock: 10 },
         });
 
-        // Stock en Sede B
         await prisma.branchInventory.upsert({
             where: { productId_branchId: { productId: product.id, branchId: branchB.id } },
             update: {},
@@ -131,8 +126,8 @@ async function main() {
 
     console.log('\n✅ Seed completado exitosamente.');
     console.log('\n🔑 Credenciales de acceso:');
-    console.log('   OWNER:  owner@erp-market.com / admin123');
-    console.log('   SELLER: seller@erp-market.com / seller123');
+    console.log('   OWNER:  admin / admin');
+    console.log('   SELLER: vendedor / vendedor123');
 }
 
 main()

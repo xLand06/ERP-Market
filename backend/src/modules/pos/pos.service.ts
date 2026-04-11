@@ -1,22 +1,5 @@
-// ============================
-// POS MODULE — SERVICE
-// POS Dual: maneja SALE e INVENTORY_IN con la misma estructura
-// ============================
-
 import { prisma } from '../../config/prisma';
-import { Decimal } from '@prisma/client/runtime/library';
-
-enum TransactionType {
-    SALE = 'SALE',
-    INVENTORY_IN = 'INVENTORY_IN',
-    ADJUSTMENT = 'ADJUSTMENT'
-}
-
-enum TransactionStatus {
-    PENDING = 'PENDING',
-    COMPLETED = 'COMPLETED',
-    CANCELLED = 'CANCELLED'
-}
+import { TransactionType, TransactionStatus } from '@prisma/client';
 
 export interface TransactionItemInput {
     productId: string;
@@ -34,27 +17,13 @@ export interface CreateTransactionInput {
     ipAddress?: string;
 }
 
-/**
- * Crea una transacción dual (SALE o INVENTORY_IN) en una sola operación atómica.
- *
- * SALE:
- *   - Verifica stock disponible en la sede
- *   - Descuenta stock (adjustStock -qty)
- *   - Vincula con el CashRegister abierto si se provee cashRegisterId
- *
- * INVENTORY_IN:
- *   - Suma stock (adjustStock +qty)
- *   - NO requiere CashRegister
- */
 export const createTransaction = async (input: CreateTransactionInput) => {
     const { type, branchId, userId, items, cashRegisterId, notes, ipAddress } = input;
 
-    // ── Calcular total ──────────────────────────────────────────────────────
     const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
-    // ── Verificar stock y Caja (solo SALE) ─────────────────────────
     let assignedCashRegisterId = cashRegisterId;
-    if (type === 'SALE') {
+    if (type === TransactionType.SALE) {
         for (const item of items) {
             const inv = await prisma.branchInventory.findUnique({
                 where: { productId_branchId: { productId: item.productId, branchId } },
@@ -70,9 +39,8 @@ export const createTransaction = async (input: CreateTransactionInput) => {
             }
         }
         
-        // Auto-assign open register if not provided
         if (!assignedCashRegisterId) {
-            const openReg = await (prisma as any).cashRegister.findFirst({
+            const openReg = await prisma.cashRegister.findFirst({
                 where: { branchId, status: 'OPEN' }
             });
             if (!openReg) throw new Error('No hay una caja abierta en esta sede. Abra caja antes de vender.');
@@ -80,41 +48,38 @@ export const createTransaction = async (input: CreateTransactionInput) => {
         }
     }
 
-    // ── Transacción atómica en BD ───────────────────────────────────────────
-    const transaction = await prisma.$transaction(async (tx: typeof prisma) => {
-        // 1. Crear registro principal
-        const txRecord = await (tx as any).transaction.create({
+    const transaction = await prisma.$transaction(async (tx) => {
+        const txRecord = await tx.transaction.create({
             data: {
                 type,
-                status: 'COMPLETED',
-                totalAmount: Number(total), // SQLite Prisma Client usa totalAmount (Float) no total (Decimal)
+                status: TransactionStatus.COMPLETED,
+                total: total,
                 notes,
                 ipAddress,
                 userId,
                 branchId,
-                cashRegisterId: type === 'SALE' ? assignedCashRegisterId : null,
+                cashRegisterId: type === TransactionType.SALE ? assignedCashRegisterId : null,
                 items: {
                     create: items.map((item) => ({
                         productId: item.productId,
                         quantity: item.quantity,
-                        unitPrice: Number(item.unitPrice),
-                        subtotal: Number(item.quantity * item.unitPrice),
+                        unitPrice: item.unitPrice,
+                        subtotal: item.quantity * item.unitPrice,
                     })),
                 },
             },
             include: { items: { include: { product: { select: { name: true, barcode: true } } } } },
         });
 
-        // 2. Ajustar stock atomicamente
         for (const item of items) {
-            const delta = type === 'SALE' ? -item.quantity : item.quantity;
+            const delta = type === TransactionType.SALE ? -item.quantity : item.quantity;
             await tx.branchInventory.upsert({
                 where: { productId_branchId: { productId: item.productId, branchId } },
                 update: { stock: { increment: delta } },
                 create: {
                     productId: item.productId,
                     branchId,
-                    stock: type === 'INVENTORY_IN' ? item.quantity : 0,
+                    stock: type === TransactionType.INVENTORY_IN ? item.quantity : 0,
                 },
             });
         }
@@ -125,7 +90,6 @@ export const createTransaction = async (input: CreateTransactionInput) => {
     return transaction;
 };
 
-/** Obtiene transacciones con filtros opcionales */
 export const getTransactions = (filters: {
     type?: TransactionType;
     branchId?: string;
@@ -138,7 +102,7 @@ export const getTransactions = (filters: {
     const { type, branchId, userId, from, to, page = 1, limit = 50 } = filters;
     return prisma.transaction.findMany({
         where: {
-            ...(type && { type }),
+            ...(type && { type: { equals: type } }),
             ...(branchId && { branchId }),
             ...(userId && { userId }),
             ...(from || to
@@ -152,7 +116,7 @@ export const getTransactions = (filters: {
         },
         include: {
             items: { include: { product: { select: { id: true, name: true, barcode: true } } } },
-            user: { select: { id: true, name: true } },
+            user: { select: { id: true, nombre: true, username: true } },
             branch: { select: { id: true, name: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -166,13 +130,12 @@ export const getTransactionById = (id: string) =>
         where: { id },
         include: {
             items: { include: { product: true } },
-            user: { select: { id: true, name: true } },
+            user: { select: { id: true, nombre: true, username: true } },
             branch: { select: { id: true, name: true } },
             cashRegister: true,
         },
     });
 
-/** Cancelar transacción: revierte el stock */
 export const cancelTransaction = async (id: string) => {
     const tx = await prisma.transaction.findUnique({
         where: { id },
@@ -180,23 +143,22 @@ export const cancelTransaction = async (id: string) => {
     });
 
     if (!tx) throw new Error('Transacción no encontrada');
-    if (tx.status === 'CANCELLED') throw new Error('La transacción ya está cancelada');
+    if (tx.status === TransactionStatus.CANCELLED) throw new Error('La transacción ya está cancelada');
 
-    return prisma.$transaction(async (prismaClient: typeof prisma) => {
-        await prismaClient.transaction.update({
+    return prisma.$transaction(async (txClient) => {
+        await txClient.transaction.update({
             where: { id },
             data: { status: TransactionStatus.CANCELLED },
         });
 
         for (const item of tx.items) {
-            // Revertir: si era SALE → devolver stock; si era INVENTORY_IN → quitar stock
-            const delta = tx.type === 'SALE' ? item.quantity : -item.quantity;
-            await prismaClient.branchInventory.updateMany({
+            const delta = tx.type === TransactionType.SALE ? item.quantity : -item.quantity;
+            await txClient.branchInventory.updateMany({
                 where: { productId: item.productId, branchId: tx.branchId },
                 data: { stock: { increment: delta } },
             });
         }
 
-        return prismaClient.transaction.findUnique({ where: { id } });
+        return txClient.transaction.findUnique({ where: { id } });
     });
 };

@@ -1,6 +1,7 @@
-// ============================
+// =============================================================================
 // AUTH MODULE — SERVICE
-// ============================
+// Login par username o cédula Venezuela
+// =============================================================================
 
 import { prisma } from '../../config/prisma';
 import bcrypt from 'bcryptjs';
@@ -8,13 +9,22 @@ import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
 import { logger } from '../../core/utils/logger';
 
-export const login = async (email: string, password: string, ip?: string) => {
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase(), isActive: true } });
+export const login = async (username: string, password: string, ip?: string) => {
+    // Buscar por username O cédula (V-12345678 o E-12345678)
+    const user = await prisma.user.findFirst({
+        where: {
+            OR: [
+                { username: username.toLowerCase() },
+                { cedula: username.toUpperCase() }
+            ],
+            isActive: true
+        }
+    });
     
     if (!user) {
         logger.warn('Intento de login con usuario no existente', {
             module: 'auth',
-            email: email.toLowerCase(),
+            identifier: username,
             ip,
         });
         return null;
@@ -35,32 +45,86 @@ export const login = async (email: string, password: string, ip?: string) => {
     logger.info('Login exitoso', {
         module: 'auth',
         userId: user.id,
+        username: user.username,
         role: user.role,
         ip,
     });
     
     return {
         token,
-        user: { id: user.id, name: user.name, email: user.email, role: user.role },
+        user: { 
+            id: user.id, 
+            username: user.username,
+            nombre: user.nombre,
+            apellido: user.apellido,
+            email: user.email,
+            telefono: user.telefono,
+            role: user.role 
+        },
     };
 };
 
 export const getUserById = (id: string) =>
     prisma.user.findUnique({
         where: { id },
-        select: { id: true, name: true, email: true, role: true, isActive: true },
+        select: { 
+            id: true, 
+            username: true,
+            nombre: true,
+            apellido: true,
+            email: true,
+            telefono: true,
+            role: true, 
+            isActive: true 
+        },
     });
 
-/** Crea un usuario (solo OWNER puede hacer esto desde users.routes) */
 export const createUser = async (data: {
-    name: string;
-    email: string;
+    username: string;
+    cedula: string;
+    cedulaType: 'V' | 'E';
+    nombre: string;
+    apellido?: string;
+    email?: string;
+    telefono?: string;
     password: string;
     role: 'OWNER' | 'SELLER';
 }) => {
     const hashed = await bcrypt.hash(data.password, 10);
     return prisma.user.create({
-        data: { ...data, password: hashed },
-        select: { id: true, name: true, email: true, role: true },
+        data: { 
+            ...data,
+            username: data.username.toLowerCase(),
+            cedula: data.cedula.toUpperCase(),
+            password: hashed 
+        },
+        select: { 
+            id: true, 
+            username: true,
+            nombre: true,
+            role: true 
+        },
+    });
+};
+
+export const updateUser = async (id: string, data: {
+    username?: string;
+    nombre?: string;
+    apellido?: string;
+    email?: string;
+    telefono?: string;
+    role?: 'OWNER' | 'SELLER';
+    isActive?: boolean;
+}) => {
+    return prisma.user.update({
+        where: { id },
+        data,
+        select: { 
+            id: true, 
+            username: true,
+            nombre: true,
+            role: true,
+            isActive: true 
+        },
     });
 };

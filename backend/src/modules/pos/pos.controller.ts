@@ -1,16 +1,8 @@
-// ============================
-// POS MODULE — CONTROLLER
-// ============================
-
 import { Response } from 'express';
 import * as posService from './pos.service';
 import { AuthRequest } from '../../core/middlewares/auth.middleware';
 import { logAudit, extractIp } from '../../core/middlewares/audit.middleware';
-
-enum TransactionType {
-    SALE = 'SALE',
-    INVENTORY_IN = 'INVENTORY_IN'
-}
+import { TransactionType } from '@prisma/client';
 
 export const createTransaction = async (req: AuthRequest, res: Response): Promise<void> => {
     const { type, branchId, items, cashRegisterId, notes } = req.body;
@@ -59,7 +51,6 @@ export const createTransaction = async (req: AuthRequest, res: Response): Promis
 export const getTransactions = async (req: AuthRequest, res: Response): Promise<void> => {
     const { type, branchId, from, to, page, limit } = req.query;
 
-    // SELLER solo ve sus propias transacciones
     const userId = req.user!.role === 'SELLER' ? req.user!.id : (req.query.userId as string | undefined);
 
     const transactions = await posService.getTransactions({

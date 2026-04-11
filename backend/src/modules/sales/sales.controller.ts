@@ -9,8 +9,8 @@ export const createSale = async (req: Request, res: Response) => {
 
 /** GET /api/sales - List all sales with filters */
 export const getSales = async (req: Request, res: Response) => {
-    const { startDate, endDate, cashierId } = req.query as Record<string, string>;
-    const sales = await salesService.getSales({ startDate, endDate, cashierId });
+    const { startDate, endDate, userId, branchId } = req.query as Record<string, string>;
+    const sales = await salesService.getSales({ startDate, endDate, userId, branchId });
     res.json(sales);
 };
 

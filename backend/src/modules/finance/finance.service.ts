@@ -1,66 +1,59 @@
 import { prisma } from '../../config/prisma';
+import { CashRegister, Transaction } from '@prisma/client';
 
-// OBTENER LA CAJA ABIERTA ACTUAL DE LA SUCURSAL
-export const getOpenRegister = async (branchId: string, userId: string) => {
-    return (prisma as any).cashRegister.findFirst({
+interface CashRegisterWithTransactions extends CashRegister {
+    transactions?: Transaction[];
+}
+
+export const getOpenRegister = async (branchId: string) => {
+    return prisma.cashRegister.findFirst({
         where: { branchId, status: 'OPEN' },
         include: {
-            transactions: true
-        }
+            transactions: { where: { status: 'COMPLETED' } },
+            user: { select: { id: true, nombre: true, username: true } },
+        },
     });
 };
 
-// ABRIR CAJA (NUEVO TURNO)
 export const openRegister = async (data: { branchId: string; userId: string; openingAmount: number }) => {
-    // Check if there's already an open register
-    const existing = await (prisma as any).cashRegister.findFirst({
-        where: { branchId: data.branchId, status: 'OPEN' }
+    const existing = await prisma.cashRegister.findFirst({
+        where: { branchId: data.branchId, status: 'OPEN' },
     });
     if (existing) {
         throw new Error('Ya existe una caja abierta para esta sucursal');
     }
 
-    return (prisma as any).cashRegister.create({
+    return prisma.cashRegister.create({
         data: {
             branchId: data.branchId,
             userId: data.userId,
             openingAmount: data.openingAmount,
-            status: 'OPEN'
-        }
+            status: 'OPEN',
+        },
+        include: { user: { select: { id: true, nombre: true, username: true } } },
     });
 };
 
-// CERRAR CAJA
 export const closeRegister = async (registerId: string, data: { closingAmount: number; notes?: string }) => {
-    const register = await (prisma as any).cashRegister.findUnique({
+    const register = await prisma.cashRegister.findUnique({
         where: { id: registerId },
-        include: { transactions: true }
+        include: { transactions: { where: { status: 'COMPLETED' } } },
     });
 
     if (!register) throw new Error('Caja no encontrada');
     if (register.status === 'CLOSED') throw new Error('La caja ya está cerrada');
 
-    // Expected amount = opening amount + income (sales) - expenses
     let expectedAmount = register.openingAmount;
     
-    register.transactions.forEach((t: any) => {
+    for (const t of register.transactions) {
         if (t.type === 'SALE' && t.status === 'COMPLETED') {
-            expectedAmount += t.totalAmount;
+            expectedAmount += t.total;
         }
-        // If there were expenses tracked
-        if (t.type === 'ADJUSTMENT') {
-            // we could adjust this logic, assuming totalAmount for adjustment is negative if it is an expense.
-            if (t.totalAmount < 0) {
-               expectedAmount += t.totalAmount; // Add negative
-            } else {
-               expectedAmount += t.totalAmount; // Income adj
-            }
-        }
-    });
+    }
 
     const difference = data.closingAmount - expectedAmount;
 
-    return (prisma as any).cashRegister.update({
+    return prisma.cashRegister.update({
         where: { id: registerId },
         data: {
             status: 'CLOSED',
@@ -68,27 +61,46 @@ export const closeRegister = async (registerId: string, data: { closingAmount: n
             closingAmount: data.closingAmount,
             expectedAmount,
             difference,
-            notes: data.notes
-        }
+            notes: data.notes,
+        },
+        include: {
+            user: { select: { id: true, nombre: true, username: true } },
+            transactions: true,
+        },
     });
 };
 
-// ENDPOINT PARA CREAR UN MOVIMIENTO MANUAL DE CAJA (EGRESO/INGRESO)
-export const addCashMovement = async (registerId: string, data: { branchId: string, userId: string, subType: 'EXPENSE' | 'INCOME', amount: number, notes?: string }) => {
-    const register = await (prisma as any).cashRegister.findUnique({ where: { id: registerId } });
+export const addCashMovement = async (
+    registerId: string,
+    data: { branchId: string; userId: string; type: 'EXPENSE' | 'INCOME'; amount: number; notes?: string }
+) => {
+    const register = await prisma.cashRegister.findUnique({ where: { id: registerId } });
     if (!register || register.status !== 'OPEN') throw new Error('Caja no está abierta');
 
-    const finalAmount = data.subType === 'EXPENSE' ? -Math.abs(data.amount) : Math.abs(data.amount);
+    const finalAmount = data.type === 'EXPENSE' ? -Math.abs(data.amount) : Math.abs(data.amount);
 
-    return (prisma as any).transaction.create({
+    return prisma.transaction.create({
         data: {
-            type: 'ADJUSTMENT',
+            type: 'SALE',
             status: 'COMPLETED',
-            totalAmount: finalAmount,
+            total: finalAmount,
+            notes: data.notes || (data.type === 'EXPENSE' ? 'Egreso de caja' : 'Ingreso de caja'),
             branchId: data.branchId,
             userId: data.userId,
             cashRegisterId: registerId,
-            paymentMethod: data.notes || (data.subType === 'EXPENSE' ? 'EGRESO_CAJA' : 'INGRESO_CAJA')
-        }
+        },
+        include: { user: { select: { id: true, nombre: true } } },
+    });
+};
+
+export const getRegisterHistory = async (branchId: string, limit = 20) => {
+    return prisma.cashRegister.findMany({
+        where: { branchId },
+        orderBy: { openedAt: 'desc' },
+        take: limit,
+        include: {
+            user: { select: { id: true, nombre: true, username: true } },
+            transactions: { where: { status: 'COMPLETED' } },
+        },
     });
 };
