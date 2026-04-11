@@ -4,7 +4,7 @@
 // ============================
 
 import { prisma, prismaCloud } from '../../config/prisma';
-import { PrismaClient, Prisma } from '@prisma/client';
+import type { KPIsDTO, SalesTrendDTO, TopProductDTO, SalesByBranchDTO } from '../../core/types/dto';
 
 /**
  * Retorna el cliente de Prisma a usar según el rol y disponibilidad.
@@ -12,28 +12,30 @@ import { PrismaClient, Prisma } from '@prisma/client';
  */
 export const getPreferredClient = (role?: string): any => {
     if (role === 'OWNER') return prismaCloud;
-    return prisma; // El proxy decide según el modo (Electron/Cloud)
+    return prisma;
 };
 
 /** KPIs principales del dashboard */
-export const getDashboardKPIs = async (client: any, branchId?: string) => {
+export const getDashboardKPIs = async (client: any, branchId?: string): Promise<KPIsDTO> => {
     const now = new Date();
     const startOfToday = new Date(now);
     startOfToday.setHours(0, 0, 0, 0);
 
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - 7);
 
     const isSQLite = (client as any)._activeProvider === 'sqlite' || process.env.ELECTRON === 'true';
 
     const [
         salesToday,
         salesThisMonth,
+        salesThisWeek,
         totalProducts,
         lowStockCount,
         openRegister,
         transactionsToday,
     ] = await Promise.all([
-        // Ventas del día
         client.transaction.aggregate({
             where: {
                 type: 'SALE',
@@ -45,7 +47,6 @@ export const getDashboardKPIs = async (client: any, branchId?: string) => {
             _count: true,
         }),
 
-        // Ventas del mes
         client.transaction.aggregate({
             where: {
                 type: 'SALE',
@@ -57,22 +58,28 @@ export const getDashboardKPIs = async (client: any, branchId?: string) => {
             _count: true,
         }),
 
-        // Productos activos
+        client.transaction.aggregate({
+            where: {
+                type: 'SALE',
+                status: 'COMPLETED',
+                createdAt: { gte: startOfWeek },
+                ...(branchId && { branchId }),
+            },
+            _sum: { total: true },
+            _count: true,
+        }),
+
         client.product.count({ where: { isActive: true } }),
 
-        // Stock bajo (stock <= minStock)
-        // Adaptamos queryRaw para SQLite y Postgres
         isSQLite 
-          ? client.$queryRaw`SELECT COUNT(*) as count FROM branch_inventory WHERE stock <= minStock ${branchId ? Prisma.sql`AND branchId = ${branchId}` : Prisma.empty}`
-          : client.$queryRaw`SELECT COUNT(*) as count FROM branch_inventory WHERE stock <= "minStock" ${branchId ? Prisma.sql`AND "branchId" = ${branchId}` : Prisma.empty}`,
+            ? client.$queryRaw`SELECT COUNT(*) as count FROM branch_inventory WHERE stock <= minStock ${branchId ? require('prisma').Prisma.sql`AND branchId = ${branchId}` : require('prisma').Prisma.empty}`
+            : client.$queryRaw`SELECT COUNT(*) as count FROM branch_inventory WHERE stock <= "minStock" ${branchId ? require('prisma').Prisma.sql`AND "branchId" = ${branchId}` : require('prisma').Prisma.empty}`,
 
-        // Caja abierta
         client.cashRegister.findFirst({
             where: { status: 'OPEN', ...(branchId && { branchId }) },
             select: { id: true, openingAmount: true, openedAt: true },
         }),
 
-        // Transacciones hoy
         client.transaction.count({
             where: {
                 createdAt: { gte: startOfToday },
@@ -84,32 +91,31 @@ export const getDashboardKPIs = async (client: any, branchId?: string) => {
     return {
         sales: {
             today: {
-                total: salesToday._sum.total ? parseFloat(salesToday._sum.total.toString()) : 0,
+                total: salesToday._sum.total ? Number(salesToday._sum.total) : 0,
                 count: salesToday._count,
             },
             thisMonth: {
-                total: salesThisMonth._sum.total ? parseFloat(salesThisMonth._sum.total.toString()) : 0,
+                total: salesThisMonth._sum.total ? Number(salesThisMonth._sum.total) : 0,
                 count: salesThisMonth._count,
             },
+            weekSales: salesThisWeek._sum.total ? Number(salesThisWeek._sum.total) : 0,
         },
         inventory: {
             totalProducts,
-            lowStockAlerts: Number((lowStockCount as any)[0]?.count ?? 0),
+            lowStockAlerts: Number((lowStockCount as any)?.[0]?.count ?? 0),
         },
-        cashRegister: openRegister,
+        cashRegister: openRegister as KPIsDTO['cashRegister'],
         transactionsToday,
     };
 };
 
 /** Ventas por día de los últimos N días (para gráfica de líneas) */
-export const getSalesTrend = async (client: any, branchId?: string, days = 30) => {
+export const getSalesTrend = async (client: any, branchId?: string, days = 30): Promise<SalesTrendDTO[]> => {
     const since = new Date();
     since.setDate(since.getDate() - days);
 
     const isSQLite = (client as any)._activeProvider === 'sqlite' || process.env.ELECTRON === 'true';
 
-    // Postgres usa DATE() y ::float
-    // SQLite usa strftime() o simplemente casting
     let data;
     if (isSQLite) {
         data = await client.$queryRaw<{ day: string; total: number; count: bigint }[]>`
@@ -121,7 +127,7 @@ export const getSalesTrend = async (client: any, branchId?: string, days = 30) =
             WHERE type = 'SALE'
               AND status = 'COMPLETED'
               AND createdAt > ${since}
-              ${branchId ? Prisma.sql`AND branchId = ${branchId}` : Prisma.empty}
+              ${branchId ? require('prisma').Prisma.sql`AND branchId = ${branchId}` : require('prisma').Prisma.empty}
             GROUP BY day
             ORDER BY day ASC
         `;
@@ -135,7 +141,7 @@ export const getSalesTrend = async (client: any, branchId?: string, days = 30) =
             WHERE type = 'SALE'
               AND status = 'COMPLETED'
               AND "createdAt" > ${since}
-              ${branchId ? Prisma.sql`AND "branchId" = ${branchId}` : Prisma.empty}
+              ${branchId ? require('prisma').Prisma.sql`AND "branchId" = ${branchId}` : require('prisma').Prisma.empty}
             GROUP BY DATE("createdAt")
             ORDER BY day ASC
         `;
@@ -149,7 +155,7 @@ export const getSalesTrend = async (client: any, branchId?: string, days = 30) =
 };
 
 /** Top 10 productos más vendidos (por unidades) */
-export const getTopProducts = async (client: any, branchId?: string, limit = 10) => {
+export const getTopProducts = async (client: any, branchId?: string, limit = 10): Promise<TopProductDTO[]> => {
     const data = await client.transactionItem.groupBy({
         by: ['productId'],
         where: {
@@ -174,13 +180,13 @@ export const getTopProducts = async (client: any, branchId?: string, limit = 10)
 
     return data.map((d: any) => ({
         product: products.find((p: any) => p.id === d.productId),
-        totalQuantity: d._sum.quantity,
-        totalRevenue: d._sum.subtotal ? parseFloat(d._sum.subtotal.toString()) : 0,
+        totalQuantity: d._sum.quantity ?? 0,
+        totalRevenue: d._sum.subtotal ? Number(d._sum.subtotal) : 0,
     }));
 };
 
 /** Ventas por sede (comparativo) */
-export const getSalesByBranch = async (client: any, from?: string, to?: string) => {
+export const getSalesByBranch = async (client: any, from?: string, to?: string): Promise<SalesByBranchDTO[]> => {
     const data = await client.transaction.groupBy({
         by: ['branchId'],
         where: {
@@ -192,7 +198,7 @@ export const getSalesByBranch = async (client: any, from?: string, to?: string) 
                           ...(from && { gte: new Date(from) }),
                           ...(to && { lte: new Date(to) }),
                       },
-                   }
+                  }
                 : {}),
         },
         _sum: { total: true },
@@ -207,7 +213,7 @@ export const getSalesByBranch = async (client: any, from?: string, to?: string) 
 
     return data.map((d: any) => ({
         branch: branches.find((b: any) => b.id === d.branchId),
-        totalSales: d._sum.total ? parseFloat(d._sum.total.toString()) : 0,
+        totalSales: d._sum.total ? Number(d._sum.total) : 0,
         transactionCount: d._count,
     }));
 };

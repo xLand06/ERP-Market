@@ -1,17 +1,36 @@
+// =============================================================================
+// ROLE GUARD — Access Control para ERP-MARKET
+// =============================================================================
+
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from './auth.middleware';
+import { ForbiddenError } from './errorHandler';
 
-// Roles del sistema ERP-MARKET
-type Role = 'OWNER' | 'SELLER';
+export type Role = 'OWNER' | 'SELLER';
 
-/**
- * Middleware de guard por rol.
- * @example router.delete('/:id', authMiddleware, roleGuard('OWNER'), controller)
- */
-export const roleGuard = (...roles: Role[]) =>
-    (req: AuthRequest, res: Response, next: NextFunction) => {
-        if (!req.user || !roles.includes(req.user.role as Role)) {
-            return res.status(403).json({ error: 'Forbidden: permisos insuficientes' });
+export const roleGuard = (...roles: Role[]) => {
+    return (req: AuthRequest, res: Response, next: NextFunction): void => {
+        if (!req.user) {
+            next(new ForbiddenError('No autenticado'));
+            return;
         }
+
+        const userRole = req.user.role as Role;
+        
+        if (!roles.includes(userRole)) {
+            next(new ForbiddenError(`Se requiere uno de los roles: ${roles.join(', ')}`));
+            return;
+        }
+
         next();
     };
+};
+
+export const requireOwner = (req: AuthRequest, res: Response, next: NextFunction) => 
+    roleGuard('OWNER')(req, res, next);
+
+export const requireSeller = (req: AuthRequest, res: Response, next: NextFunction) => 
+    roleGuard('SELLER')(req, res, next);
+
+export const requireAny = (req: AuthRequest, res: Response, next: NextFunction) => 
+    roleGuard('OWNER', 'SELLER')(req, res, next);

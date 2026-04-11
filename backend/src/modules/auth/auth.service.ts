@@ -6,14 +6,39 @@ import { prisma } from '../../config/prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
+import { logger } from '../../core/utils/logger';
 
-export const login = async (email: string, password: string) => {
-    const user = await prisma.user.findUnique({ where: { email, isActive: true } });
-    if (!user) return null;
+export const login = async (email: string, password: string, ip?: string) => {
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase(), isActive: true } });
+    
+    if (!user) {
+        logger.warn('Intento de login con usuario no existente', {
+            module: 'auth',
+            email: email.toLowerCase(),
+            ip,
+        });
+        return null;
+    }
+    
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return null;
+    if (!valid) {
+        logger.warn('Contraseña incorrecta en login', {
+            module: 'auth',
+            userId: user.id,
+            ip,
+        });
+        return null;
+    }
 
     const token = jwt.sign({ id: user.id, role: user.role }, env.JWT_SECRET, { expiresIn: '12h' });
+    
+    logger.info('Login exitoso', {
+        module: 'auth',
+        userId: user.id,
+        role: user.role,
+        ip,
+    });
+    
     return {
         token,
         user: { id: user.id, name: user.name, email: user.email, role: user.role },

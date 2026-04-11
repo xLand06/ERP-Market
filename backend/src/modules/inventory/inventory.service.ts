@@ -142,14 +142,28 @@ export const adjustStock = async (
     });
 };
 
-export const getLowStockAlerts = (branchId?: string) =>
-    prisma.branchInventory.findMany({
+export const getLowStockAlerts = async (branchId?: string) => {
+    if (branchId) {
+        return prisma.branchInventory.findMany({
+            where: {
+                branchId,
+                stock: { lte: prisma.raw('minStock') },
+            },
+            include: {
+                product: { select: { id: true, name: true, barcode: true } },
+                branch: { select: { id: true, name: true } },
+            },
+            orderBy: { stock: 'asc' },
+        });
+    }
+    return prisma.branchInventory.findMany({
         where: {
-            ...(branchId && { branchId }),
-            stock: { lte: prisma.branchInventory.fields.minStock },
+            stock: { lte: prisma.raw('minStock') },
         },
         include: {
             product: { select: { id: true, name: true, barcode: true } },
             branch: { select: { id: true, name: true } },
         },
+        orderBy: { stock: 'asc' },
     });
+};

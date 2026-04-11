@@ -53,7 +53,7 @@ export const closeCashRegister = async (
 
     // Calcular monto esperado: apertura + suma de ventas
     const salesTotal = cashRegister.transactions.reduce(
-        (sum, tx) => sum + parseFloat(tx.total.toString()),
+        (sum: number, tx: { total: { toString: () => string } }) => sum + parseFloat(tx.total.toString()),
         0
     );
     const expectedAmount = parseFloat(cashRegister.openingAmount.toString()) + salesTotal;
@@ -149,7 +149,7 @@ export const getDailySalesSummary = async (branchId: string, date?: string) => {
         include: { items: { include: { product: { select: { name: true } } } } },
     });
 
-    const total = transactions.reduce((sum, tx) => sum + parseFloat(tx.total.toString()), 0);
+    const total = transactions.reduce((sum: number, tx: { total: { toString: () => string } }) => sum + parseFloat(tx.total.toString()), 0);
 
     return {
         date: targetDate.toISOString().split('T')[0],

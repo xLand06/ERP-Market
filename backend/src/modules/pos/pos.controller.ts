@@ -6,7 +6,11 @@ import { Response } from 'express';
 import * as posService from './pos.service';
 import { AuthRequest } from '../../core/middlewares/auth.middleware';
 import { logAudit, extractIp } from '../../core/middlewares/audit.middleware';
-import { TransactionType } from '@prisma/client';
+
+enum TransactionType {
+    SALE = 'SALE',
+    INVENTORY_IN = 'INVENTORY_IN'
+}
 
 export const createTransaction = async (req: AuthRequest, res: Response): Promise<void> => {
     const { type, branchId, items, cashRegisterId, notes } = req.body;

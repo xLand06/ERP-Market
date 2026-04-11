@@ -4,8 +4,19 @@
 // ============================
 
 import { prisma } from '../../config/prisma';
-import { TransactionType, TransactionStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+
+enum TransactionType {
+    SALE = 'SALE',
+    INVENTORY_IN = 'INVENTORY_IN',
+    ADJUSTMENT = 'ADJUSTMENT'
+}
+
+enum TransactionStatus {
+    PENDING = 'PENDING',
+    COMPLETED = 'COMPLETED',
+    CANCELLED = 'CANCELLED'
+}
 
 export interface TransactionItemInput {
     productId: string;
@@ -70,7 +81,7 @@ export const createTransaction = async (input: CreateTransactionInput) => {
     }
 
     // ── Transacción atómica en BD ───────────────────────────────────────────
-    const transaction = await prisma.$transaction(async (tx) => {
+    const transaction = await prisma.$transaction(async (tx: typeof prisma) => {
         // 1. Crear registro principal
         const txRecord = await (tx as any).transaction.create({
             data: {
@@ -171,7 +182,7 @@ export const cancelTransaction = async (id: string) => {
     if (!tx) throw new Error('Transacción no encontrada');
     if (tx.status === 'CANCELLED') throw new Error('La transacción ya está cancelada');
 
-    return prisma.$transaction(async (prismaClient) => {
+    return prisma.$transaction(async (prismaClient: typeof prisma) => {
         await prismaClient.transaction.update({
             where: { id },
             data: { status: TransactionStatus.CANCELLED },

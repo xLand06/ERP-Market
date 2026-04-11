@@ -73,7 +73,7 @@ export const auditAction = (
                             userId: req.user.id,
                         },
                     })
-                    .catch((err) => console.error('[AuditLog] Error saving log:', err));
+                    .catch((err: Error) => console.error('[AuditLog] Error saving log:', err));
             }
             return originalJson(body);
         };

@@ -1,10 +1,8 @@
-import { defineConfig } from 'prisma/config';
-import { PrismaNeon } from '@prisma/adapter-neon';
-
-// prisma.config.ts — Configuración para el cliente Cloud (Neon PostgreSQL)
-// El cliente local (SQLite) usa su propio schema.local.prisma
+import "dotenv/config";
+import { defineConfig, env } from 'prisma/config';
 
 export default defineConfig({
-    earlyAccess: true,
-    schema: './prisma/schema.prisma',
+  earlyAccess: true,
+  schema: './prisma/schema.prisma',
+  datasource: { url: env('DATABASE_URL') },
 });

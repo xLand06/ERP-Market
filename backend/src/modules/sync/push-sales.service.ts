@@ -1,5 +1,5 @@
 import { prismaCloud, getLocalPrisma } from '../../config/prisma';
-import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 
 /**
  * Service to push local sales and cash register data to cloud.
@@ -21,10 +21,10 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                 where: { id: reg.id },
                 update: {
                     status: reg.status as any,
-                    openingAmount: new Prisma.Decimal(reg.openingAmount),
-                    closingAmount: reg.closingAmount ? new Prisma.Decimal(reg.closingAmount) : null,
-                    expectedAmount: reg.expectedAmount ? new Prisma.Decimal(reg.expectedAmount) : null,
-                    difference: reg.difference ? new Prisma.Decimal(reg.difference) : null,
+                    openingAmount: new Decimal(reg.openingAmount),
+                    closingAmount: reg.closingAmount ? new Decimal(reg.closingAmount) : null,
+                    expectedAmount: reg.expectedAmount ? new Decimal(reg.expectedAmount) : null,
+                    difference: reg.difference ? new Decimal(reg.difference) : null,
                     notes: reg.notes,
                     openedAt: reg.openedAt,
                     closedAt: reg.closedAt,
@@ -34,10 +34,10 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                 create: {
                     id: reg.id,
                     status: reg.status as any,
-                    openingAmount: new Prisma.Decimal(reg.openingAmount),
-                    closingAmount: reg.closingAmount ? new Prisma.Decimal(reg.closingAmount) : null,
-                    expectedAmount: reg.expectedAmount ? new Prisma.Decimal(reg.expectedAmount) : null,
-                    difference: reg.difference ? new Prisma.Decimal(reg.difference) : null,
+                    openingAmount: new Decimal(reg.openingAmount),
+                    closingAmount: reg.closingAmount ? new Decimal(reg.closingAmount) : null,
+                    expectedAmount: reg.expectedAmount ? new Decimal(reg.expectedAmount) : null,
+                    difference: reg.difference ? new Decimal(reg.difference) : null,
                     notes: reg.notes,
                     openedAt: reg.openedAt,
                     closedAt: reg.closedAt,
@@ -67,7 +67,7 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                 update: {
                     type: tx.type as any,
                     status: tx.status as any,
-                    total: new Prisma.Decimal(tx.total),
+                    total: new Decimal(tx.total),
                     notes: tx.notes,
                     ipAddress: tx.ipAddress,
                     createdAt: tx.createdAt,
@@ -79,7 +79,7 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                     id: tx.id,
                     type: tx.type as any,
                     status: tx.status as any,
-                    total: new Prisma.Decimal(tx.total),
+                    total: new Decimal(tx.total),
                     notes: tx.notes,
                     ipAddress: tx.ipAddress,
                     createdAt: tx.createdAt,
@@ -92,8 +92,8 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                             id: it.id,
                             productId: it.productId,
                             quantity: it.quantity,
-                            unitPrice: new Prisma.Decimal(it.unitPrice),
-                            subtotal: new Prisma.Decimal(it.subtotal)
+                            unitPrice: new Decimal(it.unitPrice),
+                            subtotal: new Decimal(it.subtotal)
                         }))
                     }
                 }

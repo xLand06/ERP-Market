@@ -9,9 +9,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
 }
 
 // =============================================================================
@@ -58,6 +56,9 @@ model User {
   cashRegisters CashRegister[]
   auditLogs     AuditLog[]
 
+  // Índices
+  @@index([role])
+  @@index([isActive])
   @@map("users")
 }
 
@@ -119,6 +120,10 @@ model Product {
   inventory        BranchInventory[]
   transactionItems TransactionItem[]
 
+  // Índices para optimize queries
+  @@index([name])
+  @@index([categoryId])
+  @@index([isActive])
   @@map("products")
 }
 
@@ -140,6 +145,9 @@ model BranchInventory {
   branch   Branch @relation(fields: [branchId], references: [id])
 
   @@unique([productId, branchId]) // Un producto = un registro por sede
+  @@index([branchId])
+  @@index([stock])
+  @@index([branchId, stock])
   @@map("branch_inventory")
 }
 
@@ -176,6 +184,11 @@ model Transaction {
   // Líneas de detalle
   items TransactionItem[]
 
+  // Índices para queries frecuentes
+  @@index([branchId, createdAt])
+  @@index([userId])
+  @@index([type, status])
+  @@index([createdAt])
   @@map("transactions")
 }
 
