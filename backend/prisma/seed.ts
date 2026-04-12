@@ -38,9 +38,10 @@ async function main() {
             email: 'vendedor@erp-market.com',
             password: await bcrypt.hash('vendedor123', 10),
             role: 'SELLER',
+            branchId: 'branch-b',
         },
     });
-    console.log(`✅ Usuario SELLER: ${seller.username}`);
+    console.log(`✅ Usuario SELLER: ${seller.username} → ${branchB.name}`);
 
     // ── 2. SEDES ─────────────────────────────────────────────────────────
     const branchA = await prisma.branch.upsert({

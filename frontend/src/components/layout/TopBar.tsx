@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowLeftRight, Bell, ChevronDown, LogOut, Settings, User, Menu, Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { BranchSelector } from '@/components/branch/BranchSelector';
 
 const RATES: Record<string, number> = { USD: 1, VES: 36.50, COP: 4100 };
 const SYMBOLS: Record<string, string> = { USD: '$', VES: 'Bs.', COP: '$' };
@@ -94,8 +95,11 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                 </div>
             </div>
 
-            {/* Right – Notifications + Profile */}
+            {/* Right – BranchSelector + Notifications + Profile */}
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                {/* Branch Selector */}
+                <BranchSelector />
+
                 {/* Bell */}
                 <button className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors" aria-label="Notificaciones">
                     <Bell className="w-4.5 h-4.5" />

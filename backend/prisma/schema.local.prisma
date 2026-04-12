@@ -74,6 +74,9 @@ model User {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
+  branchId    String?
+  branch     Branch?   @relation(fields: [branchId], references: [id])
+
   transactions  Transaction[]
   cashRegisters CashRegister[]
   auditLogs     AuditLog[]
@@ -82,6 +85,7 @@ model User {
   @@index([cedula])
   @@index([role])
   @@index([isActive])
+  @@index([branchId])
   @@map("users")
 }
 
@@ -98,6 +102,7 @@ model Branch {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+  users         User[]
   inventory     BranchInventory[]
   transactions  Transaction[]
   cashRegisters CashRegister[]

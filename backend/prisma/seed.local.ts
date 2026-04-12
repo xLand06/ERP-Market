@@ -65,6 +65,7 @@ async function main() {
             email: 'vendedor@erp-market.com',
             password: hashedPassword,
             role: 'SELLER',
+            branchId: 'branch-sede-b',
         },
     });
 
