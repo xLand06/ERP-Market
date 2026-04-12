@@ -8,7 +8,7 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/', async (_req: Request, res: Response) =>
-    res.json(await prisma.supplier.findMany({ include: { products: { take: 5 } } }))
+    res.json(await prisma.supplier.findMany())
 );
 
 router.post('/', roleGuard('OWNER', 'SELLER'), async (req: Request, res: Response) =>

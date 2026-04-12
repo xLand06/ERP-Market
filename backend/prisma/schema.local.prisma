@@ -15,7 +15,6 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = env("LOCAL_DATABASE_URL")
 }
 
 // =============================================================================
@@ -110,6 +109,7 @@ model Product {
   name        String
   description String?
   barcode     String?  @unique
+  baseUnit    String   @default("UNIDAD")
   price       Float                       // ← Float (era Decimal)
   cost        Float?                      // ← Float?
   imageUrl    String?
@@ -121,10 +121,26 @@ model Product {
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
 
+  presentations    ProductPresentation[]
   inventory        BranchInventory[]
   transactionItems TransactionItem[]
 
   @@map("products")
+}
+
+model ProductPresentation {
+  id        String @id @default(cuid())
+  name      String
+  multiplier Float
+  price      Float
+  barcode    String? @unique
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  transactionItems TransactionItem[]
+
+  @@map("product_presentations")
 }
 
 // =============================================================================
@@ -134,8 +150,8 @@ model Product {
 
 model BranchInventory {
   id        String   @id @default(cuid())
-  stock     Int      @default(0)
-  minStock  Int      @default(0)
+  stock     Float    @default(0)
+  minStock  Float    @default(0)
   updatedAt DateTime @updatedAt
 
   productId String
@@ -182,7 +198,7 @@ model Transaction {
 
 model TransactionItem {
   id        String @id @default(cuid())
-  quantity  Int
+  quantity  Float                          // ← Float
   unitPrice Float                          // ← Float
   subtotal  Float                          // ← Float
 
@@ -190,6 +206,9 @@ model TransactionItem {
   transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
   productId     String
   product       Product     @relation(fields: [productId], references: [id])
+
+  presentationId String?
+  presentation   ProductPresentation? @relation(fields: [presentationId], references: [id])
 
   @@map("transaction_items")
 }

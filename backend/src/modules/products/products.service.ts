@@ -6,12 +6,12 @@ export const getAllProducts = (filters: { categoryId?: string; search?: string }
             categoryId: filters.categoryId,
             name: filters.search ? { contains: filters.search, mode: 'insensitive' } : undefined,
         },
-        include: { category: true, batches: { orderBy: { expirationDate: 'asc' }, take: 1 } },
+        include: { category: true },
         orderBy: { name: 'asc' },
     });
 
 export const getProductById = (id: string) =>
-    prisma.product.findUnique({ where: { id }, include: { category: true, batches: true, supplier: true } });
+    prisma.product.findUnique({ where: { id }, include: { category: true } });
 
 export const createProduct = (data: any) => prisma.product.create({ data });
 

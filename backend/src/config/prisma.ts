@@ -19,6 +19,9 @@ const globalForPrisma = globalThis as unknown as { prismaCloud: PrismaClient };
 export const prismaCloud =
     globalForPrisma.prismaCloud ||
     new PrismaClient({
+        datasource: {
+            url: process.env.DATABASE_URL,
+        },
         log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
     });
 
@@ -39,8 +42,8 @@ export const getLocalPrisma = (): any => {
             // eslint-disable-next-line @typescript-eslint/no-var-requires
             const { PrismaClient: LocalClient } = require('../../node_modules/.prisma/client-local');
             _prismaLocal = new LocalClient({
-                datasources: {
-                    db: { url: process.env.LOCAL_DATABASE_URL || 'file:./erp-market.db' },
+                datasource: {
+                    url: process.env.LOCAL_DATABASE_URL || 'file:./erp-market.db',
                 },
                 log: process.env.NODE_ENV === 'development' ? ['error'] : ['error'],
             });

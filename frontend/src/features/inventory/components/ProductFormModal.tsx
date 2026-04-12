@@ -9,14 +9,24 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+export interface ProductFormPresentation {
+    id?: string;
+    name: string;
+    multiplier: string;
+    price: string;
+    barcode: string;
+}
+
 export interface ProductForm {
     code: string;
     name: string;
+    baseUnit: string;
     category: string;
     cost: string;
     price: string;
     stock: string;
     minStock: string;
+    presentations: ProductFormPresentation[];
 }
 
 interface ProductFormModalProps {
@@ -279,7 +289,8 @@ export function ProductFormModal({
     open, onClose, onSave, initial, initialCategories, mode = 'create',
 }: ProductFormModalProps) {
     const empty: ProductForm = {
-        code: '', name: '', category: '', cost: '', price: '', stock: '', minStock: '',
+        code: '', name: '', baseUnit: 'Unidad', category: '', cost: '', price: '', stock: '', minStock: '',
+        presentations: [],
     };
 
     const [form, setForm]         = useState<ProductForm>({ ...empty, ...initial });
@@ -297,11 +308,12 @@ export function ProductFormModal({
         const errs: Partial<ProductForm> = {};
         if (!form.code.trim())                              errs.code     = 'Requerido';
         if (!form.name.trim())                              errs.name     = 'Requerido';
+        if (!form.baseUnit.trim())                          errs.baseUnit = 'Requerido';
         if (!form.category)                                 errs.category = 'Selecciona o escribe una categoría';
         if (!form.cost   || parseFloat(form.cost)   <= 0)  errs.cost     = 'Costo inválido';
         if (!form.price  || parseFloat(form.price)  <= 0)  errs.price    = 'Precio de venta inválido';
-        if (form.stock   === '' || parseInt(form.stock)  < 0) errs.stock  = 'Stock inválido';
-        if (form.minStock === '' || parseInt(form.minStock) < 0) errs.minStock = 'Mínimo inválido';
+        if (form.stock   === '' || parseFloat(form.stock) < 0) errs.stock  = 'Stock inválido';
+        if (form.minStock === '' || parseFloat(form.minStock) < 0) errs.minStock = 'Mínimo inválido';
         setErrors(errs);
         return Object.keys(errs).length === 0;
     };
@@ -327,6 +339,32 @@ export function ProductFormModal({
     const stockId     = useId();
     const minStockId  = useId();
     const nameId      = useId();
+    const baseUnitId  = useId();
+
+    const addPresentation = () => {
+        setForm(prev => ({
+            ...prev,
+            presentations: [
+                ...prev.presentations,
+                { name: '', multiplier: '1', price: prev.price, barcode: '' }
+            ]
+        }));
+    };
+
+    const removePresentation = (index: number) => {
+        setForm(prev => ({
+            ...prev,
+            presentations: prev.presentations.filter((_, i) => i !== index)
+        }));
+    };
+
+    const updatePresentation = (index: number, key: keyof ProductFormPresentation, val: string) => {
+        setForm(prev => {
+            const next = [...prev.presentations];
+            next[index] = { ...next[index], [key]: val };
+            return { ...prev, presentations: next };
+        });
+    };
 
     return (
         <Dialog open={open} onOpenChange={o => !o && handleClose()}>
@@ -367,16 +405,28 @@ export function ProductFormModal({
 
                     {/* 2. Info básica */}
                     <Section title="Información del Producto">
-                        <Field label="Nombre completo" id={nameId} error={errors.name}>
-                            <Input
-                                id={nameId}
-                                placeholder="Ej: Harina PAN 1kg"
-                                value={form.name}
-                                onChange={e => set('name', e.target.value)}
-                                className={cn('bg-white', errors.name && 'border-red-400 ring-1 ring-red-300')}
-                                aria-invalid={!!errors.name}
-                            />
-                        </Field>
+                        <div className="grid grid-cols-[1fr,120px] gap-3">
+                            <Field label="Nombre completo" id={nameId} error={errors.name}>
+                                <Input
+                                    id={nameId}
+                                    placeholder="Ej: Harina PAN"
+                                    value={form.name}
+                                    onChange={e => set('name', e.target.value)}
+                                    className={cn('bg-white', errors.name && 'border-red-400 ring-1 ring-red-300')}
+                                    aria-invalid={!!errors.name}
+                                />
+                            </Field>
+                            <Field label="U. Medida" id={baseUnitId} error={errors.baseUnit} hint="Ej: Unid, Kg">
+                                <Input
+                                    id={baseUnitId}
+                                    placeholder="Unid"
+                                    value={form.baseUnit}
+                                    onChange={e => set('baseUnit', e.target.value)}
+                                    className={cn('bg-white', errors.baseUnit && 'border-red-400')}
+                                    aria-invalid={!!errors.baseUnit}
+                                />
+                            </Field>
+                        </div>
 
                         <div className="flex flex-col gap-1.5">
                             <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -446,11 +496,11 @@ export function ProductFormModal({
                                 label="Stock Inicial"
                                 id={stockId}
                                 error={errors.stock}
-                                hint="Unidades disponibles al registrar."
+                                hint={`En ${form.baseUnit || 'unidades'}.`}
                             >
                                 <Input
                                     id={stockId}
-                                    type="number" min="0"
+                                    type="number" min="0" step="0.01"
                                     placeholder="0"
                                     value={form.stock}
                                     onChange={e => set('stock', e.target.value)}
@@ -462,11 +512,11 @@ export function ProductFormModal({
                                 label="Stock Mínimo"
                                 id={minStockId}
                                 error={errors.minStock}
-                                hint="Umbral para alertas de reposición."
+                                hint="Umbral de alerta."
                             >
                                 <Input
                                     id={minStockId}
-                                    type="number" min="0"
+                                    type="number" min="0" step="0.01"
                                     placeholder="0"
                                     value={form.minStock}
                                     onChange={e => set('minStock', e.target.value)}
@@ -474,6 +524,74 @@ export function ProductFormModal({
                                     aria-invalid={!!errors.minStock}
                                 />
                             </Field>
+                        </div>
+                    </Section>
+
+                    {/* 5. Presentaciones */}
+                    <Section title="Presentaciones Adicionales (UMB)">
+                        <div className="space-y-3">
+                            {form.presentations.map((p, idx) => (
+                                <div key={idx} className="p-3 rounded-xl border border-slate-200 bg-white shadow-xs space-y-3 relative group/pres">
+                                    <button
+                                        type="button"
+                                        onClick={() => removePresentation(idx)}
+                                        className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-50 text-red-500 border border-red-100 flex items-center justify-center opacity-0 group-hover/pres:opacity-100 transition-opacity hover:bg-red-500 hover:text-white"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                    
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="flex flex-col gap-1">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase">Nombre</p>
+                                            <Input
+                                                placeholder="Ej: Caja x12"
+                                                value={p.name}
+                                                onChange={e => updatePresentation(idx, 'name', e.target.value)}
+                                                className="h-8 text-xs"
+                                            />
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase">Mult. (x{form.baseUnit})</p>
+                                            <Input
+                                                type="number" min="1"
+                                                value={p.multiplier}
+                                                onChange={e => updatePresentation(idx, 'multiplier', e.target.value)}
+                                                className="h-8 text-xs"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="flex flex-col gap-1">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase">Precio $</p>
+                                            <Input
+                                                type="number" step="0.01"
+                                                value={p.price}
+                                                onChange={e => updatePresentation(idx, 'price', e.target.value)}
+                                                className="h-8 text-xs tabular-nums"
+                                            />
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase">Código de Barras</p>
+                                            <Input
+                                                placeholder="Opcional"
+                                                value={p.barcode}
+                                                onChange={e => updatePresentation(idx, 'barcode', e.target.value)}
+                                                className="h-8 text-xs font-mono"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={addPresentation}
+                                className="w-full h-9 border-dashed border-slate-300 text-slate-500 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-all text-xs font-bold"
+                            >
+                                <Plus className="w-3.5 h-3.5 mr-2" />
+                                Agregar Presentación (Caja, Display, etc.)
+                            </Button>
                         </div>
                     </Section>
                 </div>

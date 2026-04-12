@@ -4,7 +4,8 @@
 // ============================
 
 import { prisma } from '../../config/prisma';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Prisma } from '@prisma/client';
+const { Decimal } = Prisma;
 
 // ─── CATÁLOGO MAESTRO ──────────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ export const getProductById = (id: string) =>
         where: { id },
         include: {
             category: true,
+            presentations: true,
             inventory: { include: { branch: { select: { id: true, name: true } } } },
         },
     });
@@ -37,6 +39,7 @@ export const getProductByBarcode = (barcode: string) =>
         where: { barcode },
         include: {
             category: { select: { id: true, name: true } },
+            presentations: true,
             inventory: { include: { branch: { select: { id: true, name: true } } } },
         },
     });
@@ -45,19 +48,32 @@ export const createProduct = async (data: {
     name: string;
     description?: string;
     barcode?: string;
+    baseUnit?: string;
     price: number;
     cost?: number;
     imageUrl?: string;
     categoryId?: string;
-}) =>
-    prisma.product.create({
+    presentations?: { name: string; multiplier: number; price: number; barcode?: string }[];
+}) => {
+    const { presentations, ...rest } = data;
+    return prisma.product.create({
         data: {
-            ...data,
+            ...rest,
             price: new Decimal(data.price),
             cost: data.cost ? new Decimal(data.cost) : undefined,
+            ...(presentations && presentations.length > 0 && {
+                presentations: {
+                    create: presentations.map(p => ({
+                        ...p,
+                        multiplier: Number(p.multiplier),
+                        price: Number(p.price),
+                    }))
+                }
+            })
         },
-        include: { category: true },
+        include: { category: true, presentations: true },
     });
+};
 
 export const updateProduct = async (
     id: string,
@@ -65,22 +81,64 @@ export const updateProduct = async (
         name: string;
         description: string;
         barcode: string;
+        baseUnit: string;
         price: number;
         cost: number;
         imageUrl: string;
         categoryId: string;
         isActive: boolean;
+        presentations: { id?: string; name: string; multiplier: number; price: number; barcode?: string }[];
     }>
 ) => {
-    const { price, cost, ...rest } = data;
-    return prisma.product.update({
-        where: { id },
-        data: {
-            ...rest,
-            ...(price !== undefined && { price: new Decimal(price) }),
-            ...(cost !== undefined && { cost: new Decimal(cost) }),
-        },
-        include: { category: true },
+    const { price, cost, presentations, ...rest } = data;
+    
+    // Use transaction to ensure consistency
+    return prisma.$transaction(async (tx) => {
+        if (presentations !== undefined) {
+            // Delete removed presentations or those not in the new list
+            const existingIds = presentations.map(p => p.id).filter(Boolean) as string[];
+            await tx.productPresentation.deleteMany({
+                where: {
+                    productId: id,
+                    id: { notIn: existingIds }
+                }
+            });
+
+            // Upsert presentations
+            for (const p of presentations) {
+                if (p.id) {
+                    await tx.productPresentation.update({
+                        where: { id: p.id },
+                        data: {
+                            name: p.name,
+                            multiplier: Number(p.multiplier),
+                            price: Number(p.price),
+                            barcode: p.barcode,
+                        }
+                    });
+                } else {
+                    await tx.productPresentation.create({
+                        data: {
+                            productId: id,
+                            name: p.name,
+                            multiplier: Number(p.multiplier),
+                            price: Number(p.price),
+                            barcode: p.barcode,
+                        }
+                    });
+                }
+            }
+        }
+
+        return tx.product.update({
+            where: { id },
+            data: {
+                ...rest,
+                ...(price !== undefined && { price: new Decimal(price) }),
+                ...(cost !== undefined && { cost: new Decimal(cost) }),
+            },
+            include: { category: true, presentations: true },
+        });
     });
 };
 
@@ -102,7 +160,17 @@ export const getStockByBranch = (branchId: string) =>
         where: { branchId },
         include: {
             product: {
-                select: { id: true, name: true, barcode: true, price: true, cost: true, imageUrl: true, category: { select: { name: true } } },
+                select: { 
+                    id: true, 
+                    name: true, 
+                    barcode: true, 
+                    price: true, 
+                    cost: true, 
+                    imageUrl: true, 
+                    baseUnit: true,
+                    category: { select: { name: true } },
+                    presentations: true
+                },
             },
         },
         orderBy: { product: { name: 'asc' } },
@@ -130,7 +198,7 @@ export const adjustStock = async (
         where: { productId_branchId: { productId, branchId } },
     });
 
-    const currentStock = existing?.stock ?? 0;
+    const currentStock = Number(existing?.stock ?? 0);
     const newStock = currentStock + delta;
 
     if (newStock < 0) throw new Error('Stock insuficiente');
@@ -153,3 +221,40 @@ export const getLowStockAlerts = (branchId?: string) =>
             branch: { select: { id: true, name: true } },
         },
     });
+// ─── PRESENTACIONES DE PRODUCTO ───────────────────────────────────────────
+
+export const createPresentation = (data: {
+    productId: string;
+    name: string;
+    multiplier: number;
+    price: number;
+    barcode?: string;
+}) =>
+    prisma.productPresentation.create({
+        data: {
+            ...data,
+            multiplier: Number(data.multiplier),
+            price: Number(data.price),
+        },
+    });
+
+export const updatePresentation = (
+    id: string,
+    data: Partial<{
+        name: string;
+        multiplier: number;
+        price: number;
+        barcode: string;
+    }>
+) =>
+    prisma.productPresentation.update({
+        where: { id },
+        data: {
+            ...data,
+            ...(data.multiplier !== undefined && { multiplier: Number(data.multiplier) }),
+            ...(data.price !== undefined && { price: Number(data.price) }),
+        },
+    });
+
+export const deletePresentation = (id: string) =>
+    prisma.productPresentation.delete({ where: { id } });

@@ -5,12 +5,16 @@
 
 import { prisma } from '../../config/prisma';
 import { TransactionType, TransactionStatus } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Prisma } from '@prisma/client';
+const { Decimal } = Prisma;
+
+import { calculateInventoryDeduction } from '../../utils/pos-logic';
 
 export interface TransactionItemInput {
     productId: string;
     quantity: number;
     unitPrice: number;
+    presentationId?: string;
 }
 
 export interface CreateTransactionInput {
@@ -45,10 +49,23 @@ export const createTransaction = async (input: CreateTransactionInput) => {
     let assignedCashRegisterId = cashRegisterId;
     if (type === 'SALE') {
         for (const item of items) {
+            // Obtener multiplicador si aplica
+            let multiplier = 1;
+            if (item.presentationId) {
+                const pres = await prisma.productPresentation.findUnique({
+                    where: { id: item.presentationId },
+                    select: { multiplier: true }
+                });
+                multiplier = Number(pres?.multiplier) || 1;
+            }
+
+            const baseQuantity = calculateInventoryDeduction(Number(item.quantity), multiplier);
+
             const inv = await prisma.branchInventory.findUnique({
                 where: { productId_branchId: { productId: item.productId, branchId } },
             });
-            if (!inv || inv.stock < item.quantity) {
+
+            if (!inv || Number(inv.stock) < baseQuantity) {
                 const product = await prisma.product.findUnique({
                     where: { id: item.productId },
                     select: { name: true },
@@ -85,6 +102,7 @@ export const createTransaction = async (input: CreateTransactionInput) => {
                 items: {
                     create: items.map((item) => ({
                         productId: item.productId,
+                        presentationId: item.presentationId,
                         quantity: item.quantity,
                         unitPrice: Number(item.unitPrice),
                         subtotal: Number(item.quantity * item.unitPrice),
@@ -94,16 +112,27 @@ export const createTransaction = async (input: CreateTransactionInput) => {
             include: { items: { include: { product: { select: { name: true, barcode: true } } } } },
         });
 
-        // 2. Ajustar stock atomicamente
+        // 2. Ajustar stock atomicamente usando la cantidad base (UMB)
         for (const item of items) {
-            const delta = type === 'SALE' ? -item.quantity : item.quantity;
+            let multiplier = 1;
+            if (item.presentationId) {
+                const pres = await tx.productPresentation.findUnique({
+                    where: { id: item.presentationId },
+                    select: { multiplier: true }
+                });
+                multiplier = Number(pres?.multiplier) || 1;
+            }
+
+            const baseQuantity = calculateInventoryDeduction(Number(item.quantity), multiplier);
+            const delta = type === 'SALE' ? -baseQuantity : baseQuantity;
+
             await tx.branchInventory.upsert({
                 where: { productId_branchId: { productId: item.productId, branchId } },
                 update: { stock: { increment: delta } },
                 create: {
                     productId: item.productId,
                     branchId,
-                    stock: type === 'INVENTORY_IN' ? item.quantity : 0,
+                    stock: type === 'INVENTORY_IN' ? baseQuantity : 0,
                 },
             });
         }
@@ -178,8 +207,19 @@ export const cancelTransaction = async (id: string) => {
         });
 
         for (const item of tx.items) {
+            let multiplier = 1;
+            if (item.presentationId) {
+                const pres = await prismaClient.productPresentation.findUnique({
+                    where: { id: item.presentationId },
+                    select: { multiplier: true }
+                });
+                multiplier = Number(pres?.multiplier) || 1;
+            }
+
+            const baseQuantity = calculateInventoryDeduction(Number(item.quantity), multiplier);
+
             // Revertir: si era SALE → devolver stock; si era INVENTORY_IN → quitar stock
-            const delta = tx.type === 'SALE' ? item.quantity : -item.quantity;
+            const delta = tx.type === 'SALE' ? baseQuantity : -baseQuantity;
             await prismaClient.branchInventory.updateMany({
                 where: { productId: item.productId, branchId: tx.branchId },
                 data: { stock: { increment: delta } },

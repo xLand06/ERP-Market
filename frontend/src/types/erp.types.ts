@@ -3,16 +3,37 @@
 export type StockLevel = 'normal' | 'warning' | 'critical';
 
 // ─── Inventory / Products ─────────────────────────────────────────────────────
+export interface ProductPresentation {
+    id: string;
+    name: string;
+    multiplier: number;
+    price: number;
+    barcode: string | null;
+    productId: string;
+}
+
 export interface Product {
     id: string;
-    code: string;
     name: string;
-    category: string;
-    cost: number;
+    description: string | null;
+    barcode: string | null;
+    baseUnit: string;
     price: number;
+    cost: number | null;
+    imageUrl: string | null;
+    isActive: boolean;
+    categoryId: string | null;
+    category?: { id: string; name: string };
+    presentations: ProductPresentation[];
+    inventory: BranchInventory[];
+}
+
+export interface BranchInventory {
+    id: string;
+    productId: string;
+    branchId: string;
     stock: number;
     minStock: number;
-    emoji: string;
 }
 
 // ─── Purchases ────────────────────────────────────────────────────────────────
@@ -27,16 +48,24 @@ export interface PurchaseItem {
     expiresAt?: string;
 }
 
-export interface Purchase {
+export interface SaleItem {
+    id?: string;
+    productId: string;
+    productName: string;
+    presentationId?: string;
+    presentationName?: string;
+    quantity: number;
+    unitPrice: number;
+    subtotal: number;
+}
+
+export interface Sale {
     id: string;
-    supplierId: string;
-    supplierName: string;
-    date: string;
-    invoiceNo: string;
-    items: PurchaseItem[];
+    userId: string;
+    branchId: string;
     total: number;
-    status: PurchaseStatus;
-    branch: string;
+    items: SaleItem[];
+    createdAt: string;
 }
 
 // ─── Finance / Cash Register ─────────────────────────────────────────────────

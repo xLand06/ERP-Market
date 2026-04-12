@@ -15,8 +15,36 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
 
 // ─── Types ─────────────────────────────────────────────────────────
-interface Product { id: string; name: string; price: number; stock: number; category: string; code: string; }
-interface CartItem extends Product { qty: number; }
+interface ProductPresentation {
+    id: string;
+    name: string;
+    multiplier: number;
+    price: number;
+    barcode: string | null;
+}
+
+interface Product {
+    id: string;
+    name: string;
+    price: number;
+    stock: number;
+    category: string;
+    code: string;
+    baseUnit: string;
+    presentations: ProductPresentation[];
+}
+
+interface CartItem {
+    cartId: string; // unique for row
+    productId: string;
+    presentationId?: string;
+    name: string;
+    displayName: string;
+    price: number;
+    qty: number;
+    stock: number;
+    multiplier: number;
+}
 
 // ─── Constants ─────────────────────────────────────────────────────
 const VES_RATE = 36.50; // TODO: Esto debería venir de config
@@ -203,7 +231,15 @@ export default function POSPage() {
             name: item.product.name,
             price: Number(item.product.price),
             stock: item.stock,
+            baseUnit: item.product.baseUnit || 'UNIDAD',
             category: item.product.category?.name || 'Varios',
+            presentations: (item.product.presentations || []).map((p: any) => ({
+                id: p.id,
+                name: p.name,
+                multiplier: Number(p.multiplier),
+                price: Number(p.price),
+                barcode: p.barcode,
+            })),
         }));
     }, [rawItems]);
 
@@ -219,24 +255,65 @@ export default function POSPage() {
         setTimeout(() => setToastVis(false), 3000);
     };
 
-    const addToCart = useCallback((p: Product) => {
+    const addToCart = useCallback((p: Product, presentation?: ProductPresentation) => {
+        const presentationId = presentation?.id;
+        const price = presentation ? presentation.price : p.price;
+        const multiplier = presentation ? presentation.multiplier : 1;
+        const displayName = presentation ? `${p.name} (${presentation.name})` : p.name;
+        const cartId = presentationId ? `${p.id}-${presentationId}` : p.id;
+
         setCart(prev => {
-            const ex = prev.find(i => i.id === p.id);
-            // Validar que no se exceda el stock si ya está en el carrito
-            if (ex && ex.qty >= p.stock) {
-                showToast(`Stock máximo alcanzado para ${p.name}`, true);
+            const ex = prev.find(i => i.cartId === cartId);
+            
+            // Verificación de stock aproximada en UMB
+            const currentTotalUMB = prev
+                .filter(i => i.productId === p.id)
+                .reduce((sum, i) => sum + (i.qty * i.multiplier), 0);
+            
+            const addedUMB = 1 * multiplier;
+
+            if (currentTotalUMB + addedUMB > p.stock) {
+                showToast(`Stock insuficiente para "${p.name}"`, true);
                 return prev;
             }
-            return ex ? prev.map(i => i.id === p.id ? { ...i, qty: i.qty + 1 } : i) : [...prev, { ...p, qty: 1 }];
+
+            if (ex) {
+                return prev.map(i => i.cartId === cartId ? { ...i, qty: i.qty + 1 } : i);
+            }
+
+            const newItem: CartItem = {
+                cartId,
+                productId: p.id,
+                presentationId,
+                name: p.name,
+                displayName,
+                price,
+                qty: 1,
+                stock: p.stock,
+                multiplier
+            };
+            return [...prev, newItem];
         });
     }, []);
 
     // HOOK DEL ESCÁNER DE HARDWARE
     useBarcodeScanner((barcode) => {
+        // Buscar primero en presentaciones
+        for (const p of PRODUCTS) {
+            const foundPres = p.presentations.find(pres => pres.barcode === barcode);
+            if (foundPres) {
+                addToCart(p, foundPres);
+                setSearch('');
+                showToast(`✓ ${p.name} (${foundPres.name}) añadido`);
+                return;
+            }
+        }
+
+        // Buscar en producto base
         const product = PRODUCTS.find(p => p.code === barcode);
         if (product) {
             addToCart(product);
-            setSearch(''); // Limpiar si el usuario estaba escribiendo
+            setSearch('');
             showToast(`✓ ${product.name} añadido`);
         } else {
             showToast(`⚠️ Código ${barcode} no encontrado en stock`, true);
@@ -261,7 +338,8 @@ export default function POSPage() {
         setIsSubmitting(true);
         try {
             const items = cart.map(c => ({
-                productId: c.id,
+                productId: c.productId,
+                presentationId: c.presentationId,
                 quantity: c.qty,
                 unitPrice: c.price,
             }));
@@ -367,12 +445,12 @@ export default function POSPage() {
 
                 <div className="flex-1 overflow-y-auto">
                     {cart.map(item => (
-                        <div key={item.id} className="flex items-center gap-3 px-5 py-4 border-b">
+                        <div key={item.cartId} className="flex items-center gap-3 px-5 py-4 border-b">
                             <div className="w-8 h-8 rounded bg-slate-50 flex items-center justify-center shrink-0">
                                 <Package className="w-4 h-4 text-slate-300" />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold truncate">{item.name}</p>
+                                <p className="text-xs font-bold truncate">{item.displayName}</p>
                                 <p className="text-[10px] text-slate-400">${item.price.toFixed(2)} x {item.qty}</p>
                             </div>
                             <p className="text-sm font-black">${(item.price * item.qty).toFixed(2)}</p>

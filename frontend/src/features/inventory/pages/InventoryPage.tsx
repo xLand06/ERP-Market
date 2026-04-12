@@ -10,8 +10,16 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
 
 interface Product {
-    id: string; code: string; name: string; category: string;
-    cost: number; price: number; stock: number; minStock: number;
+    id: string; 
+    code: string; 
+    name: string; 
+    baseUnit: string;
+    category: string;
+    cost: number; 
+    price: number; 
+    stock: number; 
+    minStock: number;
+    presentations: any[];
 }
 
 type StockLevel = 'normal' | 'warning' | 'critical';
@@ -55,11 +63,13 @@ export default function InventoryPage() {
             id: item.product.id,
             code: item.product.barcode || '',
             name: item.product.name,
+            baseUnit: item.product.baseUnit || 'Unidad',
             cost: Number(item.product.cost || 0),
             price: Number(item.product.price || 0),
             stock: item.stock,
             minStock: item.minStock || 0,
             category: item.product.category?.name || 'Varios',
+            presentations: item.product.presentations || [],
         }));
     }, [rawItems]);
 
@@ -68,7 +78,42 @@ export default function InventoryPage() {
         return ['Todos', ...Array.from(cats)].sort();
     }, [PRODUCTS]);
 
-    // Mutation to update price
+    // Mutations
+    const createProductMutation = useMutation({
+        mutationFn: async (data: any) => {
+            const res = await api.post('/inventory/products', data);
+            // After creating product, we need to initialize stock for the branch
+            await api.post('/inventory/stock', {
+                productId: res.data.id,
+                branchId: selectedBranch,
+                stock: data.stock,
+                minStock: data.minStock
+            });
+            return res.data;
+        },
+        onSuccess: () => {
+            setCreateOpen(false);
+            refetch();
+        }
+    });
+
+    const updateFullProductMutation = useMutation({
+        mutationFn: async ({ id, data }: { id: string, data: any }) => {
+            await api.put(`/inventory/products/${id}`, data);
+            // Also update stock/minStock for this branch
+            await api.post('/inventory/stock', {
+                productId: id,
+                branchId: selectedBranch,
+                stock: data.stock,
+                minStock: data.minStock
+            });
+        },
+        onSuccess: () => {
+            setEditTarget(null);
+            refetch();
+        }
+    });
+
     const updatePriceMutation = useMutation({
         mutationFn: async ({ id, price }: { id: string, price: number }) => {
             await api.put(`/inventory/products/${id}`, { price });
@@ -130,29 +175,58 @@ export default function InventoryPage() {
         <ProductFormModal
             open={createOpen}
             onClose={() => setCreateOpen(false)}
-            onSave={() => {
-                // TODO: connect new product
-                setCreateOpen(false);
-                refetch();
+            onSave={(data) => {
+                const formatted = {
+                    ...data,
+                    cost: parseFloat(data.cost),
+                    price: parseFloat(data.price),
+                    stock: parseFloat(data.stock),
+                    minStock: parseFloat(data.minStock),
+                    presentations: data.presentations.map(p => ({
+                        ...p,
+                        multiplier: parseFloat(p.multiplier),
+                        price: parseFloat(p.price)
+                    }))
+                };
+                createProductMutation.mutate(formatted);
             }}
             mode="create"
         />
         <ProductFormModal
             open={!!editTarget}
             onClose={() => setEditTarget(null)}
-            onSave={() => {
-                // TODO: connect edit product
-                setEditTarget(null);
-                refetch();
+            onSave={(data) => {
+                if (!editTarget) return;
+                const formatted = {
+                    ...data,
+                    cost: parseFloat(data.cost),
+                    price: parseFloat(data.price),
+                    stock: parseFloat(data.stock),
+                    minStock: parseFloat(data.minStock),
+                    presentations: data.presentations.map(p => ({
+                        ...p,
+                        multiplier: parseFloat(p.multiplier),
+                        price: parseFloat(p.price)
+                    }))
+                };
+                updateFullProductMutation.mutate({ id: editTarget.id, data: formatted });
             }}
             initial={editTarget ? {
                 code: editTarget.code,
                 name: editTarget.name,
+                baseUnit: editTarget.baseUnit,
                 category: editTarget.category,
                 cost: editTarget.cost.toFixed(2),
                 price: editTarget.price.toFixed(2),
                 stock: String(editTarget.stock),
                 minStock: String(editTarget.minStock),
+                presentations: editTarget.presentations.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    multiplier: String(p.multiplier),
+                    price: p.price.toFixed(2),
+                    barcode: p.barcode || ''
+                }))
             } : undefined}
             mode="edit"
         />
