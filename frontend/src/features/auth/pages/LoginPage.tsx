@@ -1,9 +1,5 @@
-// =============================================================================
-// LOGIN PAGE — Página de autenticación funcional
-// =============================================================================
-
 import { useState } from 'react';
-import { Eye, EyeOff, Lock, Mail, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
@@ -12,7 +8,7 @@ import { authApi } from '@/services';
 import toast from 'react-hot-toast';
 
 interface FormErrors {
-    email?: string;
+    username?: string;
     password?: string;
     general?: string;
 }
@@ -24,23 +20,17 @@ export default function LoginPage() {
     const navigate = useNavigate();
     const setAuth = useAuthStore((s) => s.setAuth);
 
-    const [form, setForm] = useState({ email: '', password: '' });
+    const [form, setForm] = useState({ username: '', password: '' });
 
     const validate = (): boolean => {
         const newErrors: FormErrors = {};
         
-        if (!form.email) {
-            newErrors.email = 'El email es requerido';
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-            newErrors.email = 'Email inválido';
+        if (!form.username) {
+            newErrors.username = 'El usuario es requerido';
         }
         
         if (!form.password) {
             newErrors.password = 'La contraseña es requerida';
-        } else if (form.password.length < 6) {
-            newErrors.password = 'Mínimo 6 caracteres';
-        } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])/.test(form.password) && form.password.length >= 8) {
-            newErrors.password = 'Debe tener mayúscula, número y carácter especial';
         }
         
         setErrors(newErrors);
@@ -58,12 +48,12 @@ export default function LoginPage() {
         try {
             const { token, user } = await authApi.login(form);
             setAuth(token, user);
-            toast.success(`Bienvenido, ${user.name}!`);
+            toast.success(`Bienvenido, ${user.nombre}!`);
             navigate('/dashboard');
         } catch (err) {
             const msg = err instanceof Error ? err.message : 'Error de autenticación';
-            if (msg.includes('email') || msg.includes('Email')) {
-                setErrors({ email: msg });
+            if (msg.includes('usuario') || msg.includes('Usuario') || msg.includes('username')) {
+                setErrors({ username: msg });
             } else if (msg.includes('contrase') || msg.includes('password')) {
                 setErrors({ password: msg });
             } else {
@@ -96,26 +86,26 @@ export default function LoginPage() {
                     
                     <div className="flex flex-col gap-4">
                         <div>
-                            <label htmlFor="email" className="text-xs font-semibold text-slate-300 mb-1.5 block">
-                                Email
+                            <label htmlFor="username" className="text-xs font-semibold text-slate-300 mb-1.5 block">
+                                Usuario o Cédula
                             </label>
                             <div className="relative">
-                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" aria-hidden="true" />
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" aria-hidden="true" />
                                 <Input
-                                    id="email"
-                                    type="email"
-                                    autoComplete="email"
-                                    aria-describedby={errors.email ? 'email-error' : undefined}
-                                    aria-invalid={!!errors.email}
-                                    placeholder="tu@email.com"
-                                    value={form.email}
-                                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                                    className={`pl-9 bg-slate-900/60 border-slate-700 text-white placeholder:text-slate-600 focus:border-emerald-500 ${errors.email ? 'border-red-500' : ''}`}
+                                    id="username"
+                                    type="text"
+                                    autoComplete="username"
+                                    aria-describedby={errors.username ? 'username-error' : undefined}
+                                    aria-invalid={!!errors.username}
+                                    placeholder="admin o V-12345678"
+                                    value={form.username}
+                                    onChange={(e) => setForm({ ...form, username: e.target.value })}
+                                    className={`pl-9 bg-slate-900/60 border-slate-700 text-white placeholder:text-slate-600 focus:border-emerald-500 ${errors.username ? 'border-red-500' : ''}`}
                                 />
                             </div>
-                            {errors.email && (
-                                <p id="email-error" className="text-red-400 text-xs mt-1" role="alert">
-                                    {errors.email}
+                            {errors.username && (
+                                <p id="username-error" className="text-red-400 text-xs mt-1" role="alert">
+                                    {errors.username}
                                 </p>
                             )}
                         </div>

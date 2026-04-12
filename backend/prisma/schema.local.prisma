@@ -1,17 +1,11 @@
 // =============================================================================
-// ERP-MARKET — SCHEMA LOCAL (SQLite — Desktop Offline)
-// Diferencias vs schema.prisma (cloud):
-//   ✦ provider = "sqlite"
-//   ✦ Decimal → Float (SQLite no tiene tipo Decimal nativo)
-//   ✦ Json → String (serializado como texto)
-//   ✦ SIN @db.* decorators
-//   ✦ Campos syncStatus/cloudId en modelos que se sincronizan UP (ventas, caja, auditoría)
+// ERP-MARKET - SCHEMA LOCAL (SQLite - Desktop Offline)
+// Copia exacta del schema.prisma (cloud) con适配 para SQLite
 // =============================================================================
 
 generator client {
   provider = "prisma-client-js"
   output   = "../node_modules/.prisma/client-local"
-  // output se maneja en la config de Prisma 7
 }
 
 datasource db {
@@ -19,7 +13,7 @@ datasource db {
 }
 
 // =============================================================================
-// ENUMS — mismos valores que el schema cloud
+// ENUMS - mismos valores que el schema cloud
 // =============================================================================
 
 enum Role {
@@ -43,16 +37,33 @@ enum CashRegisterStatus {
   CLOSED
 }
 
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  RECEIVED
+  CANCELLED
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+enum CedulaType {
+  V
+  E
+}
+
 // =============================================================================
-// USUARIO
-// syncStatus = SYNCED porque usuarios solo vienen de la nube (pull-only)
+// USERS
 // =============================================================================
 
 model User {
   id         String    @id @default(cuid())
   username   String    @unique
   cedula     String
-  cedulaType String    @default("V")
+  cedulaType CedulaType @default(V)
   nombre     String
   apellido   String?
   email      String?
@@ -62,66 +73,70 @@ model User {
   isActive   Boolean   @default(true)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
-  syncStatus String    @default("SYNCED")
 
   transactions  Transaction[]
   cashRegisters CashRegister[]
   auditLogs     AuditLog[]
 
+  @@index([username])
+  @@index([cedula])
+  @@index([role])
+  @@index([isActive])
   @@map("users")
 }
 
 // =============================================================================
-// SEDE (Branch)
-// Viene de la nube via pull-catalog
+// BRANCHES
 // =============================================================================
 
 model Branch {
-  id         String   @id @default(cuid())
-  name       String
-  address    String?
-  phone      String?
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  syncStatus String   @default("SYNCED")
+  id        String    @id @default(cuid())
+  name      String
+  address   String?
+  phone     String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   inventory     BranchInventory[]
   transactions  Transaction[]
   cashRegisters CashRegister[]
 
+  @@index([isActive])
   @@map("branches")
 }
 
 // =============================================================================
-// CATÁLOGO MAESTRO
+// CATEGORIES
 // =============================================================================
 
 model Category {
-  id          String   @id @default(cuid())
-  name        String   @unique
+  id          String    @id @default(cuid())
+  name        String    @unique
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  syncStatus  String   @default("SYNCED")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   products Product[]
 
   @@map("categories")
 }
 
+// =============================================================================
+// PRODUCTS
+// =============================================================================
+
 model Product {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
   description String?
-  barcode     String?  @unique
-  price       Float                       // ← Float (era Decimal)
-  cost        Float?                      // ← Float?
+  barcode     String?   @unique
+  price       Float
+  cost        Float?
   imageUrl    String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  syncStatus  String   @default("SYNCED") // Solo baja de la nube
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
@@ -129,12 +144,15 @@ model Product {
   inventory        BranchInventory[]
   transactionItems TransactionItem[]
 
+  @@index([name])
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([barcode])
   @@map("products")
 }
 
 // =============================================================================
-// INVENTARIO POR SEDE (solo local, no se sincroniza directamente)
-// El stock se recalcula en la nube a partir de las transacciones subidas
+// INVENTORY BY BRANCH
 // =============================================================================
 
 model BranchInventory {
@@ -145,115 +163,122 @@ model BranchInventory {
 
   productId String
   product   Product @relation(fields: [productId], references: [id])
-  branchId  String
-  branch    Branch  @relation(fields: [branchId], references: [id])
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
 
   @@unique([productId, branchId])
+  @@index([branchId])
+  @@index([stock])
+  @@index([branchId, stock])
   @@map("branch_inventory")
 }
 
 // =============================================================================
-// POS DUAL — TRANSACCIONES
-// syncStatus: PENDING → se sube a Neon | SYNCED → ya subió
-// cloudId: ID asignado por Neon al recibir la transacción (para dedup)
+// TRANSACTIONS
 // =============================================================================
 
 model Transaction {
-  id         String   @id @default(cuid())
+  id         String            @id @default(cuid())
   type       TransactionType
   status     TransactionStatus @default(COMPLETED)
-  total      Float                         // ← Float
+  total      Float
   notes      String?
   ipAddress  String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  // Campos de sincronización
-  syncStatus String   @default("PENDING")  // PENDING | SYNCED | CONFLICT
+  syncStatus SyncStatus        @default(PENDING)
   syncedAt   DateTime?
-  cloudId    String?  @unique              // ID en Neon (dedup)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
 
-  userId         String
-  user           User          @relation(fields: [userId], references: [id])
-  branchId       String
-  branch         Branch        @relation(fields: [branchId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
   cashRegisterId String?
-  cashRegister   CashRegister? @relation(fields: [cashRegisterId], references: [id])
+  cashRegister  CashRegister? @relation(fields: [cashRegisterId], references: [id])
 
   items TransactionItem[]
 
+  @@index([branchId, createdAt])
+  @@index([userId])
+  @@index([type, status])
+  @@index([syncStatus])
+  @@index([createdAt])
   @@map("transactions")
 }
 
 model TransactionItem {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   quantity  Int
-  unitPrice Float                          // ← Float
-  subtotal  Float                          // ← Float
+  unitPrice Float
+  subtotal  Float
 
   transactionId String
-  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  productId     String
-  product       Product     @relation(fields: [productId], references: [id])
+  transaction  Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  productId String
+  product  Product @relation(fields: [productId], references: [id])
 
   @@map("transaction_items")
 }
 
 // =============================================================================
-// FLUJO DE CAJA
+// CASH REGISTER
 // =============================================================================
 
 model CashRegister {
   id             String             @id @default(cuid())
   status         CashRegisterStatus @default(OPEN)
-  openingAmount  Float                        // ← Float
+  openingAmount  Float
   closingAmount  Float?
   expectedAmount Float?
   difference     Float?
   notes          String?
-  openedAt       DateTime           @default(now())
+  syncStatus     SyncStatus        @default(PENDING)
+  syncedAt       DateTime?
+  openedAt       DateTime          @default(now())
   closedAt       DateTime?
 
-  syncStatus String  @default("PENDING")
-  syncedAt   DateTime?
-  cloudId    String? @unique
+  userId String
+  user   User @relation(fields: [userId], references: [id])
 
-  userId   String
-  user     User   @relation(fields: [userId], references: [id])
   branchId String
   branch   Branch @relation(fields: [branchId], references: [id])
 
   transactions Transaction[]
 
+  @@index([branchId])
+  @@index([status])
+  @@index([syncStatus])
   @@map("cash_registers")
 }
 
 // =============================================================================
-// AUDITORÍA — CAJA NEGRA LOCAL
-// details almacenado como JSON string (SQLite no tiene tipo Json)
+// AUDIT LOGS
 // =============================================================================
 
 model AuditLog {
   id        String   @id @default(cuid())
   action    String
   module    String
-  details   String                          // ← String (JSON.stringify)
+  details   String?
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
 
-  syncStatus String  @default("PENDING")
-  syncedAt   DateTime?
-  cloudId    String? @unique
-
   userId String
   user   User   @relation(fields: [userId], references: [id])
 
+  @@index([userId])
+  @@index([module])
+  @@index([createdAt])
   @@map("audit_logs")
 }
 
 // =============================================================================
-// FUTURO (misma estructura que el cloud, sin activar endpoints)
+// SUPPLIERS
 // =============================================================================
 
 model Supplier {
@@ -261,7 +286,7 @@ model Supplier {
   name      String
   rut       String?  @unique
   email     String?
-  phone     String?
+  telefono  String?
   address   String?
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -272,12 +297,9 @@ model Supplier {
   @@map("suppliers")
 }
 
-enum PurchaseOrderStatus {
-  DRAFT
-  SENT
-  RECEIVED
-  CANCELLED
-}
+// =============================================================================
+// PURCHASE ORDERS
+// =============================================================================
 
 model PurchaseOrder {
   id         String              @id @default(cuid())
@@ -291,21 +313,23 @@ model PurchaseOrder {
 
   supplierId String
   supplier   Supplier @relation(fields: [supplierId], references: [id])
-  items      PurchaseOrderItem[]
+
+  items PurchaseOrderItem[]
 
   @@map("purchase_orders")
 }
 
 model PurchaseOrderItem {
-  id               String @id @default(cuid())
-  quantity         Int
-  quantityReceived Int    @default(0)
-  unitCost         Float
-  subtotal         Float
-  productId        String
+  id              String  @id @default(cuid())
+  quantity        Int
+  quantityReceived Int   @default(0)
+  unitCost        Float
+  subtotal        Float
+
+  productId String
 
   purchaseOrderId String
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrder  PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
 
   @@map("purchase_order_items")
 }

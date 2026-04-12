@@ -3,9 +3,12 @@ import { persist } from 'zustand/middleware';
 
 interface User {
     id: string;
-    name: string;
-    email: string;
-    role: string;
+    username: string;
+    nombre: string;
+    apellido?: string;
+    email?: string;
+    telefono?: string;
+    role: 'OWNER' | 'SELLER';
     branchId?: string;
 }
 
@@ -25,7 +28,6 @@ export const useAuthStore = create<AuthState>()(
             user: null,
             selectedBranch: null,
             setAuth: (token, user) => {
-                // Si el usuario trae su branch asignado, seleccionarlo por defecto
                 set({ token, user, selectedBranch: user.role === 'SELLER' && user.branchId ? user.branchId : null });
             },
             setSelectedBranch: (branchId) => set({ selectedBranch: branchId }),
@@ -33,7 +35,6 @@ export const useAuthStore = create<AuthState>()(
         }),
         { 
             name: 'erp-market-auth',
-            // Custom storage for Electron persistence
             storage: {
                 getItem: (name) => {
                     if ((window as any).erpApi?.isElectron) {

@@ -72,8 +72,8 @@ export const getDashboardKPIs = async (client: any, branchId?: string): Promise<
         client.product.count({ where: { isActive: true } }),
 
         isSQLite 
-            ? client.$queryRaw`SELECT COUNT(*) as count FROM branch_inventory WHERE stock <= minStock ${branchId ? require('prisma').Prisma.sql`AND branchId = ${branchId}` : require('prisma').Prisma.empty}`
-            : client.$queryRaw`SELECT COUNT(*) as count FROM branch_inventory WHERE stock <= "minStock" ${branchId ? require('prisma').Prisma.sql`AND "branchId" = ${branchId}` : require('prisma').Prisma.empty}`,
+            ? client.$queryRaw`SELECT COUNT(*) as count FROM branch_inventory WHERE stock <= minStock ${branchId ? require('@prisma/client').Prisma.sql`AND branchId = ${branchId}` : require('@prisma/client').Prisma.empty}`
+            : client.$queryRaw`SELECT COUNT(*) as count FROM branch_inventory WHERE stock <= "minStock" ${branchId ? require('@prisma/client').Prisma.sql`AND "branchId" = ${branchId}` : require('@prisma/client').Prisma.empty}`,
 
         client.cashRegister.findFirst({
             where: { status: 'OPEN', ...(branchId && { branchId }) },
@@ -127,7 +127,7 @@ export const getSalesTrend = async (client: any, branchId?: string, days = 30): 
             WHERE type = 'SALE'
               AND status = 'COMPLETED'
               AND createdAt > ${since}
-              ${branchId ? require('prisma').Prisma.sql`AND branchId = ${branchId}` : require('prisma').Prisma.empty}
+              ${branchId ? require('@prisma/client').Prisma.sql`AND branchId = ${branchId}` : require('@prisma/client').Prisma.empty}
             GROUP BY day
             ORDER BY day ASC
         `;
@@ -141,7 +141,7 @@ export const getSalesTrend = async (client: any, branchId?: string, days = 30): 
             WHERE type = 'SALE'
               AND status = 'COMPLETED'
               AND "createdAt" > ${since}
-              ${branchId ? require('prisma').Prisma.sql`AND "branchId" = ${branchId}` : require('prisma').Prisma.empty}
+              ${branchId ? require('@prisma/client').Prisma.sql`AND "branchId" = ${branchId}` : require('@prisma/client').Prisma.empty}
             GROUP BY DATE("createdAt")
             ORDER BY day ASC
         `;

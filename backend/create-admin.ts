@@ -1,18 +1,16 @@
-const { Client } = require('pg');
-const bcrypt = require('bcryptjs');
+import pg from 'pg';
+import bcrypt from 'bcryptjs';
+import 'dotenv/config';
 
-// Try connection string from .env (pooler)
-const connectionString = 'postgresql://postgres.gevugalbmgbyebhhueuy:I7n8EKE4l8M4X5CT@aws-1-us-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require';
-
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+const { Client } = pg;
 
 const client = new Client({
-    connectionString: connectionString,
+    connectionString: process.env.DATABASE_URL,
     ssl: false
 });
 
 async function main() {
-    console.log('🌱 Conectando a Supabase (pooler)...\n');
+    console.log('🌱 Conectando a Supabase...\n');
     
     try {
         await client.connect();
@@ -31,9 +29,11 @@ async function main() {
             console.log('✅ Contraseña actualizada');
         } else {
             console.log('➕ Creando usuario admin...');
+            
+            // Incluir todos los campos requeridos
             await client.query(
-                `INSERT INTO users (username, cedula, cedula_type, nombre, email, password, role, is_active)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                `INSERT INTO users (id, username, cedula, "cedulaType", nombre, email, password, role, "isActive", "createdAt", "updatedAt")
+                 VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
                 ['admin', '12345678', 'V', 'Administrador', 'admin@erp-market.com', hash, 'OWNER', true]
             );
             console.log('✅ Usuario admin creado');
@@ -41,7 +41,7 @@ async function main() {
         
         console.log('\n🔑 Credenciales: admin / admin');
         
-    } catch (e) {
+    } catch (e: any) {
         console.log('❌ Error:', e.message);
     } finally {
         await client.end();

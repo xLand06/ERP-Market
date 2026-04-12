@@ -1,7 +1,3 @@
-// =============================================================================
-// AUTH SERVICE — Autenticación
-// =============================================================================
-
 import api from '../lib/api';
 
 interface ApiResponseSuccess<T> {
@@ -11,14 +7,17 @@ interface ApiResponseSuccess<T> {
 }
 
 export interface LoginPayload {
-    email: string;
+    username: string;
     password: string;
 }
 
 export interface AuthUser {
     id: string;
-    name: string;
-    email: string;
+    username: string;
+    nombre: string;
+    apellido?: string;
+    email?: string;
+    telefono?: string;
     role: 'OWNER' | 'SELLER';
     branchId?: string;
 }
@@ -36,7 +35,8 @@ export const authApi = {
     },
 
     getMe: async (): Promise<AuthUser> => {
-        const { data } = await api.get<{ data: AuthUser }>('/auth/me');
+        const { data } = await api.get<ApiResponseSuccess<AuthUser>>('/auth/me');
+        if (!data.success) throw new Error(data.error || 'Error al obtener usuario');
         return data.data;
     },
 
