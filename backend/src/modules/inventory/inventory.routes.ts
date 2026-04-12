@@ -40,6 +40,9 @@ router.post('/categories', roleGuard('OWNER'), ctrl.createCategory);
 
 // ─── STOCK POR SEDE ────────────────────────────────────────────────────────
 
+/** GET  /api/inventory/stock              — Stock de todas las sedes (OWNER) */
+router.get('/stock', ctrl.getAllStock);
+
 /** GET  /api/inventory/stock/branch/:branchId   — Stock de una sede */
 router.get('/stock/branch/:branchId', ctrl.getStockByBranch);
 

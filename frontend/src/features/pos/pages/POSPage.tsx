@@ -184,12 +184,20 @@ export default function POSPage() {
     const searchRef = useRef<HTMLInputElement>(null);
 
     const selectedBranch = useAuthStore(s => s.selectedBranch);
+    const user = useAuthStore(s => s.user);
+    const isOwner = user?.role === 'OWNER';
+    const showAllBranches = selectedBranch === 'all' && isOwner;
 
     // 1. Fetching inventory from local express API
     const { data: rawItems, isLoading, refetch } = useQuery({
         queryKey: ['stock', selectedBranch],
         queryFn: async () => {
             if (!selectedBranch) return [];
+            // OWNER con "Todas las sucursales" - obtener todo el inventario
+            if (showAllBranches) {
+                const res = await api.get('/inventory/stock');
+                return res.data.data;
+            }
             const res = await api.get(`/inventory/stock/branch/${selectedBranch}`);
             return res.data.data;
         },

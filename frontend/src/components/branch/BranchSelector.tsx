@@ -26,7 +26,7 @@ export function BranchSelector() {
         queryKey: ['branches'],
         queryFn: async () => {
             const res = await api.get('/branches');
-            return res.data;
+            return res.data.data;
         },
         staleTime: 5 * 60 * 1000,
     });
@@ -64,7 +64,7 @@ export function BranchSelector() {
     }
 
     const handleSelect = (option: BranchOption) => {
-        const branchId = option.isAll ? '' : option.id;
+        const branchId = option.isAll ? 'all' : option.id;
         setSelectedBranch(branchId);
         setIsOpen(false);
     };

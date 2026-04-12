@@ -35,21 +35,24 @@ export default function CashRegisterPage() {
     const [entryOpen, setEntryOpen] = useState(false);
     const [closureOpen, setClosureOpen] = useState(false);
 
+    // No permitir "todas las sucursales" para caja - requiere selección específica
+    const effectiveBranch = selectedBranch === 'all' ? null : selectedBranch;
+
     // 1. Fetch current open register
     const { data: openRegister, isLoading, refetch } = useQuery({
-        queryKey: ['openRegister', selectedBranch],
+        queryKey: ['openRegister', effectiveBranch],
         queryFn: async () => {
-            if (!selectedBranch) return null;
-            const res = await api.get(`/finance/registers/open/${selectedBranch}`);
+            if (!effectiveBranch) return null;
+            const res = await api.get(`/finance/registers/open/${effectiveBranch}`);
             return res.data.data;
         },
-        enabled: !!selectedBranch
+        enabled: !!effectiveBranch
     });
 
     const openMutation = useMutation({
         mutationFn: async (openingAmount: number) => {
             await api.post(`/finance/registers/open`, {
-                branchId: selectedBranch,
+                branchId: effectiveBranch,
                 openingAmount
             });
         },
@@ -68,7 +71,7 @@ export default function CashRegisterPage() {
     const addMovementMutation = useMutation({
         mutationFn: async ({ subType, amount, notes }: any) => {
             await api.post(`/finance/registers/${openRegister.id}/movement`, {
-                branchId: selectedBranch,
+                branchId: effectiveBranch,
                 subType,
                 amount,
                 notes
@@ -80,7 +83,7 @@ export default function CashRegisterPage() {
         }
     });
 
-    if (!selectedBranch) {
+    if (!effectiveBranch) {
         return <div className="h-full flex items-center justify-center text-slate-500 pb-20">Por favor, seleccione una sede en la configuración.</div>;
     }
 

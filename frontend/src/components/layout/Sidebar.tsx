@@ -3,8 +3,7 @@ import { useAuthStore } from '@/features/auth/store/authStore';
 import {
     LayoutDashboard, Package, ShoppingCart,
     Coins, Users, Truck, BarChart2, ShieldCheck, Store, PanelLeftClose, PanelLeftOpen, X,
-
-    CompassIcon
+    Settings, CompassIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isPathAllowed } from '@/lib/planConfig';
@@ -21,6 +20,7 @@ const navItems: NavItem[] = [
     { name: 'Punto de Venta', path: '/pos', icon: ShoppingCart },
     { name: 'Inventario', path: '/inventory', icon: Package },
     { name: 'Flujo de Caja', path: '/finance/cash-register', icon: Coins },
+    { name: 'Configuración', path: '/settings', icon: Settings, roles: ['OWNER'] },
     { name: 'Auditoría', path: '/audit', icon: ShieldCheck, roles: ['OWNER'] },
     { name: 'Directorio', path: '/directory', icon: CompassIcon },
     { name: 'Usuarios', path: '/users', icon: Users, roles: ['OWNER'] },

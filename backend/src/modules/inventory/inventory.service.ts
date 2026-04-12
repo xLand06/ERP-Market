@@ -78,6 +78,17 @@ export const getAllCategories = () =>
 export const createCategory = (data: { name: string; description?: string }) =>
     prisma.category.create({ data });
 
+export const getAllStock = () =>
+    prisma.branchInventory.findMany({
+        include: {
+            product: {
+                select: { id: true, name: true, barcode: true, price: true, cost: true, imageUrl: true, category: { select: { name: true } } },
+            },
+            branch: { select: { id: true, name: true } },
+        },
+        orderBy: { product: { name: 'asc' } },
+    });
+
 export const getStockByBranch = (branchId: string) =>
     prisma.branchInventory.findMany({
         where: { branchId },

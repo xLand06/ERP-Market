@@ -25,6 +25,7 @@ const NotFoundPage           = lazy(() => import('../features/notFound/pages/Not
 const PurchasesPage          = lazy(() => import('../features/purchases/pages/PurchasesPage'));
 const EmployeeDirectoryPage  = lazy(() => import('../features/users/pages/EmployeeDirectoryPage'));
 const AuditLogsPage          = lazy(() => import('../features/audit/pages/AuditLogsPage'));
+const SettingsPage           = lazy(() => import('../features/settings/pages/SettingsPage'));
 
 const wrap = (Component: React.ComponentType) => (
     <Suspense fallback={<div>Cargando...</div>}>
@@ -55,6 +56,7 @@ export const router = createBrowserRouter([
             { path: 'purchases',           element: wrap(PurchasesPage) },
             { path: 'directory',           element: wrap(EmployeeDirectoryPage) },
             { path: 'audit',               element: wrap(AuditLogsPage) },
+            { path: 'settings',          element: wrap(SettingsPage) },
         ],
     },
     { path: '*', element: wrap(NotFoundPage) },

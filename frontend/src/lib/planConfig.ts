@@ -15,7 +15,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             '/sales',
             '/finance/cash-register',
             '/audit',
-            '/users'
+            '/users',
+            '/settings'
         ]
     },
     FULL: {

@@ -86,6 +86,11 @@ export const createCategory = async (req: Request, res: Response): Promise<void>
 
 // ─── STOCK POR SEDE ────────────────────────────────────────────────────────
 
+export const getAllStock = async (_req: Request, res: Response): Promise<void> => {
+    const stock = await inventoryService.getAllStock();
+    res.json({ success: true, data: stock });
+};
+
 export const getStockByBranch = async (req: Request, res: Response): Promise<void> => {
     const stock = await inventoryService.getStockByBranch(req.params.branchId);
     res.json({ success: true, data: stock });
