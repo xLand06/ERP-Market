@@ -27,37 +27,100 @@ export const getProductByBarcode = async (req: Request, res: Response): Promise<
     res.json({ success: true, data: product });
 };
 
-export const createProduct = async (req: AuthRequest, res: Response): Promise<void> => {
-    const { name, price } = req.body;
-    if (!name || price === undefined) {
-        res.status(400).json({ error: 'Nombre y precio son requeridos' });
-        return;
+export const createProduct = async (req: AuthRequest, res: Response, next: any): Promise<void> => {
+    try {
+        const { name, price, code, barcode, cost, category, stock, minStock, branchId } = req.body;
+        
+        if (!name || price === undefined) {
+            res.status(400).json({ error: 'Nombre y precio son requeridos' });
+            return;
+        }
+
+        let categoryId = req.body.categoryId;
+        if (!categoryId && category) {
+            const categories = await inventoryService.getAllCategories();
+            let existingCat = categories.find(c => c.name === category);
+            if (!existingCat) {
+                existingCat = await inventoryService.createCategory({ name: category });
+            }
+            categoryId = existingCat.id;
+        }
+
+        const productPayload = {
+            name,
+            price: parseFloat(price as string),
+            cost: cost ? parseFloat(cost as string) : 0,
+            barcode: code || barcode || '',
+            categoryId
+        };
+
+        const product = await inventoryService.createProduct(productPayload);
+
+        // Add initial stock if provided
+        if (branchId && stock !== undefined) {
+             const stockVal = parseInt(stock as string) || 0;
+             const minStockVal = minStock !== undefined ? parseInt(minStock as string) || 0 : 0;
+             await inventoryService.upsertStock(product.id, branchId, stockVal, minStockVal);
+        }
+
+        await logAudit({
+            action: 'PRODUCT_CREATE', module: 'inventory',
+            details: { name, price },
+            userId: req.user!.id, ipAddress: extractIp(req),
+        });
+        res.status(201).json({ success: true, data: product });
+    } catch (error) {
+        next(error);
     }
-    const product = await inventoryService.createProduct(req.body);
-    await logAudit({
-        action: 'PRODUCT_CREATE', module: 'inventory',
-        details: { name, price },
-        userId: req.user!.id, ipAddress: extractIp(req),
-    });
-    res.status(201).json({ success: true, data: product });
 };
 
-export const updateProduct = async (req: AuthRequest, res: Response): Promise<void> => {
-    const before = await inventoryService.getProductById(req.params.id);
-    const product = await inventoryService.updateProduct(req.params.id, req.body);
+export const updateProduct = async (req: AuthRequest, res: Response, next: any): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const before = await inventoryService.getProductById(id);
+        
+        const { name, price, code, barcode, cost, category, stock, minStock, branchId } = req.body;
 
-    // Si cambió el precio → log especial
-    const action = req.body.price !== undefined ? 'PRICE_CHANGE' : 'PRODUCT_UPDATE';
-    await logAudit({
-        action, module: 'inventory',
-        details: {
-            id: req.params.id,
-            before: { price: before?.price, name: before?.name },
-            after: req.body,
-        },
-        userId: req.user!.id, ipAddress: extractIp(req),
-    });
-    res.json({ success: true, data: product });
+        let categoryId = req.body.categoryId;
+        if (!categoryId && category) {
+            const categories = await inventoryService.getAllCategories();
+            let existingCat = categories.find(c => c.name === category);
+            if (!existingCat) {
+                existingCat = await inventoryService.createCategory({ name: category });
+            }
+            categoryId = existingCat.id;
+        }
+
+        const updatePayload: any = {};
+        if (name !== undefined) updatePayload.name = name;
+        if (price !== undefined) updatePayload.price = parseFloat(price as string);
+        if (cost !== undefined) updatePayload.cost = parseFloat(cost as string);
+        if (code !== undefined || barcode !== undefined) updatePayload.barcode = code || barcode;
+        if (categoryId !== undefined) updatePayload.categoryId = categoryId;
+
+        const product = await inventoryService.updateProduct(id, updatePayload);
+
+        // Update stock if requested
+        if (branchId && stock !== undefined) {
+             const stockVal = parseInt(stock as string) || 0;
+             const minStockVal = minStock !== undefined ? parseInt(minStock as string) || 0 : 0;
+             await inventoryService.upsertStock(product.id, branchId, stockVal, minStockVal);
+        }
+
+        const action = req.body.price !== undefined ? 'PRICE_CHANGE' : 'PRODUCT_UPDATE';
+        await logAudit({
+            action, module: 'inventory',
+            details: {
+                id,
+                before: { price: before?.price, name: before?.name },
+                after: req.body,
+            },
+            userId: req.user!.id, ipAddress: extractIp(req),
+        });
+        res.json({ success: true, data: product });
+    } catch (error) {
+        next(error);
+    }
 };
 
 export const deleteProduct = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -82,6 +145,17 @@ export const createCategory = async (req: Request, res: Response): Promise<void>
     if (!name) { res.status(400).json({ error: 'El nombre es requerido' }); return; }
     const category = await inventoryService.createCategory(req.body);
     res.status(201).json({ success: true, data: category });
+};
+
+export const updateCategory = async (req: Request, res: Response): Promise<void> => {
+    const { name, description } = req.body;
+    const category = await inventoryService.updateCategory(req.params.id, { name, description });
+    res.json({ success: true, data: category });
+};
+
+export const deleteCategory = async (req: Request, res: Response): Promise<void> => {
+    await inventoryService.deleteCategory(req.params.id);
+    res.json({ success: true, message: 'Categoría eliminada' });
 };
 
 // ─── STOCK POR SEDE ────────────────────────────────────────────────────────

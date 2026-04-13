@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../core/middlewares/auth.middleware';
 import { roleGuard } from '../../core/middlewares/roleGuard';
+import { branchFilter, requireBranchAccess } from '../../core/middlewares/branchFilter.middleware';
 import * as ctrl from './inventory.controller';
 
 const router = Router();
@@ -38,13 +39,19 @@ router.get('/categories', ctrl.getCategories);
 /** POST /api/inventory/categories            — Crear categoría (solo OWNER) */
 router.post('/categories', roleGuard('OWNER'), ctrl.createCategory);
 
+/** PUT  /api/inventory/categories/:id  — Actualizar categoría (solo OWNER) */
+router.put('/categories/:id', roleGuard('OWNER'), ctrl.updateCategory);
+
+/** DELETE /api/inventory/categories/:id — Eliminar categoría (solo OWNER) */
+router.delete('/categories/:id', roleGuard('OWNER'), ctrl.deleteCategory);
+
 // ─── STOCK POR SEDE ────────────────────────────────────────────────────────
 
 /** GET  /api/inventory/stock              — Stock de todas las sedes (OWNER) */
-router.get('/stock', ctrl.getAllStock);
+router.get('/stock', roleGuard('OWNER'), ctrl.getAllStock);
 
 /** GET  /api/inventory/stock/branch/:branchId   — Stock de una sede */
-router.get('/stock/branch/:branchId', ctrl.getStockByBranch);
+router.get('/stock/branch/:branchId', branchFilter(), requireBranchAccess, ctrl.getStockByBranch);
 
 /** GET  /api/inventory/stock/product/:productId — Stock de un producto en todas las sedes */
 router.get('/stock/product/:productId', ctrl.getStockByProduct);

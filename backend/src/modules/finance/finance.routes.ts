@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../core/middlewares/auth.middleware';
 import { roleGuard } from '../../core/middlewares/roleGuard';
+import { branchFilter, requireBranchAccess } from '../../core/middlewares/branchFilter.middleware';
 import {
     getOpenRegister, openCashRegister, closeCashRegister, addCashMovement
 } from './finance.controller';
@@ -9,15 +10,15 @@ const router = Router();
 router.use(authMiddleware);
 
 // Get current open register info for a branch (includes transactions)
-router.get('/registers/open/:branchId', roleGuard('OWNER', 'SELLER'), getOpenRegister);
+router.get('/registers/open/:branchId', branchFilter(), requireBranchAccess, getOpenRegister);
 
 // Open new register
-router.post('/registers/open', roleGuard('OWNER', 'SELLER'), openCashRegister);
+router.post('/registers/open', branchFilter(), requireBranchAccess, openCashRegister);
 
 // Close register
-router.post('/registers/:registerId/close', roleGuard('OWNER', 'SELLER'), closeCashRegister);
+router.post('/registers/:registerId/close', branchFilter(), requireBranchAccess, closeCashRegister);
 
 // Add manual expense or income to register
-router.post('/registers/:registerId/movement', roleGuard('OWNER', 'SELLER'), addCashMovement);
+router.post('/registers/:registerId/movement', branchFilter(), requireBranchAccess, addCashMovement);
 
 export default router;

@@ -1,8 +1,21 @@
 export type PlanType = 'BASICO' | 'FULL';
+export type RoleType = 'OWNER' | 'SELLER';
 
 export interface PlanConfig {
     allowedPaths: string[];
 }
+
+export interface RoleConfig {
+    allowedPaths: string[];
+}
+
+const getActivePlanFromEnv = (): PlanType => {
+    const envPlan = import.meta.env.VITE_PLAN_MODE;
+    if (envPlan === 'FULL') return 'FULL';
+    return 'BASICO';
+};
+
+export const ACTIVE_PLAN = getActivePlanFromEnv();
 
 export const PLANS: Record<PlanType, PlanConfig> = {
     BASICO: {
@@ -15,7 +28,6 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             '/sales',
             '/finance/cash-register',
             '/audit',
-            '/users',
             '/settings'
         ]
     },
@@ -29,22 +41,52 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             '/finance/cash-register',
             '/products',
             '/products/categories',
-            '/suppliers',
             '/users',
+            '/settings',
+            '/suppliers',
             '/reports',
             '/purchases',
             '/directory',
-            '/audit'
+            '/audit',
+            '/sales'
         ]
     }
 };
 
-// Configuración actual solicitada por el cliente
-export const ACTIVE_PLAN: PlanType = 'BASICO';
+export const ROLE_CONFIG: Record<RoleType, RoleConfig> = {
+    OWNER: {
+        allowedPaths: [
+            '/dashboard',
+            '/pos',
+            '/inventory',
+            '/inventory/batches',
+            '/products',
+            '/products/categories',
+            '/sales',
+            '/finance',
+            '/finance/cash-register',
+            '/audit',
+            '/settings'
+        ]
+    },
+    SELLER: {
+        allowedPaths: [
+            '/dashboard',
+            '/pos',
+            '/inventory',
+            '/products',
+            '/sales',
+            '/finance/cash-register',
+            '/directory'
+        ]
+    }
+};
 
-export const isPathAllowed = (path: string): boolean => {
-    const config = PLANS[ACTIVE_PLAN];
-    // Exact match or prefix match for nested routes if needed
-    // In this case, we check if the path starts with any allowed path
-    return config.allowedPaths.some(p => path.startsWith(p));
+export const isPathAllowed = (path: string, userRole?: RoleType): boolean => {
+    if (!userRole) return false;
+    
+    const roleConfig = ROLE_CONFIG[userRole];
+    if (!roleConfig) return false;
+    
+    return roleConfig.allowedPaths.some(p => path.startsWith(p));
 };

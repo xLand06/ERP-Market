@@ -10,9 +10,9 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
-import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
+import { useInventory } from '@/hooks/useInventory';
 
 // ─── Types ─────────────────────────────────────────────────────────
 interface Product { id: string; name: string; price: number; stock: number; category: string; code: string; }
@@ -185,35 +185,21 @@ export default function POSPage() {
 
     const selectedBranch = useAuthStore(s => s.selectedBranch);
     const user = useAuthStore(s => s.user);
-    const isOwner = user?.role === 'OWNER';
-    const showAllBranches = selectedBranch === 'all' && isOwner;
 
-    // 1. Fetching inventory from local express API
-    const { data: rawItems, isLoading, refetch } = useQuery({
-        queryKey: ['stock', selectedBranch],
-        queryFn: async () => {
-            if (!selectedBranch) return [];
-            // OWNER con "Todas las sucursales" - obtener todo el inventario
-            if (showAllBranches) {
-                const res = await api.get('/inventory/stock');
-                return res.data.data;
-            }
-            const res = await api.get(`/inventory/stock/branch/${selectedBranch}`);
-            return res.data.data;
-        },
-        enabled: !!selectedBranch
-    });
+    const effectiveBranch = selectedBranch === 'all' && user?.role === 'OWNER' ? null : selectedBranch;
+
+    const { inventory, isLoading, refetch, isOnline } = useInventory(effectiveBranch || '');
 
     const PRODUCTS: Product[] = useMemo(() => {
-        return (rawItems || []).map((item: any) => ({
+        return inventory.map(item => ({
             id: item.product.id,
             code: item.product.barcode || '',
             name: item.product.name,
             price: Number(item.product.price),
             stock: item.stock,
-            category: item.product.category?.name || 'Varios',
+            category: item.product.category || 'Varios',
         }));
-    }, [rawItems]);
+    }, [inventory]);
 
     const CATEGORIES = useMemo(() => {
         const cats = new Set(PRODUCTS.map(p => p.category));
@@ -274,16 +260,36 @@ export default function POSPage() {
                 unitPrice: c.price,
             }));
 
-            await api.post('/pos/transactions', {
-                type: isSaleMode ? 'SALE' : 'INVENTORY_IN',
-                branchId: selectedBranch,
-                items,
-            });
+            if (isOnline) {
+                await api.post('/pos/transactions', {
+                    type: isSaleMode ? 'SALE' : 'INVENTORY_IN',
+                    branchId: effectiveBranch,
+                    items,
+                });
+            } else {
+                const isElectron = typeof window !== 'undefined' && 'erpApi' in window;
+                if (isElectron && (window as any).erpApi.db) {
+                    const db = (window as any).erpApi.db;
+                    for (const item of items) {
+                        const qty = isSaleMode ? -item.quantity : item.quantity;
+                        await db.updateStock(item.productId, effectiveBranch, qty);
+                        await db.addPendingChange({
+                            id: `${Date.now()}-${item.productId}`,
+                            type: 'STOCK_UPDATE',
+                            data: { productId: item.productId, branchId: effectiveBranch, quantity: item.quantity },
+                            createdAt: new Date().toISOString(),
+                            branchId: effectiveBranch,
+                        });
+                    }
+                } else {
+                    throw new Error('Sin conexión');
+                }
+            }
 
             setCart([]);
             setPayOpen(false);
             showToast(isSaleMode ? '✓ Venta registrada exitosamente' : '✓ Entrada registrada exitosamente');
-            refetch(); // Refrescar inventario local
+            refetch();
         } catch (error: any) {
             console.error(error);
             showToast(error.response?.data?.error || `Error al procesar la ${isSaleMode ? 'venta' : 'entrada'}`, true);

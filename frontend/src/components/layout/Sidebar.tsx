@@ -90,8 +90,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
 
                 <nav className="flex flex-col space-y-1.5">
                     {navItems
-                        .filter(item => isPathAllowed(item.path))
-                        .filter(item => !item.roles || (user && item.roles.includes(user.role)))
+                        .filter(item => isPathAllowed(item.path, user?.role))
                         .map((item) => (
                         <NavLink
                             key={item.path}

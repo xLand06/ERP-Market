@@ -1,21 +1,18 @@
 import { Navigate, useLocation } from 'react-router-dom';
+import { useAuthStore } from '@/features/auth/store/authStore';
 import { isPathAllowed } from '../../lib/planConfig';
 
 interface PlanGuardProps {
     children: React.ReactNode;
 }
 
-/**
- * PlanGuard: Silently redirects to /dashboard if the current plan 
- * does not include the requested route.
- */
 export function PlanGuard({ children }: PlanGuardProps) {
-    const { pathname } = useLocation();
+    const location = useLocation();
+    const user = useAuthStore((s) => s.user);
 
-    // Special case for root which redirects to dashboard anyway
-    if (pathname === '/') return <>{children}</>;
+    if (location.pathname === '/') return <>{children}</>;
 
-    if (!isPathAllowed(pathname)) {
+    if (!isPathAllowed(location.pathname, user?.role)) {
         return <Navigate to="/dashboard" replace />;
     }
 

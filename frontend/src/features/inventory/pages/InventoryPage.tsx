@@ -1,13 +1,15 @@
 import { useState, useId, useMemo } from 'react';
-import { Search, Plus, Download, Pencil, Check, X, Package, Loader2 } from 'lucide-react';
+import { Search, Plus, Download, Pencil, Check, X, Package, Loader2, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { ProductFormModal } from '../components/ProductFormModal';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
+import { useInventory } from '@/hooks/useInventory';
+import toast from 'react-hot-toast';
 
 interface Product {
     id: string; code: string; name: string; category: string;
@@ -39,25 +41,18 @@ export default function InventoryPage() {
     const selectedBranch = useAuthStore(s => s.selectedBranch);
     const user = useAuthStore(s => s.user);
     const isOwner = user?.role === 'OWNER';
-    const showAllBranches = selectedBranch === 'all' && isOwner;
+    const effectiveBranch = selectedBranch === 'all' && isOwner ? null : selectedBranch;
 
-    // 1. Fetching inventory from local express API
-    const { data: rawItems, isLoading, refetch } = useQuery({
-        queryKey: ['inventory', selectedBranch],
-        queryFn: async () => {
-            if (!selectedBranch) return [];
-            if (showAllBranches) {
-                const res = await api.get('/inventory/stock');
-                return res.data.data;
-            }
-            const res = await api.get(`/inventory/stock/branch/${selectedBranch}`);
-            return res.data.data;
-        },
-        enabled: !!selectedBranch
-    });
+    const { inventory, isLoading, refetch, isOnline } = useInventory(effectiveBranch || '');
+
+    useMemo(() => {
+        if (inventory.length > 0) {
+            toast.success(`${inventory.length} productos cargados`, { duration: 2000 });
+        }
+    }, [inventory.length]);
 
     const PRODUCTS: Product[] = useMemo(() => {
-        return (rawItems || []).map((item: any) => ({
+        return inventory.map(item => ({
             id: item.product.id,
             code: item.product.barcode || '',
             name: item.product.name,
@@ -65,14 +60,30 @@ export default function InventoryPage() {
             price: Number(item.product.price || 0),
             stock: item.stock,
             minStock: item.minStock || 0,
-            category: item.product.category?.name || 'Varios',
+            category: item.product.category || 'Varios',
         }));
-    }, [rawItems]);
+    }, [inventory]);
 
     const CATEGORIES = useMemo(() => {
         const cats = new Set(PRODUCTS.map(p => p.category));
         return ['Todos', ...Array.from(cats)].sort();
     }, [PRODUCTS]);
+
+    // Mutation to create product
+    const createProductMutation = useMutation({
+        mutationFn: async (data: any) => {
+            const res = await api.post('/inventory/products', data);
+            return res.data;
+        },
+        onSuccess: () => {
+            toast.success('Producto creado correctamente');
+            setCreateOpen(false);
+            refetch();
+        },
+        onError: () => {
+            toast.error('Error al crear producto');
+        }
+    });
 
     // Mutation to update price
     const updatePriceMutation = useMutation({
@@ -80,8 +91,28 @@ export default function InventoryPage() {
             await api.put(`/inventory/products/${id}`, { price });
         },
         onSuccess: () => {
+            toast.success('Precio actualizado');
             setEditingId(null);
             refetch();
+        },
+        onError: () => {
+            toast.error('Error al actualizar precio');
+        }
+    });
+
+    // Mutation to update product
+    const updateProductMutation = useMutation({
+        mutationFn: async (data: any) => {
+            const res = await api.put(`/inventory/products/${editTarget?.id}`, data);
+            return res.data;
+        },
+        onSuccess: () => {
+            toast.success('Producto actualizado correctamente');
+            setEditTarget(null);
+            refetch();
+        },
+        onError: () => {
+            toast.error('Error al actualizar producto');
         }
     });
 
@@ -128,29 +159,39 @@ export default function InventoryPage() {
     };
 
     if (!selectedBranch) {
-        return <div className="h-full flex items-center justify-center text-slate-500 pb-20">Por favor, seleccione una sede en la configuración.</div>;
+        return (
+            <div className="h-full flex items-center justify-center text-slate-500 pb-20">
+                Por favor, seleccione una sede en la configuración.
+            </div>
+        );
     }
 
     return (
         <>
+        <div className="flex items-center gap-2 mb-4">
+            {isOnline ? (
+                <span className="flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                    <Wifi className="w-3 h-3" /> En línea
+                </span>
+            ) : (
+                <span className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                    <WifiOff className="w-3 h-3" /> Sin conexión
+                </span>
+            )}
+            <span className="text-xs text-slate-400">
+                {PRODUCTS.length} productos
+            </span>
+        </div>
         <ProductFormModal
             open={createOpen}
             onClose={() => setCreateOpen(false)}
-            onSave={() => {
-                // TODO: connect new product
-                setCreateOpen(false);
-                refetch();
-            }}
+            onSave={(data) => createProductMutation.mutate({ ...data, branchId: effectiveBranch })}
             mode="create"
         />
         <ProductFormModal
             open={!!editTarget}
             onClose={() => setEditTarget(null)}
-            onSave={() => {
-                // TODO: connect edit product
-                setEditTarget(null);
-                refetch();
-            }}
+            onSave={(data) => updateProductMutation.mutate({ ...data, branchId: effectiveBranch })}
             initial={editTarget ? {
                 code: editTarget.code,
                 name: editTarget.name,

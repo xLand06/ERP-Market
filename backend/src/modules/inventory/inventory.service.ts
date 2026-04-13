@@ -78,6 +78,12 @@ export const getAllCategories = () =>
 export const createCategory = (data: { name: string; description?: string }) =>
     prisma.category.create({ data });
 
+export const updateCategory = (id: string, data: { name?: string; description?: string }) =>
+    prisma.category.update({ where: { id }, data });
+
+export const deleteCategory = (id: string) =>
+    prisma.category.delete({ where: { id } });
+
 export const getAllStock = () =>
     prisma.branchInventory.findMany({
         include: {

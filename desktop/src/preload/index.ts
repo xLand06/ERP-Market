@@ -20,7 +20,6 @@ contextBridge.exposeInMainWorld('erpApi', {
         ipcRenderer.invoke('sync:getLastTime'),
 
     // ── Detección de conectividad ─────────────────────────────
-    // El renderer puede mostrar el badge online/offline
     onConnectivityChange: (
         callback: (status: 'online' | 'offline') => void
     ) => {
@@ -38,5 +37,39 @@ contextBridge.exposeInMainWorld('erpApi', {
         get: (key: string): Promise<any> => ipcRenderer.invoke('store-get', key),
         set: (key: string, value: any): Promise<void> => ipcRenderer.invoke('store-set', key, value),
         delete: (key: string): Promise<void> => ipcRenderer.invoke('store-delete', key),
+    },
+
+    // ── Base de datos local SQLite (offline) ────────────────────
+    db: {
+        // Productos
+        getProducts: (branchId: string) =>
+            ipcRenderer.invoke('db-getProducts', branchId),
+        saveProducts: (branchId: string, products: any[]) =>
+            ipcRenderer.invoke('db-saveProducts', branchId, products),
+        
+        // Stock por sucursal
+        getStock: (branchId: string) =>
+            ipcRenderer.invoke('db-getStock', branchId),
+        updateStock: (productId: string, branchId: string, quantity: number) =>
+            ipcRenderer.invoke('db-updateStock', productId, branchId, quantity),
+        saveStock: (branchId: string, inventory: any[]) =>
+            ipcRenderer.invoke('db-saveStock', branchId, inventory),
+
+        // Pending changes para sync
+        getPendingChanges: () =>
+            ipcRenderer.invoke('db-getPendingChanges'),
+        addPendingChange: (change: any) =>
+            ipcRenderer.invoke('db-addPendingChange', change),
+        markSynced: (ids: string[]) =>
+            ipcRenderer.invoke('db-markSynced', ids),
+        clearSyncedChanges: () =>
+            ipcRenderer.invoke('db-clearSyncedChanges'),
+
+        // Sync metadata
+        getLastSync: () => ipcRenderer.invoke('db-getLastSync'),
+        setLastSync: (time: string) => ipcRenderer.invoke('db-setLastSync', time),
+
+        // Obtener toda la data para inicializar cache
+        getAllData: () => ipcRenderer.invoke('db-getAllData'),
     },
 });
