@@ -39,11 +39,13 @@ export const createProduct = async (req: AuthRequest, res: Response, next: any):
         let categoryId = req.body.categoryId;
         if (!categoryId && category) {
             const categories = await inventoryService.getAllCategories();
-            let existingCat = categories.find(c => c.name === category);
+            const existingCat = categories.find(c => c.name === category);
             if (!existingCat) {
-                existingCat = await inventoryService.createCategory({ name: category });
+                const newCat = await inventoryService.createCategory({ name: category });
+                categoryId = newCat.id;
+            } else {
+                categoryId = existingCat.id;
             }
-            categoryId = existingCat.id;
         }
 
         const productPayload = {
@@ -84,11 +86,13 @@ export const updateProduct = async (req: AuthRequest, res: Response, next: any):
         let categoryId = req.body.categoryId;
         if (!categoryId && category) {
             const categories = await inventoryService.getAllCategories();
-            let existingCat = categories.find(c => c.name === category);
+            const existingCat = categories.find(c => c.name === category);
             if (!existingCat) {
-                existingCat = await inventoryService.createCategory({ name: category });
+                const newCat = await inventoryService.createCategory({ name: category });
+                categoryId = newCat.id;
+            } else {
+                categoryId = existingCat.id;
             }
-            categoryId = existingCat.id;
         }
 
         const updatePayload: any = {};

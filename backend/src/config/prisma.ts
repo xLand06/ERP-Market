@@ -1,7 +1,7 @@
 import '../config/env';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { PrismaLibSql } from '@prisma/adapter-libsql';
 import { logger } from '../core/utils/logger';
 
 // =============================================================================
@@ -59,7 +59,7 @@ export const getLocalPrisma = (): PrismaClient => {
     if (!_prismaLocal) {
         const localUrl = process.env.LOCAL_DATABASE_URL || 'file:./erp-market.db';
         _prismaLocal = new PrismaClient({
-            adapter: new PrismaBetterSqlite3({
+            adapter: new PrismaLibSql({
                 url: localUrl,
             }),
             log: process.env.NODE_ENV === 'development' ? ['error'] : ['error'],

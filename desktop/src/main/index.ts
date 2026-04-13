@@ -2,10 +2,11 @@ process.env.ELECTRON = 'true';
 
 import { app, BrowserWindow, shell } from 'electron';
 import { join } from 'path';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { is } from '@electron-toolkit/utils';
 import { startExpressServer } from './express-bridge';
 import Store from 'electron-store';
-import Database from 'better-sqlite3';
+import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
 
 const store = new Store<{ token: string | null; branchId: string | null }>({
     defaults: { token: null, branchId: null },
@@ -21,13 +22,59 @@ ipcMain.handle('store-delete', (_event, key: string) => store.delete(key));
 ipcMain.handle('get-app-path', () => app.getAppPath());
 ipcMain.handle('get-user-data-path', () => app.getPath('userData'));
 
-let db: Database.Database;
+let db: SqlJsDatabase;
+let dbPath: string;
 
-function initDatabase(userDataPath: string) {
-    const dbPath = join(userDataPath, 'erp-market.db');
-    db = new Database(dbPath);
+function saveDatabase() {
+    const data = db.export();
+    const buffer = Buffer.from(data);
+    writeFileSync(dbPath, buffer);
+}
+
+function queryAll(sql: string, params: any[] = []): any[] {
+    const stmt = db.prepare(sql);
+    if (params.length > 0) {
+        stmt.bind(params);
+    }
+    const results: any[] = [];
+    while (stmt.step()) {
+        const row = stmt.getAsObject();
+        results.push(row);
+    }
+    stmt.free();
+    return results;
+}
+
+function queryOne(sql: string, params: any[] = []): any | undefined {
+    const stmt = db.prepare(sql);
+    if (params.length > 0) {
+        stmt.bind(params);
+    }
+    let row: any = undefined;
+    if (stmt.step()) {
+        row = stmt.getAsObject();
+    }
+    stmt.free();
+    return row;
+}
+
+function runSql(sql: string, params: any[] = []) {
+    db.run(sql, params);
+}
+
+async function initDatabase(userDataPath: string) {
+    dbPath = join(userDataPath, 'erp-market.db');
     
-    db.exec(`
+    const SQL = await initSqlJs();
+    
+    if (existsSync(dbPath)) {
+        const fileBuffer = readFileSync(dbPath);
+        db = new SQL.Database(fileBuffer);
+    } else {
+        db = new SQL.Database();
+    }
+    
+    db.run(`
         CREATE TABLE IF NOT EXISTS products (
             id TEXT PRIMARY KEY,
             name TEXT,
@@ -39,8 +86,10 @@ function initDatabase(userDataPath: string) {
             isActive INTEGER DEFAULT 1,
             createdAt TEXT,
             updatedAt TEXT
-        );
-        
+        )
+    `);
+    
+    db.run(`
         CREATE TABLE IF NOT EXISTS branch_inventory (
             id TEXT PRIMARY KEY,
             productId TEXT,
@@ -49,8 +98,10 @@ function initDatabase(userDataPath: string) {
             minStock INTEGER DEFAULT 0,
             updatedAt TEXT,
             UNIQUE(productId, branchId)
-        );
-        
+        )
+    `);
+    
+    db.run(`
         CREATE TABLE IF NOT EXISTS pending_changes (
             id TEXT PRIMARY KEY,
             type TEXT,
@@ -58,123 +109,121 @@ function initDatabase(userDataPath: string) {
             createdAt TEXT,
             branchId TEXT,
             synced INTEGER DEFAULT 0
-        );
-        
+        )
+    `);
+    
+    db.run(`
         CREATE TABLE IF NOT EXISTS sync_meta (
             key TEXT PRIMARY KEY,
             value TEXT
-        );
-        
-        CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode);
-        CREATE INDEX IF NOT EXISTS idx_inventory_branch ON branch_inventory(branchId);
-        CREATE INDEX IF NOT EXISTS idx_pending_synced ON pending_changes(synced);
+        )
     `);
+    
+    db.run(`CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_inventory_branch ON branch_inventory(branchId)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_pending_synced ON pending_changes(synced)`);
+    
+    saveDatabase();
     
     return db;
 }
 
 function getAllData() {
     return {
-        products: db.prepare('SELECT * FROM products WHERE isActive = 1').all(),
-        inventory: db.prepare('SELECT * FROM branch_inventory').all(),
-        syncMeta: db.prepare('SELECT * FROM sync_meta').all(),
+        products: queryAll('SELECT * FROM products WHERE isActive = 1'),
+        inventory: queryAll('SELECT * FROM branch_inventory'),
+        syncMeta: queryAll('SELECT * FROM sync_meta'),
     };
 }
 
 function getProducts(branchId: string) {
-    return db.prepare(`
+    return queryAll(`
         SELECT p.*, bi.stock, bi.minStock, bi.updatedAt as stockUpdatedAt
         FROM products p
         LEFT JOIN branch_inventory bi ON p.id = bi.productId AND bi.branchId = ?
         WHERE p.isActive = 1
         ORDER BY p.name ASC
-    `).all(branchId);
+    `, [branchId]);
 }
 
 function saveProducts(branchId: string, products: any[]) {
-    const productStmt = db.prepare(`
-        INSERT OR REPLACE INTO products (id, name, barcode, price, cost, category, categoryId, isActive, createdAt, updatedAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
-    `);
-    
-    const trans = db.transaction((prods: any[]) => {
-        for (const p of prods) {
-            productStmt.run(p.id, p.name, p.barcode, p.price, p.cost, p.category, p.categoryId);
-        }
-    });
-    
-    trans(products);
+    for (const p of products) {
+        runSql(`
+            INSERT OR REPLACE INTO products (id, name, barcode, price, cost, category, categoryId, isActive, createdAt, updatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
+        `, [p.id, p.name, p.barcode, p.price, p.cost, p.category, p.categoryId]);
+    }
+    saveDatabase();
 }
 
 function getStock(branchId: string) {
-    return db.prepare(`
+    return queryAll(`
         SELECT bi.*, p.name as productName, p.barcode
         FROM branch_inventory bi
         JOIN products p ON bi.productId = p.id
         WHERE bi.branchId = ?
         ORDER BY p.name ASC
-    `).all(branchId);
+    `, [branchId]);
 }
 
 function updateStock(productId: string, branchId: string, quantity: number) {
-    const current = db.prepare(`
+    const current = queryOne(`
         SELECT stock FROM branch_inventory 
         WHERE productId = ? AND branchId = ?
-    `).get(productId, branchId) as { stock: number } | undefined;
+    `, [productId, branchId]);
     
     const newStock = current ? current.stock + quantity : quantity;
     
-    db.prepare(`
+    runSql(`
         INSERT OR REPLACE INTO branch_inventory (id, productId, branchId, stock, minStock, updatedAt)
         VALUES (?, ?, ?, ?, 0, datetime('now'))
-    `).run(`${branchId}_${productId}`, productId, branchId, newStock);
+    `, [`${branchId}_${productId}`, productId, branchId, newStock]);
+    
+    saveDatabase();
 }
 
 function saveStock(branchId: string, inventory: any[]) {
-    const stmt = db.prepare(`
-        INSERT OR REPLACE INTO branch_inventory (id, productId, branchId, stock, minStock, updatedAt)
-        VALUES (?, ?, ?, ?, ?, datetime('now'))
-    `);
-    
-    const trans = db.transaction((inv: any[]) => {
-        for (const i of inv) {
-            stmt.run(i.id || `${branchId}_${i.productId}`, i.productId, branchId, i.stock, i.minStock || 0);
-        }
-    });
-    
-    trans(inventory);
+    for (const i of inventory) {
+        runSql(`
+            INSERT OR REPLACE INTO branch_inventory (id, productId, branchId, stock, minStock, updatedAt)
+            VALUES (?, ?, ?, ?, ?, datetime('now'))
+        `, [i.id || `${branchId}_${i.productId}`, i.productId, branchId, i.stock, i.minStock || 0]);
+    }
+    saveDatabase();
 }
 
 function getPendingChanges() {
-    return db.prepare('SELECT * FROM pending_changes WHERE synced = 0 ORDER BY createdAt ASC').all();
+    return queryAll('SELECT * FROM pending_changes WHERE synced = 0 ORDER BY createdAt ASC');
 }
 
 function addPendingChange(change: { id: string; type: string; data: any; createdAt: string; branchId: string }) {
-    db.prepare(`
+    runSql(`
         INSERT OR REPLACE INTO pending_changes (id, type, data, createdAt, branchId, synced)
         VALUES (?, ?, ?, ?, ?, 0)
-    `).run(change.id, change.type, JSON.stringify(change.data), change.createdAt, change.branchId);
+    `, [change.id, change.type, JSON.stringify(change.data), change.createdAt, change.branchId]);
+    saveDatabase();
 }
 
 function markSynced(ids: string[]) {
-    const stmt = db.prepare('UPDATE pending_changes SET synced = 1 WHERE id = ?');
-    const trans = db.transaction((idList: string[]) => {
-        for (const id of idList) stmt.run(id);
-    });
-    trans(ids);
+    for (const id of ids) {
+        runSql('UPDATE pending_changes SET synced = 1 WHERE id = ?', [id]);
+    }
+    saveDatabase();
 }
 
 function clearSyncedChanges() {
-    db.prepare('DELETE FROM pending_changes WHERE synced = 1').run();
+    runSql('DELETE FROM pending_changes WHERE synced = 1');
+    saveDatabase();
 }
 
 function getLastSync() {
-    const row = db.prepare('SELECT value FROM sync_meta WHERE key = ?').get('lastSync') as { value: string } | undefined;
+    const row = queryOne('SELECT value FROM sync_meta WHERE key = ?', ['lastSync']);
     return row?.value;
 }
 
 function setLastSync(time: string) {
-    db.prepare('INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)').run('lastSync', time);
+    runSql('INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)', ['lastSync', time]);
+    saveDatabase();
 }
 
 ipcMain.handle('db-getAllData', () => getAllData());
@@ -190,7 +239,6 @@ ipcMain.handle('db-clearSyncedChanges', () => clearSyncedChanges());
 ipcMain.handle('db-getLastSync', () => getLastSync());
 ipcMain.handle('db-setLastSync', (_event, time: string) => setLastSync(time));
 
-// ── Ventana principal ───────────────────────────────────────
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow(): void {
@@ -210,21 +258,16 @@ function createWindow(): void {
         },
     });
 
-    // Mostrar solo cuando el contenido esté listo (evita flash blanco)
     mainWindow.on('ready-to-show', () => {
         mainWindow!.show();
         if (is.dev) mainWindow!.webContents.openDevTools();
     });
 
-    // Abrir links externos en el navegador del sistema
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
         shell.openExternal(url);
         return { action: 'deny' };
     });
 
-    // ── Cargar el renderer ──────────────────────────────────
-    // DEV:  electron-vite sirve el renderer en un puerto propio
-    // PROD: carga el build estático desde out/renderer/index.html
     if (is.dev && process.env.ELECTRON_RENDERER_URL) {
         mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
     } else {
@@ -232,19 +275,23 @@ function createWindow(): void {
     }
 }
 
-// ── App Lifecycle ───────────────────────────────────────────
 app.whenReady().then(async () => {
     const userDataPath = app.getPath('userData');
-    const dbPath = `file:${join(userDataPath, 'erp-market.db')}`;
-    process.env.LOCAL_DATABASE_URL = dbPath;
+    
+    if (!existsSync(userDataPath)) {
+        mkdirSync(userDataPath, { recursive: true });
+    }
+    
+    const dbFileName = 'erp-market.db';
+    const fullDbPath = join(userDataPath, dbFileName);
+    process.env.LOCAL_DATABASE_URL = `file:${fullDbPath}`;
 
-    console.log(`[Electron] SQLite DB: ${dbPath}`);
+    console.log(`[Electron] SQLite DB: ${fullDbPath}`);
 
-    initDatabase(userDataPath);
+    await initDatabase(userDataPath);
 
     await startExpressServer();
 
-    // Crear la ventana
     createWindow();
 
     app.on('activate', () => {
