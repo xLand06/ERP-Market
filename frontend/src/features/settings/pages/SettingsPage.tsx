@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, Trash2, Building2, Tag, Search, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Building2, Tag, Search, X, AlertTriangle, Database } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -18,7 +18,7 @@ interface Category {
     description?: string;
 }
 
-type Tab = 'branches' | 'categories';
+type Tab = 'branches' | 'categories' | 'maintenance';
 
 function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () => void }) {
     const [name, setName] = useState(branch?.name || '');
@@ -266,7 +266,37 @@ export default function SettingsPage() {
     const tabs = [
         { id: 'branches' as Tab, label: 'Sucursales', icon: Building2, count: branches.length },
         { id: 'categories' as Tab, label: 'Categorías', icon: Tag, count: categories.length },
+        { id: 'maintenance' as Tab, label: 'Mantenimiento', icon: AlertTriangle, count: 0 },
     ];
+
+    const isElectron = window.hasOwnProperty('electron');
+    const db = (window as any).electron?.db;
+
+    const handleFullPurge = async () => {
+        if (!window.confirm('¿ESTÁS ABSOLUTAMENTE SEGURO? Esta acción borrará TODOS los productos, inventarios y transacciones tanto en la NUBE como en este EQUIPO. No se puede deshacer.')) {
+            return;
+        }
+
+        const toastId = toast.loading('Iniciando limpieza total...');
+        try {
+            // 1. Limpiar Nube
+            await api.post('/sync/purge');
+            
+            // 2. Limpiar Local (si es Electron)
+            if (isElectron && db) {
+                await db.purge();
+            }
+
+            toast.success('Sistema reiniciado con éxito', { id: toastId });
+            
+            // Recargar datos
+            queryClient.invalidateQueries();
+            window.location.reload(); // Hard reload to clear all states
+        } catch (error) {
+            console.error('Error during purge:', error);
+            toast.error('Error al limpiar el sistema', { id: toastId });
+        }
+    };
 
     return (
         <div className="flex flex-col gap-6 max-w-[1400px] mx-auto pb-8">
@@ -441,6 +471,43 @@ export default function SettingsPage() {
                             </div>
                         ))
                     )}
+                </div>
+            )}
+
+            {activeTab === 'maintenance' && (
+                <div className="max-w-2xl">
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                            <div className="flex items-center gap-3 text-red-600 mb-2">
+                                <AlertTriangle className="w-6 h-6" />
+                                <h2 className="text-lg font-bold">Zona de Peligro</h2>
+                            </div>
+                            <p className="text-sm text-slate-500 font-medium">
+                                Acciones irreversibles que afectan la integridad de los datos globales del sistema.
+                            </p>
+                        </div>
+                        
+                        <div className="p-6 space-y-6">
+                            <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-red-100 bg-red-50/30">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2 font-bold text-red-700">
+                                        <Database className="w-4 h-4" />
+                                        <span>Reiniciar Base de Datos</span>
+                                    </div>
+                                    <p className="text-xs text-red-600/80 font-medium leading-relaxed max-w-sm">
+                                        Borra permanentemente todos los productos, existencias de inventario, categorías y registros de transacciones. 
+                                        Ideal para limpiar el ambiente de pruebas.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={handleFullPurge}
+                                    className="px-4 py-2.5 bg-red-600 text-white text-xs font-black rounded-xl hover:bg-red-700 transition-all shadow-sm shadow-red-600/20 active:scale-95 whitespace-nowrap uppercase tracking-wider"
+                                >
+                                    Limpiar Todo
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
