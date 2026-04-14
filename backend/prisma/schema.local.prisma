@@ -79,7 +79,7 @@ model User {
 
   transactions  Transaction[]
   cashRegisters CashRegister[]
-  auditLogs     AuditLog[]
+  auditLogs     AuditLog[]  // relación inversa (userId es opcional en AuditLog)
 
   @@index([username])
   @@index([cedula])
@@ -273,8 +273,9 @@ model AuditLog {
   userAgent String?
   createdAt DateTime @default(now())
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
+  // userId es opcional para permitir logs de intentos fallidos (usuario no existe)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([module])

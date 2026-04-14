@@ -3,15 +3,23 @@
 // Gráficas de rendimiento y métricas clave
 // ============================
 
-import { prisma, prismaCloud } from '../../config/prisma';
+import { prisma, getCloudPrisma } from '../../config/prisma';
 import type { KPIsDTO, SalesTrendDTO, TopProductDTO, SalesByBranchDTO } from '../../core/types/dto';
 
 /**
- * Retorna el cliente de Prisma a usar según el rol y disponibilidad.
- * @param role ROL del usuario (OWNER ve la nube, SELLER ve local)
+ * Selecciona el cliente Prisma adecuado:
+ * - En modo Electron/offline → siempre SQLite local (sin importar el rol)
+ * - En modo Cloud → OWNER usa cloud, SELLER usa local/cloud según config
  */
 export const getPreferredClient = (role?: string): any => {
-    if (role === 'OWNER') return prismaCloud;
+    // En Electron, NUNCA intentar conectar a la nube desde el dashboard
+    const isElectron = process.env.ELECTRON === 'true' || process.env.USE_LOCAL_DB === 'true';
+    if (isElectron) return prisma; // siempre SQLite local
+
+    if (role === 'OWNER') {
+        const cloud = getCloudPrisma();
+        return cloud ?? prisma; // fallback a local si cloud no está disponible
+    }
     return prisma;
 };
 

@@ -18,13 +18,29 @@ export const api = axios.create({
     headers: { 'Content-Type': 'application/json' },
 });
 
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 2;
 const RETRY_DELAY = 1000;
 
+/**
+ * Solo reintenta en errores de red (sin respuesta del servidor) o rate-limit (429).
+ * Los 500 son errores del servidor — reintentar no sirve y solo tarda más.
+ */
 const shouldRetry = (error: AxiosError) => {
     const status = error.response?.status;
-    return !status || status >= 500 || status === 429;
+    // Sin status = error de red (ECONNREFUSED, timeout, etc.) → sí reintenta
+    // 429 = rate limit → sí reintenta
+    // 500+ = error del servidor → NO reintenta
+    return !status || status === 429;
 };
+
+/**
+ * Rutas donde los errores NO deben mostrar toast molesto al usuario.
+ * El componente que las usa maneja el estado de error visualmente.
+ */
+const SILENT_ENDPOINTS = ['/dashboard/', '/reports/', '/finance/'];
+
+const isSilent = (url?: string) =>
+    url ? SILENT_ENDPOINTS.some((path) => url.includes(path)) : false;
 
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
@@ -44,29 +60,34 @@ api.interceptors.response.use(
 
         if (!originalRequest) return Promise.reject(error);
 
+        // 401 → cierra sesión inmediatamente
         if (error.response?.status === 401) {
             useAuthStore.getState().logout();
             window.location.href = '/login';
             return Promise.reject(error);
         }
 
+        // Reintentos (solo errores de red / 429)
         if (shouldRetry(error)) {
             originalRequest._retryCount = originalRequest._retryCount || 0;
             if (originalRequest._retryCount < MAX_RETRIES) {
                 originalRequest._retryCount++;
                 const waitTime = RETRY_DELAY * Math.pow(2, originalRequest._retryCount - 1);
-                console.log(`[API] Retry ${originalRequest._retryCount}/${MAX_RETRIES} in ${waitTime}ms...`);
                 await delay(waitTime);
                 return api(originalRequest);
             }
         }
 
-        const message = error.response?.data
-            ? (error.response.data as { error?: string }).error || error.message
-            : error.message;
+        // Toast de error — silenciar para endpoints del dashboard y reportes
+        const url = originalRequest.url || '';
+        if (!isSilent(url)) {
+            const message = error.response?.data
+                ? (error.response.data as { error?: string }).error || error.message
+                : error.message;
+            toast.error(message, { duration: 4000 });
+        }
 
-        toast.error(message, { duration: 4000 });
-        console.error('[API Error]', error.response?.status, message);
+        console.error('[API Error]', error.response?.status, originalRequest.url);
 
         return Promise.reject(error);
     }
@@ -74,11 +95,11 @@ api.interceptors.response.use(
 
 export const isOnline = async (): Promise<boolean> => {
     try {
-        await api.get('/health', { timeout: 5000 });
+        await api.get('/health', { timeout: 3000 });
         return true;
     } catch {
         return false;
     }
 };
 
-export default api;
+export default api;

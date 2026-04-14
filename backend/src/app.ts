@@ -32,7 +32,21 @@ if (process.env.ELECTRON === 'true') {
 
 // ─── MIDDLEWARES GLOBALES ───────────────────────────────────────────────────
 app.use(cors({
-    origin: process.env.FRONTEND_URL || '*',
+    origin: (origin, callback) => {
+        // Allow requests with no origin (e.g., mobile apps, curl)
+        if (!origin) return callback(null, true);
+        
+        const allowedUrls = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : ['http://localhost:5175'];
+        
+        // Allow standard localhost / network IP ranges typical for Vite
+        const isLocalNetwork = /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+):517[0-9]$/.test(origin);
+
+        if (allowedUrls.includes(origin) || allowedUrls.includes('*') || isLocalNetwork) {
+            callback(null, true);
+        } else {
+            callback(new Error(`CORS not allowed for origin: ${origin}`));
+        }
+    },
     credentials: true,
 }));
 app.use(express.json());

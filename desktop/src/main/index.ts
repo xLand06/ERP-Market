@@ -136,6 +136,14 @@ function getAllData() {
     };
 }
 
+function purgeDatabase() {
+    runSql('DELETE FROM branch_inventory');
+    runSql('DELETE FROM products');
+    runSql('DELETE FROM pending_changes');
+    runSql('DELETE FROM sync_meta');
+    saveDatabase();
+}
+
 function getProducts(branchId: string) {
     return queryAll(`
         SELECT p.*, bi.stock, bi.minStock, bi.updatedAt as stockUpdatedAt
@@ -166,18 +174,28 @@ function getStock(branchId: string) {
     `, [branchId]);
 }
 
-function updateStock(productId: string, branchId: string, quantity: number) {
+function updateStock(product: any, branchId: string, quantity: number, minStock: number = 0) {
+    // 1. Asegurar que el producto existe localmente
+    runSql(`
+        INSERT OR REPLACE INTO products (id, name, barcode, price, cost, category, categoryId, isActive, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
+    `, [product.id, product.name, product.barcode || '', product.price, product.cost || 0, product.category || 'Varios', product.categoryId || null]);
+
+    // 2. Calcular nuevo stock
     const current = queryOne(`
         SELECT stock FROM branch_inventory 
         WHERE productId = ? AND branchId = ?
-    `, [productId, branchId]);
+    `, [product.id, branchId]);
     
-    const newStock = current ? current.stock + quantity : quantity;
+    // Si queremos que sea absoluto (como en el modal), usamos quantity directamente.
+    // Si queremos que sea incremento, sumamos. 
+    // Usaremos absoluto para "Entrada Manual" si así lo pide el flujo del modal.
+    const newStock = quantity; 
     
     runSql(`
         INSERT OR REPLACE INTO branch_inventory (id, productId, branchId, stock, minStock, updatedAt)
-        VALUES (?, ?, ?, ?, 0, datetime('now'))
-    `, [`${branchId}_${productId}`, productId, branchId, newStock]);
+        VALUES (?, ?, ?, ?, ?, datetime('now'))
+    `, [`${branchId}_${product.id}`, product.id, branchId, newStock, minStock]);
     
     saveDatabase();
 }
@@ -230,8 +248,9 @@ ipcMain.handle('db-getAllData', () => getAllData());
 ipcMain.handle('db-getProducts', (_event, branchId: string) => getProducts(branchId));
 ipcMain.handle('db-saveProducts', (_event, branchId: string, products: any[]) => saveProducts(branchId, products));
 ipcMain.handle('db-getStock', (_event, branchId: string) => getStock(branchId));
-ipcMain.handle('db-updateStock', (_event, productId: string, branchId: string, quantity: number) => updateStock(productId, branchId, quantity));
+ipcMain.handle('db-updateStock', (_event, product: any, branchId: string, quantity: number, minStock: number) => updateStock(product, branchId, quantity, minStock));
 ipcMain.handle('db-saveStock', (_event, branchId: string, inventory: any[]) => saveStock(branchId, inventory));
+ipcMain.handle('db-purge', () => purgeDatabase());
 ipcMain.handle('db-getPendingChanges', () => getPendingChanges());
 ipcMain.handle('db-addPendingChange', (_event, change: any) => addPendingChange(change));
 ipcMain.handle('db-markSynced', (_event, ids: string[]) => markSynced(ids));
