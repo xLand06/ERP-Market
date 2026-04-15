@@ -130,14 +130,14 @@ export function useInventory(branchId: string) {
     });
 
     const updateStockMutation = useMutation({
-        mutationFn: async ({ productId, quantity }: { productId: string; quantity: number }) => {
+        mutationFn: async ({ product, quantity, minStock }: { product: any; quantity: number, minStock?: number }) => {
             if (isElectron) {
-                await db.updateStock(productId, branchId, quantity);
+                await db.updateStock(product, branchId, quantity, minStock || 0);
                 
                 await db.addPendingChange({
-                    id: `${Date.now()}-${productId}`,
+                    id: `${Date.now()}-${product.id}`,
                     type: 'STOCK_UPDATE',
-                    data: { productId, quantity, newStock: quantity },
+                    data: { productId: product.id, quantity, newStock: quantity, ...(minStock !== undefined && { minStock }) },
                     createdAt: new Date().toISOString(),
                     branchId,
                 });
@@ -146,11 +146,9 @@ export function useInventory(branchId: string) {
             }
             
             if (isOnline) {
-                const res = await api.put('/inventory/stock', {
-                    productId,
-                    branchId,
-                    stock: quantity,
-                });
+                const payload: any = { productId: product.id, branchId, stock: quantity };
+                if (minStock !== undefined) payload.minStock = minStock;
+                const res = await api.put('/inventory/stock', payload);
                 return res.data;
             }
             

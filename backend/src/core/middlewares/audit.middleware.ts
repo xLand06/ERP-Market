@@ -40,6 +40,16 @@ export const extractIp = (req: AuthRequest): string => {
 };
 
 /**
+ * Helper to normalize JSON details for Dual Database Support:
+ * - PostgreSQL Schema (Cloud): expects native JS objects for Prisma Json typings.
+ * - SQLite Schema (Local): expects String since sqlite driver fallback serializes to string.
+ */
+const normalizeDetails = (details: object) => {
+    const useLocal = process.env.USE_LOCAL_DB === 'true' || process.env.ELECTRON === 'true';
+    return useLocal ? JSON.stringify(details) : details;
+};
+
+/**
  * Middleware factory para auditoría automática.
  * @param action  - Tipo de acción (Ej: 'PRICE_CHANGE')
  * @param module  - Módulo origen (Ej: 'inventory')
@@ -58,16 +68,18 @@ export const auditAction = (
             // Después de que el controlador responda, escribimos el log
             if (req.user?.id) {
                 const details = getDetails ? getDetails(req) : { body: req.body };
+                const finalDetails = {
+                    request: details,
+                    response: res.statusCode < 400 ? 'SUCCESS' : 'FAILED',
+                    statusCode: res.statusCode,
+                };
+                
                 prisma.auditLog
                     .create({
                         data: {
                             action,
                             module,
-                            details: {
-                                request: details,
-                                response: res.statusCode < 400 ? 'SUCCESS' : 'FAILED',
-                                statusCode: res.statusCode,
-                            },
+                            details: normalizeDetails(finalDetails) as any,
                             ipAddress: extractIp(req),
                             userAgent: req.headers['user-agent'] || null,
                             userId: req.user.id,
@@ -89,7 +101,7 @@ export const logAudit = async (params: {
     action: AuditActionType;
     module: string;
     details: object;
-    userId: string;
+    userId: string | null;
     ipAddress?: string;
     userAgent?: string;
 }): Promise<void> => {
@@ -98,7 +110,7 @@ export const logAudit = async (params: {
             data: {
                 action: params.action,
                 module: params.module,
-                details: params.details,
+                details: normalizeDetails(params.details) as any,
                 userId: params.userId,
                 ipAddress: params.ipAddress || null,
                 userAgent: params.userAgent || null,

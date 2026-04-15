@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { ProductFormModal } from '../components/ProductFormModal';
+import { StockAdjustmentModal } from '../components/StockAdjustmentModal';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
@@ -31,8 +32,8 @@ export default function InventoryPage() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editPrice, setEditPrice] = useState('');
     const [selected, setSelected]   = useState<Set<string>>(new Set());
-    const [createOpen, setCreateOpen] = useState(false);
     const [editTarget, setEditTarget] = useState<Product | null>(null);
+    const [adjustmentOpen, setAdjustmentOpen] = useState(false);
 
     const searchId    = useId();
     const pageSizeId  = useId();
@@ -43,7 +44,7 @@ export default function InventoryPage() {
     const isOwner = user?.role === 'OWNER';
     const effectiveBranch = selectedBranch === 'all' && isOwner ? null : selectedBranch;
 
-    const { inventory, isLoading, refetch, isOnline } = useInventory(effectiveBranch || '');
+    const { inventory, isLoading, refetch, isOnline, updateStock } = useInventory(effectiveBranch || '');
 
     useMemo(() => {
         if (inventory.length > 0) {
@@ -68,22 +69,6 @@ export default function InventoryPage() {
         const cats = new Set(PRODUCTS.map(p => p.category));
         return ['Todos', ...Array.from(cats)].sort();
     }, [PRODUCTS]);
-
-    // Mutation to create product
-    const createProductMutation = useMutation({
-        mutationFn: async (data: any) => {
-            const res = await api.post('/inventory/products', data);
-            return res.data;
-        },
-        onSuccess: () => {
-            toast.success('Producto creado correctamente');
-            setCreateOpen(false);
-            refetch();
-        },
-        onError: () => {
-            toast.error('Error al crear producto');
-        }
-    });
 
     // Mutation to update price
     const updatePriceMutation = useMutation({
@@ -183,12 +168,6 @@ export default function InventoryPage() {
             </span>
         </div>
         <ProductFormModal
-            open={createOpen}
-            onClose={() => setCreateOpen(false)}
-            onSave={(data) => createProductMutation.mutate({ ...data, branchId: effectiveBranch })}
-            mode="create"
-        />
-        <ProductFormModal
             open={!!editTarget}
             onClose={() => setEditTarget(null)}
             onSave={(data) => updateProductMutation.mutate({ ...data, branchId: effectiveBranch })}
@@ -202,6 +181,16 @@ export default function InventoryPage() {
                 minStock: String(editTarget.minStock),
             } : undefined}
             mode="edit"
+        />
+        <StockAdjustmentModal 
+            open={adjustmentOpen}
+            onClose={() => setAdjustmentOpen(false)}
+            onSave={({ productId, quantity, minStock }) => {
+                updateStock({ productId, quantity, minStock });
+                toast.success('Entrada de inventario registrada con éxito');
+                setAdjustmentOpen(false);
+                setTimeout(refetch, 500);
+            }}
         />
         <div className="flex flex-col gap-6 max-w-400 mx-auto pb-8">
             {/* Header */}
@@ -220,10 +209,10 @@ export default function InventoryPage() {
                     </Button>
                     <Button
                         size="lg"
-                        className="h-11 sm:h-10 font-bold shadow-lg shadow-emerald-500/10 sm:px-4"
-                        onClick={() => setCreateOpen(true)}
+                        className="h-11 sm:h-10 font-bold shadow-lg shadow-indigo-500/20 sm:px-4 bg-indigo-600 hover:bg-indigo-700 text-white"
+                        onClick={() => setAdjustmentOpen(true)}
                     >
-                        <Plus className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Nuevo Producto
+                        <Plus className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Entrada Manual
                     </Button>
                 </div>
             </div>

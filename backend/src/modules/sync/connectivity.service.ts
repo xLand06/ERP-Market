@@ -1,15 +1,21 @@
-import { prismaCloud } from '../../config/prisma';
+import { getCloudPrisma } from '../../config/prisma';
 
 /**
- * Service to check internet/database connectivity.
+ * Verifica si hay conexión activa con la nube (Supabase).
+ * Retorna false inmediatamente si no hay DATABASE_URL configurada (modo offline).
  */
 export async function checkCloudConnection(): Promise<boolean> {
+    // Sin URL de nube → offline guaranteed, no intentar conectar
+    const hasUrl = !!(process.env.DIRECT_URL || process.env.DATABASE_URL);
+    if (!hasUrl) return false;
+
+    const cloud = getCloudPrisma();
+    if (!cloud) return false;
+
     try {
-        // Simple raw query or health check to verify Neon Postgres (Cloud) is up
-        await prismaCloud.$queryRaw`SELECT 1`;
+        await cloud.$queryRaw`SELECT 1`;
         return true;
-    } catch (error) {
-        // Log if needed, but the worker will handle retry logic
+    } catch {
         return false;
     }
 }

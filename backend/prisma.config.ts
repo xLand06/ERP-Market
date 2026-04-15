@@ -1,10 +1,13 @@
 import "dotenv/config";
 import { defineConfig, env } from 'prisma/config';
 
+// Detect if we are running for the local database
+const isLocal = process.argv.some(arg => arg.includes('schema.local.prisma'));
+
 export default defineConfig({
   earlyAccess: true,
-  schema: './prisma/schema.prisma',
+  schema: isLocal ? './prisma/schema.local.prisma' : './prisma/schema.prisma',
   datasource: { 
-    url: env('DIRECT_URL'), // Use Direct URL for CLI commands to avoid PgBouncer issues
+    url: isLocal ? (env('LOCAL_DATABASE_URL') || 'file:./erp-market.db') : env('DIRECT_URL'),
   },
 });

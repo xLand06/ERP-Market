@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Plus, Edit2, Trash2, Building2, Tag, Users, Search, X, Settings2, DollarSign, Percent } from 'lucide-react';
+import { Plus, Edit2, Trash2, Building2, Tag, Search, X, Settings2, DollarSign, Percent, AlertTriangle, Database } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useConfigStore } from '@/hooks/useConfigStore';
+import toast from 'react-hot-toast';
 
 interface Branch {
     id: string;
@@ -18,18 +19,7 @@ interface Category {
     description?: string;
 }
 
-interface User {
-    id: string;
-    username: string;
-    nombre: string;
-    apellido?: string;
-    email?: string;
-    role: 'OWNER' | 'SELLER';
-    branchId?: string;
-    isActive: boolean;
-}
-
-type Tab = 'branches' | 'categories' | 'users' | 'system';
+type Tab = 'branches' | 'categories' | 'maintenance' | 'system';
 
 function SystemSettings() {
     const { vesRate, iva, setVesRate, setIva } = useConfigStore();
@@ -116,57 +106,89 @@ function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () => void 
         try {
             if (branch) {
                 await api.put(`/branches/${branch.id}`, { name, address, phone });
+                toast.success('Sucursal actualizada exitosamente');
             } else {
                 await api.post('/branches', { name, address, phone });
+                toast.success('Sucursal creada exitosamente');
             }
             onClose();
         } catch (error) {
             console.error('Error saving branch:', error);
+            toast.error('Ocurrió un error al guardar la sucursal');
         } finally {
             setSaving(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold">{branch ? 'Editar Sucursal' : 'Nueva Sucursal'}</h3>
-                    <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div 
+                className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="branch-modal-title"
+            >
+                <div className="flex items-center justify-between p-5 border-b border-slate-100">
+                    <h3 id="branch-modal-title" className="text-lg font-bold text-slate-800">
+                        {branch ? 'Editar Sucursal' : 'Nueva Sucursal'}
+                    </h3>
+                    <button 
+                        onClick={onClose} 
+                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+                        aria-label="Cerrar modal"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
                 </div>
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="p-5 space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
+                        <label htmlFor="branchName" className="block text-sm font-semibold text-slate-700 mb-1.5">Nombre de Sucursal *</label>
                         <input
+                            id="branchName"
                             type="text"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium"
                             required
+                            autoComplete="organization"
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Dirección</label>
+                        <label htmlFor="branchAddress" className="block text-sm font-semibold text-slate-700 mb-1.5">Dirección</label>
                         <input
+                            id="branchAddress"
                             type="text"
                             value={address}
                             onChange={(e) => setAddress(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium"
+                            autoComplete="street-address"
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Teléfono</label>
+                        <label htmlFor="branchPhone" className="block text-sm font-semibold text-slate-700 mb-1.5">Teléfono</label>
                         <input
-                            type="text"
+                            id="branchPhone"
+                            type="tel"
                             value={phone}
                             onChange={(e) => setPhone(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium"
+                            autoComplete="tel"
                         />
                     </div>
-                    <div className="flex gap-2 pt-2">
-                        <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Cancelar</button>
-                        <button type="submit" disabled={saving} className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
-                            {saving ? 'Guardando...' : 'Guardar'}
+                    <div className="flex gap-3 pt-4">
+                        <button 
+                            type="button" 
+                            onClick={onClose} 
+                            className="flex-1 py-2.5 px-4 font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-800 transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            type="submit" 
+                            disabled={saving} 
+                            className="flex-1 py-2.5 px-4 font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-sm shadow-indigo-600/20"
+                        >
+                            {saving ? 'Guardando...' : 'Guardar Sucursal'}
                         </button>
                     </div>
                 </form>
@@ -186,180 +208,76 @@ function CategoryForm({ category, onClose }: { category?: Category; onClose: () 
         try {
             if (category) {
                 await api.put(`/inventory/categories/${category.id}`, { name, description });
+                toast.success('Categoría actualizada exitosamente');
             } else {
                 await api.post('/inventory/categories', { name, description });
+                toast.success('Categoría creada exitosamente');
             }
             onClose();
         } catch (error) {
             console.error('Error saving category:', error);
+            toast.error('Ocurrió un error al guardar la categoría');
         } finally {
             setSaving(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold">{category ? 'Editar Categoría' : 'Nueva Categoría'}</h3>
-                    <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div 
+                className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="category-modal-title"
+            >
+                <div className="flex items-center justify-between p-5 border-b border-slate-100">
+                    <h3 id="category-modal-title" className="text-lg font-bold text-slate-800">
+                        {category ? 'Editar Categoría' : 'Nueva Categoría'}
+                    </h3>
+                    <button 
+                        onClick={onClose} 
+                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+                        aria-label="Cerrar modal"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
                 </div>
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="p-5 space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
+                        <label htmlFor="categoryName" className="block text-sm font-semibold text-slate-700 mb-1.5">Nombre *</label>
                         <input
+                            id="categoryName"
                             type="text"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium"
                             required
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
+                        <label htmlFor="categoryDescription" className="block text-sm font-semibold text-slate-700 mb-1.5">Descripción</label>
                         <textarea
+                            id="categoryDescription"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium resize-none"
                             rows={3}
                         />
                     </div>
-                    <div className="flex gap-2 pt-2">
-                        <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Cancelar</button>
-                        <button type="submit" disabled={saving} className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
-                            {saving ? 'Guardando...' : 'Guardar'}
+                    <div className="flex gap-3 pt-4">
+                        <button 
+                            type="button" 
+                            onClick={onClose} 
+                            className="flex-1 py-2.5 px-4 font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-800 transition-colors"
+                        >
+                            Cancelar
                         </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-}
-
-function UserForm({ user, branches, onClose }: { user?: User; branches: Branch[]; onClose: () => void }) {
-    const [username, setUsername] = useState(user?.username || '');
-    const [password, setPassword] = useState('');
-    const [nombre, setNombre] = useState(user?.nombre || '');
-    const [apellido, setApellido] = useState(user?.apellido || '');
-    const [email, setEmail] = useState(user?.email || '');
-    const [role, setRole] = useState<'OWNER' | 'SELLER'>(user?.role || 'SELLER');
-    const [branchId, setBranchId] = useState(user?.branchId || '');
-    const [saving, setSaving] = useState(false);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setSaving(true);
-        try {
-            const data: any = { nombre, apellido, email, role, branchId: branchId || null };
-            if (!user) {
-                data.username = username;
-                data.password = password;
-            }
-            if (user) {
-                await api.put(`/users/${user.id}`, data);
-            } else {
-                await api.post('/users', data);
-            }
-            onClose();
-        } catch (error) {
-            console.error('Error saving user:', error);
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold">{user ? 'Editar Usuario' : 'Nuevo Usuario'}</h3>
-                    <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded"><X className="w-5 h-5" /></button>
-                </div>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    {!user && (
-                        <>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Usuario *</label>
-                                <input
-                                    type="text"
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Contraseña *</label>
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    required={!user}
-                                />
-                            </div>
-                        </>
-                    )}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
-                            <input
-                                type="text"
-                                value={nombre}
-                                onChange={(e) => setNombre(e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Apellido</label>
-                            <input
-                                type="text"
-                                value={apellido}
-                                onChange={(e) => setApellido(e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Rol *</label>
-                            <select
-                                value={role}
-                                onChange={(e) => setRole(e.target.value as 'OWNER' | 'SELLER')}
-                                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            >
-                                <option value="SELLER">Vendedor</option>
-                                <option value="OWNER">Administrador</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Sucursal</label>
-                            <select
-                                value={branchId}
-                                onChange={(e) => setBranchId(e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            >
-                                <option value="">Sin asignar</option>
-                                {branches.map(b => (
-                                    <option key={b.id} value={b.id}>{b.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-                    <div className="flex gap-2 pt-2">
-                        <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Cancelar</button>
-                        <button type="submit" disabled={saving} className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
-                            {saving ? 'Guardando...' : 'Guardar'}
+                        <button 
+                            type="submit" 
+                            disabled={saving} 
+                            className="flex-1 py-2.5 px-4 font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-sm shadow-indigo-600/20"
+                        >
+                            {saving ? 'Guardando...' : 'Guardar Categoría'}
                         </button>
                     </div>
                 </form>
@@ -373,10 +291,8 @@ export default function SettingsPage() {
     const [search, setSearch] = useState('');
     const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-    const [editingUser, setEditingUser] = useState<User | null>(null);
     const [showBranchForm, setShowBranchForm] = useState(false);
     const [showCategoryForm, setShowCategoryForm] = useState(false);
-    const [showUserForm, setShowUserForm] = useState(false);
 
     const queryClient = useQueryClient();
 
@@ -385,7 +301,8 @@ export default function SettingsPage() {
         queryFn: async () => {
             const res = await api.get('/branches');
             return res.data.data;
-        }
+        },
+        retry: false
     });
 
     const { data: categories = [] } = useQuery<Category[]>({
@@ -393,186 +310,239 @@ export default function SettingsPage() {
         queryFn: async () => {
             const res = await api.get('/inventory/categories');
             return res.data.data;
-        }
-    });
-
-    const { data: users = [] } = useQuery<User[]>({
-        queryKey: ['users-admin'],
-        queryFn: async () => {
-            const res = await api.get('/users');
-            return res.data.data;
-        }
+        },
+        retry: false
     });
 
     const deleteBranchMutation = useMutation({
         mutationFn: async (id: string) => {
             await api.delete(`/branches/${id}`);
         },
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['branches'] })
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['branches'] });
+            toast.success('Sucursal eliminada');
+        }
     });
 
     const deleteCategoryMutation = useMutation({
         mutationFn: async (id: string) => {
             await api.delete(`/inventory/categories/${id}`);
         },
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories'] })
-    });
-
-    const toggleUserMutation = useMutation({
-        mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-            await api.put(`/users/${id}`, { isActive });
-        },
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users-admin'] })
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['categories'] });
+            toast.success('Categoría eliminada');
+        }
     });
 
     const filteredBranches = branches.filter(b => b.name.toLowerCase().includes(search.toLowerCase()));
     const filteredCategories = categories.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
-    const filteredUsers = users.filter(u => u.nombre.toLowerCase().includes(search.toLowerCase()) || u.username.toLowerCase().includes(search.toLowerCase()));
 
     const tabs = [
         { id: 'branches' as Tab, label: 'Sucursales', icon: Building2, count: branches.length },
         { id: 'categories' as Tab, label: 'Categorías', icon: Tag, count: categories.length },
-        { id: 'users' as Tab, label: 'Usuarios', icon: Users, count: users.length },
-        { id: 'system' as Tab, label: 'Sistema', icon: Settings2 },
+        { id: 'maintenance' as Tab, label: 'Mantenimiento', icon: AlertTriangle, count: 0 },
     ];
 
+    const isElectron = window.hasOwnProperty('electron');
+    const db = (window as any).electron?.db;
+
+    const handleFullPurge = async () => {
+        if (!window.confirm('¿ESTÁS ABSOLUTAMENTE SEGURO? Esta acción borrará TODOS los productos, inventarios y transacciones tanto en la NUBE como en este EQUIPO. No se puede deshacer.')) {
+            return;
+        }
+
+        const toastId = toast.loading('Iniciando limpieza total...');
+        try {
+            // 1. Limpiar Nube
+            await api.post('/sync/purge');
+            
+            // 2. Limpiar Local (si es Electron)
+            if (isElectron && db) {
+                await db.purge();
+            }
+
+            toast.success('Sistema reiniciado con éxito', { id: toastId });
+            
+            // Recargar datos
+            queryClient.invalidateQueries();
+            window.location.reload(); // Hard reload to clear all states
+        } catch (error) {
+            console.error('Error during purge:', error);
+            toast.error('Error al limpiar el sistema', { id: toastId });
+        }
+    };
+
     return (
-        <div className="min-h-screen bg-white p-6">
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold text-slate-900">Configuración</h1>
-                <p className="text-slate-500">Gestiona las opciones del sistema</p>
+        <div className="flex flex-col gap-6 max-w-[1400px] mx-auto pb-8">
+            <div className="mb-2">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Configuración del Sistema</h1>
+                <p className="text-xs text-slate-400 mt-1 font-medium">Gestiona parámetros operativos, sucursales y clasificaciones.</p>
             </div>
 
-            <div className="border-b border-slate-200 mb-6">
-                <div className="flex gap-1">
+            <div className="border-b border-slate-200">
+                <div className="flex gap-2">
                     {tabs.map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                            className={`flex items-center gap-2 px-5 py-3 cursor-pointer text-sm font-bold border-b-[3px] transition-colors rounded-t-xl hover:bg-slate-50 ${
                                 activeTab === tab.id
-                                    ? 'border-indigo-600 text-indigo-600'
-                                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                                    ? 'border-indigo-600 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-50/50'
+                                    : 'border-transparent text-slate-500 hover:text-slate-800'
                             }`}
+                            aria-selected={activeTab === tab.id}
+                            role="tab"
                         >
-                            <tab.icon className="w-4 h-4" />
+                            <tab.icon className="w-4.5 h-4.5" />
                             {tab.label}
                             {tab.count !== undefined && (
-                                <span className="ml-1 px-2 py-0.5 bg-slate-100 rounded-full text-xs">{tab.count}</span>
+                                <span className={`ml-1 px-2.5 py-0.5 rounded-full text-[11px] ${
+                                activeTab === tab.id ? 'bg-white text-indigo-700 shadow-sm' : 'bg-slate-100 text-slate-500'
+                            }`}>{tab.count}</span>
                             )}
                         </button>
                     ))}
                 </div>
             </div>
 
-            {activeTab !== 'system' && (
-                <div className="mb-4 flex items-center gap-4">
-                    <div className="relative flex-1 max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input
-                            type="text"
-                            placeholder="Buscar..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                    </div>
+            <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <div className="relative flex-1 w-full max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
+                    <input
+                        type="search"
+                        placeholder={`Buscar en ${activeTab === 'branches' ? 'sucursales' : 'categorías'}...`}
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 text-sm font-medium rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm"
+                        aria-label="Buscador"
+                    />
+                </div>
+                <div className="ml-auto w-full sm:w-auto">
                     {activeTab === 'branches' && (
-                        <button onClick={() => { setEditingBranch(null); setShowBranchForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                            <Plus className="w-4 h-4" /> Nueva Sucursal
+                        <button onClick={() => { setEditingBranch(null); setShowBranchForm(true); }} className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-sm shadow-indigo-600/20">
+                            <Plus className="w-4.5 h-4.5" /> Crear Sucursal
                         </button>
                     )}
                     {activeTab === 'categories' && (
-                        <button onClick={() => { setEditingCategory(null); setShowCategoryForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                            <Plus className="w-4 h-4" /> Nueva Categoría
-                        </button>
-                    )}
-                    {activeTab === 'users' && (
-                        <button onClick={() => { setEditingUser(null); setShowUserForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                            <Plus className="w-4 h-4" /> Nuevo Usuario
+                        <button onClick={() => { setEditingCategory(null); setShowCategoryForm(true); }} className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-sm shadow-indigo-600/20">
+                            <Plus className="w-4.5 h-4.5" /> Crear Categoría
                         </button>
                     )}
                 </div>
-            )}
+            </div>
 
             {activeTab === 'branches' && (
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                    <table className="w-full">
-                        <thead className="bg-slate-50 text-slate-600 text-xs uppercase">
-                            <tr>
-                                <th className="px-4 py-3 text-left font-semibold">Nombre</th>
-                                <th className="px-4 py-3 text-left font-semibold">Dirección</th>
-                                <th className="px-4 py-3 text-left font-semibold">Teléfono</th>
-                                <th className="px-4 py-3 text-center font-semibold">Estado</th>
-                                <th className="px-4 py-3 text-right font-semibold">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {filteredBranches.length === 0 ? (
+                <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full erp-table min-w-[600px]">
+                            <thead className="bg-slate-50 border-b border-slate-100">
                                 <tr>
-                                    <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
-                                        No hay sucursales. Crea una para comenzar.
-                                    </td>
+                                    <th className="px-5 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Sucursal</th>
+                                    <th className="px-5 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Dirección</th>
+                                    <th className="px-5 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Contacto</th>
+                                    <th className="px-5 py-3.5 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+                                    <th className="px-5 py-3.5 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Acciones</th>
                                 </tr>
-                            ) : (
-                                filteredBranches.map(branch => (
-                                    <tr key={branch.id} className="hover:bg-slate-50">
-                                        <td className="px-4 py-3 font-medium text-slate-900">{branch.name}</td>
-                                        <td className="px-4 py-3 text-slate-600">{branch.address || '—'}</td>
-                                        <td className="px-4 py-3 text-slate-600">{branch.phone || '—'}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                                branch.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                                            }`}>
-                                                {branch.isActive ? 'Activo' : 'Inactivo'}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <div className="flex items-center justify-end gap-1">
-                                                <button
-                                                    onClick={() => { setEditingBranch(branch); setShowBranchForm(true); }}
-                                                    className="p-2 hover:bg-slate-100 rounded-lg"
-                                                >
-                                                    <Edit2 className="w-4 h-4 text-slate-600" />
-                                                </button>
-                                                <button
-                                                    onClick={() => deleteBranchMutation.mutate(branch.id)}
-                                                    className="p-2 hover:bg-red-50 rounded-lg"
-                                                >
-                                                    <Trash2 className="w-4 h-4 text-red-500" />
-                                                </button>
-                                            </div>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {filteredBranches.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-5 py-12 text-center text-slate-400">
+                                            <Building2 className="w-10 h-10 mx-auto text-slate-200 mb-3" />
+                                            <p className="font-semibold text-slate-600">No hay sucursales registradas</p>
                                         </td>
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                                ) : (
+                                    filteredBranches.map(branch => (
+                                        <tr key={branch.id} className="hover:bg-slate-50/60 transition-colors">
+                                            <td className="px-5 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100">
+                                                        <Building2 className="w-4.5 h-4.5" />
+                                                    </div>
+                                                    <span className="font-bold text-sm text-slate-800">{branch.name}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-5 py-4 text-sm text-slate-600 font-medium">{branch.address || '—'}</td>
+                                            <td className="px-5 py-4 text-sm text-slate-600 font-mono bg-slate-50/50">{branch.phone || '—'}</td>
+                                            <td className="px-5 py-4 text-center">
+                                                <span className={`px-2.5 py-1 rounded-md text-xs font-bold border ${
+                                                    branch.isActive 
+                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                                                }`}>
+                                                    {branch.isActive ? 'Activa' : 'Inactiva'}
+                                                </span>
+                                            </td>
+                                            <td className="px-5 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <button
+                                                        onClick={() => { setEditingBranch(branch); setShowBranchForm(true); }}
+                                                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                                        aria-label={`Editar ${branch.name}`}
+                                                    >
+                                                        <Edit2 className="w-4.5 h-4.5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            if(window.confirm('¿Seguro de eliminar esta sucursal?')) {
+                                                                deleteBranchMutation.mutate(branch.id);
+                                                            }
+                                                        }}
+                                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                        aria-label={`Eliminar ${branch.name}`}
+                                                    >
+                                                        <Trash2 className="w-4.5 h-4.5" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
 
             {activeTab === 'categories' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                     {filteredCategories.length === 0 ? (
-                        <div className="col-span-full text-center py-8 text-slate-400">
-                            No hay categorías. Crea una para comenzar.
+                        <div className="col-span-full py-12 text-center text-slate-400 bg-white border border-slate-200 rounded-xl shadow-sm">
+                            <Tag className="w-10 h-10 mx-auto text-slate-200 mb-3" />
+                            <p className="font-semibold text-slate-600">No hay categorías registradas</p>
                         </div>
                     ) : (
                         filteredCategories.map(category => (
-                            <div key={category.id} className="border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                                <div className="flex items-start justify-between">
-                                    <div>
-                                        <h3 className="font-medium text-slate-900">{category.name}</h3>
-                                        <p className="text-sm text-slate-500 mt-1">{category.description || 'Sin descripción'}</p>
+                            <div key={category.id} className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md hover:border-slate-300 transition-all group flex flex-col">
+                                <div className="flex items-start justify-between mb-3">
+                                    <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-100">
+                                        <Tag className="w-5 h-5" />
                                     </div>
-                                    <div className="flex gap-1">
-                                        <button onClick={() => { setEditingCategory(category); setShowCategoryForm(true); }} className="p-1.5 hover:bg-slate-100 rounded">
-                                            <Edit2 className="w-4 h-4 text-slate-600" />
+                                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                            onClick={() => { setEditingCategory(category); setShowCategoryForm(true); }} 
+                                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                        >
+                                            <Edit2 className="w-4 h-4" />
                                         </button>
-                                        <button onClick={() => deleteCategoryMutation.mutate(category.id)} className="p-1.5 hover:bg-red-50 rounded">
-                                            <Trash2 className="w-4 h-4 text-red-500" />
+                                        <button 
+                                            onClick={() => {
+                                                if(window.confirm('¿Seguro de eliminar esta categoría?')) {
+                                                    deleteCategoryMutation.mutate(category.id);
+                                                }
+                                            }} 
+                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
                                         </button>
                                     </div>
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800 mb-1">{category.name}</h3>
+                                    <p className="text-xs text-slate-500 font-medium line-clamp-2 leading-relaxed">
+                                        {category.description || 'Sin descripción adicional para esta categoría.'}
+                                    </p>
                                 </div>
                             </div>
                         ))
@@ -580,66 +550,40 @@ export default function SettingsPage() {
                 </div>
             )}
 
-            {activeTab === 'users' && (
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                    <table className="w-full">
-                        <thead className="bg-slate-50 text-slate-600 text-xs uppercase">
-                            <tr>
-                                <th className="px-4 py-3 text-left font-semibold">Usuario</th>
-                                <th className="px-4 py-3 text-left font-semibold">Nombre</th>
-                                <th className="px-4 py-3 text-left font-semibold">Rol</th>
-                                <th className="px-4 py-3 text-left font-semibold">Sucursal</th>
-                                <th className="px-4 py-3 text-center font-semibold">Estado</th>
-                                <th className="px-4 py-3 text-right font-semibold">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {filteredUsers.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
-                                        No hay usuarios.
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredUsers.map(user => (
-                                    <tr key={user.id} className="hover:bg-slate-50">
-                                        <td className="px-4 py-3 font-mono text-sm text-slate-900">{user.username}</td>
-                                        <td className="px-4 py-3 text-slate-900">{user.nombre} {user.apellido}</td>
-                                        <td className="px-4 py-3">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                                user.role === 'OWNER' ? 'bg-purple-50 text-purple-700' : 'bg-blue-50 text-blue-700'
-                                            }`}>
-                                                {user.role === 'OWNER' ? 'Admin' : 'Vendedor'}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-slate-600">
-                                            {branches.find(b => b.id === user.branchId)?.name || '—'}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <button
-                                                onClick={() => toggleUserMutation.mutate({ id: user.id, isActive: !user.isActive })}
-                                                className={`px-2 py-1 rounded-full text-xs font-medium cursor-pointer ${
-                                                    user.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                                                }`}
-                                            >
-                                                {user.isActive ? 'Activo' : 'Inactivo'}
-                                            </button>
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <div className="flex items-center justify-end gap-1">
-                                                <button
-                                                    onClick={() => { setEditingUser(user); setShowUserForm(true); }}
-                                                    className="p-2 hover:bg-slate-100 rounded-lg"
-                                                >
-                                                    <Edit2 className="w-4 h-4 text-slate-600" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+            {activeTab === 'maintenance' && (
+                <div className="max-w-2xl">
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                            <div className="flex items-center gap-3 text-red-600 mb-2">
+                                <AlertTriangle className="w-6 h-6" />
+                                <h2 className="text-lg font-bold">Zona de Peligro</h2>
+                            </div>
+                            <p className="text-sm text-slate-500 font-medium">
+                                Acciones irreversibles que afectan la integridad de los datos globales del sistema.
+                            </p>
+                        </div>
+                        
+                        <div className="p-6 space-y-6">
+                            <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-red-100 bg-red-50/30">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2 font-bold text-red-700">
+                                        <Database className="w-4 h-4" />
+                                        <span>Reiniciar Base de Datos</span>
+                                    </div>
+                                    <p className="text-xs text-red-600/80 font-medium leading-relaxed max-w-sm">
+                                        Borra permanentemente todos los productos, existencias de inventario, categorías y registros de transacciones. 
+                                        Ideal para limpiar el ambiente de pruebas.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={handleFullPurge}
+                                    className="px-4 py-2.5 bg-red-600 text-white text-xs font-black rounded-xl hover:bg-red-700 transition-all shadow-sm shadow-red-600/20 active:scale-95 whitespace-nowrap uppercase tracking-wider"
+                                >
+                                    Limpiar Todo
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -656,14 +600,6 @@ export default function SettingsPage() {
                 <CategoryForm
                     category={editingCategory || undefined}
                     onClose={() => { setShowCategoryForm(false); setEditingCategory(null); queryClient.invalidateQueries({ queryKey: ['categories'] }); }}
-                />
-            )}
-
-            {showUserForm && (
-                <UserForm
-                    user={editingUser || undefined}
-                    branches={branches}
-                    onClose={() => { setShowUserForm(false); setEditingUser(null); queryClient.invalidateQueries({ queryKey: ['users-admin'] }); }}
                 />
             )}
         </div>

@@ -50,8 +50,8 @@ contextBridge.exposeInMainWorld('erpApi', {
         // Stock por sucursal
         getStock: (branchId: string) =>
             ipcRenderer.invoke('db-getStock', branchId),
-        updateStock: (productId: string, branchId: string, quantity: number) =>
-            ipcRenderer.invoke('db-updateStock', productId, branchId, quantity),
+        updateStock: (product: any, branchId: string, quantity: number, minStock: number) =>
+            ipcRenderer.invoke('db-updateStock', product, branchId, quantity, minStock),
         saveStock: (branchId: string, inventory: any[]) =>
             ipcRenderer.invoke('db-saveStock', branchId, inventory),
 
@@ -64,6 +64,8 @@ contextBridge.exposeInMainWorld('erpApi', {
             ipcRenderer.invoke('db-markSynced', ids),
         clearSyncedChanges: () =>
             ipcRenderer.invoke('db-clearSyncedChanges'),
+        purge: () => 
+            ipcRenderer.invoke('db-purge'),
 
         // Sync metadata
         getLastSync: () => ipcRenderer.invoke('db-getLastSync'),

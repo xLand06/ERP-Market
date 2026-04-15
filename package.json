@@ -17,5 +17,14 @@
   "bugs": {
     "url": "https://github.com/xLand06/ERP-Market/issues"
   },
-  "homepage": "https://github.com/xLand06/ERP-Market#readme"
+  "homepage": "https://github.com/xLand06/ERP-Market#readme",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "better-sqlite3",
+      "prisma",
+      "@prisma/engines",
+      "esbuild"
+    ]
+  }
 }

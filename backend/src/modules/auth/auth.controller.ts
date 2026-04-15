@@ -23,7 +23,7 @@ export const loginController = async (req: Request, res: Response): Promise<void
             action: 'LOGIN_FAILED',
             module: 'auth',
             details: { identifier: username, reason: 'Credenciales inválidas' },
-            userId: 'anonymous',
+            userId: null, // sin FK: el usuario no existe en DB
             ipAddress: ip,
         });
         res.status(401).json({ error: 'Credenciales inválidas' });
