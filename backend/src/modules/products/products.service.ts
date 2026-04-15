@@ -36,7 +36,11 @@ export const getAllProducts = async (filters: ProductListParams): Promise<ApiLis
     ]);
 
     return {
-        data: products as ProductDTO[],
+        data: products.map(p => ({
+            ...p,
+            price: Number(p.price),
+            cost: p.cost ? Number(p.cost) : undefined,
+        })) as ProductDTO[],
         meta: {
             page,
             limit,
@@ -51,17 +55,30 @@ export const getProductById = async (id: string): Promise<ProductDTO | null> => 
         where: { id }, 
         include: { category: true } 
     });
-    return product as ProductDTO | null;
+    if (!product) return null;
+    return {
+        ...product,
+        price: Number(product.price),
+        cost: product.cost ? Number(product.cost) : undefined,
+    } as ProductDTO;
 };
 
 export const createProduct = async (data: CreateProductInput): Promise<ProductDTO> => {
     const product = await prisma.product.create({ data });
-    return product as ProductDTO;
+    return {
+        ...product,
+        price: Number(product.price),
+        cost: product.cost ? Number(product.cost) : undefined,
+    } as ProductDTO;
 };
 
 export const updateProduct = async (id: string, data: UpdateProductInput): Promise<ProductDTO> => {
     const product = await prisma.product.update({ where: { id }, data });
-    return product as ProductDTO;
+    return {
+        ...product,
+        price: Number(product.price),
+        cost: product.cost ? Number(product.cost) : undefined,
+    } as ProductDTO;
 };
 
 export const deleteProduct = async (id: string): Promise<void> => {

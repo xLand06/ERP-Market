@@ -86,7 +86,7 @@ export const getSupplierStats = async (supplierId: string) => {
     const pendingOrders = orders.filter(o => o.status === 'SENT' || o.status === 'DRAFT').length;
     const totalSpent = orders
         .filter(o => o.status === 'RECEIVED')
-        .reduce((sum, o) => sum + o.total, 0);
+        .reduce((sum, o) => sum + Number(o.total), 0);
 
     return {
         totalOrders,

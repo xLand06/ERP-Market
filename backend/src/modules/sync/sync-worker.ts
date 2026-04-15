@@ -27,13 +27,13 @@ export async function runSyncCycle() {
         // 1. Nube → Local: precios, productos, usuarios
         const pullResult = await pullCatalog();
         if (!pullResult.success) {
-            logger.warn('[Sync] Pull catalog falló (no crítico):', pullResult.error);
+            logger.warn('[Sync] Pull catalog falló (no crítico)', { error: pullResult.error });
         }
 
         // 2. Local → Nube: ventas y cajas pendientes
         const pushResult = await pushSales();
         if (!pushResult.success) {
-            logger.warn('[Sync] Push sales falló (no crítico):', pushResult.error);
+            logger.warn('[Sync] Push sales falló (no crítico)', { error: pushResult.error });
         }
 
         logger.info(`[Sync] Ciclo completado — subidas: ${pushResult.pushedItems ?? 0}, descargadas: ${pullResult.pulledItems ?? 0}`);

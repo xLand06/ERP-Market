@@ -43,11 +43,11 @@ export const closeRegister = async (registerId: string, data: { closingAmount: n
     if (!register) throw new Error('Caja no encontrada');
     if (register.status === 'CLOSED') throw new Error('La caja ya está cerrada');
 
-    let expectedAmount = register.openingAmount;
+    let expectedAmount = Number(register.openingAmount);
     
     for (const t of register.transactions) {
         if (t.type === 'SALE' && t.status === 'COMPLETED') {
-            expectedAmount += t.total;
+            expectedAmount += Number(t.total);
         }
     }
 

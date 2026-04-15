@@ -41,10 +41,10 @@ export const closeCashRegister = async (
     if (cashRegister.status === 'CLOSED') throw new Error('Esta caja ya está cerrada');
 
     const salesTotal = cashRegister.transactions.reduce(
-        (sum: number, tx) => sum + tx.total,
+        (sum: number, tx) => sum + Number(tx.total),
         0
     );
-    const expectedAmount = cashRegister.openingAmount + salesTotal;
+    const expectedAmount = Number(cashRegister.openingAmount) + salesTotal;
     const difference = closingAmount - expectedAmount;
 
     return prisma.cashRegister.update({
@@ -134,7 +134,7 @@ export const getDailySalesSummary = async (branchId: string, date?: string) => {
         include: { items: { include: { product: { select: { name: true } } } } },
     });
 
-    const total = transactions.reduce((sum: number, tx) => sum + tx.total, 0);
+    const total = transactions.reduce((sum: number, tx) => sum + Number(tx.total), 0);
 
     return {
         date: targetDate.toISOString().split('T')[0],
