@@ -1,8 +1,6 @@
 import { Router } from 'express';
 import { runSyncCycle } from './sync-worker';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../config/prisma';
 const router = Router();
 
 // Endpoint for manual sync trigger
