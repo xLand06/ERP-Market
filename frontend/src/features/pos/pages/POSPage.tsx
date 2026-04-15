@@ -189,6 +189,7 @@ export default function POSPage() {
     const selectedBranch = useAuthStore(s => s.selectedBranch);
     const user = useAuthStore(s => s.user);
 
+    const { iva, vesRate } = useConfigStore();
     const effectiveBranch = selectedBranch === 'all' && user?.role === 'OWNER' ? null : selectedBranch;
 
     const { inventory, isLoading, refetch, isOnline } = useInventory(effectiveBranch || '');
@@ -307,7 +308,7 @@ export default function POSPage() {
     );
 
     const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
-    const total = subtotal + (subtotal * IVA);
+    const total = subtotal + (subtotal * iva);
 
     if (!selectedBranch) {
         return <div className="h-full flex items-center justify-center text-slate-500">Por favor, seleccione una sede en la configuración.</div>;
@@ -408,10 +409,11 @@ export default function POSPage() {
                         <span className="text-sm font-black text-slate-400 uppercase">TOTAL</span>
                         <div className="text-right">
                             <p className="text-3xl font-black text-slate-900">${total.toFixed(2)}</p>
-                            <p className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 rounded">Bs. {(total * VES_RATE).toFixed(2)} VES</p>
+                            <p className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 rounded">Bs. {(total * vesRate).toFixed(2)} VES</p>
                         </div>
                     </div>
                 </div>
+
 
                 <div className="px-5 pb-6 pt-4">
                     <Button

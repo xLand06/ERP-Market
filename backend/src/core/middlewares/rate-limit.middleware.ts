@@ -1,13 +1,11 @@
-// =============================================================================
-// RATE LIMIT MIDDLEWARE
-// Protección contra ataques de fuerza bruta y abuso de API
-// =============================================================================
-
 import rateLimit from 'express-rate-limit';
+import { env } from '../../config/env';
+
+const isDev = env.NODE_ENV === 'development';
 
 export const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 5,
+    max: 1000, // Forzado a 1000 para descartar problemas de entorno
     message: {
         status: 'error',
         message: 'Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.',
@@ -16,6 +14,8 @@ export const authLimiter = rateLimit({
     legacyHeaders: false,
     skipSuccessfulRequests: true,
 });
+
+
 
 export const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,

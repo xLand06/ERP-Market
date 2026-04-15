@@ -28,10 +28,11 @@ const RETRY_DELAY = 1000;
 const shouldRetry = (error: AxiosError) => {
     const status = error.response?.status;
     // Sin status = error de red (ECONNREFUSED, timeout, etc.) → sí reintenta
-    // 429 = rate limit → sí reintenta
+    // 429 = rate limit → NO reintenta (empeora el bloqueo)
     // 500+ = error del servidor → NO reintenta
-    return !status || status === 429;
+    return !status;
 };
+
 
 /**
  * Rutas donde los errores NO deben mostrar toast molesto al usuario.

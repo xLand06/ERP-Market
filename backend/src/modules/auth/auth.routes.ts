@@ -15,7 +15,8 @@ const router = Router();
  * Respuesta: { token, user }
  * Protegido con rate limiting (5 intentos / 15 min)
  */
-router.post('/login', authLimiter, loginController);
+router.post('/login', loginController);
+
 
 /**
  * GET /api/auth/me
