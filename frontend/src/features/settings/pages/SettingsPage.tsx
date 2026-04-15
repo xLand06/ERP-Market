@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Plus, Edit2, Trash2, Building2, Tag, Users, Search, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Building2, Tag, Users, Search, X, Settings2, DollarSign, Percent } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useConfigStore } from '@/hooks/useConfigStore';
 
 interface Branch {
     id: string;
@@ -28,7 +29,80 @@ interface User {
     isActive: boolean;
 }
 
-type Tab = 'branches' | 'categories' | 'users';
+type Tab = 'branches' | 'categories' | 'users' | 'system';
+
+function SystemSettings() {
+    const { vesRate, iva, setVesRate, setIva } = useConfigStore();
+    const [localVes, setLocalVes] = useState(vesRate.toString());
+    const [localIva, setLocalIva] = useState((iva * 100).toString());
+
+    const handleSave = () => {
+        setVesRate(parseFloat(localVes) || 0);
+        setIva((parseFloat(localIva) || 0) / 100);
+        alert('Configuración guardada exitosamente');
+    };
+
+    return (
+        <div className="max-w-2xl space-y-6">
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-indigo-50 rounded-lg">
+                        <Settings2 className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-900">Configuración Global</h3>
+                        <p className="text-sm text-slate-500">Ajustes que afectan a todo el sistema y cálculos del POS.</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                            <DollarSign className="w-4 h-4 text-emerald-500" /> Tasa del Dólar (VES)
+                        </label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">Bs.</span>
+                            <input
+                                type="number"
+                                step="0.01"
+                                value={localVes}
+                                onChange={(e) => setLocalVes(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-mono"
+                            />
+                        </div>
+                        <p className="text-[11px] text-slate-400 italic">Usada para convertir precios de USD a Bolívares en el Ticket.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                            <Percent className="w-4 h-4 text-blue-500" /> Porcentaje IVA
+                        </label>
+                        <div className="relative">
+                            <input
+                                type="number"
+                                step="1"
+                                value={localIva}
+                                onChange={(e) => setLocalIva(e.target.value)}
+                                className="w-full pl-4 pr-10 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-mono"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">%</span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 italic">Aplicado al subtotal de las ventas en el POS.</p>
+                    </div>
+                </div>
+
+                <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end">
+                    <button
+                        onClick={handleSave}
+                        className="px-6 py-2.5 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
+                    >
+                        Guardar Cambios
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () => void }) {
     const [name, setName] = useState(branch?.name || '');
@@ -359,6 +433,7 @@ export default function SettingsPage() {
         { id: 'branches' as Tab, label: 'Sucursales', icon: Building2, count: branches.length },
         { id: 'categories' as Tab, label: 'Categorías', icon: Tag, count: categories.length },
         { id: 'users' as Tab, label: 'Usuarios', icon: Users, count: users.length },
+        { id: 'system' as Tab, label: 'Sistema', icon: Settings2 },
     ];
 
     return (
@@ -382,39 +457,43 @@ export default function SettingsPage() {
                         >
                             <tab.icon className="w-4 h-4" />
                             {tab.label}
-                            <span className="ml-1 px-2 py-0.5 bg-slate-100 rounded-full text-xs">{tab.count}</span>
+                            {tab.count !== undefined && (
+                                <span className="ml-1 px-2 py-0.5 bg-slate-100 rounded-full text-xs">{tab.count}</span>
+                            )}
                         </button>
                     ))}
                 </div>
             </div>
 
-            <div className="mb-4 flex items-center gap-4">
-                <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Buscar..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
+            {activeTab !== 'system' && (
+                <div className="mb-4 flex items-center gap-4">
+                    <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Buscar..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                    </div>
+                    {activeTab === 'branches' && (
+                        <button onClick={() => { setEditingBranch(null); setShowBranchForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                            <Plus className="w-4 h-4" /> Nueva Sucursal
+                        </button>
+                    )}
+                    {activeTab === 'categories' && (
+                        <button onClick={() => { setEditingCategory(null); setShowCategoryForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                            <Plus className="w-4 h-4" /> Nueva Categoría
+                        </button>
+                    )}
+                    {activeTab === 'users' && (
+                        <button onClick={() => { setEditingUser(null); setShowUserForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                            <Plus className="w-4 h-4" /> Nuevo Usuario
+                        </button>
+                    )}
                 </div>
-                {activeTab === 'branches' && (
-                    <button onClick={() => { setEditingBranch(null); setShowBranchForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                        <Plus className="w-4 h-4" /> Nueva Sucursal
-                    </button>
-                )}
-                {activeTab === 'categories' && (
-                    <button onClick={() => { setEditingCategory(null); setShowCategoryForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                        <Plus className="w-4 h-4" /> Nueva Categoría
-                    </button>
-                )}
-                {activeTab === 'users' && (
-                    <button onClick={() => { setEditingUser(null); setShowUserForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                        <Plus className="w-4 h-4" /> Nuevo Usuario
-                    </button>
-                )}
-            </div>
+            )}
 
             {activeTab === 'branches' && (
                 <div className="border border-slate-200 rounded-xl overflow-hidden">
@@ -563,6 +642,8 @@ export default function SettingsPage() {
                     </table>
                 </div>
             )}
+
+            {activeTab === 'system' && <SystemSettings />}
 
             {showBranchForm && (
                 <BranchForm

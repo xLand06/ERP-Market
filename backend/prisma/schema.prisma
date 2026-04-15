@@ -135,8 +135,8 @@ model Product {
   name        String
   description String?
   barcode    String?   @unique
-  price Float
-  cost Float?
+  price      Decimal   @db.Decimal(12, 2)
+  cost       Decimal?  @db.Decimal(12, 2)
   imageUrl    String?
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now()) @db.Timestamptz
@@ -186,7 +186,7 @@ model Transaction {
   id         String            @id @default(cuid())
   type       TransactionType
   status     TransactionStatus @default(COMPLETED)
-  total      Float
+  total      Decimal           @db.Decimal(12, 2)
   notes      String?
   ipAddress  String?
   syncStatus SyncStatus        @default(PENDING)
@@ -207,6 +207,7 @@ model Transaction {
 
   @@index([branchId, createdAt])
   @@index([userId])
+  @@index([cashRegisterId])
   @@index([type, status])
   @@index([syncStatus])
   @@index([createdAt])
@@ -216,8 +217,8 @@ model Transaction {
 model TransactionItem {
   id        String  @id @default(cuid())
   quantity  Int
-  unitPrice Float
-  subtotal  Float
+  unitPrice Decimal @db.Decimal(12, 2)
+  subtotal  Decimal @db.Decimal(12, 2)
 
   transactionId String
   transaction  Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
@@ -225,6 +226,8 @@ model TransactionItem {
   productId String
   product  Product @relation(fields: [productId], references: [id])
 
+  @@index([transactionId])
+  @@index([productId])
   @@map("transaction_items")
 }
 
@@ -235,15 +238,15 @@ model TransactionItem {
 model CashRegister {
   id             String             @id @default(cuid())
   status         CashRegisterStatus @default(OPEN)
-  openingAmount  Float
-  closingAmount  Float?
-  expectedAmount Float?
-  difference     Float?
+  openingAmount  Decimal            @db.Decimal(12, 2)
+  closingAmount  Decimal?           @db.Decimal(12, 2)
+  expectedAmount Decimal?           @db.Decimal(12, 2)
+  difference     Decimal?           @db.Decimal(12, 2)
   notes          String?
   syncStatus     SyncStatus        @default(PENDING)
   syncedAt       DateTime?         @db.Timestamptz
   openedAt       DateTime          @default(now()) @db.Timestamptz
-  closedAt       DateTime?
+  closedAt       DateTime?         @db.Timestamptz
 
   userId String
   user   User @relation(fields: [userId], references: [id])
@@ -254,6 +257,7 @@ model CashRegister {
   transactions Transaction[]
 
   @@index([branchId])
+  @@index([userId])
   @@index([status])
   @@index([syncStatus])
   @@map("cash_registers")
@@ -308,10 +312,10 @@ model Supplier {
 model PurchaseOrder {
   id         String              @id @default(cuid())
   status     PurchaseOrderStatus @default(DRAFT)
-  total      Float
+  total      Decimal             @db.Decimal(12, 2)
   notes      String?
-  expectedAt DateTime?
-  receivedAt DateTime?
+  expectedAt DateTime?           @db.Timestamptz
+  receivedAt DateTime?           @db.Timestamptz
   createdAt  DateTime            @default(now()) @db.Timestamptz
   updatedAt  DateTime            @updatedAt    @db.Timestamptz
 
@@ -320,6 +324,7 @@ model PurchaseOrder {
 
   items PurchaseOrderItem[]
 
+  @@index([supplierId])
   @@map("purchase_orders")
 }
 
@@ -327,13 +332,15 @@ model PurchaseOrderItem {
   id              String  @id @default(cuid())
   quantity        Int
   quantityReceived Int   @default(0)
-  unitCost        Float
-  subtotal        Float
+  unitCost        Decimal @db.Decimal(12, 2)
+  subtotal        Decimal @db.Decimal(12, 2)
 
   productId String
 
   purchaseOrderId String
   purchaseOrder  PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
 
+  @@index([purchaseOrderId])
+  @@index([productId])
   @@map("purchase_order_items")
 }

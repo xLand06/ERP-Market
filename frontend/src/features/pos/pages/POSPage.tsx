@@ -13,14 +13,14 @@ import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
 import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
 import { useInventory } from '@/hooks/useInventory';
+import { useConfigStore } from '@/hooks/useConfigStore';
 
 // ─── Types ─────────────────────────────────────────────────────────
-interface Product { id: string; name: string; price: number; stock: number; category: string; code: string; }
-interface CartItem extends Product { qty: number; }
+interface Product { id: string; name: string; price: number | string; stock: number; category: string; code: string; }
+interface CartItem extends Omit<Product, 'price'> { price: number; qty: number; }
 
-// ─── Constants ─────────────────────────────────────────────────────
-const VES_RATE = 36.50; // TODO: Esto debería venir de config
-const IVA = 0.16;
+// ─── Helpers ───────────────────────────────────────────────────────
+const toNum = (val: number | string) => typeof val === 'string' ? parseFloat(val) : val;
 
 const PAYMENT_OPTIONS = [
     { id:'cash_usd',  label:'Efectivo USD',     icon:DollarSign, currency:'USD' as const },
@@ -36,7 +36,9 @@ function StockBadge({ stock }: { stock: number }) {
 }
 
 function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product) => void }) {
+    const { vesRate } = useConfigStore();
     const [flash, setFlash] = useState(false);
+    const price = toNum(product.price);
     const handle = () => {
         if (product.stock === 0) return;
         onAdd(product);
@@ -61,8 +63,8 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product)
                 <p className="text-[13px] sm:text-xs font-bold text-slate-800 line-clamp-2 leading-snug mb-1">{product.name}</p>
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between mt-auto gap-2">
                     <div>
-                        <p className="text-sm font-black text-slate-900 tabular-nums leading-none">${product.price.toFixed(2)}</p>
-                        <p className="text-[11px] font-medium text-slate-400 tabular-nums mt-0.5 sm:hidden lg:block">Bs. {(product.price * VES_RATE).toFixed(0)}</p>
+                        <p className="text-sm font-black text-slate-900 tabular-nums leading-none">${price.toFixed(2)}</p>
+                        <p className="text-[11px] font-medium text-slate-400 tabular-nums mt-0.5 sm:hidden lg:block">Bs. {(price * vesRate).toFixed(0)}</p>
                     </div>
                     <div className="sm:opacity-80 group-hover:opacity-100 transition-opacity">
                         <StockBadge stock={product.stock} />
@@ -76,9 +78,10 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product)
 function HybridPaymentDialog({ open, total, onClose, onConfirm, isSubmitting }: {
     open: boolean; total: number; onClose: () => void; onConfirm: () => void; isSubmitting: boolean;
 }) {
+    const { vesRate } = useConfigStore();
     type PaymentRow = { methodId: string; amount: number; currency: 'USD' | 'VES' };
     const [rows, setRows] = useState<PaymentRow[]>([{ methodId: 'cash_usd', amount: total, currency: 'USD' }]);
-    const paidTotal = rows.reduce((s, r) => s + (r.currency === 'VES' ? r.amount / VES_RATE : r.amount), 0);
+    const paidTotal = rows.reduce((s, r) => s + (r.currency === 'VES' ? r.amount / vesRate : r.amount), 0);
     const change = paidTotal - total;
     const canPay = paidTotal >= (total - 0.01) && !isSubmitting; // Tolerancia de decimales
 
@@ -104,7 +107,7 @@ function HybridPaymentDialog({ open, total, onClose, onConfirm, isSubmitting }: 
                         <span className="text-sm text-slate-500">Total a Cobrar</span>
                         <span className="text-xl font-black text-slate-900 tabular-nums">${total.toFixed(2)} USD</span>
                     </div>
-                    <p className="text-[11px] text-slate-400 text-right mt-0.5 tabular-nums">= Bs. {(total * VES_RATE).toFixed(2)} VES</p>
+                    <p className="text-[11px] text-slate-400 text-right mt-0.5 tabular-nums">= Bs. {(total * vesRate).toFixed(2)} VES</p>
                 </div>
                 <div className="px-6 py-4 flex flex-col gap-3">
                     {rows.map((row, i) => (
