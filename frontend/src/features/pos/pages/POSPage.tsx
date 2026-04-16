@@ -227,7 +227,7 @@ export default function POSPage() {
                 showToast(`Stock máximo alcanzado para ${p.name}`, true);
                 return prev;
             }
-            return ex ? prev.map(i => i.id === p.id ? { ...i, qty: i.qty + 1 } : i) : [...prev, { ...p, qty: 1 }];
+            return ex ? prev.map(i => i.id === p.id ? { ...i, qty: i.qty + 1 } : i) : [...prev, { ...p, price: toNum(p.price), qty: 1 }];
         });
     }, []);
 

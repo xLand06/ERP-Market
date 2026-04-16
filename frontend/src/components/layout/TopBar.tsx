@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { BranchSelector } from '@/components/branch/BranchSelector';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import {
-    Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+    Dialog, DialogContent,
 } from '@/components/ui/dialog';
 
 const SYMBOLS: Record<string, string> = { USD: '$', VES: 'Bs.', COP: '$' };

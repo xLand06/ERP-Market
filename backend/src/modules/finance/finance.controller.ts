@@ -38,6 +38,19 @@ export const closeCashRegister = async (req: Request, res: Response) => {
     }
 };
 
+
+
+export const addCashMovement = async (req: Request, res: Response) => {
+    try {
+        const { branchId, type, amount, notes } = req.body;
+        const movement = await financeService.addCashMovement(req.params.registerId, {
+            branchId,
+            userId: (req as any).user!.id,
+            type,
+            amount: Number(amount),
+            notes
+        });
+        res.json({ success: true, data: movement });
     } catch (error: any) {
         res.status(400).json({ success: false, error: error.message });
     }

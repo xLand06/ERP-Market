@@ -12,7 +12,7 @@ router.use(authMiddleware);
 
 // --- EXCHANGE RATES ---
 router.get('/rates', getRates);
-router.post('/rates', roleGuard(['OWNER']), updateRate);
+router.post('/rates', roleGuard('OWNER'), updateRate);
 
 // --- CASH REGISTERS ---
 // Get current open register info for a branch (includes transactions)

@@ -161,7 +161,7 @@ export function useInventory(branchId: string) {
 
     const recordSale = useMutation({
         mutationFn: async ({ productId, quantity }: { productId: string; quantity: number }) => {
-            return updateStockMutation.mutateAsync({ productId, quantity: -quantity });
+            return updateStockMutation.mutateAsync({ product: { id: productId }, quantity: -quantity });
         },
     });
 

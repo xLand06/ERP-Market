@@ -185,8 +185,8 @@ export default function InventoryPage() {
         <StockAdjustmentModal 
             open={adjustmentOpen}
             onClose={() => setAdjustmentOpen(false)}
-            onSave={({ productId, quantity, minStock }) => {
-                updateStock({ productId, quantity, minStock });
+            onSave={({ product, quantity, minStock }) => {
+                updateStock({ product, quantity, minStock });
                 toast.success('Entrada de inventario registrada con éxito');
                 setAdjustmentOpen(false);
                 setTimeout(refetch, 500);
