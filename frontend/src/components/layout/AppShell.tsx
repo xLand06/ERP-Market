@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { cn } from '@/lib/utils';
@@ -7,9 +7,41 @@ import { useConfigStore } from '@/hooks/useConfigStore';
 
 export function AppShellLayout() {
     const { fetchRates } = useConfigStore();
+    const navigate = useNavigate();
     // Initial state based on window width to avoid flashes on load
     const [collapsed, setCollapsed] = useState(() => window.innerWidth < 768);
     const location = useLocation();
+
+    // Keyboard Shortcuts Logic
+    const handleKeyDown = useCallback((e: KeyboardEvent) => {
+        // Ignorar si el usuario está escribiendo en un input, textarea o contentEditable
+        const target = e.target as HTMLElement;
+        const isTyping = 
+            target.tagName === 'INPUT' || 
+            target.tagName === 'TEXTAREA' || 
+            target.isContentEditable;
+
+        if (isTyping) return;
+
+        const key = e.key.toUpperCase();
+        const paths: Record<string, string> = {
+            'V': '/pos',
+            'P': '/products',
+            'I': '/inventory',
+            'F': '/finance',
+            'C': '/settings'
+        };
+
+        if (paths[key]) {
+            e.preventDefault();
+            navigate(paths[key]);
+        }
+    }, [navigate]);
+
+    useEffect(() => {
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handleKeyDown]);
 
     // Initial fetch of configuration
     useEffect(() => {
