@@ -104,3 +104,17 @@ export const getRegisterHistory = async (branchId: string, limit = 20) => {
         },
     });
 };
+
+// --- EXCHANGE RATES ---
+
+export const getExchangeRates = async () => {
+    return prisma.exchangeRate.findMany();
+};
+
+export const updateExchangeRate = async (code: string, rate: number) => {
+    return prisma.exchangeRate.upsert({
+        where: { code },
+        update: { rate },
+        create: { code, rate },
+    });
+};

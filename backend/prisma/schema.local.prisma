@@ -339,3 +339,16 @@ model PurchaseOrderItem {
 
   @@map("purchase_order_items")
 }
+
+// =============================================================================
+// EXCHANGE RATES
+// =============================================================================
+
+model ExchangeRate {
+  id        String   @id @default(cuid())
+  code      String   @unique // 'VES', 'COP', etc.
+  rate      Float
+  updatedAt DateTime @updatedAt
+
+  @@map("exchange_rates")
+}

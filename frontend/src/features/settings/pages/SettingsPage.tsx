@@ -22,18 +22,28 @@ interface Category {
 type Tab = 'branches' | 'categories' | 'maintenance' | 'system';
 
 function SystemSettings() {
-    const { vesRate, iva, setVesRate, setIva } = useConfigStore();
-    const [localVes, setLocalVes] = useState(vesRate.toString());
+    const { rates, iva, updateRate, setIva } = useConfigStore();
+    const [localVes, setLocalVes] = useState(rates['VES']?.toString() || '36.50');
+    const [localCop, setLocalCop] = useState(rates['COP']?.toString() || '4100');
     const [localIva, setLocalIva] = useState((iva * 100).toString());
+    const [saving, setSaving] = useState(false);
 
-    const handleSave = () => {
-        setVesRate(parseFloat(localVes) || 0);
-        setIva((parseFloat(localIva) || 0) / 100);
-        alert('Configuración guardada exitosamente');
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            await updateRate('VES', parseFloat(localVes) || 0);
+            await updateRate('COP', parseFloat(localCop) || 0);
+            setIva((parseFloat(localIva) || 0) / 100);
+            toast.success('Configuración guardada en el servidor');
+        } catch (error) {
+            toast.error('Error al guardar la configuración');
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
-        <div className="max-w-2xl space-y-6">
+        <div className="max-w-2xl space-y-6 animate-fade-in">
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                 <div className="flex items-center gap-3 mb-6">
                     <div className="p-2 bg-indigo-50 rounded-lg">
@@ -41,7 +51,7 @@ function SystemSettings() {
                     </div>
                     <div>
                         <h3 className="text-lg font-bold text-slate-900">Configuración Global</h3>
-                        <p className="text-sm text-slate-500">Ajustes que afectan a todo el sistema y cálculos del POS.</p>
+                        <p className="text-sm text-slate-500">Ajustes sincronizados con el backend para todo el sistema.</p>
                     </div>
                 </div>
 
@@ -60,7 +70,22 @@ function SystemSettings() {
                                 className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-mono"
                             />
                         </div>
-                        <p className="text-[11px] text-slate-400 italic">Usada para convertir precios de USD a Bolívares en el Ticket.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                            <DollarSign className="w-4 h-4 text-blue-500" /> Tasa del Dólar (COP)
+                        </label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">$</span>
+                            <input
+                                type="number"
+                                step="1"
+                                value={localCop}
+                                onChange={(e) => setLocalCop(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-mono"
+                            />
+                        </div>
                     </div>
 
                     <div className="space-y-2">
@@ -77,16 +102,16 @@ function SystemSettings() {
                             />
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">%</span>
                         </div>
-                        <p className="text-[11px] text-slate-400 italic">Aplicado al subtotal de las ventas en el POS.</p>
                     </div>
                 </div>
 
                 <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end">
                     <button
                         onClick={handleSave}
-                        className="px-6 py-2.5 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
+                        disabled={saving}
+                        className="px-6 py-2.5 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200 disabled:opacity-50"
                     >
-                        Guardar Cambios
+                        {saving ? 'Guardando...' : 'Guardar Cambios'}
                     </button>
                 </div>
             </div>
@@ -122,7 +147,7 @@ function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () => void 
 
     return (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div 
+            <div
                 className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
                 role="dialog"
                 aria-modal="true"
@@ -132,8 +157,8 @@ function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () => void 
                     <h3 id="branch-modal-title" className="text-lg font-bold text-slate-800">
                         {branch ? 'Editar Sucursal' : 'Nueva Sucursal'}
                     </h3>
-                    <button 
-                        onClick={onClose} 
+                    <button
+                        onClick={onClose}
                         className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
                         aria-label="Cerrar modal"
                     >
@@ -176,16 +201,16 @@ function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () => void 
                         />
                     </div>
                     <div className="flex gap-3 pt-4">
-                        <button 
-                            type="button" 
-                            onClick={onClose} 
+                        <button
+                            type="button"
+                            onClick={onClose}
                             className="flex-1 py-2.5 px-4 font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-800 transition-colors"
                         >
                             Cancelar
                         </button>
-                        <button 
-                            type="submit" 
-                            disabled={saving} 
+                        <button
+                            type="submit"
+                            disabled={saving}
                             className="flex-1 py-2.5 px-4 font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-sm shadow-indigo-600/20"
                         >
                             {saving ? 'Guardando...' : 'Guardar Sucursal'}
@@ -224,7 +249,7 @@ function CategoryForm({ category, onClose }: { category?: Category; onClose: () 
 
     return (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div 
+            <div
                 className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
                 role="dialog"
                 aria-modal="true"
@@ -234,8 +259,8 @@ function CategoryForm({ category, onClose }: { category?: Category; onClose: () 
                     <h3 id="category-modal-title" className="text-lg font-bold text-slate-800">
                         {category ? 'Editar Categoría' : 'Nueva Categoría'}
                     </h3>
-                    <button 
-                        onClick={onClose} 
+                    <button
+                        onClick={onClose}
                         className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
                         aria-label="Cerrar modal"
                     >
@@ -265,16 +290,16 @@ function CategoryForm({ category, onClose }: { category?: Category; onClose: () 
                         />
                     </div>
                     <div className="flex gap-3 pt-4">
-                        <button 
-                            type="button" 
-                            onClick={onClose} 
+                        <button
+                            type="button"
+                            onClick={onClose}
                             className="flex-1 py-2.5 px-4 font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-800 transition-colors"
                         >
                             Cancelar
                         </button>
-                        <button 
-                            type="submit" 
-                            disabled={saving} 
+                        <button
+                            type="submit"
+                            disabled={saving}
                             className="flex-1 py-2.5 px-4 font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-sm shadow-indigo-600/20"
                         >
                             {saving ? 'Guardando...' : 'Guardar Categoría'}
@@ -340,7 +365,8 @@ export default function SettingsPage() {
     const tabs = [
         { id: 'branches' as Tab, label: 'Sucursales', icon: Building2, count: branches.length },
         { id: 'categories' as Tab, label: 'Categorías', icon: Tag, count: categories.length },
-        { id: 'maintenance' as Tab, label: 'Mantenimiento', icon: AlertTriangle, count: 0 },
+        { id: 'system' as Tab, label: 'Tasa de Cambios', icon: Settings2 },
+        { id: 'maintenance' as Tab, label: 'Mantenimiento', icon: AlertTriangle },
     ];
 
     const isElectron = window.hasOwnProperty('electron');
@@ -355,14 +381,14 @@ export default function SettingsPage() {
         try {
             // 1. Limpiar Nube
             await api.post('/sync/purge');
-            
+
             // 2. Limpiar Local (si es Electron)
             if (isElectron && db) {
                 await db.purge();
             }
 
             toast.success('Sistema reiniciado con éxito', { id: toastId });
-            
+
             // Recargar datos
             queryClient.invalidateQueries();
             window.location.reload(); // Hard reload to clear all states
@@ -385,20 +411,18 @@ export default function SettingsPage() {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-2 px-5 py-3 cursor-pointer text-sm font-bold border-b-[3px] transition-colors rounded-t-xl hover:bg-slate-50 ${
-                                activeTab === tab.id
+                            className={`flex items-center gap-2 px-5 py-3 cursor-pointer text-sm font-bold border-b-[3px] transition-colors rounded-t-xl hover:bg-slate-50 ${activeTab === tab.id
                                     ? 'border-indigo-600 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-50/50'
                                     : 'border-transparent text-slate-500 hover:text-slate-800'
-                            }`}
+                                }`}
                             aria-selected={activeTab === tab.id}
                             role="tab"
                         >
                             <tab.icon className="w-4.5 h-4.5" />
                             {tab.label}
                             {tab.count !== undefined && (
-                                <span className={`ml-1 px-2.5 py-0.5 rounded-full text-[11px] ${
-                                activeTab === tab.id ? 'bg-white text-indigo-700 shadow-sm' : 'bg-slate-100 text-slate-500'
-                            }`}>{tab.count}</span>
+                                <span className={`ml-1 px-2.5 py-0.5 rounded-full text-[11px] ${activeTab === tab.id ? 'bg-white text-indigo-700 shadow-sm' : 'bg-slate-100 text-slate-500'
+                                    }`}>{tab.count}</span>
                             )}
                         </button>
                     ))}
@@ -466,11 +490,10 @@ export default function SettingsPage() {
                                             <td className="px-5 py-4 text-sm text-slate-600 font-medium">{branch.address || '—'}</td>
                                             <td className="px-5 py-4 text-sm text-slate-600 font-mono bg-slate-50/50">{branch.phone || '—'}</td>
                                             <td className="px-5 py-4 text-center">
-                                                <span className={`px-2.5 py-1 rounded-md text-xs font-bold border ${
-                                                    branch.isActive 
-                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                                                    : 'bg-slate-100 text-slate-600 border-slate-200'
-                                                }`}>
+                                                <span className={`px-2.5 py-1 rounded-md text-xs font-bold border ${branch.isActive
+                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                        : 'bg-slate-100 text-slate-600 border-slate-200'
+                                                    }`}>
                                                     {branch.isActive ? 'Activa' : 'Inactiva'}
                                                 </span>
                                             </td>
@@ -485,7 +508,7 @@ export default function SettingsPage() {
                                                     </button>
                                                     <button
                                                         onClick={() => {
-                                                            if(window.confirm('¿Seguro de eliminar esta sucursal?')) {
+                                                            if (window.confirm('¿Seguro de eliminar esta sucursal?')) {
                                                                 deleteBranchMutation.mutate(branch.id);
                                                             }
                                                         }}
@@ -520,18 +543,18 @@ export default function SettingsPage() {
                                         <Tag className="w-5 h-5" />
                                     </div>
                                     <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button 
-                                            onClick={() => { setEditingCategory(category); setShowCategoryForm(true); }} 
+                                        <button
+                                            onClick={() => { setEditingCategory(category); setShowCategoryForm(true); }}
                                             className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                                         >
                                             <Edit2 className="w-4 h-4" />
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={() => {
-                                                if(window.confirm('¿Seguro de eliminar esta categoría?')) {
+                                                if (window.confirm('¿Seguro de eliminar esta categoría?')) {
                                                     deleteCategoryMutation.mutate(category.id);
                                                 }
-                                            }} 
+                                            }}
                                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                         >
                                             <Trash2 className="w-4 h-4" />
@@ -562,7 +585,7 @@ export default function SettingsPage() {
                                 Acciones irreversibles que afectan la integridad de los datos globales del sistema.
                             </p>
                         </div>
-                        
+
                         <div className="p-6 space-y-6">
                             <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-red-100 bg-red-50/30">
                                 <div className="space-y-1">
@@ -571,7 +594,7 @@ export default function SettingsPage() {
                                         <span>Reiniciar Base de Datos</span>
                                     </div>
                                     <p className="text-xs text-red-600/80 font-medium leading-relaxed max-w-sm">
-                                        Borra permanentemente todos los productos, existencias de inventario, categorías y registros de transacciones. 
+                                        Borra permanentemente todos los productos, existencias de inventario, categorías y registros de transacciones.
                                         Ideal para limpiar el ambiente de pruebas.
                                     </p>
                                 </div>

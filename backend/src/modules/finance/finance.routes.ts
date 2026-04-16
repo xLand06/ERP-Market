@@ -3,12 +3,18 @@ import { authMiddleware } from '../../core/middlewares/auth.middleware';
 import { roleGuard } from '../../core/middlewares/roleGuard';
 import { branchFilter, requireBranchAccess } from '../../core/middlewares/branchFilter.middleware';
 import {
-    getOpenRegister, openCashRegister, closeCashRegister, addCashMovement
+    getOpenRegister, openCashRegister, closeCashRegister, addCashMovement,
+    getRates, updateRate
 } from './finance.controller';
 
 const router = Router();
 router.use(authMiddleware);
 
+// --- EXCHANGE RATES ---
+router.get('/rates', getRates);
+router.post('/rates', roleGuard(['OWNER']), updateRate);
+
+// --- CASH REGISTERS ---
 // Get current open register info for a branch (includes transactions)
 router.get('/registers/open/:branchId', branchFilter(), requireBranchAccess, getOpenRegister);
 

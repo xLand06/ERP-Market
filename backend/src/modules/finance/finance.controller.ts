@@ -38,19 +38,27 @@ export const closeCashRegister = async (req: Request, res: Response) => {
     }
 };
 
-export const addCashMovement = async (req: Request, res: Response) => {
-    try {
-        const { registerId } = req.params;
-        const { branchId, type, amount, notes } = req.body;
-        const movement = await financeService.addCashMovement(registerId, {
-            branchId,
-            userId: (req as any).user!.id,
-            type,
-            amount: Number(amount),
-            notes
-        });
-        res.status(201).json({ success: true, data: movement });
     } catch (error: any) {
         res.status(400).json({ success: false, error: error.message });
     }
 };
+
+export const getRates = async (_req: Request, res: Response) => {
+    try {
+        const rates = await financeService.getExchangeRates();
+        res.json({ success: true, data: rates });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+export const updateRate = async (req: Request, res: Response) => {
+    try {
+        const { code, rate } = req.body;
+        const updated = await financeService.updateExchangeRate(code, Number(rate));
+        res.json({ success: true, data: updated });
+    } catch (error: any) {
+        res.status(400).json({ success: false, error: error.message });
+    }
+};
+

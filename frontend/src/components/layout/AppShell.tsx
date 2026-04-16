@@ -3,11 +3,18 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { cn } from '@/lib/utils';
+import { useConfigStore } from '@/hooks/useConfigStore';
 
 export function AppShellLayout() {
+    const { fetchRates } = useConfigStore();
     // Initial state based on window width to avoid flashes on load
     const [collapsed, setCollapsed] = useState(() => window.innerWidth < 768);
     const location = useLocation();
+
+    // Initial fetch of configuration
+    useEffect(() => {
+        fetchRates();
+    }, [fetchRates]);
 
     // Close sidebar on mobile when navigating
     useEffect(() => {

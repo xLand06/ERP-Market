@@ -36,7 +36,8 @@ function StockBadge({ stock }: { stock: number }) {
 }
 
 function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product) => void }) {
-    const { vesRate } = useConfigStore();
+    const { rates } = useConfigStore();
+    const vesRate = rates['VES'] || 36.50;
     const [flash, setFlash] = useState(false);
     const price = toNum(product.price);
     const handle = () => {
@@ -78,10 +79,11 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product)
 function HybridPaymentDialog({ open, total, onClose, onConfirm, isSubmitting }: {
     open: boolean; total: number; onClose: () => void; onConfirm: () => void; isSubmitting: boolean;
 }) {
-    const { vesRate } = useConfigStore();
-    type PaymentRow = { methodId: string; amount: number; currency: 'USD' | 'VES' };
+    const { rates } = useConfigStore();
+    const vesRate = rates['VES'] || 36.50;
+    type PaymentRow = { methodId: string; amount: number; currency: string };
     const [rows, setRows] = useState<PaymentRow[]>([{ methodId: 'cash_usd', amount: total, currency: 'USD' }]);
-    const paidTotal = rows.reduce((s, r) => s + (r.currency === 'VES' ? r.amount / vesRate : r.amount), 0);
+    const paidTotal = rows.reduce((s, r) => s + (r.amount / (rates[r.currency] || 1)), 0);
     const change = paidTotal - total;
     const canPay = paidTotal >= (total - 0.01) && !isSubmitting; // Tolerancia de decimales
 

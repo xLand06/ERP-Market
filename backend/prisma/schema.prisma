@@ -344,3 +344,16 @@ model PurchaseOrderItem {
   @@index([productId])
   @@map("purchase_order_items")
 }
+
+// =============================================================================
+// EXCHANGE RATES
+// =============================================================================
+
+model ExchangeRate {
+  id        String   @id @default(cuid())
+  code      String   @unique // 'VES', 'COP', etc.
+  rate      Decimal  @db.Decimal(18, 4)
+  updatedAt DateTime @updatedAt
+
+  @@map("exchange_rates")
+}

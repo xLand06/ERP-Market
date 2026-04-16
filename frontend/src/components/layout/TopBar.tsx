@@ -3,8 +3,8 @@ import { ArrowLeftRight, Bell, ChevronDown, LogOut, Settings, User, Menu, Store 
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { BranchSelector } from '@/components/branch/BranchSelector';
+import { useConfigStore } from '@/hooks/useConfigStore';
 
-const RATES: Record<string, number> = { USD: 1, VES: 36.50, COP: 4100 };
 const SYMBOLS: Record<string, string> = { USD: '$', VES: 'Bs.', COP: '$' };
 type Currency = 'USD' | 'VES' | 'COP';
 const CURRENCIES: Currency[] = ['USD', 'VES', 'COP'];
@@ -15,12 +15,15 @@ interface TopBarProps {
 }
 
 export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
+    const { rates } = useConfigStore();
     const [base, setBase] = useState<Currency>('USD');
     const [profileOpen, setProfileOpen] = useState(false);
     const navigate = useNavigate();
 
     const formatRate = (from: Currency, to: Currency) => {
-        const rate = RATES[to] / RATES[from];
+        const fromRate = rates[from] || 1;
+        const toRate = rates[to] || 1;
+        const rate = toRate / fromRate;
         return rate >= 1000
             ? rate.toLocaleString('es-VE', { maximumFractionDigits: 0 })
             : rate.toFixed(2);
