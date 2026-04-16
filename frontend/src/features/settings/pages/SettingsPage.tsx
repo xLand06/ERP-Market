@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { Plus, Edit2, Trash2, Building2, Tag, Search, X, Settings2, DollarSign, Percent, AlertTriangle, Database } from 'lucide-react';
+import { 
+    Plus, Edit2, Trash2, Building2, Tag, Search, X, Settings2, DollarSign, 
+    Percent, AlertTriangle, Database, Save 
+} from 'lucide-react';
 import { api } from '@/lib/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useConfigStore } from '@/hooks/useConfigStore';
@@ -109,8 +112,9 @@ function SystemSettings() {
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="px-6 py-2.5 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200 disabled:opacity-50"
+                        className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-200 disabled:opacity-50 flex items-center gap-2"
                     >
+                        <Save className="w-4 h-4" />
                         {saving ? 'Guardando...' : 'Guardar Cambios'}
                     </button>
                 </div>
@@ -211,8 +215,9 @@ function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () => void 
                         <button
                             type="submit"
                             disabled={saving}
-                            className="flex-1 py-2.5 px-4 font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-sm shadow-indigo-600/20"
+                            className="flex-1 py-2.5 px-4 font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-sm shadow-indigo-600/20 flex items-center justify-center gap-2 whitespace-nowrap"
                         >
+                            <Save className="w-4 h-4" />
                             {saving ? 'Guardando...' : 'Guardar Sucursal'}
                         </button>
                     </div>
@@ -300,8 +305,9 @@ function CategoryForm({ category, onClose }: { category?: Category; onClose: () 
                         <button
                             type="submit"
                             disabled={saving}
-                            className="flex-1 py-2.5 px-4 font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-sm shadow-indigo-600/20"
+                            className="flex-1 py-2.5 px-4 font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-sm shadow-indigo-600/20 flex items-center justify-center gap-2 whitespace-nowrap"
                         >
+                            <Save className="w-4 h-4" />
                             {saving ? 'Guardando...' : 'Guardar Categoría'}
                         </button>
                     </div>
