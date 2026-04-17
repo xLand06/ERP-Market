@@ -1,18 +1,28 @@
-import { useState, useRef, useId, useEffect } from 'react';
-import { Package, Barcode, ScanLine, Plus, Check, ChevronDown } from 'lucide-react';
-import {
-    Dialog, DialogContent, DialogHeader,
-    DialogTitle, DialogDescription,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Save, DollarSign, Barcode, PackageOpen, AlertTriangle } from 'lucide-react';
+import { api } from '@/lib/api';
+import toast from 'react-hot-toast';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-export interface ProductForm {
+export interface Category {
+    id: string;
+    name: string;
+}
+
+export interface Product {
+    id: string;
+    name: string;
+    description?: string;
+    barcode?: string;
+    price: number;
+    cost?: number;
+    categoryId?: string;
+    isActive?: boolean;
+}
+
+export interface ProductFormData {
     code: string;
     name: string;
-    category: string;
+    categoryId: string;
     cost: string;
     price: string;
     stock: string;
@@ -22,475 +32,323 @@ export interface ProductForm {
 interface ProductFormModalProps {
     open: boolean;
     onClose: () => void;
-    onSave: (data: ProductForm) => void;
-    initial?: Partial<ProductForm>;
-    initialCategories?: string[];
-    mode?: 'create' | 'edit';
+    product?: Product | null;
+    categories: Category[];
+    initialStock?: number;
+    initialMinStock?: number;
+    onSuccess: () => void;
 }
 
-const DEFAULT_CATEGORIES = [
-    'Abarrotes', 'Lácteos', 'Bebidas', 'Limpieza',
-    'Carnes', 'Aceites', 'Condimentos', 'Snacks',
-];
-
-// ─── CategoryCombobox ─────────────────────────────────────────────────────────
-function CategoryCombobox({
-    value, onChange, categories, onAddCategory,
-}: {
-    value: string;
-    onChange: (v: string) => void;
-    categories: string[];
-    onAddCategory: (v: string) => void;
-    error?: string;
-}) {
-    const [query, setQuery]       = useState(value);
-    const [open, setOpen]         = useState(false);
-    const id                      = useId();
-    const wrapRef                 = useRef<HTMLDivElement>(null);
-
-    const filtered = query.trim()
-        ? categories.filter(c => c.toLowerCase().includes(query.toLowerCase()))
-        : categories;
-
-    const exactMatch = categories.some(c => c.toLowerCase() === query.toLowerCase().trim());
-
-    // Close on outside click
-    useEffect(() => {
-        const handle = (e: MouseEvent) => {
-            if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-                setOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handle);
-        return () => document.removeEventListener('mousedown', handle);
-    }, []);
-
-    // Sync external value
-    useEffect(() => { setQuery(value); }, [value]);
-
-    const select = (cat: string) => {
-        onChange(cat);
-        setQuery(cat);
-        setOpen(false);
-    };
-
-    const handleAdd = () => {
-        const trimmed = query.trim();
-        if (!trimmed) return;
-        onAddCategory(trimmed);
-        onChange(trimmed);
-        setOpen(false);
-    };
-
-    return (
-        <div ref={wrapRef} className="relative" role="combobox" aria-expanded={open} aria-haspopup="listbox">
-            <label htmlFor={id} className="sr-only">Categoría</label>
-            <div className="relative">
-                <Input
-                    id={id}
-                    value={query}
-                    onChange={e => { setQuery(e.target.value); setOpen(true); onChange(''); }}
-                    onFocus={() => setOpen(true)}
-                    placeholder="Buscar o escribir categoría..."
-                    className="pr-9"
-                    autoComplete="off"
-                    aria-autocomplete="list"
-                    aria-controls={`${id}-list`}
-                />
-                <ChevronDown
-                    className={cn(
-                        'absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 transition-transform pointer-events-none',
-                        open && 'rotate-180'
-                    )}
-                    aria-hidden="true"
-                />
-            </div>
-
-            {open && (
-                <div
-                    id={`${id}-list`}
-                    role="listbox"
-                    aria-label="Categorías disponibles"
-                    className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden"
-                >
-                    {/* Filter results */}
-                    <ul className="max-h-44 overflow-y-auto py-1">
-                        {filtered.map(cat => (
-                            <li key={cat}>
-                                <button
-                                    type="button"
-                                    role="option"
-                                    aria-selected={value === cat}
-                                    onClick={() => select(cat)}
-                                    className={cn(
-                                        'w-full text-left px-4 py-2 text-sm flex items-center justify-between transition-colors',
-                                        value === cat
-                                            ? 'bg-emerald-50 text-emerald-700 font-semibold'
-                                            : 'text-slate-700 hover:bg-slate-50'
-                                    )}
-                                >
-                                    {cat}
-                                    {value === cat && <Check className="w-3.5 h-3.5 text-emerald-500" aria-hidden="true" />}
-                                </button>
-                            </li>
-                        ))}
-
-                        {filtered.length === 0 && (
-                            <li className="px-4 py-2 text-xs text-slate-400">
-                                Sin resultados para "{query}"
-                            </li>
-                        )}
-                    </ul>
-
-                    {/* Add new */}
-                    {!exactMatch && query.trim() && (
-                        <div className="border-t border-slate-100 p-2">
-                            <button
-                                type="button"
-                                onClick={handleAdd}
-                                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                            >
-                                <Plus className="w-4 h-4" aria-hidden="true" />
-                                Agregar categoría "{query.trim()}"
-                            </button>
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-}
-
-// ─── BarcodeField ─────────────────────────────────────────────────────────────
-function BarcodeField({
-    value, onChange, error,
-}: {
-    value: string;
-    onChange: (v: string) => void;
-    error?: string;
-}) {
-    const [scanning, setScanning] = useState(false);
-    const id = useId();
-
-    const simulateScan = () => {
-        setScanning(true);
-        // In production: integrate @zxing/browser or a USB HID listener
-        setTimeout(() => {
-            onChange('SCAN-' + Math.floor(Math.random() * 900000 + 100000));
-            setScanning(false);
-        }, 1200);
-    };
-
-    return (
-        <div className="flex flex-col gap-1.5">
-            <label htmlFor={id} className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Código de Barras / SKU
-            </label>
-            <div className="flex gap-2">
-                <div className="relative flex-1">
-                    <Barcode
-                        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
-                        aria-hidden="true"
-                    />
-                    <Input
-                        id={id}
-                        placeholder="EAN-13, QR, SKU..."
-                        value={value}
-                        onChange={e => onChange(e.target.value)}
-                        className={cn(
-                            'pl-9 font-mono tracking-widest',
-                            error && 'border-red-400 ring-1 ring-red-300'
-                        )}
-                        aria-invalid={!!error}
-                        aria-describedby={error ? `${id}-err` : undefined}
-                        autoFocus
-                    />
-                </div>
-
-                {/* Scan button */}
-                <button
-                    type="button"
-                    onClick={simulateScan}
-                    disabled={scanning}
-                    aria-label={scanning ? 'Escaneando...' : 'Escanear código de barras'}
-                    className={cn(
-                        'flex items-center gap-1.5 px-3 h-10 rounded-lg border text-xs font-bold transition-all shrink-0',
-                        scanning
-                            ? 'bg-emerald-50 border-emerald-300 text-emerald-600 animate-pulse cursor-not-allowed'
-                            : 'bg-slate-900 border-slate-900 text-white hover:bg-slate-700 active:scale-95'
-                    )}
-                >
-                    <ScanLine className={cn('w-4 h-4', scanning && 'animate-spin')} aria-hidden="true" />
-                    {scanning ? 'Leyendo...' : 'Escanear'}
-                </button>
-            </div>
-
-            {scanning && (
-                <div
-                    role="status"
-                    aria-live="polite"
-                    className="flex items-center gap-2 text-xs text-emerald-600 font-medium"
-                >
-                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                    Apunta el escáner al código de barras del producto...
-                </div>
-            )}
-
-            {error && (
-                <p id={`${id}-err`} className="text-xs text-red-500" role="alert">{error}</p>
-            )}
-        </div>
-    );
-}
-
-// ─── Reusable field wrapper ───────────────────────────────────────────────────
-function Field({ label, id, children, error, hint }: {
-    label: string; id: string; children: React.ReactNode; error?: string; hint?: string;
-}) {
-    return (
-        <div className="flex flex-col gap-1.5">
-            <label htmlFor={id} className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                {label}
-            </label>
-            {children}
-            {hint && !error && <p className="text-[11px] text-slate-400">{hint}</p>}
-            {error && <p className="text-xs text-red-500" role="alert">{error}</p>}
-        </div>
-    );
-}
-
-// ─── Section separator ────────────────────────────────────────────────────────
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-    return (
-        <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
-                    {title}
-                </span>
-                <div className="h-px bg-slate-200 flex-1" />
-            </div>
-            {children}
-        </div>
-    );
-}
-
-// ─── Modal ────────────────────────────────────────────────────────────────────
-export function ProductFormModal({
-    open, onClose, onSave, initial, initialCategories, mode = 'create',
+export function ProductFormModal({ 
+    open, 
+    onClose, 
+    product, 
+    categories,
+    initialStock = 0,
+    initialMinStock = 0,
+    onSuccess 
 }: ProductFormModalProps) {
-    const empty: ProductForm = {
-        code: '', name: '', category: '', cost: '', price: '', stock: '', minStock: '',
-    };
+    const [code, setCode] = useState('');
+    const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
+    const [barcode, setBarcode] = useState('');
+    const [price, setPrice] = useState<number | ''>('');
+    const [cost, setCost] = useState<number | ''>('');
+    const [categoryId, setCategoryId] = useState('');
+    const [stock, setStock] = useState<number | ''>('');
+    const [minStock, setMinStock] = useState<number | ''>('');
+    
+    const [saving, setSaving] = useState(false);
+    const initialFocusRef = useRef<HTMLInputElement>(null);
 
-    const [form, setForm]         = useState<ProductForm>({ ...empty, ...initial });
-    const [errors, setErrors]     = useState<Partial<ProductForm>>({});
-    const [categories, setCategories] = useState<string[]>(
-        initialCategories ?? DEFAULT_CATEGORIES
-    );
+    useEffect(() => {
+        if (open) {
+            if (product) {
+                setCode(product.barcode || '');
+                setName(product.name || '');
+                setDescription(product.description || '');
+                setBarcode(product.barcode || '');
+                setPrice(product.price);
+                setCost(product.cost ?? '');
+                setCategoryId(product.categoryId || '');
+            } else {
+                setCode('');
+                setName('');
+                setDescription('');
+                setBarcode('');
+                setPrice('');
+                setCost('');
+                setCategoryId('');
+                setStock(initialStock || '');
+                setMinStock(initialMinStock || '');
+            }
+            
+            setTimeout(() => {
+                initialFocusRef.current?.focus();
+            }, 100);
+        }
+    }, [open, product, initialStock, initialMinStock]);
 
-    const set = (key: keyof ProductForm, val: string) => {
-        setForm(prev => ({ ...prev, [key]: val }));
-        if (errors[key]) setErrors(prev => ({ ...prev, [key]: undefined }));
-    };
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && open) onClose();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [open, onClose]);
 
-    const validate = (): boolean => {
-        const errs: Partial<ProductForm> = {};
-        if (!form.code.trim())                              errs.code     = 'Requerido';
-        if (!form.name.trim())                              errs.name     = 'Requerido';
-        if (!form.category)                                 errs.category = 'Selecciona o escribe una categoría';
-        if (!form.cost   || parseFloat(form.cost)   <= 0)  errs.cost     = 'Costo inválido';
-        if (!form.price  || parseFloat(form.price)  <= 0)  errs.price    = 'Precio de venta inválido';
-        if (form.stock   === '' || parseInt(form.stock)  < 0) errs.stock  = 'Stock inválido';
-        if (form.minStock === '' || parseInt(form.minStock) < 0) errs.minStock = 'Mínimo inválido';
-        setErrors(errs);
-        return Object.keys(errs).length === 0;
-    };
+    if (!open) return null;
 
-    const handleSave = () => {
-        if (!validate()) return;
-        onSave(form);
-        handleClose();
-    };
-
-    const handleClose = () => {
-        setForm({ ...empty, ...initial });
-        setErrors({});
-        onClose();
-    };
-
-    const margin = form.cost && form.price
-        ? (((parseFloat(form.price) - parseFloat(form.cost)) / parseFloat(form.price)) * 100).toFixed(1)
+    const margin = cost && price 
+        ? (((Number(price) - Number(cost)) / Number(price)) * 100).toFixed(1)
         : null;
 
-    const costId      = useId();
-    const priceId     = useId();
-    const stockId     = useId();
-    const minStockId  = useId();
-    const nameId      = useId();
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (!code.trim()) {
+            toast.error('El código es requerido');
+            return;
+        }
+        if (!name.trim()) {
+            toast.error('El nombre es requerido');
+            return;
+        }
+        if (!price || Number(price) <= 0) {
+            toast.error('El precio debe ser mayor a 0');
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const data: any = { 
+                name, 
+                description: description || null, 
+                barcode: code || null, 
+                price: Number(price), 
+                cost: cost ? Number(cost) : null, 
+                categoryId: categoryId || null 
+            };
+            
+            if (product) {
+                const res = await api.put(`/products/${product.id}`, data);
+                if (res.status === 200) {
+                    toast.success('Producto actualizado correctamente');
+                    onSuccess();
+                    onClose();
+                }
+            } else {
+                const res = await api.post('/products', data);
+                if (res.status === 201 || res.status === 200) {
+                    toast.success('Producto creado correctamente');
+                    onSuccess();
+                    onClose();
+                }
+            }
+        } catch (error: any) {
+            console.error('Error saving product:', error);
+            toast.error(error?.response?.data?.message || 'Error al guardar el producto');
+        } finally {
+            setSaving(false);
+        }
+    };
 
     return (
-        <Dialog open={open} onOpenChange={o => !o && handleClose()}>
-            <DialogContent className="sm:max-w-125 max-h-[92vh] flex flex-col overflow-hidden p-0 gap-0">
-                {/* ── Colored header ── */}
-                <div className="bg-linear-to-br from-slate-900 to-slate-800 px-6 pt-6 pb-5 rounded-t-xl">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-3 text-white">
-                            <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/20">
-                                <Package className="w-4.5 h-4.5 text-emerald-400" aria-hidden="true" />
-                            </div>
-                            <div>
-                                <p className="text-base font-black leading-tight">
-                                    {mode === 'create' ? 'Nuevo Producto' : 'Editar Producto'}
-                                </p>
-                                <p className="text-xs text-slate-400 font-normal mt-0.5">
-                                    {mode === 'create'
-                                        ? 'Registra un nuevo ítem en el catálogo'
-                                        : 'Actualiza la información del ítem'}
-                                </p>
-                            </div>
-                        </DialogTitle>
-                    </DialogHeader>
-                    <DialogDescription className="sr-only">
-                        Formulario para {mode === 'create' ? 'registrar' : 'editar'} un producto.
-                    </DialogDescription>
-                </div>
-
-                {/* ── Body ── */}
-                <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1 bg-slate-50">
-
-                    {/* 1. Código de barras */}
-                    <BarcodeField
-                        value={form.code}
-                        onChange={v => set('code', v)}
-                        error={errors.code}
-                    />
-
-                    {/* 2. Info básica */}
-                    <Section title="Información del Producto">
-                        <Field label="Nombre completo" id={nameId} error={errors.name}>
-                            <Input
-                                id={nameId}
-                                placeholder="Ej: Harina PAN 1kg"
-                                value={form.name}
-                                onChange={e => set('name', e.target.value)}
-                                className={cn('bg-white', errors.name && 'border-red-400 ring-1 ring-red-300')}
-                                aria-invalid={!!errors.name}
-                            />
-                        </Field>
-
-                        <div className="flex flex-col gap-1.5">
-                            <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                                Categoría
-                            </p>
-                            <CategoryCombobox
-                                value={form.category}
-                                onChange={v => set('category', v)}
-                                categories={categories}
-                                onAddCategory={cat => setCategories(prev =>
-                                    prev.includes(cat) ? prev : [...prev, cat]
-                                )}
-                                error={errors.category}
-                            />
-                            {errors.category && (
-                                <p className="text-xs text-red-500" role="alert">{errors.category}</p>
-                            )}
-                        </div>
-                    </Section>
-
-                    {/* 3. Precios */}
-                    <Section title="Precios">
-                        <div className="grid grid-cols-2 gap-3">
-                            <Field label="Precio de Costo ($)" id={costId} error={errors.cost}>
-                                <Input
-                                    id={costId}
-                                    type="number" step="0.01" min="0"
-                                    placeholder="0.00"
-                                    value={form.cost}
-                                    onChange={e => set('cost', e.target.value)}
-                                    className={cn('bg-white tabular-nums', errors.cost && 'border-red-400')}
-                                    aria-invalid={!!errors.cost}
-                                />
-                            </Field>
-                            <Field label="Precio de Venta ($)" id={priceId} error={errors.price}>
-                                <Input
-                                    id={priceId}
-                                    type="number" step="0.01" min="0"
-                                    placeholder="0.00"
-                                    value={form.price}
-                                    onChange={e => set('price', e.target.value)}
-                                    className={cn('bg-white tabular-nums', errors.price && 'border-red-400')}
-                                    aria-invalid={!!errors.price}
-                                />
-                            </Field>
-                        </div>
-                        {/* Live margin preview */}
-                        {margin !== null && !isNaN(parseFloat(margin)) && (
-                            <div className={cn(
-                                'flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-lg',
-                                parseFloat(margin) >= 20
-                                    ? 'bg-emerald-50 text-emerald-700'
-                                    : parseFloat(margin) >= 0
-                                        ? 'bg-amber-50 text-amber-700'
-                                        : 'bg-red-50 text-red-700'
-                            )}>
-                                Margen bruto estimado: <strong>{margin}%</strong>
-                                {parseFloat(margin) < 0 && ' · El costo supera el precio de venta'}
-                            </div>
-                        )}
-                    </Section>
-
-                    {/* 4. Stock */}
-                    <Section title="Control de Stock">
-                        <div className="grid grid-cols-2 gap-3">
-                            <Field
-                                label="Stock Inicial"
-                                id={stockId}
-                                error={errors.stock}
-                                hint="Unidades disponibles al registrar."
-                            >
-                                <Input
-                                    id={stockId}
-                                    type="number" min="0"
-                                    placeholder="0"
-                                    value={form.stock}
-                                    onChange={e => set('stock', e.target.value)}
-                                    className={cn('bg-white tabular-nums', errors.stock && 'border-red-400')}
-                                    aria-invalid={!!errors.stock}
-                                />
-                            </Field>
-                            <Field
-                                label="Stock Mínimo"
-                                id={minStockId}
-                                error={errors.minStock}
-                                hint="Umbral para alertas de reposición."
-                            >
-                                <Input
-                                    id={minStockId}
-                                    type="number" min="0"
-                                    placeholder="0"
-                                    value={form.minStock}
-                                    onChange={e => set('minStock', e.target.value)}
-                                    className={cn('bg-white tabular-nums', errors.minStock && 'border-red-400')}
-                                    aria-invalid={!!errors.minStock}
-                                />
-                            </Field>
-                        </div>
-                    </Section>
-                </div>
-
-                {/* ── Footer ── */}
-                <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-200 bg-white rounded-b-xl">
-                    <Button variant="outline" onClick={handleClose} className="font-bold">
-                        Cancelar
-                    </Button>
-                    <Button
-                        onClick={handleSave}
-                        className="font-bold shadow-md shadow-emerald-500/20 bg-emerald-600 hover:bg-emerald-700"
+        <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-product-title"
+        >
+            <div className="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-2xl overflow-y-auto max-h-[90vh]">
+                <div className="flex items-center justify-between mb-6">
+                    <h2 id="modal-product-title" className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+                        <PackageOpen className="w-5 h-5 text-indigo-600" />
+                        {product ? 'Editar Producto' : 'Nuevo Producto'}
+                    </h2>
+                    <button 
+                        onClick={onClose} 
+                        className="p-2 hover:bg-slate-100 rounded-full text-slate-500 hover:text-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300"
+                        aria-label="Cerrar ventana"
                     >
-                        {mode === 'create' ? 'Registrar Producto' : 'Guardar Cambios'}
-                    </Button>
+                        <X className="w-5 h-5" />
+                    </button>
                 </div>
-            </DialogContent>
-        </Dialog>
+                
+                <form onSubmit={handleSubmit} className="space-y-5">
+                    <div>
+                        <label htmlFor="code" className="block text-sm font-semibold text-slate-700 mb-1.5">Código / SKU *</label>
+                        <div className="relative">
+                            <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input
+                                id="code"
+                                ref={initialFocusRef}
+                                type="text"
+                                value={code}
+                                onChange={(e) => setCode(e.target.value)}
+                                className="w-full pl-9 pr-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm font-mono"
+                                required
+                                aria-required="true"
+                                placeholder="EAN-13, QR, SKU..."
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label htmlFor="name" className="block text-sm font-semibold text-slate-700 mb-1.5">Nombre del Producto *</label>
+                        <input
+                            id="name"
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm"
+                            required
+                            aria-required="true"
+                            placeholder="Ej: Leche Deslactosada 1L"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="categoryId" className="block text-sm font-semibold text-slate-700 mb-1.5">Categoría</label>
+                            <select
+                                id="categoryId"
+                                value={categoryId}
+                                onChange={(e) => setCategoryId(e.target.value)}
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm bg-white"
+                            >
+                                <option value="">Sin categoría asignada</option>
+                                {categories.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label htmlFor="barcode" className="block text-sm font-semibold text-slate-700 mb-1.5">Código de Barras</label>
+                            <div className="relative">
+                                <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <input
+                                    id="barcode"
+                                    type="text"
+                                    value={barcode}
+                                    onChange={(e) => setBarcode(e.target.value)}
+                                    className="w-full pl-9 pr-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm font-mono"
+                                    placeholder="Ej: 7501020304050"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <div>
+                            <label htmlFor="price" className="block text-sm font-semibold text-slate-700 mb-1.5">Precio de Venta *</label>
+                            <div className="relative">
+                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600" />
+                                <input
+                                    id="price"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={price}
+                                    onChange={(e) => setPrice(e.target.value ? Number(e.target.value) : '')}
+                                    className="w-full pl-9 pr-3.5 py-2.5 border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm font-semibold text-slate-900"
+                                    required
+                                    aria-required="true"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label htmlFor="cost" className="block text-sm font-semibold text-slate-700 mb-1.5">Costo (Base)</label>
+                            <div className="relative">
+                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <input
+                                    id="cost"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={cost}
+                                    onChange={(e) => setCost(e.target.value ? Number(e.target.value) : '')}
+                                    className="w-full pl-9 pr-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-500/50 transition-all text-sm"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {margin !== null && !isNaN(Number(margin)) && (
+                        <div className={Number(margin) >= 20 
+                            ? 'flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700'
+                            : Number(margin) >= 0
+                                ? 'flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-lg bg-amber-50 text-amber-700'
+                                : 'flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-lg bg-red-50 text-red-700'
+                        }>
+                            <AlertTriangle className="w-4 h-4" />
+                            Margen bruto estimado: <strong>{margin}%</strong>
+                            {Number(margin) < 0 && ' · El costo supera el precio de venta'}
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="stock" className="block text-sm font-semibold text-slate-700 mb-1.5">Stock Inicial</label>
+                            <input
+                                id="stock"
+                                type="number"
+                                min="0"
+                                value={stock}
+                                onChange={(e) => setStock(e.target.value ? Number(e.target.value) : '')}
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm"
+                                placeholder="0"
+                            />
+                            <p className="text-[11px] text-slate-400 mt-1">Unidades disponibles al registrar</p>
+                        </div>
+                        <div>
+                            <label htmlFor="minStock" className="block text-sm font-semibold text-slate-700 mb-1.5">Stock Mínimo</label>
+                            <input
+                                id="minStock"
+                                type="number"
+                                min="0"
+                                value={minStock}
+                                onChange={(e) => setMinStock(e.target.value ? Number(e.target.value) : '')}
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm"
+                                placeholder="0"
+                            />
+                            <p className="text-[11px] text-slate-400 mt-1">Umbral para alertas de reposición</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label htmlFor="description" className="block text-sm font-semibold text-slate-700 mb-1.5">Descripción Adicional</label>
+                        <textarea
+                            id="description"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            rows={3}
+                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm resize-none"
+                            placeholder="Detalles adicionales del producto..."
+                        />
+                    </div>
+
+                    <div className="flex gap-3 pt-6 mt-6 border-t border-slate-100">
+                        <button 
+                            type="button" 
+                            onClick={onClose} 
+                            className="flex-1 px-4 py-2.5 bg-slate-100/80 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300"
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            type="submit" 
+                            disabled={saving} 
+                            className="flex-1 px-4 py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2"
+                        >
+                            <Save className="w-4 h-4" />
+                            {saving ? 'Guardando...' : 'Guardar Producto'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     );
 }

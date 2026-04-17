@@ -15,6 +15,7 @@ import toast from 'react-hot-toast';
 interface Product {
     id: string; code: string; name: string; category: string;
     cost: number; price: number; stock: number; minStock: number;
+    isActive?: boolean;
 }
 
 type StockLevel = 'normal' | 'warning' | 'critical';
@@ -85,21 +86,7 @@ export default function InventoryPage() {
         }
     });
 
-    // Mutation to update product
-    const updateProductMutation = useMutation({
-        mutationFn: async (data: any) => {
-            const res = await api.put(`/inventory/products/${editTarget?.id}`, data);
-            return res.data;
-        },
-        onSuccess: () => {
-            toast.success('Producto actualizado correctamente');
-            setEditTarget(null);
-            refetch();
-        },
-        onError: () => {
-            toast.error('Error al actualizar producto');
-        }
-    });
+    
 
     const filtered = PRODUCTS.filter(p =>
         (category === 'Todos' || p.category === category) &&
@@ -170,17 +157,14 @@ export default function InventoryPage() {
         <ProductFormModal
             open={!!editTarget}
             onClose={() => setEditTarget(null)}
-            onSave={(data) => updateProductMutation.mutate({ ...data, branchId: effectiveBranch })}
-            initial={editTarget ? {
-                code: editTarget.code,
-                name: editTarget.name,
-                category: editTarget.category,
-                cost: editTarget.cost.toFixed(2),
-                price: editTarget.price.toFixed(2),
-                stock: String(editTarget.stock),
-                minStock: String(editTarget.minStock),
-            } : undefined}
-            mode="edit"
+            product={editTarget}
+            categories={CATEGORIES.map(c => ({ id: c, name: c })).filter(c => c.id !== 'Todos')}
+            initialStock={editTarget?.stock}
+            initialMinStock={editTarget?.minStock}
+            onSuccess={() => {
+                refetch();
+                setEditTarget(null);
+            }}
         />
         <StockAdjustmentModal 
             open={adjustmentOpen}
