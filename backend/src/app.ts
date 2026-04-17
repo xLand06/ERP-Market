@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { errorHandler, notFoundHandler } from './core/middlewares/errorHandler';
 import logger from './core/utils/logger';
 
@@ -33,12 +34,10 @@ if (process.env.ELECTRON === 'true') {
 // ─── MIDDLEWARES GLOBALES ───────────────────────────────────────────────────
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (e.g., mobile apps, curl)
         if (!origin) return callback(null, true);
         
         const allowedUrls = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : ['http://localhost:5175'];
         
-        // Allow standard localhost / network IP ranges typical for Vite
         const isLocalNetwork = /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+):517[0-9]$/.test(origin);
 
         if (allowedUrls.includes(origin) || allowedUrls.includes('*') || isLocalNetwork) {
@@ -49,7 +48,20 @@ app.use(cors({
     },
     credentials: true,
 }));
-app.use(express.json());
+
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:", "https:"],
+        },
+    },
+    crossOriginEmbedderPolicy: false,
+}));
+
+app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ─── REQUEST LOGGING ─────────────────────────────────────────────────────────
