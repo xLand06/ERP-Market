@@ -6,8 +6,9 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../core/middlewares/auth.middleware';
 import { roleGuard } from '../../core/middlewares/roleGuard';
-import { validate, validatedData } from '../../core/middlewares/validate.middleware';
-import { productFiltersSchema, createProductSchema, updateProductSchema, idParamSchema } from '../../core/validations/products.zod';
+import { validate } from '../../core/middlewares/validate.middleware';
+import { idParamSchema } from '../../core/validations/common.zod';
+import { productFiltersSchema, createProductSchema, updateProductSchema } from '../../core/validations/products.zod';
 import * as ctrl from './products.controller';
 
 const router = Router();

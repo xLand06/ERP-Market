@@ -237,10 +237,10 @@ function CategoryForm({ category, onClose }: { category?: Category; onClose: () 
         setSaving(true);
         try {
             if (category) {
-                await api.put(`/inventory/categories/${category.id}`, { name, description });
+                await api.put(`/categories/${category.id}`, { name, description });
                 toast.success('Categoría actualizada exitosamente');
             } else {
-                await api.post('/inventory/categories', { name, description });
+                await api.post('/categories', { name, description });
                 toast.success('Categoría creada exitosamente');
             }
             onClose();

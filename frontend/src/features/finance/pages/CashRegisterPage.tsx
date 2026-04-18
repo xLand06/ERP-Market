@@ -43,7 +43,7 @@ export default function CashRegisterPage() {
         queryKey: ['openRegister', effectiveBranch],
         queryFn: async () => {
             if (!effectiveBranch) return null;
-            const res = await api.get(`/finance/registers/open/${effectiveBranch}`);
+            const res = await api.get(`/cash-flow/current/${effectiveBranch}`);
             return res.data.data;
         },
         enabled: !!effectiveBranch
@@ -51,7 +51,7 @@ export default function CashRegisterPage() {
 
     const openMutation = useMutation({
         mutationFn: async (openingAmount: number) => {
-            await api.post(`/finance/registers/open`, {
+            await api.post(`/cash-flow/open`, {
                 branchId: effectiveBranch,
                 openingAmount
             });
@@ -61,7 +61,7 @@ export default function CashRegisterPage() {
 
     const closeMutation = useMutation({
         mutationFn: async ({ closingAmount, notes }: { closingAmount: number, notes?: string }) => {
-            await api.post(`/finance/registers/${openRegister.id}/close`, {
+            await api.patch(`/cash-flow/${openRegister.id}/close`, {
                 closingAmount, notes
             });
         },
@@ -70,7 +70,10 @@ export default function CashRegisterPage() {
 
     const addMovementMutation = useMutation({
         mutationFn: async ({ subType, amount, notes }: any) => {
-            await api.post(`/finance/registers/${openRegister.id}/movement`, {
+            // Nota: Este endpoint parece no estar en cash-flow actualmente,
+            // se debe manejar como una transacción de tipo ADJUSTMENT en el POS o similar.
+            // Por ahora lo mantengo apuntando a una ruta que crearemos si es necesario.
+            await api.post(`/cash-flow/${openRegister.id}/movement`, {
                 branchId: effectiveBranch,
                 subType,
                 amount,
@@ -131,7 +134,7 @@ export default function CashRegisterPage() {
     let totalExpense = 0;
 
     transactions.forEach((t: any) => {
-        const amt = Number(t.totalAmount) || 0;
+        const amt = Number(t.total) || 0;
         if (t.type === 'SALE' && t.status === 'COMPLETED') {
             totalIncome += amt;
         } else if (t.type === 'ADJUSTMENT' && t.status === 'COMPLETED') {
@@ -222,7 +225,7 @@ export default function CashRegisterPage() {
                             </thead>
                             <tbody>
                                 {transactions.sort((a:any, b:any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((entry: any) => {
-                                    const amt = Number(entry.totalAmount);
+                                    const amt = Number(entry.total);
                                     const isIncome = entry.type === 'SALE' || amt > 0;
                                     const time = new Date(entry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                                     

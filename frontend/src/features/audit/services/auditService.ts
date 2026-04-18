@@ -1,10 +1,11 @@
 import { api } from '../../../lib/api';
+import { ApiResponse } from '../../../types';
 
 export interface AuditLog {
     id: string;
     action: string;
     module: string;
-    details: string;
+    details: any; // Cambiado a any porque Prisma/JSON ya lo trae parseado o como objeto
     ipAddress?: string;
     userAgent?: string;
     createdAt: string;
@@ -26,12 +27,13 @@ export interface AuditFilters {
     limit?: number;
 }
 
-export const getAuditLogs = async (filters: AuditFilters = {}) => {
-    const { data } = await api.get<{ success: boolean; data: AuditLog[] }>('/audit', { params: filters });
+export const getAuditLogs = async (filters: AuditFilters = {}): Promise<AuditLog[]> => {
+    // Corregida la ruta para que coincida con backend (audit/logs)
+    const { data } = await api.get<ApiResponse<AuditLog[]>>('/audit/logs', { params: filters });
     return data.data;
 };
 
-export const getAuditStats = async () => {
-    const { data } = await api.get<{ success: boolean; data: any }>('/audit/stats');
+export const getAuditStats = async (): Promise<any> => {
+    const { data } = await api.get<ApiResponse<any>>('/audit/stats');
     return data.data;
 };

@@ -1,92 +1,129 @@
-// ============================
+// =============================================================================
 // CASH FLOW MODULE — CONTROLLER
-// ============================
+// Manejo de peticiones para arqueos y flujo de caja
+// =============================================================================
 
 import { Request, Response } from 'express';
 import * as cashFlowService from './cashFlow.service';
 import { AuthRequest } from '../../core/middlewares/auth.middleware';
 import { logAudit, extractIp } from '../../core/middlewares/audit.middleware';
+import { validatedData } from '../../core/middlewares/validate.middleware';
 
+/**
+ * Abrir una caja (Auditado)
+ */
 export const openRegister = async (req: AuthRequest, res: Response): Promise<void> => {
-    const { branchId, openingAmount, notes } = req.body;
-    if (!branchId || openingAmount === undefined) {
-        res.status(400).json({ error: 'branchId y openingAmount son requeridos' });
-        return;
-    }
     try {
+        const data = validatedData(req, 'body');
+        
         const register = await cashFlowService.openCashRegister({
-            branchId,
+            ...data,
             userId: req.user!.id,
-            openingAmount,
-            notes,
         });
+        
         await logAudit({
-            action: 'CASH_OPEN', module: 'cashFlow',
-            details: { branchId, openingAmount, cashRegisterId: register.id },
-            userId: req.user!.id, ipAddress: extractIp(req),
+            action: 'CASH_OPEN',
+            module: 'cashFlow',
+            details: { branchId: data.branchId, openingAmount: data.openingAmount, cashRegisterId: register.id },
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
         });
+        
         res.status(201).json({ success: true, data: register });
-    } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Error al abrir caja';
-        res.status(422).json({ error: message });
+    } catch (err: any) {
+        res.status(422).json({ success: false, error: err.message });
     }
 };
 
+/**
+ * Cerrar un arqueo (Auditado - Solo OWNER)
+ */
 export const closeRegister = async (req: AuthRequest, res: Response): Promise<void> => {
-    const { closingAmount, notes } = req.body;
-    if (closingAmount === undefined) {
-        res.status(400).json({ error: 'closingAmount es requerido' });
-        return;
-    }
     try {
-        const register = await cashFlowService.closeCashRegister(req.params.id, closingAmount, notes);
+        const { id } = validatedData(req, 'params');
+        const { closingAmount, notes } = validatedData(req, 'body');
+        
+        const register = await cashFlowService.closeCashRegister(id, closingAmount, notes);
+        
         await logAudit({
-            action: 'CASH_CLOSE', module: 'cashFlow',
+            action: 'CASH_CLOSE',
+            module: 'cashFlow',
             details: {
-                cashRegisterId: req.params.id,
+                cashRegisterId: id,
                 closingAmount,
                 difference: register.difference,
             },
-            userId: req.user!.id, ipAddress: extractIp(req),
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
         });
+        
         res.json({ success: true, data: register });
-    } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Error al cerrar caja';
-        res.status(422).json({ error: message });
+    } catch (err: any) {
+        res.status(422).json({ success: false, error: err.message });
     }
 };
 
+/**
+ * Obtener la caja abierta actual por sede
+ */
 export const getCurrentRegister = async (req: Request, res: Response): Promise<void> => {
-    const { branchId } = req.params;
-    const register = await cashFlowService.getCurrentOpenRegister(branchId);
-    if (!register) {
-        res.status(404).json({ error: 'No hay caja abierta en esta sede' });
-        return;
+    try {
+        const { branchId } = validatedData(req, 'params');
+        const register = await cashFlowService.getCurrentOpenRegister(branchId);
+        
+        if (!register) {
+            res.status(404).json({ success: false, error: 'No hay caja abierta en esta sede' });
+            return;
+        }
+        
+        res.json({ success: true, data: register });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
     }
-    res.json({ success: true, data: register });
 };
 
+/**
+ * Historial de arqueos con filtros
+ */
 export const getHistory = async (req: Request, res: Response): Promise<void> => {
-    const { branchId, from, to, page, limit } = req.query;
-    const history = await cashFlowService.getCashRegisterHistory({
-        branchId: branchId as string | undefined,
-        from: from as string | undefined,
-        to: to as string | undefined,
-        page: page ? parseInt(page as string) : 1,
-        limit: limit ? parseInt(limit as string) : 30,
-    });
-    res.json({ success: true, data: history });
+    try {
+        const filters = validatedData(req, 'query');
+        const history = await cashFlowService.getCashRegisterHistory(filters);
+        res.json({ success: true, data: history });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
 };
 
+/**
+ * Detalle de un arqueo por ID
+ */
 export const getRegisterById = async (req: Request, res: Response): Promise<void> => {
-    const register = await cashFlowService.getCashRegisterById(req.params.id);
-    if (!register) { res.status(404).json({ error: 'Arqueo no encontrado' }); return; }
-    res.json({ success: true, data: register });
+    try {
+        const { id } = validatedData(req, 'params');
+        const register = await cashFlowService.getCashRegisterById(id);
+        
+        if (!register) {
+            res.status(404).json({ success: false, error: 'Arqueo no encontrado' });
+            return;
+        }
+        
+        res.json({ success: true, data: register });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
 };
 
+/**
+ * Resumen diario de ventas por sede
+ */
 export const getDailySummary = async (req: Request, res: Response): Promise<void> => {
-    const { branchId } = req.params;
-    const { date } = req.query;
-    const summary = await cashFlowService.getDailySalesSummary(branchId, date as string | undefined);
-    res.json({ success: true, data: summary });
+    try {
+        const { branchId } = validatedData(req, 'params');
+        const { date } = req.query;
+        const summary = await cashFlowService.getDailySalesSummary(branchId, date as string | undefined);
+        res.json({ success: true, data: summary });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
 };

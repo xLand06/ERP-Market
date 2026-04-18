@@ -97,11 +97,14 @@ export const getLocalPrisma = (): PrismaClient => {
     return _prismaLocal;
 };
 
-// ── Export Principal (Proxy — elige automáticamente local o cloud) ────────────
+// ── Export Principal (SIEMPRE SQLite para sistema híbrido) ────────────────────
+// El sistema híbrido escribe SIEMPRE a SQLite local.
+// Supabase (getCloudPrisma) solo se usa para operaciones de sync.
 export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
     get(_target, prop: string) {
-        const useLocal = process.env.USE_LOCAL_DB === 'true' || process.env.ELECTRON === 'true';
-        const db: PrismaClient = useLocal ? getLocalPrisma() : getCloudPrisma()!;
+        // SIEMPRE usar SQLite como base de datos principal
+        // para sistema híbrido offline-first
+        const db: PrismaClient = getLocalPrisma();
         const value = (db as any)[prop];
         return typeof value === 'function' ? value.bind(db) : value;
     },

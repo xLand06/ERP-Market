@@ -26,10 +26,10 @@ import { startSyncWorker } from './modules/sync/sync-worker';
 
 const app = express();
 
-// ─── BACKGROUND SYNC (Electron Only) ─────────────────────────────────────────
-if (process.env.ELECTRON === 'true') {
-    startSyncWorker(300000); // 5 minutes
-}
+// ─── BACKGROUND SYNC (Sistema Híbrido) ─────────────────────────────────────────
+// Sync worker para sistema híbrido SQLite + Supabase
+// Intervalo: 15 minutos (900000ms)
+startSyncWorker(900000);
 
 // ─── MIDDLEWARES GLOBALES ───────────────────────────────────────────────────
 app.use(cors({

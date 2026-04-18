@@ -1,88 +1,106 @@
+// =============================================================================
+// POS MODULE — CONTROLLER
+// Manejo de transacciones en caja y ajustes de inventario
+// =============================================================================
+
 import { Response } from 'express';
 import * as posService from './pos.service';
 import { AuthRequest } from '../../core/middlewares/auth.middleware';
 import { logAudit, extractIp } from '../../core/middlewares/audit.middleware';
-import { TransactionType } from '@prisma/client';
+import { validatedData } from '../../core/middlewares/validate.middleware';
 
+/**
+ * Crear una transacción (Venta o Entrada de Almacén)
+ */
 export const createTransaction = async (req: AuthRequest, res: Response): Promise<void> => {
-    const { type, branchId, items, cashRegisterId, notes } = req.body;
-
-    if (!type || !branchId || !items || !Array.isArray(items) || items.length === 0) {
-        res.status(400).json({ error: 'type, branchId e items son requeridos' });
-        return;
-    }
-
-    if (!['SALE', 'INVENTORY_IN'].includes(type)) {
-        res.status(400).json({ error: 'type debe ser SALE o INVENTORY_IN' });
-        return;
-    }
-
     try {
+        const data = validatedData(req, 'body');
+        
         const transaction = await posService.createTransaction({
-            type: type as TransactionType,
-            branchId,
+            ...data,
             userId: req.user!.id,
-            items,
-            cashRegisterId,
-            notes,
             ipAddress: extractIp(req),
         });
 
         await logAudit({
-            action: type === 'SALE' ? 'SALE_CREATE' : 'INVENTORY_IN',
+            action: data.type === 'SALE' ? 'SALE_CREATE' : 'INVENTORY_IN',
             module: 'pos',
             details: {
                 transactionId: transaction.id,
-                branchId,
+                branchId: data.branchId,
                 total: transaction.total,
-                itemCount: items.length,
+                itemCount: data.items.length,
             },
             userId: req.user!.id,
             ipAddress: extractIp(req),
         });
 
         res.status(201).json({ success: true, data: transaction });
-    } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Error al crear transacción';
-        res.status(422).json({ error: message });
+    } catch (err: any) {
+        res.status(422).json({ success: false, error: err.message });
     }
 };
 
+/**
+ * Listar transacciones con filtros y paginación
+ */
 export const getTransactions = async (req: AuthRequest, res: Response): Promise<void> => {
-    const { type, branchId, from, to, page, limit } = req.query;
+    try {
+        const filters = validatedData(req, 'query');
+        
+        // Si es SELLER, solo ve sus propias ventas por defecto
+        const userId = req.user!.role === 'SELLER' ? req.user!.id : (filters.userId as string | undefined);
 
-    const userId = req.user!.role === 'SELLER' ? req.user!.id : (req.query.userId as string | undefined);
+        const transactions = await posService.getTransactions({
+            ...filters,
+            userId,
+        });
 
-    const transactions = await posService.getTransactions({
-        type: type as TransactionType | undefined,
-        branchId: branchId as string | undefined,
-        userId,
-        from: from as string | undefined,
-        to: to as string | undefined,
-        page: page ? parseInt(page as string) : 1,
-        limit: limit ? parseInt(limit as string) : 50,
-    });
-
-    res.json({ success: true, data: transactions });
+        res.json({ success: true, data: transactions });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
 };
 
+/**
+ * Detalle de una transacción por ID
+ */
 export const getTransactionById = async (req: AuthRequest, res: Response): Promise<void> => {
-    const tx = await posService.getTransactionById(req.params.id);
-    if (!tx) { res.status(404).json({ error: 'Transacción no encontrada' }); return; }
-    res.json({ success: true, data: tx });
+    try {
+        const { id } = validatedData(req, 'params');
+        const tx = await posService.getTransactionById(id);
+        
+        if (!tx) {
+            res.status(404).json({ success: false, error: 'Transacción no encontrada' });
+            return;
+        }
+        
+        res.json({ success: true, data: tx });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
 };
 
+/**
+ * Cancelar una transacción y revertir stock (Solo OWNER)
+ */
 export const cancelTransaction = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const tx = await posService.cancelTransaction(req.params.id);
+        const { id } = validatedData(req, 'params');
+        const { reason } = validatedData(req, 'body');
+        
+        const tx = await posService.cancelTransaction(id);
+        
         await logAudit({
-            action: 'SALE_CANCEL', module: 'pos',
-            details: { transactionId: req.params.id },
-            userId: req.user!.id, ipAddress: extractIp(req),
+            action: 'SALE_CANCEL',
+            module: 'pos',
+            details: { transactionId: id, reason },
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
         });
+        
         res.json({ success: true, data: tx });
-    } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Error al cancelar';
-        res.status(422).json({ error: message });
+    } catch (err: any) {
+        res.status(422).json({ success: false, error: err.message });
     }
 };

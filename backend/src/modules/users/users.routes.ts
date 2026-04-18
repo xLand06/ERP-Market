@@ -8,7 +8,7 @@ import { authMiddleware } from '../../core/middlewares/auth.middleware';
 import { roleGuard } from '../../core/middlewares/roleGuard';
 import { validate } from '../../core/middlewares/validate.middleware';
 import { idParamSchema } from '../../core/validations/common.zod';
-import { updateUserSchema } from '../../core/validations/auth.zod';
+import { registerSchema, updateUserSchema } from '../../core/validations/auth.zod';
 import * as ctrl from './users.controller';
 
 const router = Router();
@@ -23,7 +23,7 @@ router.get('/', ctrl.getAll);
 router.get('/:id', validate(idParamSchema, { source: 'params' }), ctrl.getOne);
 
 /** POST /api/users — Crear usuario */
-router.post('/', ctrl.create);
+router.post('/', validate(registerSchema), ctrl.create);
 
 /** PUT  /api/users/:id — Actualizar usuario */
 router.put('/:id', validate(idParamSchema, { source: 'params' }), validate(updateUserSchema), ctrl.update);

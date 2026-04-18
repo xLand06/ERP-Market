@@ -1,61 +1,17 @@
+// =============================================================================
+// FINANCE MODULE — CONTROLLER
+// Manejo de peticiones para tasas de cambio y finanzas globales
+// =============================================================================
+
 import { Request, Response } from 'express';
 import * as financeService from './finance.service';
+import { AuthRequest } from '../../core/middlewares/auth.middleware';
+import { logAudit, extractIp } from '../../core/middlewares/audit.middleware';
+import { validatedData } from '../../core/middlewares/validate.middleware';
 
-export const getOpenRegister = async (req: Request, res: Response) => {
-    try {
-        const { branchId } = req.params;
-        const register = await financeService.getOpenRegister(branchId);
-        res.json({ success: true, data: register });
-    } catch (error: any) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-}
-
-export const openCashRegister = async (req: Request, res: Response) => {
-    try {
-        const { branchId, openingAmount } = req.body;
-        const session = await financeService.openRegister({
-            branchId,
-            userId: (req as any).user!.id,
-            openingAmount: Number(openingAmount)
-        });
-        res.status(201).json({ success: true, data: session });
-    } catch (error: any) {
-        res.status(400).json({ success: false, error: error.message });
-    }
-};
-
-export const closeCashRegister = async (req: Request, res: Response) => {
-    try {
-        const { closingAmount, notes } = req.body;
-        const summary = await financeService.closeRegister(req.params.registerId, {
-            closingAmount: Number(closingAmount),
-            notes
-        });
-        res.json({ success: true, data: summary });
-    } catch (error: any) {
-        res.status(400).json({ success: false, error: error.message });
-    }
-};
-
-
-
-export const addCashMovement = async (req: Request, res: Response) => {
-    try {
-        const { branchId, type, amount, notes } = req.body;
-        const movement = await financeService.addCashMovement(req.params.registerId, {
-            branchId,
-            userId: (req as any).user!.id,
-            type,
-            amount: Number(amount),
-            notes
-        });
-        res.json({ success: true, data: movement });
-    } catch (error: any) {
-        res.status(400).json({ success: false, error: error.message });
-    }
-};
-
+/**
+ * Listar todas las tasas de cambio
+ */
 export const getRates = async (_req: Request, res: Response) => {
     try {
         const rates = await financeService.getExchangeRates();
@@ -65,13 +21,24 @@ export const getRates = async (_req: Request, res: Response) => {
     }
 };
 
-export const updateRate = async (req: Request, res: Response) => {
+/**
+ * Actualizar una tasa de cambio (Auditado - Solo OWNER)
+ */
+export const updateRate = async (req: AuthRequest, res: Response) => {
     try {
-        const { code, rate } = req.body;
-        const updated = await financeService.updateExchangeRate(code, Number(rate));
-        res.json({ success: true, data: updated });
+        const data = validatedData(req, 'body');
+        const rate = await financeService.updateExchangeRate(data);
+        
+        await logAudit({
+            action: 'FINANCE_RATE_UPDATE',
+            module: 'finance',
+            details: { code: data.code, rate: data.rate },
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
+        });
+        
+        res.json({ success: true, data: rate });
     } catch (error: any) {
-        res.status(400).json({ success: false, error: error.message });
+        res.status(422).json({ success: false, error: error.message });
     }
 };
-

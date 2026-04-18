@@ -235,9 +235,12 @@ function QuickActions() {
 }
 
 export default function DashboardPage() {
-    const { data: kpis, isLoading: kpisLoading } = useKPIs();
-    const { data: salesTrend, isLoading: trendLoading } = useSalesTrend(30);
-    const { data: topProducts, isLoading: topLoading } = useTopProducts(10);
+    const selectedBranch = useAuthStore(s => s.selectedBranch);
+    const effectiveBranch = selectedBranch === 'all' ? undefined : selectedBranch;
+
+    const { data: kpis, isLoading: kpisLoading } = useKPIs(effectiveBranch);
+    const { data: salesTrend, isLoading: trendLoading } = useSalesTrend(30, effectiveBranch);
+    const { data: topProducts, isLoading: topLoading } = useTopProducts(10, effectiveBranch);
     const { data: salesByBranch, isLoading: branchLoading } = useSalesByBranch();
 
     const loading = kpisLoading || trendLoading || topLoading || branchLoading;

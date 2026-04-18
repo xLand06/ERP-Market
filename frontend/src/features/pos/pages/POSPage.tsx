@@ -38,6 +38,7 @@ function StockBadge({ stock }: { stock: number }) {
 function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product) => void }) {
     const { rates } = useConfigStore();
     const vesRate = rates['VES'] || 36.50;
+    
     const [flash, setFlash] = useState(false);
     const price = toNum(product.price);
     const handle = () => {

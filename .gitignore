@@ -36,3 +36,5 @@ SKILL.md
 ##Electron
 out/
 dist/
+
+.unlighthouse

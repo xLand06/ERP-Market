@@ -94,6 +94,7 @@ export default function LoginPage() {
                                 <Input
                                     id="username"
                                     type="text"
+                                    autoFocus
                                     autoComplete="username"
                                     aria-describedby={errors.username ? 'username-error' : undefined}
                                     aria-invalid={!!errors.username}

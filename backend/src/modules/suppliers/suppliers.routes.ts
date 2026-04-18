@@ -1,17 +1,35 @@
+// =============================================================================
+// SUPPLIER MODULE — ROUTES
+// Gestión de proveedores y contactos comerciales
+// =============================================================================
+
 import { Router } from 'express';
 import { authMiddleware } from '../../core/middlewares/auth.middleware';
 import { roleGuard } from '../../core/middlewares/roleGuard';
+import { validate } from '../../core/middlewares/validate.middleware';
+import { idParamSchema } from '../../core/validations/common.zod';
+import { createSupplierSchema, updateSupplierSchema, supplierFiltersSchema } from '../../core/validations/suppliers.zod';
 import * as ctrl from './suppliers.controller';
 
 const router = Router();
 router.use(authMiddleware);
 
-router.get('/', ctrl.getSuppliers);
-router.get('/:id', ctrl.getSupplierById);
-router.get('/:id/stats', ctrl.getSupplierStats);
+/** GET  /api/suppliers — Listar proveedores con filtros */
+router.get('/', validate(supplierFiltersSchema, { source: 'query' }), ctrl.getSuppliers);
 
-router.post('/', roleGuard('OWNER'), ctrl.createSupplier);
-router.patch('/:id', roleGuard('OWNER'), ctrl.updateSupplier);
-router.delete('/:id', roleGuard('OWNER'), ctrl.deleteSupplier);
+/** GET  /api/suppliers/:id — Detalle de un proveedor */
+router.get('/:id', validate(idParamSchema, { source: 'params' }), ctrl.getSupplierById);
+
+/** GET  /api/suppliers/:id/stats — Estadísticas del proveedor */
+router.get('/:id/stats', validate(idParamSchema, { source: 'params' }), ctrl.getSupplierStats);
+
+/** POST /api/suppliers — Crear proveedor (Solo OWNER) */
+router.post('/', roleGuard('OWNER'), validate(createSupplierSchema), ctrl.createSupplier);
+
+/** PATCH /api/suppliers/:id — Actualizar proveedor (Solo OWNER) */
+router.patch('/:id', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), validate(updateSupplierSchema), ctrl.updateSupplier);
+
+/** DELETE /api/suppliers/:id — Desactivar proveedor (Solo OWNER) */
+router.delete('/:id', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), ctrl.deleteSupplier);
 
 export default router;

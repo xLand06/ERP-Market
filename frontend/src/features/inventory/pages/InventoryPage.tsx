@@ -74,7 +74,7 @@ export default function InventoryPage() {
     // Mutation to update price
     const updatePriceMutation = useMutation({
         mutationFn: async ({ id, price }: { id: string, price: number }) => {
-            await api.put(`/inventory/products/${id}`, { price });
+            await api.put(`/products/${id}`, { price });
         },
         onSuccess: () => {
             toast.success('Precio actualizado');

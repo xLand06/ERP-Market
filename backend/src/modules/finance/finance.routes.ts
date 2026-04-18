@@ -1,30 +1,26 @@
+// =============================================================================
+// FINANCE MODULE — ROUTES
+// Gestión de tasas de cambio y configuraciones financieras
+// =============================================================================
+
 import { Router } from 'express';
 import { authMiddleware } from '../../core/middlewares/auth.middleware';
 import { roleGuard } from '../../core/middlewares/roleGuard';
-import { branchFilter } from '../../core/middlewares/branchFilter.middleware';
-import {
-    getOpenRegister, openCashRegister, closeCashRegister, addCashMovement,
-    getRates, updateRate
-} from './finance.controller';
+import { validate } from '../../core/middlewares/validate.middleware';
+import { updateExchangeRateSchema } from '../../core/validations/finance.zod';
+import * as ctrl from './finance.controller';
 
 const router = Router();
 router.use(authMiddleware);
 
-// --- EXCHANGE RATES ---
-router.get('/rates', getRates);
-router.post('/rates', roleGuard('OWNER'), updateRate);
+/**
+ * GET /api/finance/rates — Obtener todas las tasas de cambio
+ */
+router.get('/rates', ctrl.getRates);
 
-// --- CASH REGISTERS ---
-// Get current open register info for a branch (includes transactions)
-router.get('/registers/open/:branchId', branchFilter(), getOpenRegister);
-
-// Open new register
-router.post('/registers/open', branchFilter(), openCashRegister);
-
-// Close register
-router.post('/registers/:registerId/close', branchFilter(), closeCashRegister);
-
-// Add manual expense or income to register
-router.post('/registers/:registerId/movement', branchFilter(), addCashMovement);
+/**
+ * POST /api/finance/rates — Crear o actualizar una tasa de cambio (Solo OWNER)
+ */
+router.post('/rates', roleGuard('OWNER'), validate(updateExchangeRateSchema), ctrl.updateRate);
 
 export default router;

@@ -88,10 +88,12 @@ export function useInventory(branchId: string) {
                     id: item.productId,
                     name: item.productName,
                     barcode: item.barcode,
-                    price: 0,
-                    cost: 0,
-                    category: 'Varios',
-                    isActive: true,
+                    // Obtener price desde cache local, no hardcodear a 0
+                    price: item.price ?? item.productPrice ?? 0,
+                    cost: item.cost ?? item.productCost ?? 0,
+                    category: item.categoryName || item.category || 'Varios',
+                    categoryId: item.categoryId,
+                    isActive: item.isActive ?? true,
                 },
                 stock: item.stock,
                 minStock: item.minStock || 0,
@@ -106,18 +108,21 @@ export function useInventory(branchId: string) {
     const { data, isLoading, error, refetch } = useQuery({
         queryKey: ['inventory', branchId],
         queryFn: async () => {
-            // 1. En Electron, siempre intentar primero cache local
+            // 1. Intentar primero la API (fuente principal)
+            if (isOnline) {
+                try {
+                    const apiData = await fetchFromApi();
+                    if (apiData.length > 0 && apiData.some((i: InventoryItem) => i.product.price > 0)) {
+                        return apiData;
+                    }
+                } catch { /* continuar */ }
+            }
+            
+            // 2. Fallback a local solo si API falló o no tiene precios
             if (isElectron) {
                 try {
                     const local = await fetchFromLocal();
                     if (local.length > 0) return local;
-                } catch { /* continuar */ }
-            }
-            
-            // 2. Si hay conexión, tentar API
-            if (isOnline) {
-                try {
-                    return await fetchFromApi();
                 } catch { /* continuar */ }
             }
             

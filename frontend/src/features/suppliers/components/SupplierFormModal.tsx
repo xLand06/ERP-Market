@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Building2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Building2, Loader2 } from 'lucide-react';
 import {
     Dialog, DialogContent, DialogHeader,
     DialogTitle, DialogDescription, DialogFooter,
@@ -7,28 +7,28 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { suppliersApi, Supplier } from '@/services/suppliers.service';
+import toast from 'react-hot-toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface SupplierForm {
     name: string;
-    rif: string;
+    rut: string;
     category: string;
-    phone: string;
+    telefono: string;
     email: string;
     address: string;
-    paymentTerms: string;
 }
 
 interface SupplierFormModalProps {
     open: boolean;
     onClose: () => void;
-    onSave: (data: SupplierForm) => void;
-    initial?: Partial<SupplierForm>;
+    onSuccess: () => void;
+    initial?: Supplier | null;
     mode?: 'create' | 'edit';
 }
 
 const CATEGORIES = ['Abarrotes', 'Lácteos', 'Aceites', 'Carnes', 'Bebidas', 'Limpieza', 'Varios'];
-const PAYMENT_OPTIONS = ['7 días', '15 días', '30 días', '45 días', '60 días', 'Contado'];
 
 function Field({ label, id, children, error }: {
     label: string; id: string; children: React.ReactNode; error?: string;
@@ -45,36 +45,64 @@ function Field({ label, id, children, error }: {
 }
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
-export function SupplierFormModal({ open, onClose, onSave, initial, mode = 'create' }: SupplierFormModalProps) {
+export function SupplierFormModal({ open, onClose, onSuccess, initial, mode = 'create' }: SupplierFormModalProps) {
     const empty: SupplierForm = {
-        name: '', rif: '', category: '', phone: '', email: '', address: '', paymentTerms: '',
+        name: '', rut: '', category: 'Varios', telefono: '', email: '', address: '',
     };
 
-    const [form, setForm] = useState<SupplierForm>({ ...empty, ...initial });
+    const [form, setForm] = useState<SupplierForm>(empty);
     const [errors, setErrors] = useState<Partial<SupplierForm>>({});
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (open && initial) {
+            setForm({
+                name: initial.name || '',
+                rut: initial.rut || '',
+                category: initial.category || 'Varios',
+                telefono: initial.telefono || '',
+                email: initial.email || '',
+                address: initial.address || '',
+            });
+        } else if (open) {
+            setForm(empty);
+        }
+    }, [open, initial]);
 
     const set = (key: keyof SupplierForm, val: string) =>
         setForm(prev => ({ ...prev, [key]: val }));
 
     const validate = (): boolean => {
         const errs: Partial<SupplierForm> = {};
-        if (!form.name.trim())     errs.name     = 'Requerido';
-        if (!form.rif.trim())      errs.rif      = 'Requerido';
-        if (!form.category)        errs.category  = 'Selecciona una categoría';
-        if (!form.paymentTerms)    errs.paymentTerms = 'Selecciona términos de pago';
+        if (!form.name.trim())     errs.name     = 'El nombre es requerido';
         if (form.email && !/\S+@\S+\.\S+/.test(form.email)) errs.email = 'Email inválido';
         setErrors(errs);
         return Object.keys(errs).length === 0;
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!validate()) return;
-        onSave(form);
-        handleClose();
+        
+        setLoading(true);
+        try {
+            if (mode === 'edit' && initial?.id) {
+                await suppliersApi.updateSupplier(initial.id, form);
+                toast.success('Proveedor actualizado correctamente');
+            } else {
+                await suppliersApi.createSupplier(form);
+                toast.success('Proveedor registrado correctamente');
+            }
+            onSuccess();
+            handleClose();
+        } catch (error: any) {
+            toast.error(error?.response?.data?.error || 'Error al guardar el proveedor');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleClose = () => {
-        setForm({ ...empty, ...initial });
+        setForm(empty);
         setErrors({});
         onClose();
     };
@@ -99,7 +127,7 @@ export function SupplierFormModal({ open, onClose, onSave, initial, mode = 'crea
                 <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
                     {/* Razón social + RIF */}
                     <div className="grid grid-cols-2 gap-4">
-                        <Field label="Razón Social" id="name" error={errors.name}>
+                        <Field label="Razón Social *" id="name" error={errors.name}>
                             <Input
                                 id="name"
                                 placeholder="Distribuidora La Montaña"
@@ -109,20 +137,18 @@ export function SupplierFormModal({ open, onClose, onSave, initial, mode = 'crea
                                 aria-invalid={!!errors.name}
                             />
                         </Field>
-                        <Field label="RIF" id="rif" error={errors.rif}>
+                        <Field label="RIF / RUT" id="rut">
                             <Input
-                                id="rif"
+                                id="rut"
                                 placeholder="J-30122456-1"
-                                value={form.rif}
-                                onChange={e => set('rif', e.target.value)}
-                                className={cn(errors.rif && 'border-red-400')}
-                                aria-invalid={!!errors.rif}
+                                value={form.rut}
+                                onChange={e => set('rut', e.target.value)}
                             />
                         </Field>
                     </div>
 
                     {/* Categoría */}
-                    <Field label="Categoría" id="category" error={errors.category}>
+                    <Field label="Categoría" id="category">
                         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Categoría del proveedor">
                             {CATEGORIES.map(cat => (
                                 <button
@@ -140,17 +166,16 @@ export function SupplierFormModal({ open, onClose, onSave, initial, mode = 'crea
                                 </button>
                             ))}
                         </div>
-                        {errors.category && <p className="text-xs text-red-500">{errors.category}</p>}
                     </Field>
 
                     {/* Teléfono + Email */}
                     <div className="grid grid-cols-2 gap-4">
-                        <Field label="Teléfono" id="phone">
+                        <Field label="Teléfono" id="telefono">
                             <Input
-                                id="phone"
+                                id="telefono"
                                 placeholder="+58 212 555-0100"
-                                value={form.phone}
-                                onChange={e => set('phone', e.target.value)}
+                                value={form.telefono}
+                                onChange={e => set('telefono', e.target.value)}
                             />
                         </Field>
                         <Field label="Email" id="email" error={errors.email}>
@@ -175,33 +200,12 @@ export function SupplierFormModal({ open, onClose, onSave, initial, mode = 'crea
                             onChange={e => set('address', e.target.value)}
                         />
                     </Field>
-
-                    {/* Términos de pago */}
-                    <Field label="Términos de Pago" id="paymentTerms" error={errors.paymentTerms}>
-                        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Términos de pago">
-                            {PAYMENT_OPTIONS.map(opt => (
-                                <button
-                                    key={opt}
-                                    type="button"
-                                    onClick={() => set('paymentTerms', opt)}
-                                    className={cn(
-                                        'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all',
-                                        form.paymentTerms === opt
-                                            ? 'bg-indigo-600 text-white border-indigo-600'
-                                            : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
-                                    )}
-                                >
-                                    {opt}
-                                </button>
-                            ))}
-                        </div>
-                        {errors.paymentTerms && <p className="text-xs text-red-500">{errors.paymentTerms}</p>}
-                    </Field>
                 </div>
 
-                <DialogFooter className="border-t border-slate-100">
-                    <Button variant="outline" onClick={handleClose}>Cancelar</Button>
-                    <Button onClick={handleSave}>
+                <DialogFooter className="border-t border-slate-100 p-6">
+                    <Button variant="outline" onClick={handleClose} disabled={loading}>Cancelar</Button>
+                    <Button onClick={handleSave} disabled={loading}>
+                        {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                         {mode === 'create' ? 'Registrar Proveedor' : 'Guardar Cambios'}
                     </Button>
                 </DialogFooter>

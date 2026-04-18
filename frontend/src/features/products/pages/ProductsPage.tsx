@@ -35,7 +35,7 @@ export default function ProductsPage() {
     const { data: categories = [] } = useQuery<Category[]>({
         queryKey: ['categories'],
         queryFn: async () => {
-            const res = await api.get('/inventory/categories');
+            const res = await api.get('/categories');
             return res.data.data;
         },
         retry: false,

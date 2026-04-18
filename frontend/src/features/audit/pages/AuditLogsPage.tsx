@@ -226,7 +226,9 @@ const AuditLogsPage: React.FC = () => {
                                     <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
                                         <div className="text-[10px] uppercase tracking-wider text-blue-600 mb-2 font-bold">Resumen de Cambios</div>
                                         <pre className="text-xs font-mono text-blue-800 whitespace-pre-wrap max-h-[300px] overflow-y-auto custom-scrollbar">
-                                            {JSON.stringify(JSON.parse(selectedLog.details), null, 2)}
+                                            {typeof selectedLog.details === 'string' 
+                                                ? selectedLog.details 
+                                                : JSON.stringify(selectedLog.details, null, 2)}
                                         </pre>
                                     </div>
                                 </div>
