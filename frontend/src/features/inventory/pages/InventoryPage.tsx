@@ -1,4 +1,4 @@
-import { useState, useId, useMemo } from 'react';
+import { useState, useId, useMemo, useEffect } from 'react';
 import { Search, Plus, Download, Pencil, Check, X, Package, Loader2, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -47,7 +47,7 @@ export default function InventoryPage() {
 
     const { inventory, isLoading, refetch, isOnline, updateStock } = useInventory(effectiveBranch || '');
 
-    useMemo(() => {
+    useEffect(() => {
         if (inventory.length > 0) {
             toast.success(`${inventory.length} productos cargados`, { duration: 2000 });
         }

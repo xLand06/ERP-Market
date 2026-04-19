@@ -8,8 +8,7 @@ import { authMiddleware } from '../../core/middlewares/auth.middleware';
 import { roleGuard } from '../../core/middlewares/roleGuard';
 import { branchFilter } from '../../core/middlewares/branchFilter.middleware';
 import { validate } from '../../core/middlewares/validate.middleware';
-import { setStockSchema } from '../../core/validations/inventory.zod';
-import { idParamSchema } from '../../core/validations/common.zod';
+import { setStockSchema, branchIdParamSchema, productIdParamSchema } from '../../core/validations/inventory.zod';
 import * as ctrl from './inventory.controller';
 
 const router = Router();
@@ -22,14 +21,14 @@ router.get('/stock', roleGuard('OWNER'), ctrl.getAllStock);
 
 /** GET  /api/inventory/stock/branch/:branchId — Stock de una sede específica */
 router.get('/stock/branch/:branchId', 
-    validate(idParamSchema, { source: 'params' }), 
+    validate(branchIdParamSchema, { source: 'params' }), 
     branchFilter(), 
     ctrl.getStockByBranch
 );
 
 /** GET  /api/inventory/stock/product/:productId — Stock de un producto en todas las sedes */
 router.get('/stock/stock/product/:productId', 
-    validate(idParamSchema, { source: 'params' }), 
+    validate(productIdParamSchema, { source: 'params' }), 
     ctrl.getStockByProduct
 );
 

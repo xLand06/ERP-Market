@@ -2,6 +2,7 @@ import { createBrowserRouter, redirect } from 'react-router-dom';
 import { AppShellLayout } from '../components/layout/AppShell';
 import { PrivateRoute } from '../components/guards/PrivateRoute';
 import { PlanGuard } from '../components/guards/PlanGuard';
+import RouteErrorBoundary from '../components/errors/RouteErrorBoundary';
 
 // Lazy-loaded feature pages
 import { lazy, Suspense } from 'react';
@@ -34,10 +35,15 @@ const wrap = (Component: React.ComponentType) => (
 );
 
 export const router = createBrowserRouter([
-    { path: '/login', element: wrap(LoginPage) },
+    { 
+        path: '/login', 
+        element: wrap(LoginPage),
+        errorElement: <RouteErrorBoundary />
+    },
     {
         path: '/',
         element: <PrivateRoute><PlanGuard><AppShellLayout /></PlanGuard></PrivateRoute>,
+        errorElement: <RouteErrorBoundary />,
         children: [
             { index: true, loader: () => redirect('/dashboard') },
             { path: 'dashboard',           element: wrap(DashboardPage) },

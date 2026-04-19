@@ -35,6 +35,11 @@ export const useAuthStore = create<AuthState>()(
         }),
         { 
             name: 'erp-market-auth',
+            partialize: (state) => ({
+                token: state.token,
+                user: state.user,
+                selectedBranch: state.selectedBranch,
+            }),
             storage: {
                 getItem: (name) => {
                     if ((window as any).erpApi?.isElectron) {

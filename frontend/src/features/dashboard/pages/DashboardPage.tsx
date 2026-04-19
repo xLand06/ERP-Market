@@ -11,6 +11,8 @@ import {
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
 } from 'recharts';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/features/auth/store/authStore';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
@@ -206,7 +208,7 @@ function LowStockPanel({ count }: { count: number }) {
 }
 
 function QuickActions() {
-    const navigate = (path: string) => window.location.href = path;
+    const navigate = useNavigate();
     const actions = [
         { label: 'Nueva Venta', icon: ShoppingCart, color: 'text-emerald-600', bg: 'bg-emerald-50', href: '/pos' },
         { label: 'Inventario', icon: PackageOpen, color: 'text-blue-600', bg: 'bg-blue-50', href: '/inventory' },
@@ -235,6 +237,7 @@ function QuickActions() {
 }
 
 export default function DashboardPage() {
+    const navigate = useNavigate();
     const selectedBranch = useAuthStore(s => s.selectedBranch);
     const effectiveBranch = selectedBranch === 'all' ? undefined : selectedBranch;
 

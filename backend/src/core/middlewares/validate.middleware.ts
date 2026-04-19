@@ -5,19 +5,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from './auth.middleware';
-
-type ZodSchema = {
-    safeParse: (data: unknown, options?: { coerce?: boolean }) => {
-        success: boolean;
-        data?: unknown;
-        error?: {
-            flatten: () => {
-                formErrors: { formErrors: string[] };
-                fieldErrors: Record<string, string[]>;
-            };
-        };
-    };
-};
+import { ZodTypeAny } from 'zod';
 
 /**
  * Opciones de validación
@@ -44,16 +32,14 @@ interface ValidateOptions {
  * // Validar URL params
  * router.get('/products/:id', validate(idParamSchema, { source: 'params' }), controller);
  */
-export const validate = (schema: ZodSchema, options: ValidateOptions = {}) => {
+export const validate = (schema: any, options: ValidateOptions = {}) => {
     const { source = 'body' } = options;
 
     return (req: AuthRequest, res: Response, next: NextFunction): void => {
         const data = req[source];
 
         // Validar datos
-        const result = schema.safeParse(data, {
-            coerce: source === 'query' || source === 'params',
-        });
+        const result = schema.safeParse(data);
 
         if (!result.success) {
             const error = result.error;
