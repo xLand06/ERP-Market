@@ -106,6 +106,7 @@ model Branch {
   inventory     BranchInventory[]
   transactions  Transaction[]
   cashRegisters CashRegister[]
+  purchaseOrders PurchaseOrder[]
 
   @@index([isActive])
   @@map("branches")
@@ -138,6 +139,7 @@ model Product {
   barcode     String?   @unique
   price       Float
   cost        Float?
+  baseUnit    String    @default("UNIDAD")
   imageUrl    String?
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
@@ -146,8 +148,10 @@ model Product {
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
 
-  inventory        BranchInventory[]
-  transactionItems TransactionItem[]
+  presentations      ProductPresentation[]
+  inventory          BranchInventory[]
+  transactionItems   TransactionItem[]
+  purchaseOrderItems PurchaseOrderItem[]
 
   @@index([name])
   @@index([categoryId])
@@ -156,14 +160,31 @@ model Product {
   @@map("products")
 }
 
+model ProductPresentation {
+  id         String  @id @default(cuid())
+  name       String
+  multiplier Float
+  price      Float
+  barcode    String? @unique
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  transactionItems TransactionItem[]
+
+  @@index([productId])
+  @@index([barcode])
+  @@map("product_presentations")
+}
+
 // =============================================================================
 // INVENTORY BY BRANCH
 // =============================================================================
 
 model BranchInventory {
   id        String   @id @default(cuid())
-  stock     Int      @default(0)
-  minStock  Int      @default(0)
+  stock     Float    @default(0)
+  minStock  Float    @default(0)
   updatedAt DateTime @updatedAt
 
   productId String
@@ -215,16 +236,20 @@ model Transaction {
 }
 
 model TransactionItem {
-  id        String  @id @default(cuid())
-  quantity  Int
-  unitPrice Float
-  subtotal  Float
+  id             String  @id @default(cuid())
+  quantity       Float
+  multiplierUsed Float   @default(1)
+  unitPrice      Float
+  subtotal       Float
 
   transactionId String
   transaction  Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 
   productId String
   product  Product @relation(fields: [productId], references: [id])
+
+  presentationId String?
+  presentation   ProductPresentation? @relation(fields: [presentationId], references: [id])
 
   @@map("transaction_items")
 }
@@ -320,19 +345,23 @@ model PurchaseOrder {
   supplierId String
   supplier   Supplier @relation(fields: [supplierId], references: [id])
 
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
   items PurchaseOrderItem[]
 
   @@map("purchase_orders")
 }
 
 model PurchaseOrderItem {
-  id              String  @id @default(cuid())
-  quantity        Int
-  quantityReceived Int   @default(0)
-  unitCost        Float
-  subtotal        Float
+  id               String  @id @default(cuid())
+  quantity         Float
+  quantityReceived Float   @default(0)
+  unitCost         Float
+  subtotal         Float
 
   productId String
+  product   Product @relation(fields: [productId], references: [id])
 
   purchaseOrderId String
   purchaseOrder  PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
@@ -351,4 +380,5 @@ model ExchangeRate {
   updatedAt DateTime @updatedAt
 
   @@map("exchange_rates")
-}
+}
+

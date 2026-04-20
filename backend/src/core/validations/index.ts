@@ -3,20 +3,21 @@
 // =============================================================================
 
 // Common schemas
-export { paginationSchema, idParamSchema, emailSchema, passwordSchema } from './common.zod';
-export type { PaginationInput, IdParamInput, DateRangeInput } from './common.zod';
+export { paginationSchema, idParamSchema, branchIdParamSchema, emailSchema, passwordSchema } from './common.zod';
+export type { PaginationInput, IdParamInput } from './common.zod';
 
 // Auth schemas
 export { loginSchema, registerSchema, updateUserSchema } from './auth.zod';
 export type { LoginInput, RegisterInput, UpdateUserInput } from './auth.zod';
 
 // Products schemas
-export { createProductSchema, updateProductSchema, productFiltersSchema, idParamSchema as productIdParamSchema } from './products.zod';
+export { createProductSchema, updateProductSchema, productFiltersSchema } from './products.zod';
+export { idParamSchema as productIdParamSchema } from './common.zod';
 export type { CreateProductInput, UpdateProductInput, ProductFiltersInput } from './products.zod';
 
 // POS schemas
-export { createSaleSchema, transactionFiltersSchema, cancelTransactionSchema } from './pos.zod';
-export type { CreateSaleInput, TransactionFiltersInput, CancelTransactionInput } from './pos.zod';
+export { createTransactionSchema, transactionFiltersSchema, cancelTransactionSchema } from './pos.zod';
+export type { CreateTransactionInput, TransactionFiltersInput, CancelTransactionInput } from './pos.zod';
 
 // Categories schemas
 export { createCategorySchema, updateCategorySchema } from './categories.zod';

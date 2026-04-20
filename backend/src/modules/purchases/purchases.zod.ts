@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const createOrderItemSchema = z.object({
     productId: z.string().uuid('ID de producto inválido'),
-    quantity: z.number().int().positive('Cantidad debe ser positiva'),
+    quantity: z.number().positive('Cantidad debe ser positiva'),
     unitCost: z.number().positive('Costo debe ser positivo'),
 });
 
@@ -20,7 +20,7 @@ export const updateOrderStatusSchema = z.object({
 
 export const receiveOrderItemSchema = z.object({
     productId: z.string().uuid('ID de producto inválido'),
-    quantityReceived: z.number().int().min(0, 'Cantidad no puede ser negativa'),
+    quantityReceived: z.number().min(0, 'Cantidad no puede ser negativa'),
 }).strict();
 
 export const receiveOrderSchema = z.object({

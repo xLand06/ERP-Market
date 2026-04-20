@@ -11,8 +11,8 @@ import { z } from 'zod';
 export const setStockSchema = z.object({
     productId: z.string().cuid('ID de producto inválido'),
     branchId: z.string(),
-    stock: z.number().int('El stock debe ser un número entero').min(0, 'El stock no puede ser negativo'),
-    minStock: z.number().int().min(0).optional().default(0),
+    stock: z.number().min(0, 'El stock no puede ser negativo'),
+    minStock: z.number().min(0).optional().default(0),
 });
 
 /**
@@ -21,7 +21,7 @@ export const setStockSchema = z.object({
 export const adjustStockSchema = z.object({
     productId: z.string().cuid(),
     branchId: z.string(),
-    delta: z.number().int().refine(val => val !== 0, 'El ajuste debe ser distinto de cero'),
+    delta: z.number().refine(val => val !== 0, 'El ajuste debe ser distinto de cero'),
     reason: z.string().max(255).optional(),
 });
 

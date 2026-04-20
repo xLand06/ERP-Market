@@ -7,7 +7,7 @@ import { Router } from 'express';
 import { authMiddleware } from '../../core/middlewares/auth.middleware';
 import { roleGuard } from '../../core/middlewares/roleGuard';
 import { validate } from '../../core/middlewares/validate.middleware';
-import { idParamSchema } from '../../core/validations/common.zod';
+import { idParamSchema, branchIdParamSchema } from '../../core/validations/common.zod';
 import { openCashRegisterSchema, closeCashRegisterSchema, cashRegisterFiltersSchema } from '../../core/validations/cashFlow.zod';
 import * as ctrl from './cashFlow.controller';
 
@@ -27,7 +27,7 @@ router.patch('/:id/close',
 
 /** GET /api/cash-flow/current/:branchId — Caja abierta actual por sede */
 router.get('/current/:branchId', 
-    validate(idParamSchema, { source: 'params', key: 'branchId' }), 
+    validate(branchIdParamSchema, { source: 'params' }), 
     ctrl.getCurrentRegister
 );
 
@@ -36,7 +36,7 @@ router.get('/history', validate(cashRegisterFiltersSchema, { source: 'query' }),
 
 /** GET /api/cash-flow/daily/:branchId — Resumen diario por sede */
 router.get('/daily/:branchId', 
-    validate(idParamSchema, { source: 'params', key: 'branchId' }), 
+    validate(branchIdParamSchema, { source: 'params' }), 
     ctrl.getDailySummary
 );
 

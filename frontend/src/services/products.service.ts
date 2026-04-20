@@ -3,22 +3,7 @@
 // =============================================================================
 
 import api from '../lib/api';
-import type { ApiResponse, ApiListResponse, ListParams } from '../types';
-
-export interface Product {
-    id: string;
-    name: string;
-    description?: string;
-    barcode?: string;
-    price: number;
-    cost?: number;
-    imageUrl?: string;
-    categoryId?: string;
-    category?: { id: string; name: string };
-    isActive: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
+import type { ApiResponse, ApiListResponse, ListParams, Product, ProductPresentation } from '../types';
 
 export interface ProductListItem {
     id: string;
@@ -28,6 +13,8 @@ export interface ProductListItem {
     cost?: number;
     category: { id: string; name: string } | null;
     isActive: boolean;
+    baseUnit: string;
+    presentations: ProductPresentation[];
 }
 
 export interface CreateProductPayload {
@@ -38,6 +25,8 @@ export interface CreateProductPayload {
     cost?: number;
     imageUrl?: string;
     categoryId?: string;
+    baseUnit?: string;
+    presentations?: { name: string; multiplier: number; price: number; barcode?: string }[];
 }
 
 export interface UpdateProductPayload extends Partial<CreateProductPayload> {

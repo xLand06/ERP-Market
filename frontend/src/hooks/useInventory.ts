@@ -8,6 +8,8 @@ interface Product {
     barcode: string;
     price: number;
     cost: number;
+    baseUnit: string;
+    presentations: any[];
     category: string;
     categoryId?: string;
     isActive: boolean;
@@ -53,27 +55,36 @@ export function useInventory(branchId: string) {
             const res = await api.get(`/inventory/stock/branch/${branchId}`);
             const data = res.data.data;
             
+            if (!data || !Array.isArray(data)) {
+                console.warn(`[useInventory] API returned invalid data for branch ${branchId}:`, data);
+                return [];
+            }
+            
             if (db && data.length > 0) {
                 await db.saveStock(branchId, data);
             }
             
-            return data.map((item: any) => ({
-                product: {
-                    id: item.product.id,
-                    name: item.product.name,
-                    barcode: item.product.barcode,
-                    price: Number(item.product.price),
-                    cost: Number(item.product.cost || 0),
-                    category: item.product.category?.name || 'Varios',
-                    categoryId: item.product.categoryId,
-                    isActive: true,
-                },
-                stock: item.stock,
-                minStock: item.minStock || 0,
-                updatedAt: item.updatedAt,
-            }));
+            return data
+                .filter((item: any) => item && item.product) // Seguridad ante registros corruptos
+                .map((item: any) => ({
+                    product: {
+                        id: item.product.id,
+                        name: item.product.name || 'Sin Nombre',
+                        barcode: item.product.barcode || '',
+                        price: Number(item.product.price || 0),
+                        cost: Number(item.product.cost || 0),
+                        baseUnit: item.product.baseUnit || 'UNIDAD',
+                        presentations: item.product.presentations || [],
+                        category: item.product.category?.name || 'Varios',
+                        categoryId: item.product.categoryId,
+                        isActive: true,
+                    },
+                    stock: Number(item.stock || 0),
+                    minStock: Number(item.minStock || 0),
+                    updatedAt: item.updatedAt,
+                }));
         } catch (error) {
-            console.error('Error fetching from API:', error);
+            console.error('[useInventory] Error fetching from API:', error);
             return fetchFromLocal();
         }
     };

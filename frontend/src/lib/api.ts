@@ -8,9 +8,7 @@ import { useAuthStore } from '../features/auth/store/authStore';
 import toast from 'react-hot-toast';
 
 const isElectron = typeof window !== 'undefined' && 'erpApi' in window;
-const baseURL = isElectron
-    ? 'http://127.0.0.1:3001/api'
-    : import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const baseURL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3001/api';
 
 export const api = axios.create({
     baseURL,
@@ -47,7 +45,26 @@ const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 api.interceptors.request.use(
     (config) => {
-        const token = useAuthStore.getState().token;
+        let token = useAuthStore.getState().token;
+
+        // Fallback: Si no hay token en el estado (hidratación pendiente), buscar en localStorage/Electron Store
+        if (!token) {
+            try {
+                if ((window as any).erpApi?.isElectron) {
+                    // Si estamos en Electron, intentar obtenerlo del store síncrono si existe
+                    const authData = (window as any).erpApi.store.get('erp-market-auth');
+                    token = authData?.state?.token;
+                } else {
+                    const authData = localStorage.getItem('erp-market-auth');
+                    if (authData) {
+                        token = JSON.parse(authData)?.state?.token;
+                    }
+                }
+            } catch (err) {
+                console.error('[API] Error parsing persistent token:', err);
+            }
+        }
+
         if (token) config.headers.Authorization = `Bearer ${token}`;
         return config;
     },

@@ -3,6 +3,7 @@ import { TransactionType, TransactionStatus } from '@prisma/client';
 
 export interface TransactionItemInput {
     productId: string;
+    presentationId?: string;
     quantity: number;
     unitPrice: number;
 }
@@ -22,33 +23,58 @@ export const createTransaction = async (input: CreateTransactionInput) => {
 
     const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
-    let assignedCashRegisterId = cashRegisterId;
-    if (type === TransactionType.SALE) {
-        for (const item of items) {
-            const inv = await prisma.branchInventory.findUnique({
-                where: { productId_branchId: { productId: item.productId, branchId } },
-            });
-            if (!inv || inv.stock < item.quantity) {
-                const product = await prisma.product.findUnique({
-                    where: { id: item.productId },
-                    select: { name: true },
-                });
-                throw new Error(
-                    `Stock insuficiente para "${product?.name || item.productId}". Disponible: ${inv?.stock ?? 0}`
-                );
-            }
-        }
-        
-        if (!assignedCashRegisterId) {
-            const openReg = await prisma.cashRegister.findFirst({
+    return await prisma.$transaction(async (tx) => {
+        let assignedCashRegisterId = cashRegisterId;
+        const processedItems = [];
+
+        if (type === TransactionType.SALE && !assignedCashRegisterId) {
+            const openReg = await tx.cashRegister.findFirst({
                 where: { branchId, status: 'OPEN' }
             });
             if (!openReg) throw new Error('No hay una caja abierta en esta sede. Abra caja antes de vender.');
             assignedCashRegisterId = openReg.id;
         }
-    }
 
-    const transaction = await prisma.$transaction(async (tx) => {
+        for (const item of items) {
+            let multiplier = 1;
+
+            if (item.presentationId) {
+                const presentation = await tx.productPresentation.findUnique({
+                    where: { id: item.presentationId }
+                });
+                if (!presentation) throw new Error(`Presentación ${item.presentationId} no válida`);
+                multiplier = Number(presentation.multiplier);
+            }
+
+            const totalUnitsToDeduct = item.quantity * multiplier;
+
+            if (type === TransactionType.SALE) {
+                const inv = await tx.branchInventory.findUnique({
+                    where: { productId_branchId: { productId: item.productId, branchId } },
+                });
+
+                if (!inv || Number(inv.stock) < totalUnitsToDeduct) {
+                    const product = await tx.product.findUnique({
+                        where: { id: item.productId },
+                        select: { name: true, baseUnit: true },
+                    });
+                    throw new Error(
+                        `Stock insuficiente para "${product?.name || item.productId}". Requerido: ${totalUnitsToDeduct} ${product?.baseUnit}. Disponible: ${inv?.stock ?? 0}`
+                    );
+                }
+            }
+
+            processedItems.push({
+                productId: item.productId,
+                presentationId: item.presentationId || null,
+                quantity: item.quantity,
+                multiplierUsed: multiplier,
+                unitPrice: item.unitPrice,
+                subtotal: item.quantity * item.unitPrice,
+                totalUnitsToDeduct
+            });
+        }
+
         const txRecord = await tx.transaction.create({
             data: {
                 type,
@@ -60,34 +86,34 @@ export const createTransaction = async (input: CreateTransactionInput) => {
                 branchId,
                 cashRegisterId: type === TransactionType.SALE ? assignedCashRegisterId : null,
                 items: {
-                    create: items.map((item) => ({
+                    create: processedItems.map((item) => ({
                         productId: item.productId,
+                        presentationId: item.presentationId,
                         quantity: item.quantity,
+                        multiplierUsed: item.multiplierUsed,
                         unitPrice: item.unitPrice,
-                        subtotal: item.quantity * item.unitPrice,
+                        subtotal: item.subtotal,
                     })),
                 },
             },
             include: { items: { include: { product: { select: { name: true, barcode: true } } } } },
         });
 
-        for (const item of items) {
-            const delta = type === TransactionType.SALE ? -item.quantity : item.quantity;
+        for (const item of processedItems) {
+            const delta = type === TransactionType.SALE ? -item.totalUnitsToDeduct : item.totalUnitsToDeduct;
             await tx.branchInventory.upsert({
                 where: { productId_branchId: { productId: item.productId, branchId } },
                 update: { stock: { increment: delta } },
                 create: {
                     productId: item.productId,
                     branchId,
-                    stock: type === TransactionType.INVENTORY_IN ? item.quantity : 0,
+                    stock: type === TransactionType.INVENTORY_IN ? item.totalUnitsToDeduct : 0,
                 },
             });
         }
 
         return txRecord;
     });
-
-    return transaction;
 };
 
 export const getTransactions = (filters: {
@@ -115,7 +141,7 @@ export const getTransactions = (filters: {
                 : {}),
         },
         include: {
-            items: { include: { product: { select: { id: true, name: true, barcode: true } } } },
+            items: { include: { product: { select: { id: true, name: true, barcode: true, baseUnit: true } }, presentation: true } },
             user: { select: { id: true, nombre: true, username: true } },
             branch: { select: { id: true, name: true } },
         },
@@ -129,7 +155,7 @@ export const getTransactionById = (id: string) =>
     prisma.transaction.findUnique({
         where: { id },
         include: {
-            items: { include: { product: true } },
+            items: { include: { product: true, presentation: true } },
             user: { select: { id: true, nombre: true, username: true } },
             branch: { select: { id: true, name: true } },
             cashRegister: true,
@@ -152,7 +178,8 @@ export const cancelTransaction = async (id: string) => {
         });
 
         for (const item of tx.items) {
-            const delta = tx.type === TransactionType.SALE ? item.quantity : -item.quantity;
+            const realQuantity = Number(item.quantity) * Number(item.multiplierUsed);
+            const delta = tx.type === TransactionType.SALE ? realQuantity : -realQuantity;
             await txClient.branchInventory.updateMany({
                 where: { productId: item.productId, branchId: tx.branchId },
                 data: { stock: { increment: delta } },

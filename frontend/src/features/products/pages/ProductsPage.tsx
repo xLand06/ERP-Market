@@ -210,7 +210,7 @@ export default function ProductsPage() {
                                         </td>
                                         <td className="text-right">
                                             <span className="text-sm font-bold text-emerald-600">
-                                                ${prod.price.toFixed(2)}
+                                                ${Number(prod.price || 0).toFixed(2)}
                                             </span>
                                         </td>
                                         <td className="text-center">

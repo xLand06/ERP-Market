@@ -59,22 +59,22 @@ enum CedulaType {
 // =============================================================================
 
 model User {
-  id         String    @id @default(cuid())
-  username   String    @unique
+  id         String     @id @default(cuid())
+  username   String     @unique
   cedula     String
-  cedulaType  CedulaType @default(V)
+  cedulaType CedulaType @default(V)
   nombre     String
   apellido   String?
   email      String?
   password   String
   telefono   String?
-  role       Role      @default(SELLER)
-  isActive   Boolean   @default(true)
-  createdAt  DateTime  @default(now()) @db.Timestamptz
-  updatedAt  DateTime  @updatedAt    @db.Timestamptz
+  role       Role       @default(SELLER)
+  isActive   Boolean    @default(true)
+  createdAt  DateTime   @default(now()) @db.Timestamptz
+  updatedAt  DateTime   @updatedAt @db.Timestamptz
 
-  branchId    String?
-  branch     Branch?   @relation(fields: [branchId], references: [id])
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id])
 
   transactions  Transaction[]
   cashRegisters CashRegister[]
@@ -93,18 +93,19 @@ model User {
 // =============================================================================
 
 model Branch {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   name      String
   address   String?
   phone     String?
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now()) @db.Timestamptz
-  updatedAt DateTime  @updatedAt    @db.Timestamptz
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
 
-  users         User[]
-  inventory     BranchInventory[]
-  transactions  Transaction[]
-  cashRegisters CashRegister[]
+  users          User[]
+  inventory      BranchInventory[]
+  transactions   Transaction[]
+  cashRegisters  CashRegister[]
+  purchaseOrders PurchaseOrder[]
 
   @@index([isActive])
   @@map("branches")
@@ -115,11 +116,11 @@ model Branch {
 // =============================================================================
 
 model Category {
-  id          String    @id @default(cuid())
-  name        String    @unique
+  id          String   @id @default(cuid())
+  name        String   @unique
   description String?
-  createdAt   DateTime  @default(now()) @db.Timestamptz
-  updatedAt   DateTime  @updatedAt    @db.Timestamptz
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  updatedAt   DateTime @updatedAt @db.Timestamptz
 
   products Product[]
 
@@ -131,22 +132,25 @@ model Category {
 // =============================================================================
 
 model Product {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   name        String
   description String?
-  barcode    String?   @unique
-  price      Decimal   @db.Decimal(12, 2)
-  cost       Decimal?  @db.Decimal(12, 2)
+  barcode     String?  @unique
+  price       Decimal  @db.Decimal(12, 2)
+  cost        Decimal? @db.Decimal(12, 2)
+  baseUnit    String   @default("UNIDAD")
   imageUrl    String?
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now()) @db.Timestamptz
-  updatedAt   DateTime  @updatedAt     @db.Timestamptz
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  updatedAt   DateTime @updatedAt @db.Timestamptz
 
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
 
-  inventory        BranchInventory[]
-  transactionItems TransactionItem[]
+  presentations      ProductPresentation[]
+  inventory          BranchInventory[]
+  transactionItems   TransactionItem[]
+  purchaseOrderItems PurchaseOrderItem[]
 
   @@index([name])
   @@index([categoryId])
@@ -155,14 +159,31 @@ model Product {
   @@map("products")
 }
 
+model ProductPresentation {
+  id         String  @id @default(cuid())
+  name       String
+  multiplier Decimal @db.Decimal(12, 3)
+  price      Decimal @db.Decimal(12, 2)
+  barcode    String? @unique
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  transactionItems TransactionItem[]
+
+  @@index([productId])
+  @@index([barcode])
+  @@map("product_presentations")
+}
+
 // =============================================================================
 // INVENTORY BY BRANCH
 // =============================================================================
 
 model BranchInventory {
   id        String   @id @default(cuid())
-  stock     Int      @default(0)
-  minStock  Int      @default(0)
+  stock     Decimal  @default(0) @db.Decimal(12, 3)
+  minStock  Decimal  @default(0) @db.Decimal(12, 3)
   updatedAt DateTime @updatedAt @db.Timestamptz
 
   productId String
@@ -192,7 +213,7 @@ model Transaction {
   syncStatus SyncStatus        @default(PENDING)
   syncedAt   DateTime?         @db.Timestamptz
   createdAt  DateTime          @default(now()) @db.Timestamptz
-  updatedAt  DateTime          @updatedAt    @db.Timestamptz
+  updatedAt  DateTime          @updatedAt @db.Timestamptz
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
@@ -201,7 +222,7 @@ model Transaction {
   branch   Branch @relation(fields: [branchId], references: [id])
 
   cashRegisterId String?
-  cashRegister  CashRegister? @relation(fields: [cashRegisterId], references: [id])
+  cashRegister   CashRegister? @relation(fields: [cashRegisterId], references: [id])
 
   items TransactionItem[]
 
@@ -215,19 +236,24 @@ model Transaction {
 }
 
 model TransactionItem {
-  id        String  @id @default(cuid())
-  quantity  Int
-  unitPrice Decimal @db.Decimal(12, 2)
-  subtotal  Decimal @db.Decimal(12, 2)
+  id             String  @id @default(cuid())
+  quantity       Decimal @db.Decimal(12, 3)
+  multiplierUsed Decimal @default(1) @db.Decimal(12, 3)
+  unitPrice      Decimal @db.Decimal(12, 2)
+  subtotal       Decimal @db.Decimal(12, 2)
 
   transactionId String
-  transaction  Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 
   productId String
-  product  Product @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+
+  presentationId String?
+  presentation   ProductPresentation? @relation(fields: [presentationId], references: [id])
 
   @@index([transactionId])
   @@index([productId])
+  @@index([presentationId])
   @@map("transaction_items")
 }
 
@@ -243,13 +269,13 @@ model CashRegister {
   expectedAmount Decimal?           @db.Decimal(12, 2)
   difference     Decimal?           @db.Decimal(12, 2)
   notes          String?
-  syncStatus     SyncStatus        @default(PENDING)
-  syncedAt       DateTime?         @db.Timestamptz
-  openedAt       DateTime          @default(now()) @db.Timestamptz
-  closedAt       DateTime?         @db.Timestamptz
+  syncStatus     SyncStatus         @default(PENDING)
+  syncedAt       DateTime?          @db.Timestamptz
+  openedAt       DateTime           @default(now()) @db.Timestamptz
+  closedAt       DateTime?          @db.Timestamptz
 
   userId String
-  user   User @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
   branchId String
   branch   Branch @relation(fields: [branchId], references: [id])
@@ -298,7 +324,7 @@ model Supplier {
   address   String?
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now()) @db.Timestamptz
-  updatedAt DateTime @updatedAt    @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
 
   purchaseOrders PurchaseOrder[]
 
@@ -317,28 +343,33 @@ model PurchaseOrder {
   expectedAt DateTime?           @db.Timestamptz
   receivedAt DateTime?           @db.Timestamptz
   createdAt  DateTime            @default(now()) @db.Timestamptz
-  updatedAt  DateTime            @updatedAt    @db.Timestamptz
+  updatedAt  DateTime            @updatedAt @db.Timestamptz
 
   supplierId String
   supplier   Supplier @relation(fields: [supplierId], references: [id])
 
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
   items PurchaseOrderItem[]
 
   @@index([supplierId])
+  @@index([branchId])
   @@map("purchase_orders")
 }
 
 model PurchaseOrderItem {
-  id              String  @id @default(cuid())
-  quantity        Int
-  quantityReceived Int   @default(0)
-  unitCost        Decimal @db.Decimal(12, 2)
-  subtotal        Decimal @db.Decimal(12, 2)
+  id               String  @id @default(cuid())
+  quantity         Decimal @db.Decimal(12, 3)
+  quantityReceived Decimal @default(0) @db.Decimal(12, 3)
+  unitCost         Decimal @db.Decimal(12, 2)
+  subtotal         Decimal @db.Decimal(12, 2)
 
   productId String
+  product   Product @relation(fields: [productId], references: [id])
 
   purchaseOrderId String
-  purchaseOrder  PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
 
   @@index([purchaseOrderId])
   @@index([productId])
@@ -356,4 +387,4 @@ model ExchangeRate {
   updatedAt DateTime @updatedAt
 
   @@map("exchange_rates")
-}
+}

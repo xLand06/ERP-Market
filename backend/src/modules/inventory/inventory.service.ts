@@ -10,46 +10,46 @@ import { SetStockInput, AdjustStockInput } from '../../core/validations/inventor
  * Obtener stock consolidado de todas las sedes
  */
 export const getAllStock = async () => {
-    return prisma.branchInventory.findMany({
-        include: {
-            product: {
-                select: { 
-                    id: true, 
-                    name: true, 
-                    barcode: true, 
-                    price: true, 
-                    cost: true, 
-                    imageUrl: true, 
-                    category: { select: { name: true } } 
+    try {
+        return await prisma.branchInventory.findMany({
+            include: {
+                product: {
+                    include: { 
+                        category: { select: { name: true } },
+                        presentations: true
+                    },
                 },
+                branch: { select: { id: true, name: true } },
             },
-            branch: { select: { id: true, name: true } },
-        },
-        orderBy: { product: { name: 'asc' } },
-    });
+            orderBy: { product: { name: 'asc' } },
+        });
+    } catch (error) {
+        console.error('[InventoryService.getAllStock] Error:', error);
+        throw error;
+    }
 };
 
 /**
  * Obtener stock de una sede específica
  */
 export const getStockByBranch = async (branchId: string) => {
-    return prisma.branchInventory.findMany({
-        where: { branchId },
-        include: {
-            product: {
-                select: { 
-                    id: true, 
-                    name: true, 
-                    barcode: true, 
-                    price: true, 
-                    cost: true, 
-                    imageUrl: true, 
-                    category: { select: { name: true } } 
+    try {
+        const inventory = await prisma.branchInventory.findMany({
+            where: { branchId },
+            include: {
+                product: {
+                    include: { 
+                        category: { select: { name: true } },
+                        presentations: true
+                    },
                 },
             },
-        },
-        orderBy: { product: { name: 'asc' } },
-    });
+        });
+        return inventory;
+    } catch (error) {
+        console.error(`[InventoryService.getStockByBranch] Error for branch ${branchId}:`, error);
+        throw error;
+    }
 };
 
 /**
@@ -63,7 +63,7 @@ export const getStockByProduct = async (productId: string) => {
 };
 
 /**
- * Establecer stock absoluto para un producto/sede (Auditado)
+ * Establecer stock absoluto para un producto/sede
  */
 export const upsertStock = async (data: SetStockInput) => {
     const { productId, branchId, stock, minStock } = data;
@@ -85,7 +85,7 @@ export const adjustStock = async (data: AdjustStockInput) => {
         where: { productId_branchId: { productId, branchId } },
     });
 
-    const currentStock = existing?.stock ?? 0;
+    const currentStock = Number(existing?.stock ?? 0);
     const newStock = currentStock + delta;
 
     if (newStock < 0) {
@@ -114,7 +114,11 @@ export const getLowStockAlerts = async (branchId?: string) => {
     return prisma.branchInventory.findMany({
         where,
         include: {
-            product: { select: { id: true, name: true, barcode: true } },
+            product: { 
+                include: { 
+                    presentations: true 
+                } 
+            },
             branch: { select: { id: true, name: true } },
         },
         orderBy: { stock: 'asc' },

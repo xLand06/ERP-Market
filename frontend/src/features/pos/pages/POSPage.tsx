@@ -16,8 +16,37 @@ import { useInventory } from '@/hooks/useInventory';
 import { useConfigStore } from '@/hooks/useConfigStore';
 
 // ─── Types ─────────────────────────────────────────────────────────
-interface Product { id: string; name: string; price: number | string; stock: number; category: string; code: string; }
-interface CartItem extends Omit<Product, 'price'> { price: number; qty: number; }
+interface ProductPresentation {
+    id: string;
+    name: string;
+    multiplier: number;
+    price: number;
+    barcode?: string | null;
+}
+
+interface Product { 
+    id: string; 
+    name: string; 
+    price: number; 
+    stock: number; 
+    category: string; 
+    code: string; 
+    baseUnit: string;
+    presentations: ProductPresentation[];
+}
+
+interface CartItem {
+    id: string; // productId
+    name: string;
+    basePrice: number; // Price of base unit
+    currentPrice: number; // Price of selected presentation
+    stock: number;
+    qty: number;
+    baseUnit: string;
+    presentationId?: string;
+    presentationName?: string;
+    multiplier: number;
+}
 
 // ─── Helpers ───────────────────────────────────────────────────────
 const toNum = (val: number | string) => typeof val === 'string' ? parseFloat(val) : val;
@@ -29,18 +58,18 @@ const PAYMENT_OPTIONS = [
 ];
 
 // ─── Sub-Components ────────────────────────────────────────────────
-function StockBadge({ stock }: { stock: number }) {
+function StockBadge({ stock, unit }: { stock: number, unit: string }) {
     const v = stock < 5 ? 'destructive' : stock < 12 ? 'warning' : 'success';
-    const label = stock < 5 ? `${stock} restantes` : `${stock} unid`;
+    const label = `${stock.toFixed(unit === 'UNIDAD' ? 0 : 2)} ${unit}`;
     return <Badge variant={v}>{label}</Badge>;
 }
 
-function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product) => void }) {
+function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product, pres?: ProductPresentation) => void }) {
     const { rates } = useConfigStore();
     const vesRate = rates['VES'] || 36.50;
     
     const [flash, setFlash] = useState(false);
-    const price = toNum(product.price);
+    const price = product.price;
     const handle = () => {
         if (product.stock === 0) return;
         onAdd(product);
@@ -69,7 +98,7 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product)
                         <p className="text-[11px] font-medium text-slate-400 tabular-nums mt-0.5 sm:hidden lg:block">Bs. {(price * vesRate).toFixed(0)}</p>
                     </div>
                     <div className="sm:opacity-80 group-hover:opacity-100 transition-opacity">
-                        <StockBadge stock={product.stock} />
+                        <StockBadge stock={product.stock} unit={product.baseUnit} />
                     </div>
                 </div>
             </div>
@@ -198,14 +227,26 @@ export default function POSPage() {
     const { inventory, isLoading, refetch, isOnline } = useInventory(effectiveBranch || '');
 
     const PRODUCTS: Product[] = useMemo(() => {
-        return inventory.map(item => ({
-            id: item.product.id,
-            code: item.product.barcode || '',
-            name: item.product.name,
-            price: Number(item.product.price),
-            stock: item.stock,
-            category: item.product.category || 'Varios',
-        }));
+        if (!inventory || !Array.isArray(inventory)) return [];
+        
+        return inventory
+            .filter(item => item && item.product) // Asegurar que el producto existe
+            .map(item => ({
+                id: item.product.id,
+                code: item.product.barcode || '',
+                name: item.product.name,
+                price: Number(item.product.price),
+                stock: Number(item.stock),
+                category: item.product.category || 'Varios',
+                baseUnit: item.product.baseUnit || 'UNIDAD',
+                presentations: (item.product.presentations || []).map((p: any) => ({
+                    id: p.id,
+                    name: p.name,
+                    multiplier: Number(p.multiplier),
+                    price: Number(p.price),
+                    barcode: p.barcode
+                })),
+            }));
     }, [inventory]);
 
     const CATEGORIES = useMemo(() => {
@@ -220,28 +261,127 @@ export default function POSPage() {
         setTimeout(() => setToastVis(false), 3000);
     };
 
-    const addToCart = useCallback((p: Product) => {
+    const addToCart = useCallback((p: Product, pres?: ProductPresentation) => {
         setCart(prev => {
-            const ex = prev.find(i => i.id === p.id);
-            // Validar que no se exceda el stock si ya está en el carrito
-            if (ex && ex.qty >= p.stock) {
-                showToast(`Stock máximo alcanzado para ${p.name}`, true);
-                return prev;
+            const exIdx = prev.findIndex(i => i.id === p.id && i.presentationId === pres?.id);
+            
+            const multiplier = pres ? pres.multiplier : 1;
+            const price = pres ? pres.price : p.price;
+            
+            if (exIdx > -1) {
+                const ex = prev[exIdx];
+                const totalUnitsInCart = prev.filter(i => i.id === p.id).reduce((acc, i) => acc + (i.qty * i.multiplier), 0);
+                
+                if (totalUnitsInCart + multiplier > p.stock) {
+                    showToast(`Stock insuficiente para añadir más ${p.name}`, true);
+                    return prev;
+                }
+                
+                const newCart = [...prev];
+                newCart[exIdx] = { ...ex, qty: ex.qty + 1 };
+                return newCart;
+            } else {
+                const totalUnitsInCart = prev.filter(i => i.id === p.id).reduce((acc, i) => acc + (i.qty * i.multiplier), 0);
+                if (totalUnitsInCart + multiplier > p.stock) {
+                    showToast(`Stock insuficiente para ${p.name}`, true);
+                    return prev;
+                }
+
+                return [...prev, { 
+                    id: p.id, 
+                    name: p.name, 
+                    basePrice: p.price,
+                    currentPrice: price,
+                    stock: p.stock,
+                    baseUnit: p.baseUnit,
+                    qty: 1,
+                    presentationId: pres?.id,
+                    presentationName: pres?.name,
+                    multiplier: multiplier
+                }];
             }
-            return ex ? prev.map(i => i.id === p.id ? { ...i, qty: i.qty + 1 } : i) : [...prev, { ...p, price: toNum(p.price), qty: 1 }];
         });
     }, []);
 
+    const updateCartItemQty = (productId: string, presentationId: string | undefined, newQty: number) => {
+        setCart(prev => {
+            const item = prev.find(i => i.id === productId && i.presentationId === presentationId);
+            if (!item) return prev;
+            
+            const otherItemsUnits = prev.filter(i => i.id === productId && i.presentationId !== presentationId).reduce((acc, i) => acc + (i.qty * i.multiplier), 0);
+            if (otherItemsUnits + (newQty * item.multiplier) > item.stock) {
+                showToast(`Stock insuficiente`, true);
+                return prev;
+            }
+
+            return prev.map(i => (i.id === productId && i.presentationId === presentationId) ? { ...i, qty: newQty } : i);
+        });
+    };
+
+    const updateCartItemPresentation = (productId: string, oldPresId: string | undefined, newPresId: string | 'base') => {
+        setCart(prev => {
+            const item = prev.find(i => i.id === productId && i.presentationId === oldPresId);
+            if (!item) return prev;
+
+            const product = PRODUCTS.find(p => p.id === productId);
+            if (!product) return prev;
+
+            let multiplier = 1;
+            let price = product.price;
+            let name = undefined;
+            let finalPresId = undefined;
+
+            if (newPresId !== 'base') {
+                const pres = product.presentations.find(p => p.id === newPresId);
+                if (!pres) return prev;
+                multiplier = pres.multiplier;
+                price = pres.price;
+                name = pres.name;
+                finalPresId = pres.id;
+            }
+
+            // Validar stock
+            const otherItemsUnits = prev.filter(i => i.id === productId && i.presentationId !== oldPresId).reduce((acc, i) => acc + (i.qty * i.multiplier), 0);
+            if (otherItemsUnits + (item.qty * multiplier) > product.stock) {
+                showToast(`Stock insuficiente para esta presentación`, true);
+                return prev;
+            }
+
+            return prev.map(i => (i.id === productId && i.presentationId === oldPresId) ? { 
+                ...i, 
+                presentationId: finalPresId, 
+                presentationName: name,
+                multiplier: multiplier,
+                currentPrice: price
+            } : i);
+        });
+    };
+
+    const removeFromCart = (productId: string, presentationId: string | undefined) => {
+        setCart(prev => prev.filter(i => !(i.id === productId && i.presentationId === presentationId)));
+    };
+
     // HOOK DEL ESCÁNER DE HARDWARE
     useBarcodeScanner((barcode) => {
+        // Buscar por código base
         const product = PRODUCTS.find(p => p.code === barcode);
         if (product) {
             addToCart(product);
-            setSearch(''); // Limpiar si el usuario estaba escribiendo
             showToast(`✓ ${product.name} añadido`);
-        } else {
-            showToast(`⚠️ Código ${barcode} no encontrado en stock`, true);
+            return;
         }
+
+        // Buscar en presentaciones
+        for (const p of PRODUCTS) {
+            const pres = p.presentations.find(pr => pr.barcode === barcode);
+            if (pres) {
+                addToCart(p, pres);
+                showToast(`✓ ${p.name} (${pres.name}) añadido`);
+                return;
+            }
+        }
+
+        showToast(`⚠️ Código ${barcode} no encontrado en stock`, true);
     });
 
     useEffect(() => {
@@ -263,8 +403,9 @@ export default function POSPage() {
         try {
             const items = cart.map(c => ({
                 productId: c.id,
+                presentationId: c.presentationId,
                 quantity: c.qty,
-                unitPrice: c.price,
+                unitPrice: c.currentPrice,
             }));
 
             if (isOnline) {
@@ -274,23 +415,8 @@ export default function POSPage() {
                     items,
                 });
             } else {
-                const isElectron = typeof window !== 'undefined' && 'erpApi' in window;
-                if (isElectron && (window as any).erpApi.db) {
-                    const db = (window as any).erpApi.db;
-                    for (const item of items) {
-                        const qty = isSaleMode ? -item.quantity : item.quantity;
-                        await db.updateStock(item.productId, effectiveBranch, qty);
-                        await db.addPendingChange({
-                            id: `${Date.now()}-${item.productId}`,
-                            type: 'STOCK_UPDATE',
-                            data: { productId: item.productId, branchId: effectiveBranch, quantity: item.quantity },
-                            createdAt: new Date().toISOString(),
-                            branchId: effectiveBranch,
-                        });
-                    }
-                } else {
-                    throw new Error('Sin conexión');
-                }
+                // TODO: Actualizar lógica offline para UMB si es necesario
+                throw new Error('Sin conexión. Sincronización offline de UMB pendiente.');
             }
 
             setCart([]);
@@ -310,7 +436,7 @@ export default function POSPage() {
         (p.name.toLowerCase().includes(search.toLowerCase()) || p.code.includes(search))
     );
 
-    const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+    const subtotal = cart.reduce((s, i) => s + i.currentPrice * i.qty, 0);
     const total = subtotal + (subtotal * iva);
 
     if (!selectedBranch) {
@@ -387,18 +513,63 @@ export default function POSPage() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
-                    {cart.map(item => (
-                        <div key={item.id} className="flex items-center gap-3 px-5 py-4 border-b">
-                            <div className="w-8 h-8 rounded bg-slate-50 flex items-center justify-center shrink-0">
-                                <Package className="w-4 h-4 text-slate-300" />
+                    {cart.map(item => {
+                        const product = PRODUCTS.find(p => p.id === item.id);
+                        return (
+                            <div key={`${item.id}-${item.presentationId}`} className="flex flex-col border-b px-5 py-4 gap-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded bg-slate-50 flex items-center justify-center shrink-0">
+                                        <Package className="w-4 h-4 text-slate-300" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-bold truncate">{item.name}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            {product && product.presentations.length > 0 ? (
+                                                <select 
+                                                    value={item.presentationId || 'base'}
+                                                    onChange={(e) => updateCartItemPresentation(item.id, item.presentationId, e.target.value)}
+                                                    className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 hover:bg-slate-200 transition-colors border-none outline-none cursor-pointer"
+                                                >
+                                                    <option value="base">{product.baseUnit} (UMB)</option>
+                                                    {product.presentations.map(pres => (
+                                                        <option key={pres.id} value={pres.id}>{pres.name} (x{pres.multiplier})</option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <span className="text-[10px] text-slate-400">{item.baseUnit}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <button onClick={() => removeFromCart(item.id, item.presentationId)} className="text-slate-300 hover:text-red-500">
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                                <div className="flex items-center justify-between pl-11">
+                                    <div className="flex items-center border rounded-lg h-8 overflow-hidden">
+                                        <button 
+                                            onClick={() => updateCartItemQty(item.id, item.presentationId, Math.max(0, item.qty - 1))}
+                                            className="px-2 bg-slate-50 hover:bg-slate-100 text-slate-600 border-r"
+                                        >-</button>
+                                        <input 
+                                            type="number" 
+                                            step={item.baseUnit === 'UNIDAD' ? "1" : "0.01"}
+                                            value={item.qty}
+                                            onChange={(e) => updateCartItemQty(item.id, item.presentationId, parseFloat(e.target.value) || 0)}
+                                            className="w-12 text-center text-xs font-bold outline-none"
+                                        />
+                                        <button 
+                                            onClick={() => updateCartItemQty(item.id, item.presentationId, item.qty + 1)}
+                                            className="px-2 bg-slate-50 hover:bg-slate-100 text-slate-600 border-l"
+                                        >+</button>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[10px] text-slate-400">${item.currentPrice.toFixed(2)} c/u</p>
+                                        <p className="text-sm font-black">${(item.currentPrice * item.qty).toFixed(2)}</p>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold truncate">{item.name}</p>
-                                <p className="text-[10px] text-slate-400">${item.price.toFixed(2)} x {item.qty}</p>
-                            </div>
-                            <p className="text-sm font-black">${(item.price * item.qty).toFixed(2)}</p>
-                        </div>
-                    ))}
+                        );
+                    })}
                     {cart.length === 0 && (
                         <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-3">
                             <Package className="w-12 h-12" />

@@ -38,7 +38,7 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
     const { data: globalProducts = [], isLoading } = useQuery({
         queryKey: ['global-products'],
         queryFn: async () => {
-            const res = await api.get('/inventory/products');
+            const res = await api.get('/products', { params: { limit: 1000 } });
             return res.data?.data || [];
         },
         enabled: open

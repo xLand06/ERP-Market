@@ -27,7 +27,7 @@ router.get('/stock/branch/:branchId',
 );
 
 /** GET  /api/inventory/stock/product/:productId — Stock de un producto en todas las sedes */
-router.get('/stock/stock/product/:productId', 
+router.get('/stock/product/:productId', 
     validate(productIdParamSchema, { source: 'params' }), 
     ctrl.getStockByProduct
 );

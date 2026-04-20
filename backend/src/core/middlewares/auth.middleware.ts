@@ -40,7 +40,7 @@ export const authMiddleware = (
     res: Response,
     next: NextFunction
 ): void => {
-    const path = req.path;
+    const path = req.originalUrl;
 
     if (publicPaths.some(p => path.startsWith(p))) {
         next();

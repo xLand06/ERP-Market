@@ -2,17 +2,40 @@
 
 export type StockLevel = 'normal' | 'warning' | 'critical';
 
+export interface ProductPresentation {
+    id: string;
+    name: string;
+    multiplier: number;
+    price: number;
+    barcode?: string | null;
+    productId: string;
+}
+
 // ─── Inventory / Products ─────────────────────────────────────────────────────
 export interface Product {
     id: string;
-    code: string;
     name: string;
-    category: string;
-    cost: number;
+    description?: string | null;
+    barcode?: string | null;
+    baseUnit: string;
     price: number;
+    cost?: number | null;
+    imageUrl?: string | null;
+    categoryId?: string | null;
+    category?: { id: string; name: string } | null;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+    presentations: ProductPresentation[];
+    inventory?: BranchInventory[];
+}
+
+export interface BranchInventory {
+    id: string;
     stock: number;
     minStock: number;
-    emoji: string;
+    productId: string;
+    branchId: string;
 }
 
 // ─── Purchases ────────────────────────────────────────────────────────────────

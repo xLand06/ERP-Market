@@ -9,7 +9,7 @@ import { z } from 'zod';
  * Filtros generales del dashboard (KPIs)
  */
 export const dashboardFiltersSchema = z.object({
-    branchId: z.string().cuid('ID de sede inválido').optional().or(z.literal('all')),
+    branchId: z.string().optional().or(z.literal('all')).or(z.literal('')),
 });
 
 /**

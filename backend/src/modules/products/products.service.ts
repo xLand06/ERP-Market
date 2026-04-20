@@ -20,6 +20,7 @@ export const getAllProducts = async (filters: ProductListParams): Promise<ApiLis
             OR: [
                 { name: { contains: search, mode: 'insensitive' as const } },
                 { barcode: { contains: search, mode: 'insensitive' as const } },
+                { presentations: { some: { barcode: { contains: search, mode: 'insensitive' as const } } } }
             ],
         }),
     };
@@ -27,7 +28,10 @@ export const getAllProducts = async (filters: ProductListParams): Promise<ApiLis
     const [products, total] = await Promise.all([
         prisma.product.findMany({
             where,
-            include: { category: true },
+            include: { 
+                category: true,
+                presentations: true 
+            },
             orderBy: { name: 'asc' },
             skip,
             take: limit,
@@ -53,7 +57,10 @@ export const getAllProducts = async (filters: ProductListParams): Promise<ApiLis
 export const getProductById = async (id: string): Promise<ProductDTO | null> => {
     const product = await prisma.product.findUnique({ 
         where: { id }, 
-        include: { category: true } 
+        include: { 
+            category: true,
+            presentations: true
+        } 
     });
     if (!product) return null;
     return {
@@ -64,7 +71,31 @@ export const getProductById = async (id: string): Promise<ProductDTO | null> => 
 };
 
 export const createProduct = async (data: CreateProductInput): Promise<ProductDTO> => {
-    const product = await prisma.product.create({ data });
+    const { presentations, ...productData } = data;
+    
+    const product = await prisma.product.create({ 
+        data: {
+            ...productData,
+            presentations: {
+                create: presentations
+            }
+        },
+        include: { presentations: true }
+    });
+
+    // Inicializar stock en 0 en todas las sedes para este nuevo producto
+    const branches = await prisma.branch.findMany({ select: { id: true } });
+    if (branches.length > 0) {
+        await prisma.branchInventory.createMany({
+            data: branches.map(b => ({
+                productId: product.id,
+                branchId: b.id,
+                stock: 0,
+            })),
+            skipDuplicates: true
+        });
+    }
+
     return {
         ...product,
         price: Number(product.price),
@@ -73,7 +104,27 @@ export const createProduct = async (data: CreateProductInput): Promise<ProductDT
 };
 
 export const updateProduct = async (id: string, data: UpdateProductInput): Promise<ProductDTO> => {
-    const product = await prisma.product.update({ where: { id }, data });
+    const { presentations, ...productData } = data;
+
+    // Si vienen presentaciones, realizamos un "sync" manual (delete + create) o upsert
+    // Por simplicidad en MVP, si vienen presentaciones, borramos las anteriores y creamos las nuevas
+    if (presentations) {
+        await prisma.productPresentation.deleteMany({ where: { productId: id } });
+    }
+
+    const product = await prisma.product.update({ 
+        where: { id }, 
+        data: {
+            ...productData,
+            ...(presentations && {
+                presentations: {
+                    create: presentations
+                }
+            })
+        },
+        include: { presentations: true }
+    });
+
     return {
         ...product,
         price: Number(product.price),

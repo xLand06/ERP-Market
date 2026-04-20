@@ -34,21 +34,28 @@ startSyncWorker(900000);
 // ─── MIDDLEWARES GLOBALES ───────────────────────────────────────────────────
 app.use(cors({
     origin: (origin, callback) => {
+        // Permitir peticiones sin origen (como apps móviles o curl)
         if (!origin) return callback(null, true);
-        
-        const allowedUrls = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : ['http://localhost:5175'];
-        
-        const isLocalNetwork = /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+):517[0-9]$/.test(origin);
 
-        if (allowedUrls.includes(origin) || allowedUrls.includes('*') || isLocalNetwork) {
+        const allowedUrls = process.env.FRONTEND_URL 
+            ? process.env.FRONTEND_URL.split(',') 
+            : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://127.0.0.1:5173'];
+
+        // Regex para permitir localhost en cualquier puerto de Vite (5170-5189)
+        const isLocalDevelopment = /^http:\/\/(localhost|127\.0\.0\.1):51[7-8][0-9]$/.test(origin);
+
+        // Regex para red local (IPs privadas)
+        const isLocalNetwork = /^http:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+):51[7-8][0-9]$/.test(origin);
+
+        if (allowedUrls.includes(origin) || allowedUrls.includes('*') || isLocalDevelopment || isLocalNetwork) {
             callback(null, true);
         } else {
+            console.warn(`[CORS] Blocked origin: ${origin}`);
             callback(new Error(`CORS not allowed for origin: ${origin}`));
         }
     },
     credentials: true,
 }));
-
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {

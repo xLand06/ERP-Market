@@ -3,9 +3,11 @@
 // =============================================================================
 
 import api from '../lib/api';
+import type { Product, ProductPresentation } from '../types';
 
 export interface POSItem {
     productId: string;
+    presentationId?: string;
     quantity: number;
     unitPrice: number;
 }
@@ -23,7 +25,11 @@ export interface CreateTransactionPayload {
 export interface TransactionItem {
     id: string;
     productId: string;
+    product: Product;
+    presentationId?: string | null;
+    presentation?: ProductPresentation | null;
     quantity: number;
+    multiplierUsed: number;
     unitPrice: number;
     subtotal: number;
 }

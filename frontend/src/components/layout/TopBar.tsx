@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { BranchSelector } from '@/components/branch/BranchSelector';
 import { useConfigStore } from '@/hooks/useConfigStore';
+import { useAuthStore } from '@/features/auth/store/authStore';
 import {
     Dialog, DialogContent,
 } from '@/components/ui/dialog';
@@ -22,10 +23,16 @@ interface TopBarProps {
 
 export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     const { rates } = useConfigStore();
+    const { user, logout } = useAuthStore();
     const [base, setBase] = useState<Currency>('USD');
     const [profileOpen, setProfileOpen] = useState(false);
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
     const navigate = useNavigate();
+
+    const handleLogout = () => {
+        logout();
+        navigate('/login');
+    };
 
     const formatRate = (from: Currency, to: Currency) => {
         const fromRate = rates[from] || 1;
@@ -145,8 +152,8 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                             <User className="w-4 h-4 text-white" />
                         </div>
                         <div className="hidden md:block text-left">
-                            <p className="text-xs font-bold text-slate-900 leading-none">Admin</p>
-                            <p className="text-[10px] text-slate-400 mt-0.5 font-medium uppercase tracking-tight italic">Root</p>
+                            <p className="text-xs font-bold text-slate-900 leading-none">{user?.nombre || 'Usuario'}</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5 font-medium uppercase tracking-tight italic">{user?.role || 'Invitado'}</p>
                         </div>
                         <ChevronDown className="w-3 h-3 text-slate-400 hidden sm:block" />
                     </button>
@@ -160,7 +167,10 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                                 <Settings className="w-4 h-4" /> Configuración
                             </button>
                             <div className="my-1 border-t border-slate-100" />
-                            <button className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors">
+                            <button 
+                                onClick={handleLogout}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors"
+                            >
                                 <LogOut className="w-4 h-4" /> Cerrar Sesión
                             </button>
                         </div>
