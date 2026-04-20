@@ -67,6 +67,10 @@ export const getCurrentOpenRegister = (branchId: string) =>
             user: { select: { id: true, nombre: true, username: true } },
             branch: { select: { id: true, name: true } },
             _count: { select: { transactions: true } },
+            transactions: {
+                where: { status: 'COMPLETED' },
+                orderBy: { createdAt: 'desc' }
+            }
         },
     });
 
