@@ -46,7 +46,8 @@ export default function CashRegisterPage() {
             const res = await api.get(`/cash-flow/current/${effectiveBranch}`);
             return res.data.data;
         },
-        enabled: !!effectiveBranch
+        enabled: !!effectiveBranch,
+        staleTime: 0, // Siempre obtener datos frescos al entrar
     });
 
     const openMutation = useMutation({

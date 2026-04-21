@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
     Search, Barcode, Package, DollarSign, Smartphone, CreditCard, X, Check, Loader2, ShoppingCart, PackagePlus
 } from 'lucide-react';
@@ -423,6 +424,9 @@ export default function POSPage() {
             setPayOpen(false);
             showToast(isSaleMode ? '✓ Venta registrada exitosamente' : '✓ Entrada registrada exitosamente');
             refetch();
+            
+            // Invalidar datos de caja para que el flujo se actualice inmediatamente
+            queryClient.invalidateQueries({ queryKey: ['openRegister'] });
         } catch (error: any) {
             console.error(error);
             showToast(error.response?.data?.error || `Error al procesar la ${isSaleMode ? 'venta' : 'entrada'}`, true);

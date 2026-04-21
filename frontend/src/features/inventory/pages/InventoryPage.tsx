@@ -15,6 +15,7 @@ import toast from 'react-hot-toast';
 interface Product {
     id: string; code: string; name: string; category: string;
     cost: number; price: number; stock: number; minStock: number;
+    baseUnit: string;
     isActive?: boolean;
 }
 
@@ -60,8 +61,9 @@ export default function InventoryPage() {
             name: item.product.name,
             cost: Number(item.product.cost || 0),
             price: Number(item.product.price || 0),
-            stock: item.stock,
-            minStock: item.minStock || 0,
+            stock: Number(item.stock || 0),
+            minStock: Number(item.minStock || 0),
+            baseUnit: item.product.baseUnit || 'UNIDAD',
             category: item.product.category || 'Varios',
         }));
     }, [inventory]);
@@ -332,11 +334,20 @@ export default function InventoryPage() {
                                             )}
                                         </td>
                                         <td className="text-center">
-                                            <span className={cn('text-sm font-bold tabular-nums', level === 'critical' ? 'text-red-600' : level === 'warning' ? 'text-amber-600' : 'text-slate-700')}>
-                                                {p.stock}
-                                            </span>
+                                            <div className="flex flex-col items-center">
+                                                <span className={cn('text-sm font-bold tabular-nums', level === 'critical' ? 'text-red-600' : level === 'warning' ? 'text-amber-600' : 'text-slate-700')}>
+                                                    {p.baseUnit === 'UNIDAD' ? p.stock : p.stock.toFixed(2)}
+                                                </span>
+                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{p.baseUnit}</span>
+                                            </div>
                                         </td>
-                                        <td className="text-center text-sm text-slate-400 tabular-nums">{p.minStock}</td>
+                                        <td className="text-center">
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-sm text-slate-400 tabular-nums">
+                                                    {p.baseUnit === 'UNIDAD' ? p.minStock : p.minStock.toFixed(2)}
+                                                </span>
+                                            </div>
+                                        </td>
                                         <td>
                                             <Badge variant={getBadgeVariant(level)}>{STATUS_LABELS[level]}</Badge>
                                         </td>
