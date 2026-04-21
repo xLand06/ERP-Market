@@ -99,10 +99,17 @@ export function useInventory(branchId: string) {
                     id: item.productId,
                     name: item.productName,
                     barcode: item.barcode,
-                    // Obtener price desde cache local, no hardcodear a 0
-                    price: item.price ?? item.productPrice ?? 0,
-                    cost: item.cost ?? item.productCost ?? 0,
-                    category: item.categoryName || item.category || 'Varios',
+                    price: item.productPrice ?? 0,
+                    cost: item.productCost ?? 0,
+                    baseUnit: item.baseUnit || 'UNIDAD',
+                    presentations: (item.productPresentations || []).map((p: any) => ({
+                        id: p.id,
+                        name: p.name,
+                        multiplier: Number(p.multiplier),
+                        price: Number(p.price),
+                        barcode: p.barcode
+                    })),
+                    category: item.categoryName || 'Varios',
                     categoryId: item.categoryId,
                     isActive: item.isActive ?? true,
                 },

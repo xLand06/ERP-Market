@@ -431,16 +431,21 @@ export default function POSPage() {
         }
     };
 
-    const filtered = PRODUCTS.filter(p =>
-        (category === 'Todos' || p.category === category) &&
-        (p.name.toLowerCase().includes(search.toLowerCase()) || p.code.includes(search))
-    );
+    const filtered = PRODUCTS.filter(p => {
+        const matchesCategory = category === 'Todos' || p.category === category;
+        const searchLower = search.toLowerCase();
+        const matchesName = p.name.toLowerCase().includes(searchLower);
+        const matchesBaseCode = p.code.includes(search);
+        const matchesPresentationCode = p.presentations.some(pr => pr.barcode?.includes(search));
+        
+        return matchesCategory && (matchesName || matchesBaseCode || matchesPresentationCode);
+    });
 
     const subtotal = cart.reduce((s, i) => s + i.currentPrice * i.qty, 0);
     const total = subtotal + (subtotal * iva);
 
     if (!selectedBranch) {
-        return <div className="h-full flex items-center justify-center text-slate-500">Por favor, seleccione una sede en la configuración.</div>;
+        return <div className="h-full flex items-center justify-center text-slate-500 pb-20">Por favor, seleccione una sede en la configuración.</div>;
     }
 
     return (
@@ -500,7 +505,25 @@ export default function POSPage() {
                     ) : filtered.length === 0 ? (
                         <div className="col-span-full text-center text-slate-400 mt-10">No se encontraron productos.</div>
                     ) : (
-                        filtered.map(p => <ProductCard key={p.id} product={p} onAdd={addToCart} />)
+                        filtered.map(p => (
+                            <div key={p.id} className="relative group">
+                                <ProductCard product={p} onAdd={addToCart} />
+                                {p.presentations.length > 0 && (
+                                    <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                        {p.presentations.map(pres => (
+                                            <button
+                                                key={pres.id}
+                                                onClick={(e) => { e.stopPropagation(); addToCart(p, pres); }}
+                                                className="bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg hover:bg-indigo-700 active:scale-95"
+                                                title={`Añadir ${pres.name}`}
+                                            >
+                                                +{pres.name.split(' ')[0]}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ))
                     )}
                 </div>
             </div>

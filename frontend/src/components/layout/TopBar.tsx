@@ -6,6 +6,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { BranchSelector } from '@/components/branch/BranchSelector';
+import { CloudSyncWidget } from './CloudSyncWidget';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import {
@@ -122,6 +123,9 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
 
             {/* Right – BranchSelector + Notifications + Shortcuts + Profile */}
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                {/* Cloud Sync Status */}
+                <CloudSyncWidget />
+
                 {/* Branch Selector */}
                 <BranchSelector />
 

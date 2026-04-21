@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { cn } from '@/lib/utils';
 import { useConfigStore } from '@/hooks/useConfigStore';
+import { useSyncStore } from '@/services/sync.service';
 
 export function AppShellLayout() {
     const { fetchRates } = useConfigStore();
@@ -46,6 +47,10 @@ export function AppShellLayout() {
     // Initial fetch of configuration
     useEffect(() => {
         fetchRates();
+        const { checkConnection } = useSyncStore.getState();
+        checkConnection();
+        const interval = setInterval(checkConnection, 30000);
+        return () => clearInterval(interval);
     }, [fetchRates]);
 
     // Close sidebar on mobile when navigating

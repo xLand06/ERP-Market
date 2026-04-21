@@ -81,11 +81,24 @@ async function initDatabase(userDataPath: string) {
             barcode TEXT,
             price REAL,
             cost REAL,
+            baseUnit TEXT DEFAULT 'UNIDAD',
             category TEXT,
             categoryId TEXT,
             isActive INTEGER DEFAULT 1,
             createdAt TEXT,
             updatedAt TEXT
+        )
+    `);
+
+    db.run(`
+        CREATE TABLE IF NOT EXISTS product_presentations (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            multiplier REAL,
+            price REAL,
+            barcode TEXT,
+            productId TEXT,
+            FOREIGN KEY(productId) REFERENCES products(id) ON DELETE CASCADE
         )
     `);
     
@@ -157,39 +170,49 @@ function getProducts(branchId: string) {
 function saveProducts(branchId: string, products: any[]) {
     for (const p of products) {
         runSql(`
-            INSERT OR REPLACE INTO products (id, name, barcode, price, cost, category, categoryId, isActive, createdAt, updatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
-        `, [p.id, p.name, p.barcode, p.price, p.cost, p.category, p.categoryId]);
+            INSERT OR REPLACE INTO products (id, name, barcode, price, cost, baseUnit, category, categoryId, isActive, createdAt, updatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
+        `, [p.id, p.name, p.barcode, p.price, p.cost, p.baseUnit || 'UNIDAD', p.category, p.categoryId]);
+
+        if (p.presentations && Array.isArray(p.presentations)) {
+            runSql('DELETE FROM product_presentations WHERE productId = ?', [p.id]);
+            for (const pres of p.presentations) {
+                runSql(`
+                    INSERT INTO product_presentations (id, name, multiplier, price, barcode, productId)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                `, [pres.id, pres.name, pres.multiplier, pres.price, pres.barcode, p.id]);
+            }
+        }
     }
     saveDatabase();
 }
 
 function getStock(branchId: string) {
-    return queryAll(`
-        SELECT bi.*, p.name as productName, p.barcode
+    const inventory = queryAll(`
+        SELECT bi.*, p.name as productName, p.barcode, p.price as productPrice, p.cost as productCost, p.baseUnit, p.category as categoryName, p.categoryId
         FROM branch_inventory bi
         JOIN products p ON bi.productId = p.id
         WHERE bi.branchId = ?
         ORDER BY p.name ASC
     `, [branchId]);
+
+    for (const item of inventory) {
+        item.productPresentations = queryAll(`
+            SELECT * FROM product_presentations WHERE productId = ?
+        `, [item.productId]);
+    }
+
+    return inventory;
 }
 
 function updateStock(product: any, branchId: string, quantity: number, minStock: number = 0) {
     // 1. Asegurar que el producto existe localmente
     runSql(`
-        INSERT OR REPLACE INTO products (id, name, barcode, price, cost, category, categoryId, isActive, updatedAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
-    `, [product.id, product.name, product.barcode || '', product.price, product.cost || 0, product.category || 'Varios', product.categoryId || null]);
+        INSERT OR REPLACE INTO products (id, name, barcode, price, cost, baseUnit, category, categoryId, isActive, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
+    `, [product.id, product.name, product.barcode || '', product.price, product.cost || 0, product.baseUnit || 'UNIDAD', product.category || 'Varios', product.categoryId || null]);
 
     // 2. Calcular nuevo stock
-    const current = queryOne(`
-        SELECT stock FROM branch_inventory 
-        WHERE productId = ? AND branchId = ?
-    `, [product.id, branchId]);
-    
-    // Si queremos que sea absoluto (como en el modal), usamos quantity directamente.
-    // Si queremos que sea incremento, sumamos. 
-    // Usaremos absoluto para "Entrada Manual" si así lo pide el flujo del modal.
     const newStock = quantity; 
     
     runSql(`
@@ -202,6 +225,24 @@ function updateStock(product: any, branchId: string, quantity: number, minStock:
 
 function saveStock(branchId: string, inventory: any[]) {
     for (const i of inventory) {
+        const p = i.product;
+        if (p) {
+            runSql(`
+                INSERT OR REPLACE INTO products (id, name, barcode, price, cost, baseUnit, category, categoryId, isActive, updatedAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
+            `, [p.id, p.name, p.barcode || '', p.price, p.cost || 0, p.baseUnit || 'UNIDAD', p.category?.name || p.category || 'Varios', p.categoryId || null]);
+
+            if (p.presentations && Array.isArray(p.presentations)) {
+                runSql('DELETE FROM product_presentations WHERE productId = ?', [p.id]);
+                for (const pres of p.presentations) {
+                    runSql(`
+                        INSERT INTO product_presentations (id, name, multiplier, price, barcode, productId)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    `, [pres.id, pres.name, pres.multiplier, pres.price, pres.barcode, p.id]);
+                }
+            }
+        }
+
         runSql(`
             INSERT OR REPLACE INTO branch_inventory (id, productId, branchId, stock, minStock, updatedAt)
             VALUES (?, ?, ?, ?, ?, datetime('now'))
