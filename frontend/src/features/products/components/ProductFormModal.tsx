@@ -105,15 +105,17 @@ export function ProductFormModal({ open, onClose, product, categories, onSuccess
                 description: description || null, 
                 barcode: barcode || null, 
                 baseUnit,
-                price: Number(price), 
+                price: Number(price) || 0, 
                 cost: cost ? Number(cost) : null, 
                 categoryId: categoryId || null,
-                presentations: presentations.map(p => ({
-                    ...p,
-                    multiplier: Number(p.multiplier),
-                    price: Number(p.price),
-                    barcode: p.barcode || null
-                }))
+                presentations: presentations
+                    .filter(p => p.name.trim() !== '') // Evitar enviar filas vacías
+                    .map(p => ({
+                        name: p.name,
+                        multiplier: Number(p.multiplier) || 1,
+                        price: Number(p.price) || 0,
+                        barcode: p.barcode || null
+                    }))
             };
             
             if (product) {

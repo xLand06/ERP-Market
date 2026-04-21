@@ -82,7 +82,9 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                         create: tx.items.map((it: any) => ({
                             id: it.id,
                             productId: it.productId,
+                            presentationId: it.presentationId,
                             quantity: it.quantity,
+                            multiplierUsed: it.multiplierUsed,
                             unitPrice: it.unitPrice,
                             subtotal: it.subtotal
                         }))

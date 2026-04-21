@@ -42,6 +42,7 @@ export const validate = (schema: any, options: ValidateOptions = {}) => {
         const result = schema.safeParse(data);
 
         if (!result.success) {
+            console.error('[Validation Error]', JSON.stringify(result.error.flatten(), null, 2));
             const error = result.error;
             const formattedErrors: Record<string, string[]> = {};
             

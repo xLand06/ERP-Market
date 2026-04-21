@@ -12,20 +12,20 @@ import { paginationSchema } from './common.zod';
 export const createProductSchema = z.object({
     name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(200),
     description: z.string().max(500).nullable().optional().or(z.literal('')),
-    barcode: z.string().max(50).nullable().optional().or(z.literal('')),
+    barcode: z.string().max(100).nullable().optional().or(z.literal('')),
     baseUnit: z.string().min(1).default('UNIDAD'),
-    price: z.preprocess((val) => Number(val), z.number().positive('El precio debe ser mayor a 0').max(999999.99)),
-    cost: z.preprocess((val) => val ? Number(val) : null, z.number().positive().nullable().optional()),
-    imageUrl: z.string().url('URL de imagen inválida').nullable().optional().or(z.literal('')),
+    price: z.preprocess((val) => (val === '' || val === null || val === undefined) ? 0 : Number(val), z.number().min(0)),
+    cost: z.preprocess((val) => (val === '' || val === null || val === undefined) ? null : Number(val), z.number().min(0).nullable().optional()),
+    imageUrl: z.string().nullable().optional().or(z.literal('')),
     categoryId: z.string().nullable().optional().or(z.literal('')),
     isActive: z.boolean().default(true),
     
     // Múltiples Presentaciones
     presentations: z.array(z.object({
-        name: z.string().min(1),
-        multiplier: z.number().positive(),
-        price: z.number().positive(),
-        barcode: z.string().max(50).optional().or(z.literal('')),
+        name: z.string().min(1, 'El nombre de la presentación es requerido'),
+        multiplier: z.preprocess((val) => (val === '' || val === null || val === undefined) ? 1 : Number(val), z.number().positive()),
+        price: z.preprocess((val) => (val === '' || val === null || val === undefined) ? 0 : Number(val), z.number().min(0)),
+        barcode: z.string().max(100).nullable().optional().or(z.literal('')),
     })).optional().default([]),
 });
 

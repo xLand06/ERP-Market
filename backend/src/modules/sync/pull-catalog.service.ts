@@ -21,7 +21,7 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
 
         // 2. Pulled Products
         const cloudProducts = await prismaCloud.product.findMany({
-            include: { category: true }
+            include: { category: true, presentations: true }
         });
         for (const prod of cloudProducts) {
             await localPrisma.product.upsert({
@@ -31,6 +31,7 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
                     barcode: prod.barcode,
                     price: Number(prod.price),
                     cost: Number(prod.cost),
+                    baseUnit: prod.baseUnit,
                     categoryId: prod.categoryId,
                     isActive: prod.isActive,
                 },
@@ -40,10 +41,28 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
                     barcode: prod.barcode,
                     price: Number(prod.price),
                     cost: Number(prod.cost),
+                    baseUnit: prod.baseUnit,
                     categoryId: prod.categoryId,
                     isActive: prod.isActive,
                 }
             });
+
+            // Synchronize Presentations for this product
+            if (prod.presentations.length > 0) {
+                // Delete local presentations first for a clean sync
+                await localPrisma.productPresentation.deleteMany({ where: { productId: prod.id } });
+                
+                await localPrisma.productPresentation.createMany({
+                    data: prod.presentations.map((p: any) => ({
+                        id: p.id,
+                        name: p.name,
+                        multiplier: Number(p.multiplier),
+                        price: Number(p.price),
+                        barcode: p.barcode,
+                        productId: p.productId
+                    }))
+                });
+            }
         }
 
         // 3. Pulled Branches

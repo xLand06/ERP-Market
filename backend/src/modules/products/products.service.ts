@@ -91,8 +91,7 @@ export const createProduct = async (data: CreateProductInput): Promise<ProductDT
                 productId: product.id,
                 branchId: b.id,
                 stock: 0,
-            })),
-            skipDuplicates: true
+            }))
         });
     }
 

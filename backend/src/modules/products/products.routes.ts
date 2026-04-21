@@ -40,7 +40,7 @@ router.post('/', roleGuard('OWNER'), validate(createProductSchema), ctrl.createP
  * PUT /api/products/:id
  * Actualizar producto (SOLO OWNER)
  */
-router.put('/:id', roleGuard('OWNER'), validate(updateProductSchema), ctrl.updateProduct);
+router.put('/:id', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), validate(updateProductSchema), ctrl.updateProduct);
 
 /**
  * DELETE /api/products/:id
