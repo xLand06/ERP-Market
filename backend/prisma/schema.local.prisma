@@ -96,6 +96,7 @@ model User {
 model Branch {
   id        String    @id @default(cuid())
   name      String
+  code      String    @unique
   address   String?
   phone     String?
   isActive  Boolean   @default(true)
@@ -109,6 +110,7 @@ model Branch {
   purchaseOrders PurchaseOrder[]
 
   @@index([isActive])
+  @@index([code])
   @@map("branches")
 }
 

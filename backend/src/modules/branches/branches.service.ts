@@ -14,8 +14,10 @@ export const getAllBranches = () =>
 export const getBranchById = (id: string) =>
     prisma.branch.findUnique({ where: { id } });
 
-export const createBranch = (data: { name: string; address?: string; phone?: string }) =>
-    prisma.branch.create({ data });
+export const createBranch = (data: { name: string; code?: string; address?: string; phone?: string }) => {
+    const code = data.code || `SEDE-${Date.now().toString(36).toUpperCase()}`;
+    return prisma.branch.create({ data: { ...data, code } });
+};
 
 export const updateBranch = (
     id: string,

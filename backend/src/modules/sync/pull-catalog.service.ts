@@ -70,8 +70,8 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
         for (const branch of cloudBranches) {
             await localPrisma.branch.upsert({
                 where: { id: branch.id },
-                update: { name: branch.name, address: branch.address, phone: branch.phone },
-                create: { id: branch.id, name: branch.name, address: branch.address, phone: branch.phone }
+                update: { name: branch.name, code: branch.code || '', address: branch.address, phone: branch.phone },
+                create: { id: branch.id, name: branch.name, code: branch.code || '', address: branch.address, phone: branch.phone }
             });
         }
 
