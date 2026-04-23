@@ -78,27 +78,39 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
         // 4. Pulled Users
         const cloudUsers = await prismaCloud.user.findMany();
         for (const user of cloudUsers) {
-            await localPrisma.user.upsert({
-                where: { id: user.id },
-                update: { 
-                    nombre: user.nombre, 
-                    email: user.email, 
-                    password: user.password, 
-                    role: user.role,
-                    isActive: user.isActive 
-                },
-                create: { 
-                    id: user.id, 
-                    username: user.username,
-                    cedula: user.cedula,
-                    cedulaType: user.cedulaType,
-                    nombre: user.nombre, 
-                    email: user.email, 
-                    password: user.password, 
-                    role: user.role,
-                    isActive: user.isActive 
+            try {
+                // Check if user already exists locally by username
+                const existingUser = await localPrisma.user.findUnique({
+                    where: { username: user.username }
+                });
+
+                if (existingUser) {
+                    // User exists locally with different ID, skip
+                    console.log(`[Sync] User ${user.username} already exists locally, skipping...`);
+                    continue;
                 }
-            });
+
+                // Create new user
+                await localPrisma.user.create({
+                    data: {
+                        id: user.id,
+                        username: user.username,
+                        cedula: user.cedula,
+                        cedulaType: user.cedulaType,
+                        nombre: user.nombre,
+                        apellido: user.apellido,
+                        email: user.email,
+                        password: user.password,
+                        telefono: user.telefono,
+                        role: user.role,
+                        branchId: user.branchId,
+                        isActive: user.isActive
+                    }
+                });
+                console.log(`[Sync] Pulled user: ${user.username}`);
+            } catch (err: any) {
+                console.error(`[Sync] Failed to pull user ${user.username}:`, err.message);
+            }
         }
 
         console.log('[Sync] Pull Catalog Completed');
