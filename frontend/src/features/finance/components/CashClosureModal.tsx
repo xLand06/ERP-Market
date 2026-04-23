@@ -18,7 +18,7 @@ interface CashClosureModalProps {
 }
 
 interface ClosingData {
-    countedBalance: number;
+    closingAmount: number;
     notes: string;
 }
 
@@ -40,7 +40,7 @@ export function CashClosureModal({
             setError('Ingresa un monto contado válido.');
             return;
         }
-        onConfirm({ countedBalance: countedNum, notes });
+        onConfirm({ closingAmount: countedNum, notes });
         handleClose();
     };
 

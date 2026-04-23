@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Search, Barcode, Package, DollarSign, Smartphone, CreditCard, X, Check, Loader2, ShoppingCart, PackagePlus
 } from 'lucide-react';
@@ -221,9 +221,24 @@ export default function POSPage() {
 
     const selectedBranch = useAuthStore(s => s.selectedBranch);
     const user = useAuthStore(s => s.user);
+    const queryClient = useQueryClient();
+
+    const { data: branches = [] } = useQuery({
+        queryKey: ['branches'],
+        queryFn: async () => {
+            const res = await api.get('/branches');
+            return res.data.data;
+        },
+        staleTime: 5 * 60 * 1000,
+    });
+
+    const selectedBranchData = useMemo(() => {
+        if (!selectedBranch || selectedBranch === 'all') return null;
+        return branches.find((b: any) => b.id === selectedBranch);
+    }, [selectedBranch, branches]);
 
     const { iva, vesRate } = useConfigStore();
-    const effectiveBranch = selectedBranch === 'all' && user?.role === 'OWNER' ? null : selectedBranch;
+    const effectiveBranch = selectedBranchData?.id || (selectedBranch === 'all' && user?.role === 'OWNER' ? null : selectedBranch);
 
     const { inventory, isLoading, refetch, isOnline } = useInventory(effectiveBranch || '');
 

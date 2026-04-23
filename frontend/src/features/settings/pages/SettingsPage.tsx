@@ -339,7 +339,7 @@ export default function SettingsPage() {
     const { data: categories = [] } = useQuery<Category[]>({
         queryKey: ['categories'],
         queryFn: async () => {
-            const res = await api.get('/inventory/categories');
+            const res = await api.get('/categories');
             return res.data.data;
         },
         retry: false
@@ -357,7 +357,7 @@ export default function SettingsPage() {
 
     const deleteCategoryMutation = useMutation({
         mutationFn: async (id: string) => {
-            await api.delete(`/inventory/categories/${id}`);
+            await api.delete(`/categories/${id}`);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['categories'] });
