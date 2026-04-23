@@ -18,40 +18,67 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
 
         for (const user of localUsers) {
             try {
-                await prismaCloud.user.upsert({
-                    where: { id: user.id },
-                    update: {
-                        username: user.username,
-                        cedula: user.cedula,
-                        cedulaType: user.cedulaType,
-                        nombre: user.nombre,
-                        apellido: user.apellido,
-                        email: user.email,
-                        password: user.password,
-                        telefono: user.telefono,
-                        role: user.role,
-                        branchId: user.branchId,
-                        isActive: user.isActive
-                    },
-                    create: {
-                        id: user.id,
-                        username: user.username,
-                        cedula: user.cedula,
-                        cedulaType: user.cedulaType,
-                        nombre: user.nombre,
-                        apellido: user.apellido,
-                        email: user.email,
-                        password: user.password,
-                        telefono: user.telefono,
-                        role: user.role,
-                        branchId: user.branchId,
-                        isActive: user.isActive
-                    }
+                // First try to check if user exists in cloud by ID
+                const existingInCloud = await prismaCloud.user.findUnique({
+                    where: { id: user.id }
                 });
+
+                if (existingInCloud) {
+                    // Update existing user
+                    await prismaCloud.user.update({
+                        where: { id: user.id },
+                        data: {
+                            username: user.username,
+                            cedula: user.cedula,
+                            cedulaType: user.cedulaType,
+                            nombre: user.nombre,
+                            apellido: user.apellido,
+                            email: user.email,
+                            password: user.password,
+                            telefono: user.telefono,
+                            role: user.role,
+                            branchId: user.branchId,
+                            isActive: user.isActive
+                        }
+                    });
+                } else {
+                    // Check if user exists by username (handle case where ID differs but username same)
+                    const existingByUsername = await prismaCloud.user.findUnique({
+                        where: { username: user.username }
+                    });
+
+                    if (existingByUsername) {
+                        // User exists with different ID, skip or update by username
+                        console.log(`[Sync] User ${user.username} exists in cloud with different ID, skipping...`);
+                        continue;
+                    }
+
+                    // Create new user
+                    await prismaCloud.user.create({
+                        data: {
+                            id: user.id,
+                            username: user.username,
+                            cedula: user.cedula,
+                            cedulaType: user.cedulaType,
+                            nombre: user.nombre,
+                            apellido: user.apellido,
+                            email: user.email,
+                            password: user.password,
+                            telefono: user.telefono,
+                            role: user.role,
+                            branchId: user.branchId,
+                            isActive: user.isActive
+                        }
+                    });
+                }
                 console.log(`[Sync] Pushed/synced user: ${user.username}`);
                 pushedCount++;
             } catch (err: any) {
-                console.error(`[Sync] Failed to push user ${user.id}:`, err.message);
+                if (err.code === 'P2002') { // Prisma unique constraint error
+                    console.log(`[Sync] User ${user.username} already exists in cloud, skipping...`);
+                } else {
+                    console.error(`[Sync] Failed to push user ${user.id}:`, err.message);
+                }
             }
         }
 

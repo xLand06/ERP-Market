@@ -96,7 +96,7 @@ model User {
 model Branch {
   id        String    @id @default(cuid())
   name      String
-  code      String    @unique
+  code      String?
   address   String?
   phone     String?
   isActive  Boolean   @default(true)
