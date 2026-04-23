@@ -7,7 +7,7 @@
         "dev": "nodemon src/server.ts",
         "build": "tsc",
         "start": "node dist/server.js",
-        "postinstall": "prisma generate && prisma generate --schema=prisma/schema.local.prisma && prisma db push && prisma db push --schema=prisma/schema.local.prisma",
+        "postinstall": "db:setup",
         "db:generate": "prisma generate",
         "db:generate:local": "prisma generate --schema=prisma/schema.local.prisma",
         "db:migrate": "prisma migrate dev",
