@@ -249,7 +249,7 @@ model TransactionItem {
   product  Product @relation(fields: [productId], references: [id])
 
   presentationId String?
-  presentation   ProductPresentation? @relation(fields: [presentationId], references: [id])
+  presentation   ProductPresentation? @relation(fields: [presentationId], references: [id], onDelete: SetNull)
 
   @@map("transaction_items")
 }

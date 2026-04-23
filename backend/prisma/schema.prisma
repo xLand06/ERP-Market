@@ -93,13 +93,14 @@ model User {
 // =============================================================================
 
 model Branch {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   name      String
+  code      String    @unique // Ej: 'V-01', 'CCS-02'
   address   String?
   phone     String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now()) @db.Timestamptz
-  updatedAt DateTime @updatedAt @db.Timestamptz
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now()) @db.Timestamptz
+  updatedAt DateTime  @updatedAt     @db.Timestamptz
 
   users          User[]
   inventory      BranchInventory[]
@@ -249,7 +250,7 @@ model TransactionItem {
   product   Product @relation(fields: [productId], references: [id])
 
   presentationId String?
-  presentation   ProductPresentation? @relation(fields: [presentationId], references: [id])
+  presentation   ProductPresentation? @relation(fields: [presentationId], references: [id], onDelete: SetNull)
 
   @@index([transactionId])
   @@index([productId])
