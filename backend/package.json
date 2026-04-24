@@ -15,7 +15,7 @@
         "db:push:local": "prisma db push --schema=prisma/schema.local.prisma",
         "db:studio": "prisma studio",
         "db:studio:local": "prisma studio --schema=prisma/schema.local.prisma",
-        "db:setup": "prisma generate && prisma generate --schema=prisma/schema.local.prisma && prisma db push && prisma db push --schema=prisma/schema.local.prisma",
+        "db:setup": "prisma generate && prisma generate --schema=prisma/schema.local.prisma && prisma db push && prisma db push --schema=prisma/schema.prisma",
         "db:seed": "ts-node prisma/seed.ts",
         "db:seed:local": "ts-node prisma/seed.local.ts",
         "db:reset": "prisma migrate reset --force && ts-node prisma/seed.ts"

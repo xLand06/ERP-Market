@@ -1,72 +1,95 @@
-import { prismaCloud, getLocalPrisma } from '../../config/prisma';
+import { prismaCloud } from '../../config/prisma';
+import { 
+    fetchLocalUsers, 
+    fetchLocalBranches, 
+    fetchPendingTransactions, 
+    fetchPendingCashRegisters,
+    checkElectronConnection,
+    ElectronUser,
+    ElectronBranch,
+    ElectronTransaction,
+    ElectronCashRegister
+} from './electron-api.client';
+import { logger } from '../../core/utils/logger';
+import { $Enums } from '@prisma/client';
+
+const loggerSync = {
+    info: (msg: string, meta?: any) => logger.info(msg, { module: 'sync', ...meta }),
+    error: (msg: string, meta?: any) => logger.error(msg, { module: 'sync', ...meta }),
+    warn: (msg: string, meta?: any) => logger.warn(msg, { module: 'sync', ...meta }),
+};
 
 export async function pushSales(): Promise<{ success: boolean; pushedItems?: number; error?: string }> {
-    const localPrisma = getLocalPrisma();
+    
+    const isConnected = await checkElectronConnection();
+    if (!isConnected) {
+        loggerSync.warn('[Sync] Electron no conectado, saltando push...');
+        return { success: false, error: 'Electron no disponible' };
+    }
     
     try {
         console.log('[Sync] Starting Push Sales & Cash Registers...');
+        console.log('[Sync] Mode: HTTP API → Cloud (hybrid)');
         let pushedCount = 0;
 
         // ============================================
         // STEP 1: Push USERS first (needed for cash_registers and transactions)
-        // Note: Cloud schema may not have syncStatus on User, so we push all active users
         // ============================================
         console.log('[Sync] Step 1: Pushing Users...');
-        const localUsers = await localPrisma.user.findMany({
-            where: { isActive: true },
-        });
+        const localUsers: ElectronUser[] = await fetchLocalUsers();
+        
+        if (localUsers.length === 0) {
+            console.log('[Sync] No users found in local (Electron)');
+        }
 
         for (const user of localUsers) {
+            if (!user.isActive) continue;
+            
             try {
-                // First try to check if user exists in cloud by ID
                 const existingInCloud = await prismaCloud.user.findUnique({
                     where: { id: user.id }
                 });
 
                 if (existingInCloud) {
-                    // Update existing user
                     await prismaCloud.user.update({
                         where: { id: user.id },
                         data: {
                             username: user.username,
                             cedula: user.cedula,
-                            cedulaType: user.cedulaType,
+                            cedulaType: user.cedulaType as $Enums.CedulaType,
                             nombre: user.nombre,
-                            apellido: user.apellido,
-                            email: user.email,
+                            apellido: user.apellido || '',
+                            email: user.email || '',
                             password: user.password,
-                            telefono: user.telefono,
-                            role: user.role,
-                            branchId: user.branchId,
+                            telefono: user.telefono || '',
+                            role: user.role as $Enums.Role,
+                            branchId: user.branchId || null,
                             isActive: user.isActive
                         }
                     });
                 } else {
-                    // Check if user exists by username (handle case where ID differs but username same)
                     const existingByUsername = await prismaCloud.user.findUnique({
                         where: { username: user.username }
                     });
 
                     if (existingByUsername) {
-                        // User exists with different ID, skip or update by username
                         console.log(`[Sync] User ${user.username} exists in cloud with different ID, skipping...`);
                         continue;
                     }
 
-                    // Create new user
                     await prismaCloud.user.create({
                         data: {
                             id: user.id,
                             username: user.username,
                             cedula: user.cedula,
-                            cedulaType: user.cedulaType,
+                            cedulaType: user.cedulaType as $Enums.CedulaType,
                             nombre: user.nombre,
-                            apellido: user.apellido,
-                            email: user.email,
+                            apellido: user.apellido || '',
+                            email: user.email || '',
                             password: user.password,
-                            telefono: user.telefono,
-                            role: user.role,
-                            branchId: user.branchId,
+                            telefono: user.telefono || '',
+                            role: user.role as $Enums.Role,
+                            branchId: user.branchId || null,
                             isActive: user.isActive
                         }
                     });
@@ -74,7 +97,7 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                 console.log(`[Sync] Pushed/synced user: ${user.username}`);
                 pushedCount++;
             } catch (err: any) {
-                if (err.code === 'P2002') { // Prisma unique constraint error
+                if (err.code === 'P2002') {
                     console.log(`[Sync] User ${user.username} already exists in cloud, skipping...`);
                 } else {
                     console.error(`[Sync] Failed to push user ${user.id}:`, err.message);
@@ -84,16 +107,18 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
 
         // ============================================
         // STEP 2: Push BRANCHES (needed for cash_registers and transactions)
-        // Note: Cloud schema may not have syncStatus on Branch
         // ============================================
         console.log('[Sync] Step 2: Pushing Branches...');
-        const localBranches = await localPrisma.branch.findMany({
-            where: { isActive: true },
-        });
+        const localBranches: ElectronBranch[] = await fetchLocalBranches();
+        
+        if (localBranches.length === 0) {
+            console.log('[Sync] No branches found in local (Electron)');
+        }
 
         for (const branch of localBranches) {
+            if (!branch.isActive) continue;
+            
             try {
-                // Generate code if not exists
                 const branchCode = branch.code || `SEDE-${branch.id.slice(-6).toUpperCase()}`;
                 
                 await prismaCloud.branch.upsert({
@@ -125,21 +150,20 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
         // STEP 3: Push CASH REGISTERS
         // ============================================
         console.log('[Sync] Step 3: Pushing Cash Registers...');
-        const pendingRegisters = await localPrisma.cashRegister.findMany({
-            where: { syncStatus: 'PENDING', status: 'CLOSED' },
-        });
+        const pendingRegisters: ElectronCashRegister[] = await fetchPendingCashRegisters();
+        
+        if (pendingRegisters.length === 0) {
+            console.log('[Sync] No pending cash registers to sync');
+        }
 
         for (const reg of pendingRegisters) {
             try {
                 await prismaCloud.cashRegister.upsert({
                     where: { id: reg.id },
                     update: {
-                        status: reg.status,
+                        status: reg.status as $Enums.CashRegisterStatus,
                         openingAmount: reg.openingAmount,
                         closingAmount: reg.closingAmount,
-                        expectedAmount: reg.expectedAmount,
-                        difference: reg.difference,
-                        notes: reg.notes,
                         openedAt: reg.openedAt,
                         closedAt: reg.closedAt,
                         userId: reg.userId,
@@ -147,22 +171,14 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                     },
                     create: {
                         id: reg.id,
-                        status: reg.status,
+                        status: reg.status as $Enums.CashRegisterStatus,
                         openingAmount: reg.openingAmount,
                         closingAmount: reg.closingAmount,
-                        expectedAmount: reg.expectedAmount,
-                        difference: reg.difference,
-                        notes: reg.notes,
                         openedAt: reg.openedAt,
                         closedAt: reg.closedAt,
                         userId: reg.userId,
                         branchId: reg.branchId
                     }
-                });
-
-                await localPrisma.cashRegister.update({
-                    where: { id: reg.id },
-                    data: { syncStatus: 'SYNCED', syncedAt: new Date() }
                 });
                 console.log(`[Sync] Pushed cash register: ${reg.id}`);
                 pushedCount++;
@@ -175,87 +191,33 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
         // STEP 4: Push TRANSACTIONS
         // ============================================
         console.log('[Sync] Step 4: Pushing Transactions...');
-        const pendingTxs = await localPrisma.transaction.findMany({
-            where: { syncStatus: 'PENDING' },
-            include: { items: true }
-        });
+        const pendingTxs: ElectronTransaction[] = await fetchPendingTransactions();
+        
+        if (pendingTxs.length === 0) {
+            console.log('[Sync] No pending transactions to sync');
+        }
 
         for (const tx of pendingTxs) {
             try {
-                // Ensure all products in the transaction exist in the cloud to avoid FK errors
-                for (const item of tx.items) {
-                    const cloudProd = await prismaCloud.product.findUnique({ where: { id: item.productId } });
-                    if (!cloudProd) {
-                        const localProd = await localPrisma.product.findUnique({ where: { id: item.productId } });
-                        if (localProd) {
-                            await prismaCloud.product.upsert({
-                                where: { id: localProd.id },
-                                update: {
-                                    name: localProd.name,
-                                    barcode: localProd.barcode,
-                                    price: localProd.price,
-                                    cost: localProd.cost,
-                                    baseUnit: localProd.baseUnit,
-                                    categoryId: localProd.categoryId,
-                                    isActive: localProd.isActive
-                                },
-                                create: {
-                                    id: localProd.id,
-                                    name: localProd.name,
-                                    barcode: localProd.barcode,
-                                    price: localProd.price,
-                                    cost: localProd.cost,
-                                    baseUnit: localProd.baseUnit,
-                                    categoryId: localProd.categoryId,
-                                    isActive: localProd.isActive
-                                }
-                            });
-                            console.log(`[Sync] Auto-pushed product: ${localProd.name}`);
-                        }
-                    }
-                }
-
                 await prismaCloud.transaction.upsert({
                     where: { id: tx.id },
                     update: {
-                        type: tx.type,
-                        status: tx.status,
-                        total: tx.total,
-                        notes: tx.notes,
-                        ipAddress: tx.ipAddress,
+                        type: tx.type as $Enums.TransactionType,
+                        status: tx.status as $Enums.TransactionStatus,
+                        total: tx.amount,
                         createdAt: tx.createdAt,
                         userId: tx.userId,
-                        branchId: tx.branchId,
-                        cashRegisterId: tx.cashRegisterId
+                        branchId: tx.branchId
                     },
                     create: {
                         id: tx.id,
-                        type: tx.type,
-                        status: tx.status,
-                        total: tx.total,
-                        notes: tx.notes,
-                        ipAddress: tx.ipAddress,
+                        type: tx.type as $Enums.TransactionType,
+                        status: tx.status as $Enums.TransactionStatus,
+                        total: tx.amount,
                         createdAt: tx.createdAt,
                         userId: tx.userId,
-                        branchId: tx.branchId,
-                        cashRegisterId: tx.cashRegisterId,
-                        items: {
-                            create: tx.items.map((it: any) => ({
-                                id: it.id,
-                                productId: it.productId,
-                                presentationId: it.presentationId,
-                                quantity: it.quantity,
-                                multiplierUsed: it.multiplierUsed,
-                                unitPrice: it.unitPrice,
-                                subtotal: it.subtotal
-                            }))
-                        }
+                        branchId: tx.branchId
                     }
-                });
-
-                await localPrisma.transaction.update({
-                    where: { id: tx.id },
-                    data: { syncStatus: 'SYNCED', syncedAt: new Date() }
                 });
                 console.log(`[Sync] Pushed transaction: ${tx.id}`);
                 pushedCount++;

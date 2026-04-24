@@ -55,28 +55,28 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     ];
 
     return (
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-3 sm:px-5 gap-2 sm:gap-4 transition-all duration-300 shadow-sm relative z-30">
+        <header className="h-14 lg:h-16 bg-white border-b border-slate-200 flex items-center justify-between px-2 lg:px-5 gap-1 lg:gap-4 transition-all duration-300 shadow-sm relative z-30">
             {/* Left – Toggle + Logo */}
-            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+            <div className="flex items-center gap-1 lg:gap-4 shrink-0">
                 <button 
                     onClick={onToggleSidebar}
-                    className="p-1.5 sm:p-2 -ml-1 sm:-ml-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all active:scale-95"
+                    className="p-2 lg:p-2 -ml-1 lg:-ml-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all active:scale-95 min-w-11 min-h-11"
                     aria-label={collapsed ? 'Abrir menú' : 'Cerrar menú'}
                 >
-                    <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <Menu className="w-5 h-5 lg:w-6 lg:h-6" />
                 </button>
 
                 <div className="flex items-center gap-2 shrink-0">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shrink-0">
                         <Store className="w-4 h-4 text-white" />
                     </div>
-                    {/* Hide text on tablet/mobile screens to provide space for widgets */}
+                    {/* Hide text on mobile to provide space for widgets */}
                     <span className="font-black text-sm text-slate-900 tracking-tight hidden lg:block uppercase">Abastos sofimar</span>
                 </div>
             </div>
 
             {/* Center – Exchange Rate Widget */}
-            <div className="flex items-center gap-0 bg-slate-50 border border-slate-200 rounded-xl p-1 text-xs shrink-0 max-w-[140px] sm:max-w-none overflow-x-auto min-[400px]:flex hidden no-scrollbar">
+            <div className="flex items-center gap-0 bg-slate-50 border border-slate-200 rounded-xl p-1 text-xs shrink-0 max-w-[140px] sm:max-w-none overflow-x-auto min-[400px]:flex hidden lg:flex no-scrollbar">
                 {/* Label */}
                 <div className="hidden sm:flex items-center gap-1.5 px-2 text-slate-400">
                     <ArrowLeftRight className="w-3 h-3" />
@@ -122,7 +122,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
             </div>
 
             {/* Right – BranchSelector + Notifications + Shortcuts + Profile */}
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="flex items-center gap-1 lg:gap-3 shrink-0">
                 {/* Cloud Sync Status */}
                 <CloudSyncWidget />
 
@@ -133,14 +133,14 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                     {/* Keyboard Shortcuts */}
                     <button 
                         onClick={() => setShortcutsOpen(true)}
-                        className="w-9 h-9 flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95" 
+                        className="w-10 h-10 lg:w-9 lg:h-9 flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 min-w-10" 
                         title="Atajos de teclado (K)"
                     >
                         <Keyboard className="w-4.5 h-4.5" />
                     </button>
 
                     {/* Bell */}
-                    <button className="relative w-9 h-9 flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95" aria-label="Notificaciones">
+                    <button className="relative w-10 h-10 lg:w-9 lg:h-9 flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 min-w-10" aria-label="Notificaciones">
                         <Bell className="w-4.5 h-4.5" />
                         <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full border border-white" />
                     </button>
@@ -150,16 +150,16 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                 <div className="relative">
                     <button
                         onClick={() => setProfileOpen(!profileOpen)}
-                        className="flex items-center gap-2 py-1.5 px-1.5 sm:px-2 rounded-xl hover:bg-slate-100 transition-all active:scale-95"
+                        className="flex items-center gap-1.5 lg:py-1.5 py-1 px-1.5 lg:px-2 rounded-xl hover:bg-slate-100 transition-all active:scale-95"
                     >
-                        <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center shadow-md">
+                        <div className="w-9 h-9 lg:w-8 lg:h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center shadow-md">
                             <User className="w-4 h-4 text-white" />
                         </div>
-                        <div className="hidden md:block text-left">
+                        <div className="hidden lg:block text-left">
                             <p className="text-xs font-bold text-slate-900 leading-none">{user?.nombre || 'Usuario'}</p>
                             <p className="text-[10px] text-slate-400 mt-0.5 font-medium uppercase tracking-tight italic">{user?.role || 'Invitado'}</p>
                         </div>
-                        <ChevronDown className="w-3 h-3 text-slate-400 hidden sm:block" />
+                        <ChevronDown className="w-3 h-3 text-slate-400 hidden lg:block" />
                     </button>
 
                     {profileOpen && (

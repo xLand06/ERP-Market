@@ -9,8 +9,8 @@ import { useSyncStore } from '@/services/sync.service';
 export function AppShellLayout() {
     const { fetchRates } = useConfigStore();
     const navigate = useNavigate();
-    // Initial state based on window width to avoid flashes on load
-    const [collapsed, setCollapsed] = useState(() => window.innerWidth < 768);
+    // Initial state: mobile (<640), tablet (640-1023), desktop (1024+)
+    const [collapsed, setCollapsed] = useState(() => window.innerWidth < 1024);
     const location = useLocation();
 
     // Keyboard Shortcuts Logic
@@ -55,19 +55,21 @@ export function AppShellLayout() {
 
     // Close sidebar on mobile when navigating
     useEffect(() => {
-        if (window.innerWidth < 768) {
+        if (window.innerWidth < 640) {
             setCollapsed(true);
         }
     }, [location.pathname]);
 
-    // Handle window resize dynamically
+    // Handle window resize - respect user preference on desktop
     useEffect(() => {
         const handleResize = () => {
-            if (window.innerWidth < 768) {
+            const width = window.innerWidth;
+            if (width < 640) {
                 setCollapsed(true);
-            } else {
-                setCollapsed(false);
+            } else if (width < 1024) {
+                setCollapsed(true); // Tablet = icon-only
             }
+            // Desktop (1024+) - don't auto-collapse, respect user preference
         };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
@@ -78,7 +80,7 @@ export function AppShellLayout() {
             {/* Mobile Overlay */}
             {!collapsed && (
                 <div 
-                    className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
+                    className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"
                     onClick={() => setCollapsed(true)}
                     aria-hidden="true"
                 />
@@ -87,8 +89,12 @@ export function AppShellLayout() {
             {/* Sidebar */}
             <aside
                 className={cn(
-                    'fixed left-0 top-0 h-dvh z-50 bg-slate-900 flex flex-col transition-all duration-300 ease-in-out shadow-2xl md:shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)] border-r border-slate-800',
-                    collapsed ? '-translate-x-full md:translate-x-0 md:w-20' : 'translate-x-0 w-65'
+                    'fixed left-0 top-0 h-dvh z-50 bg-slate-900 flex flex-col transition-all duration-300 ease-in-out shadow-2xl lg:shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)] border-r border-slate-800',
+                    // Mobile: full overlay, toggles between off-screen and full
+                    // Tablet/Desktop: icon-only (80px) or full (256px)
+                    collapsed 
+                        ? '-translate-x-full lg:-translate-x-0 lg:w-20' 
+                        : 'translate-x-0 w-65'
                 )}
             >
                 <div className="flex-1 w-full h-full overflow-hidden">
@@ -104,21 +110,21 @@ export function AppShellLayout() {
             <div
                 className={cn(
                     'flex flex-col flex-1 min-w-0 transition-all duration-300 ease-in-out',
-                    collapsed ? 'md:ml-20' : 'md:ml-65' // Always 0 on mobile implicitly
+                    collapsed ? 'lg:ml-20' : 'lg:ml-65'
                 )}
             >
                 {/* Topbar – Fixed */}
                 <div
                     className={cn(
                         'fixed top-0 right-0 z-30 transition-all duration-300 ease-in-out',
-                        collapsed ? 'left-0 md:left-20' : 'left-0 md:left-65'
+                        collapsed ? 'left-0 lg:left-20' : 'left-0 lg:left-65'
                     )}
                 >
                     <TopBar onToggleSidebar={() => setCollapsed(!collapsed)} collapsed={collapsed} />
                 </div>
 
                 {/* Page content */}
-                <main className="flex-1 overflow-y-auto mt-16 p-4 md:p-6 lg:p-8">
+                <main className="flex-1 overflow-y-auto mt-14 lg:mt-16 p-3 lg:p-6 xl:p-8">
                     <Outlet />
                 </main>
             </div>

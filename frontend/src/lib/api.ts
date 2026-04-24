@@ -8,7 +8,7 @@ import { useAuthStore } from '../features/auth/store/authStore';
 import toast from 'react-hot-toast';
 
 const isElectron = typeof window !== 'undefined' && 'erpApi' in window;
-const baseURL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3001/api';
+const baseURL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3000/api';
 
 export const api = axios.create({
     baseURL,

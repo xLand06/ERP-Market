@@ -173,7 +173,8 @@ export default function CashRegisterPage() {
                     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm w-full mt-4">
                         <form onSubmit={(e) => {
                             e.preventDefault();
-                            const val = parseFloat((e.target as HTMLFormElement).get('openingAmount') as string);
+                            const formData = new FormData(e.currentTarget);
+                            const val = parseFloat(formData.get('openingAmount') as string);
                             if (!isNaN(val) && val >= 0) openMutation.mutate(val);
                         }}>
                             <label className="block text-left text-sm font-bold text-slate-700 mb-2">Monto de Apertura</label>
