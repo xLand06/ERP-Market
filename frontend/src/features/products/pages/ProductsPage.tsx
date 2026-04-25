@@ -8,12 +8,17 @@ import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { ProductFormModal, Product, Category } from '../components/ProductFormModal';
+import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
 
 export default function ProductsPage() {
     const [search, setSearch] = useState('');
     const [filterCategory, setFilterCategory] = useState<string>('all');
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('active');
     
+    useBarcodeScanner((barcode) => {
+        setSearch(barcode);
+    });
+
     // Modal State
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);

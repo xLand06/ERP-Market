@@ -10,6 +10,7 @@ import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
 import { useInventory } from '@/hooks/useInventory';
+import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
 import toast from 'react-hot-toast';
 
 interface Product {
@@ -47,6 +48,10 @@ export default function InventoryPage() {
     const effectiveBranch = selectedBranch === 'all' && isOwner ? null : selectedBranch;
 
     const { inventory, isLoading, refetch, isOnline, updateStock } = useInventory(effectiveBranch || '');
+
+    useBarcodeScanner((barcode) => {
+        setSearch(barcode);
+    });
 
     useEffect(() => {
         if (inventory.length > 0) {

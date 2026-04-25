@@ -173,11 +173,11 @@ async function main() {
     try {
         // 1. EXCHANGE RATES
         await sql(`INSERT INTO exchange_rates (code, rate) VALUES ($1, $2) ON CONFLICT (code) DO UPDATE SET rate = $2`,
-            ['USD', 1]);
+            ['USD', '1.0000']);
         await sql(`INSERT INTO exchange_rates (code, rate) VALUES ($1, $2) ON CONFLICT (code) DO UPDATE SET rate = $2`,
-            ['VES', 36.5]);
+            ['VES', '36.5000']);
         await sql(`INSERT INTO exchange_rates (code, rate) VALUES ($1, $2) ON CONFLICT (code) DO UPDATE SET rate = $2`,
-            ['COP', 3950]);
+            ['COP', '3950.0000']);
         console.log('✅ Tasas de cambio');
 
         // 2. SEDES

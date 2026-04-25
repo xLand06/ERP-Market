@@ -378,6 +378,7 @@ export default function POSPage() {
 
     // HOOK DEL ESCÁNER DE HARDWARE
     useBarcodeScanner((barcode) => {
+        setSearch(barcode); // Siempre colocar en el input
         // Buscar por código base
         const product = PRODUCTS.find(p => p.code === barcode);
         if (product) {
