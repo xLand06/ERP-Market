@@ -4,7 +4,6 @@ import {
     AlertTriangle, RefreshCcw, ArrowLeft, Home, ChevronDown, ChevronRight 
 } from 'lucide-react';
 import { useState } from 'react';
-import { cn } from '@/lib/utils';
 
 export default function RouteErrorBoundary() {
     const error = useRouteError();

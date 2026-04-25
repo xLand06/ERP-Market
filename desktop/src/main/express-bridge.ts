@@ -1,4 +1,5 @@
-import { resolve } from 'path';
+import { resolve, join } from 'path';
+import { is } from '@electron-toolkit/utils';
 import type { Application } from 'express';
 
 // =============================================================================
@@ -14,20 +15,28 @@ let serverStarted = false;
 export async function startExpressServer(): Promise<void> {
     if (serverStarted) return;
 
-    // Importación dinámica del app de Express mediante ts-node.
-    // Esto permite que el Main Process en Node interprete la carpeta backend/ 
-    // al vuelo en tiempo real sin requerir compilación estricta.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    require('ts-node').register({ 
-        transpileOnly: true,
-        project: resolve(__dirname, '../../../backend/tsconfig.json')
-    });
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const backendPath = resolve(__dirname, '../../../backend/src/app.ts');
-    const { default: app } = require(backendPath);
+    let expressApp: Application;
+    
+    if (is.dev) {
+        // Importación dinámica del app de Express mediante ts-node en DESARROLLO.
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        require('ts-node').register({ 
+            transpileOnly: true,
+            project: resolve(__dirname, '../../../backend/tsconfig.json')
+        });
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const backendPath = resolve(__dirname, '../../../backend/src/app.ts');
+        expressApp = require(backendPath).default;
+    } else {
+        // En PRODUCCIÓN, cargar el JS ya compilado en la carpeta resources/backend
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const backendPath = join(process.resourcesPath, 'backend', 'app.js');
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        expressApp = require(backendPath).default;
+    }
 
     return new Promise((resolve, reject) => {
-        const server = app.listen(ELECTRON_PORT, '127.0.0.1', () => {
+        const server = expressApp.listen(ELECTRON_PORT, '127.0.0.1', () => {
             serverStarted = true;
             console.log(`[ERP-Market] Express local API → http://127.0.0.1:${ELECTRON_PORT}/api`);
             resolve();

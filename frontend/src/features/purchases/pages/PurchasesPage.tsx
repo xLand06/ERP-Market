@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { PurchaseEntryModal } from '../components/PurchaseEntryModal';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { purchasesApi, PurchaseOrder } from '@/services/purchases.service';
+import { purchasesApi } from '@/services/purchases.service';
 import { useAuthStore } from '../../auth/store/authStore';
 import toast from 'react-hot-toast';
 
@@ -41,7 +41,7 @@ export default function PurchasesPage() {
     const selectedBranch = useAuthStore(s => s.selectedBranch);
     const queryClient = useQueryClient();
     
-    const effectiveBranch = selectedBranch === 'all' ? undefined : selectedBranch;
+    const effectiveBranch = (selectedBranch === 'all' || !selectedBranch) ? undefined : selectedBranch;
 
     // 1. Fetch Orders
     const { data: orders = [], isLoading, isError } = useQuery({

@@ -237,9 +237,8 @@ function QuickActions() {
 }
 
 export default function DashboardPage() {
-    const navigate = useNavigate();
     const selectedBranch = useAuthStore(s => s.selectedBranch);
-    const effectiveBranch = selectedBranch === 'all' ? undefined : selectedBranch;
+    const effectiveBranch = (selectedBranch === 'all' || !selectedBranch) ? undefined : selectedBranch;
 
     const { data: kpis, isLoading: kpisLoading } = useKPIs(effectiveBranch);
     const { data: salesTrend, isLoading: trendLoading } = useSalesTrend(30, effectiveBranch);

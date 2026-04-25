@@ -17,9 +17,12 @@ extraFiles:
   # Incluye el frontend construido
   - from: "../frontend/dist"
     to: "frontend/dist"
-  # Incluye el backend construido con sus node_modules (Prisma, Express)
-  - from: "../backend/node_modules/.prisma"
-    to: "resources/prisma"
+  # Incluye el backend construido (JS compilado)
+  - from: "../backend/dist"
+    to: "backend"
+  # Incluye las dependencias del backend (necesario para Express y Prisma)
+  - from: "../backend/node_modules"
+    to: "backend/node_modules"
 
 win:
   icon: resources/icon.ico

@@ -50,7 +50,6 @@ interface CartItem {
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────
-const toNum = (val: number | string) => typeof val === 'string' ? parseFloat(val) : val;
 
 const PAYMENT_OPTIONS = [
     { id:'cash_usd',  label:'Efectivo USD',     icon:DollarSign, currency:'USD' as const },
