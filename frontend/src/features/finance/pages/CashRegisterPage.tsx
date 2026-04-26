@@ -44,7 +44,6 @@ export default function CashRegisterPage() {
     const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
     
     const { rates } = useConfigStore();
-    const [openCurrency, setOpenCurrency] = useState<'USD' | 'VES' | 'COP'>('COP');
     const [filterMode, setFilterMode] = useState<'range' | 'month'>('range');
     const [selectedMonth, setSelectedMonth] = useState<string>(String(new Date().getMonth() + 1).padStart(2, '0'));
     const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()));
@@ -186,10 +185,10 @@ export default function CashRegisterPage() {
         staleTime: 30 * 1000,
     });
 
+    const { fmtCOP } = useConfigStore();
     const formatCurrency = (value: number | string | null | undefined) => {
         const num = typeof value === 'string' ? parseFloat(value) : (value || 0);
-        const copValue = num * (rates['COP'] || 4100);
-        return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(copValue);
+        return fmtCOP(num);
     };
 
     const formatDate = (dateStr: string | null | undefined) => {

@@ -24,12 +24,11 @@ export function CashRegisterDetailModal({ id, open, onClose, onSaleClick }: Prop
         enabled: !!id && open,
     });
 
-    const { rates } = useConfigStore();
+    const { fmtCOP, fromCOP } = useConfigStore();
 
     const formatCurrency = (value: number | string | null | undefined) => {
         const num = typeof value === 'string' ? parseFloat(value) : (value || 0);
-        const copValue = num * (rates['COP'] || 4100);
-        return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(copValue);
+        return fmtCOP(num); // DB already stores total in COP
     };
 
     if (!register && isLoading) {
@@ -70,21 +69,39 @@ export function CashRegisterDetailModal({ id, open, onClose, onSaleClick }: Prop
                 </DialogHeader>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                    <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+                    <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100 flex flex-col h-full">
                         <p className="text-[10px] uppercase font-bold text-emerald-600 mb-1">Apertura</p>
-                        <p className="text-lg font-black text-emerald-900 tabular-nums">{formatCurrency(openingAmount)}</p>
+                        <p className="text-lg font-black text-emerald-900 tabular-nums leading-none">{formatCurrency(openingAmount)}</p>
+                        <div className="mt-auto pt-2 flex justify-between text-[10px] text-emerald-700/70 font-semibold tabular-nums">
+                            <span>${fromCOP(openingAmount, 'USD').toFixed(2)}</span>
+                            <span>Bs.{fromCOP(openingAmount, 'VES').toFixed(2)}</span>
+                        </div>
                     </div>
-                    <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+                    <div className="bg-blue-50 rounded-xl p-3 border border-blue-100 flex flex-col h-full">
                         <p className="text-[10px] uppercase font-bold text-blue-600 mb-1">Ingresos</p>
-                        <p className="text-lg font-black text-blue-900 tabular-nums">{formatCurrency(totalIncome)}</p>
+                        <p className="text-lg font-black text-blue-900 tabular-nums leading-none">{formatCurrency(totalIncome)}</p>
+                        <div className="mt-auto pt-2 flex justify-between text-[10px] text-blue-700/70 font-semibold tabular-nums">
+                            <span>${fromCOP(totalIncome, 'USD').toFixed(2)}</span>
+                            <span>Bs.{fromCOP(totalIncome, 'VES').toFixed(2)}</span>
+                        </div>
                     </div>
-                    <div className="bg-red-50 rounded-xl p-3 border border-red-100">
+                    <div className="bg-red-50 rounded-xl p-3 border border-red-100 flex flex-col h-full">
                         <p className="text-[10px] uppercase font-bold text-red-600 mb-1">Egresos</p>
-                        <p className="text-lg font-black text-red-900 tabular-nums">{formatCurrency(totalExpense)}</p>
+                        <p className="text-lg font-black text-red-900 tabular-nums leading-none">{formatCurrency(totalExpense)}</p>
+                        <div className="mt-auto pt-2 flex justify-between text-[10px] text-red-700/70 font-semibold tabular-nums">
+                            <span>${fromCOP(totalExpense, 'USD').toFixed(2)}</span>
+                            <span>Bs.{fromCOP(totalExpense, 'VES').toFixed(2)}</span>
+                        </div>
                     </div>
-                    <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                    <div className="bg-amber-50 rounded-xl p-3 border border-amber-100 flex flex-col h-full">
                         <p className="text-[10px] uppercase font-bold text-amber-600 mb-1">Cierre Real</p>
-                        <p className="text-lg font-black text-amber-900 tabular-nums">{register.closedAt ? formatCurrency(register.closingAmount) : '—'}</p>
+                        <p className="text-lg font-black text-amber-900 tabular-nums leading-none">{register.closedAt ? formatCurrency(register.closingAmount) : '—'}</p>
+                        {register.closedAt && (
+                            <div className="mt-auto pt-2 flex justify-between text-[10px] text-amber-700/70 font-semibold tabular-nums">
+                                <span>${fromCOP(Number(register.closingAmount), 'USD').toFixed(2)}</span>
+                                <span>Bs.{fromCOP(Number(register.closingAmount), 'VES').toFixed(2)}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -147,7 +164,14 @@ export function CashRegisterDetailModal({ id, open, onClose, onSaleClick }: Prop
                                         <p className={cn('text-sm font-bold tabular-nums', t.type === 'SALE' ? 'text-emerald-600' : 'text-amber-600')}>
                                             {t.type === 'SALE' ? '+' : ''}{formatCurrency(t.total)}
                                         </p>
-                                        <p className="text-[10px] text-slate-400 capitalize font-semibold mt-0.5">{t.status.toLowerCase()}</p>
+                                        <div className="flex gap-2 justify-end mt-0.5">
+                                            {t.currency && t.currency !== 'COP' && (
+                                                <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono">
+                                                    Pagado en {t.currency}
+                                                </span>
+                                            )}
+                                            <p className="text-[10px] text-slate-400 capitalize font-semibold">{t.status.toLowerCase()}</p>
+                                        </div>
                                     </div>
                                 </div>
                             ))}

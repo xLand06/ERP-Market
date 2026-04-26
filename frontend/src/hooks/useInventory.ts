@@ -5,9 +5,10 @@ import { api } from '@/lib/api';
 interface Product {
     id: string;
     name: string;
-    barcode: string;
-    price: number;
-    cost: number;
+    barcode: string; // legacy barcode
+    barcodes: { id: string; code: string; label?: string | null }[]; // multi-barcode
+    price: number;  // en COP
+    cost: number;   // en COP
     baseUnit: string;
     presentations: any[];
     subGroup: string;
@@ -71,6 +72,7 @@ export function useInventory(branchId: string) {
                         id: item.product.id,
                         name: item.product.name || 'Sin Nombre',
                         barcode: item.product.barcode || '',
+                        barcodes: item.product.barcodes || [],
                         price: Number(item.product.price || 0),
                         cost: Number(item.product.cost || 0),
                         baseUnit: item.product.baseUnit || 'UNIDAD',

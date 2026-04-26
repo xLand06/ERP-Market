@@ -27,7 +27,7 @@ interface ClosingData {
 export function CashClosureModal({
     open, onClose, openingBalance, expectedBalance, onConfirm,
 }: CashClosureModalProps) {
-    const { rates } = useConfigStore();
+    const { fmtCOP, rates } = useConfigStore();
     const [countedCop, setCountedCop] = useState('');
     const [countedUsd, setCountedUsd] = useState('');
     const [countedVes, setCountedVes] = useState('');
@@ -37,17 +37,13 @@ export function CashClosureModal({
     const copRate = rates['COP'] || 4100;
     const vesRate = rates['VES'] || 36.50;
 
-    const convertedOpening = openingBalance * copRate;
-    const convertedExpected = expectedBalance * copRate;
-
     const countedCopNum = parseFloat(countedCop) || 0;
     const countedUsdNum = parseFloat(countedUsd) || 0;
     const countedVesNum = parseFloat(countedVes) || 0;
 
     const totalCountedCop = countedCopNum + (countedUsdNum * copRate) + ((countedVesNum / vesRate) * copRate);
-    const totalCountedUsd = (countedCopNum / copRate) + countedUsdNum + (countedVesNum / vesRate);
 
-    const difference = totalCountedCop - convertedExpected;
+    const difference = totalCountedCop - expectedBalance;
     const isShort = difference < 0;
     const isOver = difference > 0;
 
@@ -56,7 +52,7 @@ export function CashClosureModal({
             setError('Ingresa montos contados válidos.');
             return;
         }
-        onConfirm({ closingAmount: totalCountedUsd, notes });
+        onConfirm({ closingAmount: totalCountedCop, notes });
         handleClose();
     };
 
@@ -88,13 +84,13 @@ export function CashClosureModal({
                     {/* Summary Grid */}
                     <div className="grid grid-cols-3 gap-3">
                         {[
-                            { label: 'Apertura', value: convertedOpening, color: 'text-slate-700' },
-                            { label: 'Esperado', value: convertedExpected, color: 'text-blue-700' },
+                            { label: 'Apertura', value: openingBalance, color: 'text-slate-700' },
+                            { label: 'Esperado', value: expectedBalance, color: 'text-blue-700' },
                         ].map(item => (
                             <div key={item.label} className="bg-slate-50 rounded-xl p-3 border border-slate-200">
                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">{item.label}</p>
                                 <p className={cn('text-lg font-black tabular-nums', item.color)}>
-                                    ${Math.round(item.value).toLocaleString('es-CO')}
+                                    {fmtCOP(item.value)}
                                 </p>
                             </div>
                         ))}
@@ -108,7 +104,7 @@ export function CashClosureModal({
                                 isShort ? 'text-red-600' : isOver ? 'text-emerald-600' : 'text-slate-700'
                             )}>
                                 {isShort ? '' : isOver ? '+' : ''}
-                                ${Math.round(difference).toLocaleString('es-CO')}
+                                {fmtCOP(difference)}
                             </p>
                         </div>
                     </div>
@@ -183,9 +179,9 @@ export function CashClosureModal({
                             <AlertTriangle className="w-4 h-4 shrink-0" />
                             <p className="text-sm font-semibold">
                                 {isShort
-                                    ? `Faltante de $${Math.round(Math.abs(difference)).toLocaleString('es-CO')} en caja.`
+                                    ? `Faltante de ${fmtCOP(Math.abs(difference))} en caja.`
                                     : isOver
-                                        ? `Sobrante de +$${Math.round(difference).toLocaleString('es-CO')} en caja.`
+                                        ? `Sobrante de +${fmtCOP(difference)} en caja.`
                                         : 'Caja cuadrada correctamente.'}
                             </p>
                         </div>

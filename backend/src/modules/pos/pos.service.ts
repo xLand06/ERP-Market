@@ -16,11 +16,19 @@ export interface CreateTransactionInput {
     cashRegisterId?: string;
     notes?: string;
     ipAddress?: string;
+    // Multi-moneda
+    currency?: string;       // 'COP' | 'USD' | 'VES'
+    exchangeRate?: number | null; // tasa COP por unidad de currency
+    invoiceNumber?: string;  // nº factura para INVENTORY_IN
 }
 
 export const createTransaction = async (input: CreateTransactionInput) => {
-    const { type, branchId, userId, items, cashRegisterId, notes, ipAddress } = input;
+    const {
+        type, branchId, userId, items, cashRegisterId, notes, ipAddress,
+        currency = 'COP', exchangeRate, invoiceNumber
+    } = input;
 
+    // El total siempre se calcula en COP (moneda principal)
     const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
     return await prisma.$transaction(async (tx) => {
@@ -85,6 +93,10 @@ export const createTransaction = async (input: CreateTransactionInput) => {
                 userId,
                 branchId,
                 cashRegisterId: type === TransactionType.SALE ? assignedCashRegisterId : null,
+                // Campos multi-moneda
+                currency: currency || 'COP',
+                exchangeRate: exchangeRate ?? null,
+                invoiceNumber: invoiceNumber || null,
                 items: {
                     create: processedItems.map((item) => ({
                         productId: item.productId,
@@ -99,6 +111,7 @@ export const createTransaction = async (input: CreateTransactionInput) => {
             include: { items: { include: { product: { select: { name: true, barcode: true } } } } },
         });
 
+        // Afectar stock: SALE descuenta, INVENTORY_IN suma (inmediatamente)
         for (const item of processedItems) {
             const delta = type === TransactionType.SALE ? -item.totalUnitsToDeduct : item.totalUnitsToDeduct;
             await tx.branchInventory.upsert({
@@ -110,6 +123,14 @@ export const createTransaction = async (input: CreateTransactionInput) => {
                     stock: type === TransactionType.INVENTORY_IN ? item.totalUnitsToDeduct : 0,
                 },
             });
+
+            // Para INVENTORY_IN: actualizar costo del producto en catálogo maestro
+            if (type === TransactionType.INVENTORY_IN) {
+                await tx.product.update({
+                    where: { id: item.productId },
+                    data: { cost: item.unitPrice }, // unitPrice ya está en COP
+                });
+            }
         }
 
         return txRecord;

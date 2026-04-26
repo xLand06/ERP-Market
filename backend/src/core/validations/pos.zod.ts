@@ -13,7 +13,7 @@ export const transactionItemSchema = z.object({
     productId: z.string().min(1, 'ID de producto es requerido'),
     presentationId: z.string().optional(),
     quantity: z.preprocess((val) => Number(val), z.number().positive('La cantidad debe ser mayor a 0')),
-    unitPrice: z.preprocess((val) => Number(val), z.number().positive('El precio unitario debe ser mayor a 0').max(999999.99, 'Precio excede el límite')),
+    unitPrice: z.preprocess((val) => Number(val), z.number().positive('El precio unitario debe ser mayor a 0').max(99999999.99, 'Precio excede el límite')),
 });
 
 /**
@@ -26,6 +26,16 @@ export const createTransactionSchema = z.object({
     cashRegisterId: z.string().optional(),
     notes: z.string().max(500, 'Las notas son muy largas').optional().or(z.literal('')),
     ipAddress: z.string().ip().optional(),
+
+    // Multi-moneda: moneda en la que se realizó el pago/compra
+    currency: z.enum(['COP', 'USD', 'VES']).optional().default('COP'),
+    // Tasa de cambio al momento de la transacción (COP por unidad de currency)
+    exchangeRate: z.preprocess(
+        (val) => (val === '' || val === null || val === undefined) ? null : Number(val),
+        z.number().positive().nullable().optional()
+    ),
+    // Número de factura (requerido para INVENTORY_IN, opcional para SALE)
+    invoiceNumber: z.string().max(100).optional().or(z.literal('')),
 });
 
 /**

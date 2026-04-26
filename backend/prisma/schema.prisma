@@ -153,9 +153,10 @@ model Product {
   id          String   @id @default(cuid())
   name        String
   description String?
+  /// @deprecated — usar barcodes relation
   barcode     String?  @unique
-  price       Decimal  @db.Decimal(12, 2)
-  cost        Decimal? @db.Decimal(12, 2)
+  price       Decimal  @db.Decimal(12, 2) // en COP (moneda principal)
+  cost        Decimal? @db.Decimal(12, 2) // en COP (moneda principal)
   baseUnit    String   @default("UNIDAD")
   imageUrl    String?
   isActive    Boolean  @default(true)
@@ -165,6 +166,7 @@ model Product {
   subGroupId String?
   subGroup   SubGroup? @relation(fields: [subGroupId], references: [id])
 
+  barcodes           ProductBarcode[]
   presentations      ProductPresentation[]
   inventory          BranchInventory[]
   transactionItems   TransactionItem[]
@@ -181,7 +183,7 @@ model ProductPresentation {
   id         String  @id @default(cuid())
   name       String
   multiplier Decimal @db.Decimal(12, 3)
-  price      Decimal @db.Decimal(12, 2)
+  price      Decimal @db.Decimal(12, 2) // en COP (moneda principal)
   barcode    String? @unique
 
   productId String
@@ -192,6 +194,20 @@ model ProductPresentation {
   @@index([productId])
   @@index([barcode])
   @@map("product_presentations")
+}
+
+// Múltiples códigos de barras por producto (EAN, interno, proveedor, etc.)
+model ProductBarcode {
+  id    String  @id @default(cuid())
+  code  String  @unique
+  label String? // Ej: "EAN-13", "Interno", "Proveedor"
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([code])
+  @@map("product_barcodes")
 }
 
 // =============================================================================
@@ -222,16 +238,21 @@ model BranchInventory {
 // =============================================================================
 
 model Transaction {
-  id         String            @id @default(cuid())
-  type       TransactionType
-  status     TransactionStatus @default(COMPLETED)
-  total      Decimal           @db.Decimal(12, 2)
-  notes      String?
-  ipAddress  String?
-  syncStatus SyncStatus        @default(PENDING)
-  syncedAt   DateTime?         @db.Timestamptz
-  createdAt  DateTime          @default(now()) @db.Timestamptz
-  updatedAt  DateTime          @updatedAt @db.Timestamptz
+  id             String            @id @default(cuid())
+  type           TransactionType
+  status         TransactionStatus @default(COMPLETED)
+  total          Decimal           @db.Decimal(12, 2) // siempre en COP
+  notes          String?
+  ipAddress      String?
+  syncStatus     SyncStatus        @default(PENDING)
+  syncedAt       DateTime?         @db.Timestamptz
+  createdAt      DateTime          @default(now()) @db.Timestamptz
+  updatedAt      DateTime          @updatedAt @db.Timestamptz
+
+  // Multi-moneda
+  currency       String?           // 'COP' | 'USD' | 'VES' — moneda en la que se realizó
+  exchangeRate   Decimal?          @db.Decimal(18, 4) // tasa COP/currency usada al momento
+  invoiceNumber  String?           // Nº factura (para INVENTORY_IN)
 
   userId String
   user   User   @relation(fields: [userId], references: [id])

@@ -20,7 +20,9 @@ export const getAllProducts = async (filters: ProductListParams): Promise<ApiLis
             OR: [
                 { name: { contains: search, mode: 'insensitive' as const } },
                 { barcode: { contains: search, mode: 'insensitive' as const } },
-                { presentations: { some: { barcode: { contains: search, mode: 'insensitive' as const } } } }
+                { presentations: { some: { barcode: { contains: search, mode: 'insensitive' as const } } } },
+                // Buscar también en los barcodes del modelo ProductBarcode
+                { barcodes: { some: { code: { contains: search, mode: 'insensitive' as const } } } },
             ],
         }),
     };
@@ -28,9 +30,10 @@ export const getAllProducts = async (filters: ProductListParams): Promise<ApiLis
     const [products, total] = await Promise.all([
         prisma.product.findMany({
             where,
-            include: { 
+            include: {
                 subGroup: { include: { group: true } },
-                presentations: true 
+                presentations: true,
+                barcodes: true,
             },
             orderBy: { name: 'asc' },
             skip,
@@ -55,12 +58,13 @@ export const getAllProducts = async (filters: ProductListParams): Promise<ApiLis
 };
 
 export const getProductById = async (id: string): Promise<ProductDTO | null> => {
-    const product = await prisma.product.findUnique({ 
-        where: { id }, 
-        include: { 
+    const product = await prisma.product.findUnique({
+        where: { id },
+        include: {
             subGroup: { include: { group: true } },
-            presentations: true
-        } 
+            presentations: true,
+            barcodes: true,
+        }
     });
     if (!product) return null;
     return {
@@ -71,16 +75,25 @@ export const getProductById = async (id: string): Promise<ProductDTO | null> => 
 };
 
 export const createProduct = async (data: CreateProductInput): Promise<ProductDTO> => {
-    const { presentations, ...productData } = data;
-    
-    const product = await prisma.product.create({ 
+    const { presentations, barcodes, ...productData } = data;
+
+    const product = await prisma.product.create({
         data: {
             ...productData,
             presentations: {
-                create: presentations
-            }
+                create: presentations ?? [],
+            },
+            barcodes: {
+                create: (barcodes ?? []).map(b => ({
+                    code: b.code,
+                    label: b.label || null,
+                })),
+            },
         },
-        include: { presentations: true }
+        include: {
+            presentations: true,
+            barcodes: true,
+        },
     });
 
     // Inicializar stock en 0 en todas las sedes para este nuevo producto
@@ -103,25 +116,40 @@ export const createProduct = async (data: CreateProductInput): Promise<ProductDT
 };
 
 export const updateProduct = async (id: string, data: UpdateProductInput): Promise<ProductDTO> => {
-    const { presentations, ...productData } = data;
+    const { presentations, barcodes, ...productData } = data;
 
-    // Si vienen presentaciones, realizamos un "sync" manual (delete + create) o upsert
-    // Por simplicidad en MVP, si vienen presentaciones, borramos las anteriores y creamos las nuevas
-    if (presentations) {
+    // Sincronizar presentaciones: borrar anteriores y crear nuevas (MVP)
+    if (presentations !== undefined) {
         await prisma.productPresentation.deleteMany({ where: { productId: id } });
     }
 
-    const product = await prisma.product.update({ 
-        where: { id }, 
+    // Sincronizar barcodes: borrar anteriores y crear nuevos
+    if (barcodes !== undefined) {
+        await prisma.productBarcode.deleteMany({ where: { productId: id } });
+    }
+
+    const product = await prisma.product.update({
+        where: { id },
         data: {
             ...productData,
-            ...(presentations && {
+            ...(presentations !== undefined && {
                 presentations: {
-                    create: presentations
-                }
-            })
+                    create: presentations,
+                },
+            }),
+            ...(barcodes !== undefined && {
+                barcodes: {
+                    create: barcodes.map(b => ({
+                        code: b.code,
+                        label: b.label || null,
+                    })),
+                },
+            }),
         },
-        include: { presentations: true }
+        include: {
+            presentations: true,
+            barcodes: true,
+        },
     });
 
     return {

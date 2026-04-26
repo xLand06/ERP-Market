@@ -21,26 +21,27 @@ interface ProductPresentation {
     id: string;
     name: string;
     multiplier: number;
-    price: number;
+    price: number; // en COP
     barcode?: string | null;
 }
 
 interface Product { 
     id: string; 
     name: string; 
-    price: number; 
+    price: number;  // en COP
     stock: number; 
     category: string; 
-    code: string; 
+    code: string;   // legacy barcode
+    barcodes: { id: string; code: string; label?: string | null }[];
     baseUnit: string;
     presentations: ProductPresentation[];
 }
 
 interface CartItem {
-    id: string; // productId
+    id: string;
     name: string;
-    basePrice: number; // Price of base unit
-    currentPrice: number; // Price of selected presentation
+    basePrice: number;    // COP
+    currentPrice: number; // COP
     stock: number;
     qty: number;
     baseUnit: string;
@@ -52,9 +53,10 @@ interface CartItem {
 // ─── Helpers ───────────────────────────────────────────────────────
 
 const PAYMENT_OPTIONS = [
-    { id:'cash_usd',  label:'Efectivo USD',     icon:DollarSign, currency:'USD' as const },
-    { id:'pagomovil', label:'Pago Móvil VES',   icon:Smartphone, currency:'VES' as const },
-    { id:'tarjeta',   label:'Tarjeta',          icon:CreditCard, currency:'USD' as const },
+    { id:'cash_cop',  label:'Efectivo COP',    icon:DollarSign, currency:'COP' as const },
+    { id:'cash_usd',  label:'Efectivo USD',    icon:DollarSign, currency:'USD' as const },
+    { id:'pagomovil', label:'Pago Móvil VES',  icon:Smartphone, currency:'VES' as const },
+    { id:'tarjeta',   label:'Tarjeta USD',     icon:CreditCard, currency:'USD' as const },
 ];
 
 // ─── Sub-Components ────────────────────────────────────────────────
@@ -65,17 +67,15 @@ function StockBadge({ stock, unit }: { stock: number, unit: string }) {
 }
 
 function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product, pres?: ProductPresentation) => void }) {
-    const { rates } = useConfigStore();
-    const vesRate = rates['VES'] || 36.50;
-    
+    const { fmtCOP, fromCOP } = useConfigStore();
     const [flash, setFlash] = useState(false);
-    const price = product.price;
     const handle = () => {
         if (product.stock === 0) return;
         onAdd(product);
         setFlash(true);
         setTimeout(() => setFlash(false), 250);
     };
+    const usd = fromCOP(product.price, 'USD');
     return (
         <button
             onClick={handle}
@@ -94,8 +94,8 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product,
                 <p className="text-[13px] sm:text-xs font-bold text-slate-800 line-clamp-2 leading-snug mb-1">{product.name}</p>
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between mt-auto gap-2">
                     <div>
-                        <p className="text-sm font-black text-slate-900 tabular-nums leading-none">${price.toFixed(2)}</p>
-                        <p className="text-[11px] font-medium text-slate-400 tabular-nums mt-0.5 sm:hidden lg:block">Bs. {(price * vesRate).toFixed(0)}</p>
+                        <p className="text-sm font-black text-slate-900 tabular-nums leading-none">{fmtCOP(product.price)}</p>
+                        <p className="text-[11px] font-medium text-slate-400 tabular-nums mt-0.5 sm:hidden lg:block">${usd.toFixed(2)} USD</p>
                     </div>
                     <div className="sm:opacity-80 group-hover:opacity-100 transition-opacity">
                         <StockBadge stock={product.stock} unit={product.baseUnit} />
@@ -109,23 +109,33 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product,
 function HybridPaymentDialog({ open, total, onClose, onConfirm, isSubmitting }: {
     open: boolean; total: number; onClose: () => void; onConfirm: () => void; isSubmitting: boolean;
 }) {
-    const { rates } = useConfigStore();
+    const { rates, fmtCOP, fromCOP } = useConfigStore();
+    const copRate = rates['COP'] || 4100;
     const vesRate = rates['VES'] || 36.50;
     type PaymentRow = { methodId: string; amount: number; currency: string };
-    const [rows, setRows] = useState<PaymentRow[]>([{ methodId: 'cash_usd', amount: total, currency: 'USD' }]);
-    const paidTotal = rows.reduce((s, r) => s + (r.amount / (rates[r.currency] || 1)), 0);
+    // Por defecto: pago en COP
+    const [rows, setRows] = useState<PaymentRow[]>([{ methodId: 'cash_cop', amount: total, currency: 'COP' }]);
+    
+    // paidTotal siempre en COP
+    const paidTotal = rows.reduce((s, r) => {
+        if (r.currency === 'COP') return s + r.amount;
+        if (r.currency === 'USD') return s + r.amount * copRate;
+        if (r.currency === 'VES') return s + (r.amount / vesRate) * copRate;
+        return s;
+    }, 0);
     const change = paidTotal - total;
-    const canPay = paidTotal >= (total - 0.01) && !isSubmitting; // Tolerancia de decimales
+    const canPay = paidTotal >= (total - 1) && !isSubmitting;
 
-    // Reset when opened
     useEffect(() => {
-        if (open) setRows([{ methodId: 'cash_usd', amount: total, currency: 'USD' }]);
+        if (open) setRows([{ methodId: 'cash_cop', amount: total, currency: 'COP' }]);
     }, [open, total]);
 
-    const addRow = () => setRows(p => [...p, { methodId: 'pagomovil', amount: 0, currency: 'VES' }]);
+    const addRow = () => setRows(p => [...p, { methodId: 'cash_usd', amount: 0, currency: 'USD' }]);
     const updateRow = (i: number, field: string, val: any) =>
         setRows(p => p.map((r, idx) => idx === i ? { ...r, [field]: val } : r) as PaymentRow[]);
     const removeRow = (i: number) => setRows(p => p.filter((_, idx) => idx !== i));
+
+    const getSymbol = (currency: string) => currency === 'VES' ? 'Bs.' : '$';
 
     return (
         <Dialog open={open} onOpenChange={o => !o && onClose()}>
@@ -137,9 +147,12 @@ function HybridPaymentDialog({ open, total, onClose, onConfirm, isSubmitting }: 
                 <div className="px-6 py-3 bg-slate-50 border-y border-slate-100">
                     <div className="flex items-baseline justify-between">
                         <span className="text-sm text-slate-500">Total a Cobrar</span>
-                        <span className="text-xl font-black text-slate-900 tabular-nums">${total.toFixed(2)} USD</span>
+                        <span className="text-xl font-black text-slate-900 tabular-nums">{fmtCOP(total)}</span>
                     </div>
-                    <p className="text-[11px] text-slate-400 text-right mt-0.5 tabular-nums">= Bs. {(total * vesRate).toFixed(2)} VES</p>
+                    <div className="flex justify-end gap-3 mt-1">
+                        <p className="text-[11px] text-slate-400 tabular-nums">${fromCOP(total,'USD').toFixed(2)} USD</p>
+                        <p className="text-[11px] text-slate-400 tabular-nums">Bs. {fromCOP(total,'VES').toFixed(0)} VES</p>
+                    </div>
                 </div>
                 <div className="px-6 py-4 flex flex-col gap-3">
                     {rows.map((row, i) => (
@@ -156,23 +169,23 @@ function HybridPaymentDialog({ open, total, onClose, onConfirm, isSubmitting }: 
                                 {PAYMENT_OPTIONS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                             </select>
                             <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">{row.currency === 'VES' ? 'Bs.' : '$'}</span>
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">{getSymbol(row.currency)}</span>
                                 <Input
                                     type="number"
                                     value={row.amount}
                                     onChange={e => updateRow(i, 'amount', parseFloat(e.target.value) || 0)}
-                                    className="w-28 pl-8 font-semibold"
+                                    className="w-32 pl-8 font-semibold"
                                 />
                             </div>
                             {rows.length > 1 && <button onClick={() => removeRow(i)} className="p-2 text-slate-400"><X className="w-4 h-4" /></button>}
                         </div>
                     ))}
-                    <button onClick={addRow} className="border border-dashed border-slate-300 rounded-lg h-10 text-sm text-slate-400">+ Agregar Pago</button>
+                    <button onClick={addRow} className="border border-dashed border-slate-300 rounded-lg h-10 text-sm text-slate-400">+ Agregar otro método</button>
                 </div>
                 <div className="px-6 pb-2 flex justify-between items-center">
                     <span className="text-sm text-slate-500">{change >= 0 ? 'Vuelto' : 'Faltante'}</span>
                     <span className={cn('text-lg font-black tabular-nums', change >= 0 ? 'text-emerald-600' : 'text-red-500')}>
-                        ${Math.abs(change).toFixed(2)} USD
+                        {fmtCOP(Math.abs(change))}
                     </span>
                 </div>
                 <div className="px-6 pb-6 flex gap-3">
@@ -186,7 +199,7 @@ function HybridPaymentDialog({ open, total, onClose, onConfirm, isSubmitting }: 
                         )}
                     >
                         {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />} 
-                        {isSubmitting ? 'Procesando...' : 'Confirmar'}
+                        {isSubmitting ? 'Procesando...' : 'Confirmar Venta'}
                     </button>
                 </div>
             </DialogContent>
@@ -236,7 +249,7 @@ export default function POSPage() {
         return branches.find((b: any) => b.id === selectedBranch);
     }, [selectedBranch, branches]);
 
-    const { iva, vesRate } = useConfigStore();
+    const { iva, fmtCOP, fromCOP, rates } = useConfigStore();
     const effectiveBranch = selectedBranchData?.id || (selectedBranch === 'all' && user?.role === 'OWNER' ? null : selectedBranch);
 
     const { inventory, isLoading, refetch, isOnline } = useInventory(effectiveBranch || '');
@@ -245,12 +258,13 @@ export default function POSPage() {
         if (!inventory || !Array.isArray(inventory)) return [];
         
         return inventory
-            .filter(item => item && item.product) // Asegurar que el producto existe
+            .filter(item => item && item.product)
             .map(item => ({
                 id: item.product.id,
                 code: item.product.barcode || '',
+                barcodes: item.product.barcodes || [],
                 name: item.product.name,
-                price: Number(item.product.price),
+                price: Number(item.product.price), // en COP
                 stock: Number(item.stock),
                 category: item.product.subGroup || 'Varios',
                 baseUnit: item.product.baseUnit || 'UNIDAD',
@@ -258,7 +272,7 @@ export default function POSPage() {
                     id: p.id,
                     name: p.name,
                     multiplier: Number(p.multiplier),
-                    price: Number(p.price),
+                    price: Number(p.price), // en COP
                     barcode: p.barcode
                 })),
             }));
@@ -378,26 +392,25 @@ export default function POSPage() {
 
     // HOOK DEL ESCÁNER DE HARDWARE
     useBarcodeScanner((barcode) => {
-        setSearch(barcode); // Siempre colocar en el input
-        // Buscar por código base
-        const product = PRODUCTS.find(p => p.code === barcode);
-        if (product) {
-            addToCart(product);
-            showToast(`✓ ${product.name} añadido`);
-            return;
-        }
+        setSearch(barcode);
+        // 1. Buscar en barcode legacy
+        let product = PRODUCTS.find(p => p.code === barcode);
+        if (product) { addToCart(product); showToast(`✓ ${product.name} añadido`); return; }
 
-        // Buscar en presentaciones
+        // 2. Buscar en el array de barcodes (ProductBarcode)
         for (const p of PRODUCTS) {
-            const pres = p.presentations.find(pr => pr.barcode === barcode);
-            if (pres) {
-                addToCart(p, pres);
-                showToast(`✓ ${p.name} (${pres.name}) añadido`);
-                return;
+            if (p.barcodes.some(b => b.code === barcode)) {
+                addToCart(p); showToast(`✓ ${p.name} añadido`); return;
             }
         }
 
-        showToast(`⚠️ Código ${barcode} no encontrado en stock`, true);
+        // 3. Buscar en barcodes de presentaciones
+        for (const p of PRODUCTS) {
+            const pres = p.presentations.find(pr => pr.barcode === barcode);
+            if (pres) { addToCart(p, pres); showToast(`✓ ${p.name} (${pres.name}) añadido`); return; }
+        }
+
+        showToast(`⚠️ Código ${barcode} no encontrado`, true);
     });
 
     useEffect(() => {
@@ -421,26 +434,27 @@ export default function POSPage() {
                 productId: c.id,
                 presentationId: c.presentationId,
                 quantity: c.qty,
-                unitPrice: c.currentPrice,
+                unitPrice: c.currentPrice, // en COP
             }));
+
+            const copRate = rates['COP'] || 4100;
 
             if (isOnline) {
                 await api.post('/pos/transactions', {
                     type: isSaleMode ? 'SALE' : 'INVENTORY_IN',
                     branchId: effectiveBranch,
                     items,
+                    currency: 'COP',
+                    exchangeRate: copRate,
                 });
             } else {
-                // TODO: Actualizar lógica offline para UMB si es necesario
-                throw new Error('Sin conexión. Sincronización offline de UMB pendiente.');
+                throw new Error('Sin conexión.');
             }
 
             setCart([]);
             setPayOpen(false);
             showToast(isSaleMode ? '✓ Venta registrada exitosamente' : '✓ Entrada registrada exitosamente');
             refetch();
-            
-            // Invalidar datos de caja para que el flujo se actualice inmediatamente
             queryClient.invalidateQueries({ queryKey: ['openRegister'] });
         } catch (error: any) {
             console.error(error);
@@ -455,9 +469,10 @@ export default function POSPage() {
         const searchLower = search.toLowerCase();
         const matchesName = p.name.toLowerCase().includes(searchLower);
         const matchesBaseCode = p.code.includes(search);
+        const matchesBarcodes = p.barcodes.some(b => b.code.includes(search));
         const matchesPresentationCode = p.presentations.some(pr => pr.barcode?.includes(search));
         
-        return matchesCategory && (matchesName || matchesBaseCode || matchesPresentationCode);
+        return matchesCategory && (matchesName || matchesBaseCode || matchesBarcodes || matchesPresentationCode);
     });
 
     const subtotal = cart.reduce((s, i) => s + i.currentPrice * i.qty, 0);
@@ -605,8 +620,8 @@ export default function POSPage() {
                                         >+</button>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-[10px] text-slate-400">${item.currentPrice.toFixed(2)} c/u</p>
-                                        <p className="text-sm font-black">${(item.currentPrice * item.qty).toFixed(2)}</p>
+                                        <p className="text-[10px] text-slate-400">{fmtCOP(item.currentPrice)} c/u</p>
+                                        <p className="text-sm font-black">{fmtCOP(item.currentPrice * item.qty)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -624,8 +639,11 @@ export default function POSPage() {
                     <div className="flex justify-between items-center">
                         <span className="text-sm font-black text-slate-400 uppercase">TOTAL</span>
                         <div className="text-right">
-                            <p className="text-3xl font-black text-slate-900">${total.toFixed(2)}</p>
-                            <p className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 rounded">Bs. {(total * vesRate).toFixed(2)} VES</p>
+                            <p className="text-3xl font-black text-slate-900">{fmtCOP(total)}</p>
+                            <div className="flex gap-2 justify-end mt-0.5">
+                                <p className="text-[11px] text-slate-400">${fromCOP(total,'USD').toFixed(2)} USD</p>
+                                <p className="text-[11px] text-slate-400">Bs. {Math.round(fromCOP(total,'VES'))} VES</p>
+                            </div>
                         </div>
                     </div>
                 </div>

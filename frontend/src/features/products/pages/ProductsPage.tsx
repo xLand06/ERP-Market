@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { ProductFormModal, Product, Category } from '../components/ProductFormModal';
 import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
+import { useConfigStore } from '@/hooks/useConfigStore';
 
 export default function ProductsPage() {
     const [search, setSearch] = useState('');
@@ -18,6 +19,8 @@ export default function ProductsPage() {
     // Pagination State
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(25);
+    
+    const { fmtCOP } = useConfigStore();
     
     useBarcodeScanner((barcode) => {
         setSearch(barcode);
@@ -177,6 +180,7 @@ export default function ProductsPage() {
                                     <th>Producto</th>
                                     <th>Categoría</th>
                                     <th>C. Barras</th>
+                                    <th className="text-right">Costo</th>
                                     <th className="text-right">Precio Venta</th>
                                     <th className="text-center">Estado</th>
                                     <th className="w-24 text-right">Acciones</th>
@@ -185,7 +189,7 @@ export default function ProductsPage() {
                             <tbody>
                                 {isLoading ? (
                                     <tr>
-                                        <td colSpan={7} className="text-center py-10 text-sm text-slate-400">
+                                        <td colSpan={8} className="text-center py-10 text-sm text-slate-400">
                                             Cargando productos...
                                         </td>
                                     </tr>
@@ -208,13 +212,33 @@ export default function ProductsPage() {
                                             </span>
                                         </td>
                                         <td>
-                                            <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded">
-                                                {prod.barcode || '—'}
+                                            <div className="flex flex-col gap-1">
+                                                {prod.barcodes && prod.barcodes.length > 0 ? (
+                                                    <>
+                                                        <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded w-fit">
+                                                            {prod.barcodes[0].code}
+                                                        </span>
+                                                        {prod.barcodes.length > 1 && (
+                                                            <span className="text-[10px] text-slate-400 font-medium">
+                                                                +{prod.barcodes.length - 1} código{prod.barcodes.length - 1 > 1 ? 's' : ''} más
+                                                            </span>
+                                                        )}
+                                                    </>
+                                                ) : (
+                                                    <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded w-fit">
+                                                        {prod.barcode || '—'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="text-right">
+                                            <span className="text-sm font-medium text-slate-500">
+                                                {prod.cost ? fmtCOP(Number(prod.cost)) : '—'}
                                             </span>
                                         </td>
                                         <td className="text-right">
                                             <span className="text-sm font-bold text-emerald-600">
-                                                ${Number(prod.price || 0).toFixed(2)}
+                                                {fmtCOP(Number(prod.price || 0))}
                                             </span>
                                         </td>
                                         <td className="text-center">
@@ -252,7 +276,7 @@ export default function ProductsPage() {
                                 ))}
                                 {!isLoading && filtered.length === 0 && !isError && (
                                     <tr>
-                                        <td colSpan={7} className="text-center py-12">
+                                        <td colSpan={8} className="text-center py-12">
                                             <PackageX className="w-10 h-10 text-slate-300 mx-auto mb-3" />
                                             <p className="text-base font-semibold text-slate-700">No se encontraron productos</p>
                                             <p className="text-sm text-slate-500 mt-1">Ajusta los filtros o crea un nuevo registro.</p>
