@@ -10,8 +10,8 @@ interface Product {
     cost: number;
     baseUnit: string;
     presentations: any[];
-    category: string;
-    categoryId?: string;
+    subGroup: string;
+    subGroupId?: string;
     isActive: boolean;
 }
 
@@ -75,8 +75,8 @@ export function useInventory(branchId: string) {
                         cost: Number(item.product.cost || 0),
                         baseUnit: item.product.baseUnit || 'UNIDAD',
                         presentations: item.product.presentations || [],
-                        category: item.product.category?.name || 'Varios',
-                        categoryId: item.product.categoryId,
+                        subGroup: item.product.subGroup?.group?.name || 'Varios',
+                        subGroupId: item.product.subGroupId,
                         isActive: true,
                     },
                     stock: Number(item.stock || 0),
@@ -109,8 +109,8 @@ export function useInventory(branchId: string) {
                         price: Number(p.price),
                         barcode: p.barcode
                     })),
-                    category: item.categoryName || 'Varios',
-                    categoryId: item.categoryId,
+                    subGroup: item.subGroupName || 'Varios',
+                    subGroupId: item.subGroupId,
                     isActive: item.isActive ?? true,
                 },
                 stock: item.stock,

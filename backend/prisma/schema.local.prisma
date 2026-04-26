@@ -115,19 +115,36 @@ model Branch {
 }
 
 // =============================================================================
-// CATEGORIES
+// GROUPS
 // =============================================================================
 
-model Category {
-  id          String    @id @default(cuid())
-  name        String    @unique
+model Group {
+  id          String   @id @default(cuid())
+  name        String   @unique
   description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subGroups SubGroup[]
+
+  @@map("groups")
+}
+
+model SubGroup {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  groupId String
+  group   Group   @relation(fields: [groupId], references: [id])
 
   products Product[]
 
-  @@map("categories")
+  @@unique([name, groupId])
+  @@index([groupId])
+  @@map("sub_groups")
 }
 
 // =============================================================================
@@ -147,8 +164,8 @@ model Product {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  categoryId String?
-  category   Category? @relation(fields: [categoryId], references: [id])
+  subGroupId String?
+  subGroup   SubGroup? @relation(fields: [subGroupId], references: [id])
 
   presentations      ProductPresentation[]
   inventory          BranchInventory[]
@@ -156,7 +173,7 @@ model Product {
   purchaseOrderItems PurchaseOrderItem[]
 
   @@index([name])
-  @@index([categoryId])
+  @@index([subGroupId])
   @@index([isActive])
   @@index([barcode])
   @@map("products")

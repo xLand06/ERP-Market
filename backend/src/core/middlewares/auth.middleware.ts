@@ -32,7 +32,7 @@ const publicPaths = [
 
 const authOptionalPaths = [
     '/api/products',
-    '/api/categories',
+    '/api/groups',
 ];
 
 export const authMiddleware = (

@@ -15,6 +15,10 @@ export default function ProductsPage() {
     const [filterCategory, setFilterCategory] = useState<string>('all');
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('active');
     
+    // Pagination State
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(25);
+    
     useBarcodeScanner((barcode) => {
         setSearch(barcode);
     });
@@ -27,9 +31,17 @@ export default function ProductsPage() {
 
     // Data Fetching
     const { data, isLoading, isError } = useQuery<{ data: Product[], meta: any }>({
-        queryKey: ['products'],
+        queryKey: ['products', search, filterCategory, filterStatus, page, limit],
         queryFn: async () => {
-            const res = await api.get('/products', { params: { limit: 100 } });
+            const params: any = { 
+                page, 
+                limit,
+                search: search || undefined
+            };
+            if (filterCategory !== 'all') params.subGroupId = filterCategory;
+            if (filterStatus !== 'all') params.isActive = filterStatus === 'active';
+            
+            const res = await api.get('/products', { params });
             return res.data;
         },
         retry: false,
@@ -38,9 +50,9 @@ export default function ProductsPage() {
     const products = data?.data || [];
 
     const { data: categories = [] } = useQuery<Category[]>({
-        queryKey: ['categories'],
+        queryKey: ['subgroups'],
         queryFn: async () => {
-            const res = await api.get('/categories');
+            const res = await api.get('/groups/subgroups/all');
             return res.data.data;
         },
         retry: false,
@@ -60,20 +72,7 @@ export default function ProductsPage() {
         }
     });
 
-    const filtered = products.filter((p: Product) => {
-        const searchText = search.toLowerCase();
-        const matchSearch =
-            p.name.toLowerCase().includes(searchText) ||
-            (p.barcode || '').toLowerCase().includes(searchText);
-            
-        const matchCategory = filterCategory === 'all' || p.categoryId === filterCategory;
-        const matchStatus = 
-            filterStatus === 'all' ? true :
-            filterStatus === 'active' ? p.isActive === true :
-            p.isActive === false;
-            
-        return matchSearch && matchCategory && matchStatus;
-    });
+    const filtered = products;
 
     const handleOpenCreate = () => {
         setSelectedProduct(null);
@@ -123,7 +122,7 @@ export default function ProductsPage() {
                         <Input
                             placeholder="Buscar por nombre o código de barras..."
                             value={search}
-                            onChange={e => setSearch(e.target.value)}
+                            onChange={e => { setSearch(e.target.value); setPage(1); }}
                             className="pl-9 w-full"
                             aria-label="Buscar productos"
                         />
@@ -132,7 +131,7 @@ export default function ProductsPage() {
                     <div className="flex gap-3 w-full md:w-auto">
                         <select 
                             value={filterCategory}
-                            onChange={(e) => setFilterCategory(e.target.value)}
+                            onChange={(e) => { setFilterCategory(e.target.value); setPage(1); }}
                             aria-label="Filtrar por categoría"
                             className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-[140px]"
                         >
@@ -145,7 +144,7 @@ export default function ProductsPage() {
                             {(['all', 'active', 'inactive'] as const).map(s => (
                                 <button
                                     key={s}
-                                    onClick={() => setFilterStatus(s)}
+                                    onClick={() => { setFilterStatus(s); setPage(1); }}
                                     aria-label={`Mostrar productos ${s}`}
                                     className={cn(
                                         'px-3 py-1.5 rounded-md text-xs font-semibold transition-all',
@@ -205,7 +204,7 @@ export default function ProductsPage() {
                                         </td>
                                         <td>
                                             <span className="text-xs font-medium bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md">
-                                                {categories.find(c => c.id === prod.categoryId)?.name || 'N/A'}
+                                                {categories.find(c => c.id === prod.subGroupId)?.name || 'N/A'}
                                             </span>
                                         </td>
                                         <td>
@@ -262,6 +261,48 @@ export default function ProductsPage() {
                                 )}
                             </tbody>
                         </table>
+                    </div>
+
+                    {/* Pagination UI */}
+                    <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50 mt-auto">
+                        <p className="text-xs text-slate-500">
+                            Mostrando {((page - 1) * limit) + 1}–{Math.min(page * limit, data?.meta?.total || 0)} de {data?.meta?.total || 0} productos
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <select 
+                                value={limit} 
+                                onChange={e => { setLimit(Number(e.target.value)); setPage(1); }} 
+                                className="h-8 rounded-lg border border-slate-200 px-2 text-xs text-slate-600 bg-white"
+                            >
+                                <option value={10}>10</option>
+                                <option value={25}>25</option>
+                                <option value={50}>50</option>
+                                <option value={100}>100</option>
+                            </select>
+                            <div className="flex items-center gap-1">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    disabled={page === 1} 
+                                    onClick={() => setPage(p => p - 1)}
+                                    className="h-8 px-2 text-xs"
+                                >
+                                    Anterior
+                                </Button>
+                                <span className="text-xs text-slate-600 px-2">
+                                    Página {page} de {data?.meta?.totalPages || 1}
+                                </span>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    disabled={page >= (data?.meta?.totalPages || 1)} 
+                                    onClick={() => setPage(p => p + 1)}
+                                    className="h-8 px-2 text-xs"
+                                >
+                                    Siguiente
+                                </Button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

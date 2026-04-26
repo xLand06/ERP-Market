@@ -23,6 +23,7 @@ export function AppShellLayout() {
             target.isContentEditable;
 
         if (isTyping) return;
+        if (e.ctrlKey || e.altKey || e.metaKey) return;
 
         const key = e.key.toUpperCase();
         const paths: Record<string, string> = {

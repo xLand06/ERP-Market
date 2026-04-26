@@ -86,7 +86,13 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
         
         res.json({ success: true, data: product });
     } catch (error: any) {
-        res.status(500).json({ success: false, error: error.message });
+        if (error.code === 'P2025') {
+            res.status(404).json({ success: false, error: 'Producto no encontrado' });
+        } else if (error.code === 'P2002') {
+            res.status(409).json({ success: false, error: 'El código de barras ya está registrado' });
+        } else {
+            res.status(500).json({ success: false, error: error.message });
+        }
     }
 };
 

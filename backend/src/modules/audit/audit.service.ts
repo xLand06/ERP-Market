@@ -32,7 +32,7 @@ export const getAuditLogs = (filters: {
                 : {}),
         },
         include: {
-            user: { select: { id: true, name: true, email: true, role: true } },
+            user: { select: { id: true, username: true, nombre: true, apellido: true, email: true, role: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
@@ -43,7 +43,7 @@ export const getAuditLogs = (filters: {
 export const getAuditLogById = (id: string) =>
     (prisma as any).auditLog.findUnique({
         where: { id },
-        include: { user: { select: { id: true, name: true, email: true } } },
+        include: { user: { select: { id: true, username: true, nombre: true, apellido: true, email: true } } },
     });
 
 export const getAuditStats = async () => {

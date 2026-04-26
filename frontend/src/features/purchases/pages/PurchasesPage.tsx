@@ -69,6 +69,24 @@ export default function PurchasesPage() {
         }
     });
 
+    const createMutation = useMutation({
+        mutationFn: (data: any) => purchasesApi.createOrder({
+            supplierId: 'some-supplier-id', // We need to handle this correctly based on form!
+            branchId: data.branch,
+            items: data.lines.map((l: any) => ({
+                productId: 'some-product-id', // The form actually uses string product name...
+                quantity: Number(l.quantity),
+                unitCost: Number(l.unitCost)
+            })),
+            notes: `Factura: ${data.invoiceNo}`,
+        }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['purchases'] });
+            toast.success('Compra registrada con éxito');
+            setModalOpen(false);
+        }
+    });
+
     if (isLoading) {
         return (
             <div className="h-full flex items-center justify-center">
@@ -82,7 +100,9 @@ export default function PurchasesPage() {
             <PurchaseEntryModal
                 open={modalOpen}
                 onClose={() => setModalOpen(false)}
-                onSuccess={() => queryClient.invalidateQueries({ queryKey: ['purchases'] })}
+                onSave={(data) => {
+                    createMutation.mutate(data);
+                }}
             />
 
             <div className="flex flex-col gap-6 max-w-350 mx-auto pb-8">
@@ -213,9 +233,9 @@ export default function PurchasesPage() {
                                                     </button>
                                                     {row.status !== 'RECEIVED' && row.status !== 'CANCELLED' && (
                                                         <Button 
-                                                            size="xs" 
-                                                            variant="success" 
-                                                            className="h-7 text-[10px] font-bold"
+                                                            size="sm" 
+                                                            variant="default" 
+                                                            className="h-7 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700"
                                                             onClick={() => {
                                                                 if (confirm('¿Confirmar recepción de mercancía? El stock se actualizará automáticamente.')) {
                                                                     receiveMutation.mutate(row.id);

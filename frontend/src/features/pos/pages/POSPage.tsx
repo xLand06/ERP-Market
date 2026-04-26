@@ -252,7 +252,7 @@ export default function POSPage() {
                 name: item.product.name,
                 price: Number(item.product.price),
                 stock: Number(item.stock),
-                category: item.product.category || 'Varios',
+                category: item.product.subGroup || 'Varios',
                 baseUnit: item.product.baseUnit || 'UNIDAD',
                 presentations: (item.product.presentations || []).map((p: any) => ({
                     id: p.id,

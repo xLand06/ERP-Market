@@ -1,16 +1,84 @@
 // =============================================================================
-// CATEGORIES MODULE — SERVICE
-// Lógica de negocio para la gestión de categorías
+// GROUPS MODULE — SERVICE
+// Lógica de negocio para la gestión de grupos y subgrupos
 // =============================================================================
 
 import { prisma } from '../../config/prisma';
-import { CreateCategoryInput, UpdateCategoryInput } from '../../core/validations/categories.zod';
+import { CreateGroupInput, UpdateGroupInput, CreateSubGroupInput, UpdateSubGroupInput } from '../../core/validations/groups.zod';
+
+// =============================================================================
+// GROUPS
+// =============================================================================
 
 /**
- * Listar todas las categorías con conteo de productos
+ * Listar todos los grupos con conteo de subgrupos
  */
-export const getAllCategories = async () => {
-    return prisma.category.findMany({
+export const getAllGroups = async () => {
+    return prisma.group.findMany({
+        include: { 
+            _count: { 
+                select: { subGroups: true } 
+            } 
+        },
+        orderBy: { name: 'asc' },
+    });
+};
+
+/**
+ * Obtener un grupo por ID
+ */
+export const getGroupById = async (id: string) => {
+    return prisma.group.findUnique({
+        where: { id },
+        include: { 
+            subGroups: {
+                include: {
+                    _count: { select: { products: true } }
+                },
+                orderBy: { name: 'asc' }
+            }
+        },
+    });
+};
+
+/**
+ * Crear nuevo grupo
+ */
+export const createGroup = async (data: CreateGroupInput) => {
+    return prisma.group.create({
+        data,
+    });
+};
+
+/**
+ * Actualizar grupo existente
+ */
+export const updateGroup = async (id: string, data: UpdateGroupInput) => {
+    return prisma.group.update({
+        where: { id },
+        data,
+    });
+};
+
+/**
+ * Eliminar grupo (Solo si no tiene subgrupos asociados)
+ */
+export const deleteGroup = async (id: string) => {
+    return prisma.group.delete({
+        where: { id },
+    });
+};
+
+// =============================================================================
+// SUBGROUPS
+// =============================================================================
+
+/**
+ * Listar todos los subgrupos (opcionalmente filtrados por grupo)
+ */
+export const getAllSubGroups = async (groupId?: string) => {
+    return prisma.subGroup.findMany({
+        where: groupId ? { groupId } : undefined,
         include: { 
             _count: { 
                 select: { products: true } 
@@ -21,10 +89,10 @@ export const getAllCategories = async () => {
 };
 
 /**
- * Obtener una categoría por ID
+ * Obtener un subgrupo por ID
  */
-export const getCategoryById = async (id: string) => {
-    return prisma.category.findUnique({
+export const getSubGroupById = async (id: string) => {
+    return prisma.subGroup.findUnique({
         where: { id },
         include: { 
             _count: { 
@@ -35,30 +103,29 @@ export const getCategoryById = async (id: string) => {
 };
 
 /**
- * Crear nueva categoría
+ * Crear nuevo subgrupo
  */
-export const createCategory = async (data: CreateCategoryInput) => {
-    return prisma.category.create({
+export const createSubGroup = async (data: CreateSubGroupInput) => {
+    return prisma.subGroup.create({
         data,
     });
 };
 
 /**
- * Actualizar categoría existente
+ * Actualizar subgrupo existente
  */
-export const updateCategory = async (id: string, data: UpdateCategoryInput) => {
-    return prisma.category.update({
+export const updateSubGroup = async (id: string, data: UpdateSubGroupInput) => {
+    return prisma.subGroup.update({
         where: { id },
         data,
     });
 };
 
 /**
- * Eliminar categoría (Solo si no tiene productos asociados)
- * Prisma lanzará error P2003 si hay restricción de FK
+ * Eliminar subgrupo (Solo si no tiene productos asociados)
  */
-export const deleteCategory = async (id: string) => {
-    return prisma.category.delete({
+export const deleteSubGroup = async (id: string) => {
+    return prisma.subGroup.delete({
         where: { id },
     });
 };

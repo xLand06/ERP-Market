@@ -19,7 +19,7 @@ router.use(authMiddleware);
 /**
  * GET /api/products
  * Lista productos con paginación
- * Query: ?page=1&limit=20&search=&categoryId=
+ * Query: ?page=1&limit=20&search=&subGroupId=
  */
 router.get('/', validate(productFiltersSchema, { source: 'query' }), ctrl.getProducts);
 
@@ -32,7 +32,7 @@ router.get('/:id', validate(idParamSchema, { source: 'params' }), ctrl.getProduc
 /**
  * POST /api/products
  * Crear producto (SOLO OWNER)
- * Body: { name, description, barcode, price, cost, categoryId }
+ * Body: { name, description, barcode, price, cost, subGroupId }
  */
 router.post('/', roleGuard('OWNER'), validate(createProductSchema), ctrl.createProduct);
 

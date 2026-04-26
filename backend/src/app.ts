@@ -95,7 +95,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth',       authRouter);
 app.use('/api/users',      usersRouter);
 app.use('/api/branches',   branchesRouter);
-app.use('/api/categories', categoriesRouter);
+app.use('/api/groups', categoriesRouter);
 app.use('/api/products',   productsRouter);
 app.use('/api/inventory',  inventoryRouter);
 app.use('/api/pos',        posRouter);

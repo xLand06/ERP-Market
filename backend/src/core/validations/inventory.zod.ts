@@ -9,7 +9,7 @@ import { z } from 'zod';
  * Esquema para establecer/ajustar stock en una sucursal
  */
 export const setStockSchema = z.object({
-    productId: z.string().cuid('ID de producto inválido'),
+    productId: z.string().min(1, 'ID de producto inválido'),
     branchId: z.string(),
     stock: z.number().min(0, 'El stock no puede ser negativo'),
     minStock: z.number().min(0).optional().default(0),
@@ -19,7 +19,7 @@ export const setStockSchema = z.object({
  * Esquema para ajustes relativos de stock (Entradas/Salidas)
  */
 export const adjustStockSchema = z.object({
-    productId: z.string().cuid(),
+    productId: z.string().min(1),
     branchId: z.string(),
     delta: z.number().refine(val => val !== 0, 'El ajuste debe ser distinto de cero'),
     reason: z.string().max(255).optional(),

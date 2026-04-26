@@ -11,7 +11,7 @@ export interface ProductListItem {
     barcode: string | null;
     price: number;
     cost?: number;
-    category: { id: string; name: string } | null;
+    subGroup: { id: string; name: string; group?: { id: string; name: string } } | null;
     isActive: boolean;
     baseUnit: string;
     presentations: ProductPresentation[];
@@ -24,7 +24,7 @@ export interface CreateProductPayload {
     price: number;
     cost?: number;
     imageUrl?: string;
-    categoryId?: string;
+    subGroupId?: string;
     baseUnit?: string;
     presentations?: { name: string; multiplier: number; price: number; barcode?: string }[];
 }

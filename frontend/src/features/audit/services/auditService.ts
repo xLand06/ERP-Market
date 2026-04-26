@@ -9,12 +9,14 @@ export interface AuditLog {
     ipAddress?: string;
     userAgent?: string;
     createdAt: string;
-    user: {
+    user?: {
         id: string;
-        name: string;
-        email: string;
+        username: string;
+        nombre: string;
+        apellido: string | null;
+        email: string | null;
         role: string;
-    };
+    } | null;
 }
 
 export interface AuditFilters {

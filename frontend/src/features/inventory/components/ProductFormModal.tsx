@@ -15,14 +15,14 @@ export interface Product {
     barcode?: string;
     price: number;
     cost?: number;
-    categoryId?: string;
+    subGroupId?: string;
     isActive?: boolean;
 }
 
 export interface ProductFormData {
     code: string;
     name: string;
-    categoryId: string;
+    subGroupId: string;
     cost: string;
     price: string;
     stock: string;
@@ -54,7 +54,7 @@ export function ProductFormModal({
     const [barcode, setBarcode] = useState('');
     const [price, setPrice] = useState<number | ''>('');
     const [cost, setCost] = useState<number | ''>('');
-    const [categoryId, setCategoryId] = useState('');
+    const [subGroupId, setSubGroupId] = useState('');
     const [stock, setStock] = useState<number | ''>('');
     const [minStock, setMinStock] = useState<number | ''>('');
     
@@ -70,7 +70,7 @@ export function ProductFormModal({
                 setBarcode(product.barcode || '');
                 setPrice(product.price);
                 setCost(product.cost ?? '');
-                setCategoryId(product.categoryId || '');
+                setSubGroupId(product.subGroupId || '');
             } else {
                 setCode('');
                 setName('');
@@ -78,7 +78,7 @@ export function ProductFormModal({
                 setBarcode('');
                 setPrice('');
                 setCost('');
-                setCategoryId('');
+                setSubGroupId('');
                 setStock(initialStock || '');
                 setMinStock(initialMinStock || '');
             }
@@ -127,7 +127,7 @@ export function ProductFormModal({
                 barcode: code || null, 
                 price: Number(price), 
                 cost: cost ? Number(cost) : null, 
-                categoryId: categoryId || null 
+                subGroupId: subGroupId || null 
             };
             
             if (product) {
@@ -210,11 +210,11 @@ export function ProductFormModal({
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label htmlFor="categoryId" className="block text-sm font-semibold text-slate-700 mb-1.5">Categoría</label>
+                            <label htmlFor="subGroupId" className="block text-sm font-semibold text-slate-700 mb-1.5">Categoría (Subgrupo)</label>
                             <select
-                                id="categoryId"
-                                value={categoryId}
-                                onChange={(e) => setCategoryId(e.target.value)}
+                                id="subGroupId"
+                                value={subGroupId}
+                                onChange={(e) => setSubGroupId(e.target.value)}
                                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm bg-white"
                             >
                                 <option value="">Sin categoría asignada</option>

@@ -7,6 +7,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { useConfigStore } from '@/hooks/useConfigStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CashClosureModalProps {
@@ -26,26 +27,43 @@ interface ClosingData {
 export function CashClosureModal({
     open, onClose, openingBalance, expectedBalance, onConfirm,
 }: CashClosureModalProps) {
-    const [counted, setCounted] = useState('');
+    const { rates } = useConfigStore();
+    const [countedCop, setCountedCop] = useState('');
+    const [countedUsd, setCountedUsd] = useState('');
+    const [countedVes, setCountedVes] = useState('');
     const [notes, setNotes] = useState('');
     const [error, setError] = useState('');
 
-    const countedNum = parseFloat(counted) || 0;
-    const difference = countedNum - expectedBalance;
+    const copRate = rates['COP'] || 4100;
+    const vesRate = rates['VES'] || 36.50;
+
+    const convertedOpening = openingBalance * copRate;
+    const convertedExpected = expectedBalance * copRate;
+
+    const countedCopNum = parseFloat(countedCop) || 0;
+    const countedUsdNum = parseFloat(countedUsd) || 0;
+    const countedVesNum = parseFloat(countedVes) || 0;
+
+    const totalCountedCop = countedCopNum + (countedUsdNum * copRate) + ((countedVesNum / vesRate) * copRate);
+    const totalCountedUsd = (countedCopNum / copRate) + countedUsdNum + (countedVesNum / vesRate);
+
+    const difference = totalCountedCop - convertedExpected;
     const isShort = difference < 0;
     const isOver = difference > 0;
 
     const handleConfirm = () => {
-        if (!counted || countedNum < 0) {
-            setError('Ingresa un monto contado válido.');
+        if (countedCopNum < 0 || countedUsdNum < 0 || countedVesNum < 0) {
+            setError('Ingresa montos contados válidos.');
             return;
         }
-        onConfirm({ closingAmount: countedNum, notes });
+        onConfirm({ closingAmount: totalCountedUsd, notes });
         handleClose();
     };
 
     const handleClose = () => {
-        setCounted('');
+        setCountedCop('');
+        setCountedUsd('');
+        setCountedVes('');
         setNotes('');
         setError('');
         onClose();
@@ -70,13 +88,13 @@ export function CashClosureModal({
                     {/* Summary Grid */}
                     <div className="grid grid-cols-3 gap-3">
                         {[
-                            { label: 'Apertura', value: openingBalance, color: 'text-slate-700' },
-                            { label: 'Esperado', value: expectedBalance, color: 'text-blue-700' },
+                            { label: 'Apertura', value: convertedOpening, color: 'text-slate-700' },
+                            { label: 'Esperado', value: convertedExpected, color: 'text-blue-700' },
                         ].map(item => (
                             <div key={item.label} className="bg-slate-50 rounded-xl p-3 border border-slate-200">
                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">{item.label}</p>
                                 <p className={cn('text-lg font-black tabular-nums', item.color)}>
-                                    ${item.value.toFixed(2)}
+                                    ${Math.round(item.value).toLocaleString('es-CO')}
                                 </p>
                             </div>
                         ))}
@@ -89,33 +107,71 @@ export function CashClosureModal({
                                 'text-lg font-black tabular-nums',
                                 isShort ? 'text-red-600' : isOver ? 'text-emerald-600' : 'text-slate-700'
                             )}>
-                                {isShort ? '' : isOver ? '+' : ''}{difference.toFixed(2)}
+                                {isShort ? '' : isOver ? '+' : ''}
+                                ${Math.round(difference).toLocaleString('es-CO')}
                             </p>
                         </div>
                     </div>
 
-                    {/* Counted Input */}
-                    <div className="space-y-1.5">
-                        <label htmlFor="counted" className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                    {/* Counted Inputs for each currency */}
+                    <div className="space-y-3">
+                        <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
                             Monto Físico Contado <span className="text-red-500">*</span>
                         </label>
-                        <Input
-                            id="counted"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="0.00"
-                            value={counted}
-                            onChange={e => { setCounted(e.target.value); setError(''); }}
-                            className={cn('text-lg font-bold tabular-nums h-12', error && 'border-red-400')}
-                            aria-invalid={!!error}
-                            aria-describedby={error ? 'counted-err' : undefined}
-                        />
+                        
+                        <div className="flex items-center gap-2">
+                            <span className="w-16 font-bold text-slate-600 text-sm">COP</span>
+                            <div className="relative flex-1">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                <Input
+                                    type="number"
+                                    step="1"
+                                    min="0"
+                                    placeholder="0"
+                                    value={countedCop}
+                                    onChange={e => { setCountedCop(e.target.value); setError(''); }}
+                                    className={cn('text-base font-bold tabular-nums h-10 pl-8', error && 'border-red-400')}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <span className="w-16 font-bold text-slate-600 text-sm">USD</span>
+                            <div className="relative flex-1">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="0.00"
+                                    value={countedUsd}
+                                    onChange={e => { setCountedUsd(e.target.value); setError(''); }}
+                                    className={cn('text-base font-bold tabular-nums h-10 pl-8', error && 'border-red-400')}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <span className="w-16 font-bold text-slate-600 text-sm">VES</span>
+                            <div className="relative flex-1">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">Bs.</span>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="0.00"
+                                    value={countedVes}
+                                    onChange={e => { setCountedVes(e.target.value); setError(''); }}
+                                    className={cn('text-base font-bold tabular-nums h-10 pl-10', error && 'border-red-400')}
+                                />
+                            </div>
+                        </div>
+
                         {error && <p id="counted-err" className="text-xs text-red-500">{error}</p>}
                     </div>
 
                     {/* Difference Indicator */}
-                    {counted && (
+                    {(countedCop || countedUsd || countedVes) && (
                         <div className={cn(
                             'flex items-center gap-3 p-3 rounded-xl border',
                             isShort
@@ -127,9 +183,9 @@ export function CashClosureModal({
                             <AlertTriangle className="w-4 h-4 shrink-0" />
                             <p className="text-sm font-semibold">
                                 {isShort
-                                    ? `Faltante de $${Math.abs(difference).toFixed(2)} en caja.`
+                                    ? `Faltante de $${Math.round(Math.abs(difference)).toLocaleString('es-CO')} en caja.`
                                     : isOver
-                                        ? `Sobrante de $${difference.toFixed(2)} en caja.`
+                                        ? `Sobrante de +$${Math.round(difference).toLocaleString('es-CO')} en caja.`
                                         : 'Caja cuadrada correctamente.'}
                             </p>
                         </div>

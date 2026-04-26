@@ -52,7 +52,7 @@ export interface CreateProductDTO {
     price: number;
     cost?: number;
     imageUrl?: string;
-    categoryId?: string;
+    subGroupId?: string;
     isActive?: boolean;
 }
 
@@ -63,7 +63,7 @@ export interface UpdateProductDTO {
     price?: number;
     cost?: number;
     imageUrl?: string;
-    categoryId?: string;
+    subGroupId?: string;
     isActive?: boolean;
 }
 
@@ -76,8 +76,8 @@ export interface ProductDTO {
     cost?: number;
     imageUrl?: string;
     isActive: boolean;
-    categoryId?: string;
-    category?: CategoryDTO;
+    subGroupId?: string;
+    subGroup?: SubGroupDTO;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -86,7 +86,7 @@ export interface ProductListParams {
     page?: number;
     limit?: number;
     search?: string;
-    categoryId?: string;
+    subGroupId?: string;
     isActive?: boolean;
 }
 
@@ -96,23 +96,48 @@ export interface ProductFiltersDTO extends ProductListParams {
 }
 
 // =============================================================================
-// CATEGORY DTOs
+// GROUP DTOs
 // =============================================================================
 
-export interface CreateCategoryDTO {
+export interface CreateGroupDTO {
     name: string;
     description?: string;
 }
 
-export interface UpdateCategoryDTO {
+export interface UpdateGroupDTO {
     name?: string;
     description?: string;
 }
 
-export interface CategoryDTO {
+export interface GroupDTO {
     id: string;
     name: string;
     description?: string;
+    createdAt: Date;
+    updatedAt: Date;
+    subGroups?: SubGroupDTO[];
+    _count?: {
+        subGroups: number;
+    };
+}
+
+export interface CreateSubGroupDTO {
+    name: string;
+    description?: string;
+    groupId: string;
+}
+
+export interface UpdateSubGroupDTO {
+    name?: string;
+    description?: string;
+}
+
+export interface SubGroupDTO {
+    id: string;
+    name: string;
+    description?: string;
+    groupId: string;
+    group?: GroupDTO;
     createdAt: Date;
     updatedAt: Date;
     _count?: {

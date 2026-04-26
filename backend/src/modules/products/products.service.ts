@@ -5,16 +5,16 @@ import type { ProductDTO } from '../../core/types/dto';
 import type { ApiListResponse } from '../../core/types/responses';
 
 interface ProductListParams extends PaginationParams {
-    categoryId?: string;
+    subGroupId?: string;
     isActive?: boolean;
 }
 
 export const getAllProducts = async (filters: ProductListParams): Promise<ApiListResponse<ProductDTO>> => {
-    const { page = 1, limit = 20, search, categoryId, isActive } = filters;
+    const { page = 1, limit = 20, search, subGroupId, isActive } = filters;
     const skip = (page - 1) * limit;
 
     const where = {
-        ...(categoryId && { categoryId }),
+        ...(subGroupId && { subGroupId }),
         ...(isActive !== undefined && { isActive }),
         ...(search && {
             OR: [
@@ -29,7 +29,7 @@ export const getAllProducts = async (filters: ProductListParams): Promise<ApiLis
         prisma.product.findMany({
             where,
             include: { 
-                category: true,
+                subGroup: { include: { group: true } },
                 presentations: true 
             },
             orderBy: { name: 'asc' },
@@ -58,7 +58,7 @@ export const getProductById = async (id: string): Promise<ProductDTO | null> => 
     const product = await prisma.product.findUnique({ 
         where: { id }, 
         include: { 
-            category: true,
+            subGroup: { include: { group: true } },
             presentations: true
         } 
     });

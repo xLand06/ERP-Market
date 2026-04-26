@@ -18,6 +18,7 @@ interface Product {
     cost: number; price: number; stock: number; minStock: number;
     baseUnit: string;
     isActive?: boolean;
+    presentations?: any[];
 }
 
 type StockLevel = 'normal' | 'warning' | 'critical';
@@ -38,6 +39,9 @@ export default function InventoryPage() {
     const [editTarget, setEditTarget] = useState<Product | null>(null);
     const [adjustmentOpen, setAdjustmentOpen] = useState(false);
 
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(25);
+
     const searchId    = useId();
     const pageSizeId  = useId();
     const tableId     = useId();
@@ -51,6 +55,25 @@ export default function InventoryPage() {
 
     useBarcodeScanner((barcode) => {
         setSearch(barcode);
+        
+        const product = PRODUCTS.find(p => p.code === barcode);
+        if (product) {
+            updateStock({ product: { id: product.id }, quantity: product.stock + 1, minStock: product.minStock });
+            toast.success(`+1 añadido a ${product.name}`);
+            return;
+        }
+
+        for (const p of PRODUCTS) {
+            const pres = p.presentations?.find((pr: any) => pr.barcode === barcode);
+            if (pres) {
+                const added = Number(pres.multiplier);
+                updateStock({ product: { id: p.id }, quantity: p.stock + added, minStock: p.minStock });
+                toast.success(`+${added} añadido a ${p.name} (${pres.name})`);
+                return;
+            }
+        }
+
+        toast.error(`⚠️ Código ${barcode} no encontrado en catálogo`);
     });
 
     useEffect(() => {
@@ -69,7 +92,8 @@ export default function InventoryPage() {
             stock: Number(item.stock || 0),
             minStock: Number(item.minStock || 0),
             baseUnit: item.product.baseUnit || 'UNIDAD',
-            category: item.product.category || 'Varios',
+            category: item.product.subGroup || 'Varios',
+            presentations: item.product.presentations || [],
         }));
     }, [inventory]);
 
@@ -99,6 +123,13 @@ export default function InventoryPage() {
         (category === 'Todos' || p.category === category) &&
         (p.name.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase()))
     );
+
+    const paginated = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filtered.slice(start, start + pageSize);
+    }, [filtered, currentPage, pageSize]);
+
+    const totalPages = Math.ceil(filtered.length / pageSize) || 1;
 
     const allSelected  = filtered.length > 0 && filtered.every(p => selected.has(p.id));
     const someSelected = filtered.some(p => selected.has(p.id)) && !allSelected;
@@ -218,7 +249,7 @@ export default function InventoryPage() {
                             id={searchId}
                             placeholder="Buscar por nombre, código..."
                             value={search}
-                            onChange={e => setSearch(e.target.value)}
+                            onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
                             className="pl-9"
                             type="search"
                         />
@@ -227,15 +258,14 @@ export default function InventoryPage() {
                         {CATEGORIES.map(cat => (
                             <button
                                 key={cat}
-                                onClick={() => setCategory(cat)}
+                                onClick={() => { setCategory(cat); setCurrentPage(1); }}
                                 aria-pressed={category === cat}
                                 className={cn(
                                     'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all',
                                     category === cat
                                         ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
                                         : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-                                )}
-                            >
+                                )}>
                                 {cat}
                             </button>
                         ))}
@@ -277,7 +307,7 @@ export default function InventoryPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {!isLoading && filtered.map(p => {
+                            {!isLoading && paginated.map(p => {
                                 const level = stockLevel(p.stock, p.minStock);
                                 const isEditing = editingId === p.id;
                                 const editInputId = `edit-price-${p.id}`;
@@ -372,20 +402,44 @@ export default function InventoryPage() {
 
                 {/* Pagination */}
                 <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50 mt-auto">
-                    <p className="text-xs text-slate-500">Mostrando 1–{filtered.length} de {PRODUCTS.length} productos</p>
+                    <p className="text-xs text-slate-500">
+                        Mostrando {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, filtered.length)} de {filtered.length} productos
+                    </p>
                     <div className="flex items-center gap-2">
-                        <select id={pageSizeId} className="h-8 rounded-lg border border-slate-200 px-2 text-xs text-slate-600 bg-white">
-                            <option>25</option><option>50</option><option>100</option>
+                        <select 
+                            id={pageSizeId} 
+                            value={pageSize}
+                            onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                            className="h-8 rounded-lg border border-slate-200 px-2 text-xs text-slate-600 bg-white"
+                        >
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
                         </select>
-                        <nav aria-label="Paginación de inventario">
-                            <ul className="flex gap-1 list-none m-0 p-0">
-                                {[1].map((page, i) => (
-                                    <li key={i}>
-                                        <button className="w-8 h-8 rounded-lg text-xs font-medium bg-emerald-500 text-white">{page}</button>
-                                    </li>
-                                ))}
-                            </ul>
-                        </nav>
+                        <div className="flex items-center gap-1">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                disabled={currentPage === 1} 
+                                onClick={() => setCurrentPage(p => p - 1)}
+                                className="h-8 px-2 text-xs"
+                            >
+                                Anterior
+                            </Button>
+                            <span className="text-xs text-slate-600 px-2">
+                                Página {currentPage} de {totalPages}
+                            </span>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                disabled={currentPage >= totalPages} 
+                                onClick={() => setCurrentPage(p => p + 1)}
+                                className="h-8 px-2 text-xs"
+                            >
+                                Siguiente
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </div>

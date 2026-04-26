@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { 
-    ArrowLeftRight, Bell, ChevronDown, LogOut, Settings, User, Menu, Store, Keyboard,
+    ArrowLeftRight, Bell, ChevronDown, LogOut, Settings, User, Menu, Keyboard,
     ShoppingCart, Package, Layers, Banknote
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -66,17 +66,14 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                     <Menu className="w-5 h-5 lg:w-6 lg:h-6" />
                 </button>
 
-                <div className="flex items-center gap-2 shrink-0">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shrink-0">
-                        <Store className="w-4 h-4 text-white" />
-                    </div>
-                    {/* Hide text on mobile to provide space for widgets */}
-                    <span className="font-black text-sm text-slate-900 tracking-tight hidden lg:block uppercase">Abastos sofimar</span>
-                </div>
+                
             </div>
 
             {/* Center – Exchange Rate Widget */}
-            <div className="flex items-center gap-0 bg-slate-50 border border-slate-200 rounded-xl p-1 text-xs shrink-0 max-w-[140px] sm:max-w-none overflow-x-auto min-[400px]:flex hidden lg:flex no-scrollbar">
+            <div className={cn(
+                "items-center gap-0 bg-slate-50 border border-slate-200 rounded-xl p-1 text-xs shrink-0 max-w-[140px] sm:max-w-none overflow-x-auto no-scrollbar",
+                collapsed ? "hidden md:flex" : "hidden xl:flex"
+            )}>
                 {/* Label */}
                 <div className="hidden sm:flex items-center gap-1.5 px-2 text-slate-400">
                     <ArrowLeftRight className="w-3 h-3" />
@@ -102,10 +99,10 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                     ))}
                 </div>
 
-                <div className="w-px h-5 bg-slate-200 mx-1 hidden lg:block" />
+                <div className={cn("w-px h-5 bg-slate-200 mx-1", collapsed ? "hidden lg:block" : "hidden xl:block")} />
 
                 {/* Rates display */}
-                <div className="hidden lg:flex items-center">
+                <div className={cn("items-center", collapsed ? "hidden lg:flex" : "hidden xl:flex")}>
                     {others.map((cur, i) => (
                         <div key={cur} className="flex items-center">
                             {i > 0 && <div className="w-px h-4 bg-slate-200 mx-2" />}
@@ -129,7 +126,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                 {/* Branch Selector */}
                 <BranchSelector />
 
-                <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/50">
+                <div className="hidden sm:flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/50">
                     {/* Keyboard Shortcuts */}
                     <button 
                         onClick={() => setShortcutsOpen(true)}

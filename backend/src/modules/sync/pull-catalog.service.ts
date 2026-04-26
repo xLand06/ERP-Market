@@ -23,13 +23,26 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
     try {
         console.log('[Sync] Starting Pull Catalog (standalone mode)...');
 
-        const cloudCategories = await prismaCloud.category.findMany();
-        for (const cat of cloudCategories) {
+        const cloudGroups = await prismaCloud.group.findMany();
+        for (const group of cloudGroups) {
             try {
-                await localPrisma.category.upsert({
-                    where: { id: cat.id },
-                    update: { name: cat.name },
-                    create: { id: cat.id, name: cat.name },
+                await localPrisma.group.upsert({
+                    where: { id: group.id },
+                    update: { name: group.name },
+                    create: { id: group.id, name: group.name },
+                });
+            } catch (e) {
+                // Ignore
+            }
+        }
+
+        const cloudSubGroups = await prismaCloud.subGroup.findMany();
+        for (const subGroup of cloudSubGroups) {
+            try {
+                await localPrisma.subGroup.upsert({
+                    where: { id: subGroup.id },
+                    update: { name: subGroup.name, groupId: subGroup.groupId },
+                    create: { id: subGroup.id, name: subGroup.name, groupId: subGroup.groupId },
                 });
             } catch (e) {
                 // Ignore
@@ -37,7 +50,7 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
         }
 
         const cloudProducts = await prismaCloud.product.findMany({
-            include: { category: true, presentations: true }
+            include: { subGroup: true, presentations: true }
         });
         for (const prod of cloudProducts) {
             try {
@@ -49,7 +62,7 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
                         price: Number(prod.price),
                         cost: Number(prod.cost),
                         baseUnit: prod.baseUnit,
-                        categoryId: prod.categoryId,
+                        subGroupId: prod.subGroupId,
                         isActive: prod.isActive,
                     },
                     create: {
@@ -59,7 +72,7 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
                         price: Number(prod.price),
                         cost: Number(prod.cost),
                         baseUnit: prod.baseUnit,
-                        categoryId: prod.categoryId,
+                        subGroupId: prod.subGroupId,
                         isActive: prod.isActive,
                     }
                 });

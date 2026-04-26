@@ -114,7 +114,8 @@ router.post('/purge', roleGuard('OWNER'), async (req: AuthRequest, res: Response
             prisma.transaction.deleteMany({}),
             prisma.auditLog.deleteMany({}),
             prisma.product.deleteMany({}),
-            prisma.category.deleteMany({}),
+            prisma.subGroup.deleteMany({}),
+            prisma.group.deleteMany({}),
         ]);
 
         await logAudit({

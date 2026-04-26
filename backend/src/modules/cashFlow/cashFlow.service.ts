@@ -74,35 +74,50 @@ export const getCurrentOpenRegister = (branchId: string) =>
         },
     });
 
-export const getCashRegisterHistory = (filters: {
+export const getCashRegisterHistory = async (filters: {
     branchId?: string;
     from?: string;
     to?: string;
-    page?: number;
-    limit?: number;
+    page?: string | number;
+    limit?: string | number;
 }) => {
-    const { branchId, from, to, page = 1, limit = 30 } = filters;
-    return prisma.cashRegister.findMany({
-        where: {
-            ...(branchId && { branchId }),
-            ...(from || to
-                ? {
-                      openedAt: {
-                          ...(from && { gte: new Date(from) }),
-                          ...(to && { lte: new Date(to) }),
-                      },
-                  }
-                : {}),
-        },
-        include: {
-            user: { select: { id: true, nombre: true, username: true } },
-            branch: { select: { id: true, name: true } },
-            _count: { select: { transactions: true } },
-        },
-        orderBy: { openedAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-    });
+    const { branchId, from, to } = filters;
+    const page = Number(filters.page) || 1;
+    const limit = Number(filters.limit) || 30;
+
+    const whereClause = {
+        ...(branchId && { branchId }),
+        ...(from || to
+            ? {
+                  openedAt: {
+                      ...(from && { gte: new Date(from) }),
+                      ...(to && { lte: new Date(to) }),
+                  },
+              }
+            : {}),
+    };
+
+    const [total, registers] = await Promise.all([
+        prisma.cashRegister.count({ where: whereClause }),
+        prisma.cashRegister.findMany({
+            where: whereClause,
+            include: {
+                user: { select: { id: true, nombre: true, username: true } },
+                branch: { select: { id: true, name: true } },
+                _count: { select: { transactions: true } },
+            },
+            orderBy: { openedAt: 'desc' },
+            skip: (page - 1) * limit,
+            take: limit,
+        })
+    ]);
+
+    return {
+        registers,
+        total,
+        totalPages: Math.ceil(total / limit),
+        currentPage: page
+    };
 };
 
 export const getCashRegisterById = (id: string) =>

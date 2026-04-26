@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import {
     TrendingUp, TrendingDown, DollarSign, ArrowUpCircle,
-    Plus, Lock, Circle, Play, History, ChevronLeft, ChevronRight, Calendar
+    Plus, Lock, Circle, Play, History, ChevronLeft, ChevronRight, Calendar, Copy, Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,9 +9,12 @@ import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { ExpenseEntryModal } from '../components/ExpenseEntryModal';
 import { CashClosureModal } from '../components/CashClosureModal';
+import { CashRegisterDetailModal } from '../components/CashRegisterDetailModal';
+import { SaleDetailModal, Sale } from '../../sales/components/SaleDetailModal';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
+import { useConfigStore } from '@/hooks/useConfigStore';
 
 function StatCard({ icon: Icon, label, value, color, bg }: {
     icon: React.ElementType; label: string; value: string; color: string; bg: string;
@@ -37,6 +40,59 @@ export default function CashRegisterPage() {
     const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
     const [historyPage, setHistoryPage] = useState(1);
     const [historyFilters, setHistoryFilters] = useState({ from: '', to: '' });
+    const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+    const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
+    
+    const { rates } = useConfigStore();
+    const [openCurrency, setOpenCurrency] = useState<'USD' | 'VES' | 'COP'>('COP');
+    const [filterMode, setFilterMode] = useState<'range' | 'month'>('range');
+    const [selectedMonth, setSelectedMonth] = useState<string>(String(new Date().getMonth() + 1).padStart(2, '0'));
+    const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()));
+
+    const MONTHS = [
+        { value: '01', label: 'Enero' },
+        { value: '02', label: 'Febrero' },
+        { value: '03', label: 'Marzo' },
+        { value: '04', label: 'Abril' },
+        { value: '05', label: 'Mayo' },
+        { value: '06', label: 'Junio' },
+        { value: '07', label: 'Julio' },
+        { value: '08', label: 'Agosto' },
+        { value: '09', label: 'Septiembre' },
+        { value: '10', label: 'Octubre' },
+        { value: '11', label: 'Noviembre' },
+        { value: '12', label: 'Diciembre' },
+    ];
+
+    const currentYear = new Date().getFullYear();
+    const YEARS = Array.from({ length: 5 }, (_, i) => String(currentYear - i));
+
+    const { data: selectedSaleDetails } = useQuery({
+        queryKey: ['saleDetail', selectedSaleId],
+        queryFn: async () => {
+            if (!selectedSaleId) return null;
+            const res = await api.get(`/sales/${selectedSaleId}`);
+            const tx = res.data;
+            const sale: Sale = {
+                id: tx.id,
+                ticketNo: tx.id.slice(-6).toUpperCase(),
+                date: tx.createdAt,
+                cashier: tx.user?.nombre || tx.user?.username || 'Sistema',
+                branch: tx.branch?.name || '-',
+                paymentMethod: tx.notes?.includes('Tarjeta') ? 'Tarjeta' : tx.notes?.includes('Transferencia') ? 'Transferencia' : tx.notes?.includes('Divisa') ? 'Divisa' : 'Efectivo',
+                items: tx.items.map((i: any) => ({
+                    name: i.product?.name || 'Producto Desconocido',
+                    qty: Number(i.quantity),
+                    unitPrice: Number(i.unitPrice),
+                })),
+                subtotal: Number(tx.total),
+                discount: 0,
+                total: Number(tx.total)
+            };
+            return sale;
+        },
+        enabled: !!selectedSaleId
+    });
 
     const { data: branches = [] } = useQuery({
         queryKey: ['branches'],
@@ -107,12 +163,22 @@ export default function CashRegisterPage() {
 
     const historyBranchId = selectedBranch === 'all' ? undefined : effectiveBranch;
     const { data: historyData, isLoading: historyLoading, refetch: refetchHistory } = useQuery({
-        queryKey: ['cashFlowHistory', historyBranchId, historyFilters, historyPage],
+        queryKey: ['cashFlowHistory', historyBranchId, historyFilters, filterMode, selectedMonth, selectedYear, historyPage],
         queryFn: async () => {
             const params: any = { page: historyPage, limit: 10 };
             if (historyBranchId) params.branchId = historyBranchId;
-            if (historyFilters.from) params.from = historyFilters.from;
-            if (historyFilters.to) params.to = historyFilters.to;
+            
+            if (filterMode === 'range') {
+                if (historyFilters.from) params.from = historyFilters.from;
+                if (historyFilters.to) params.to = historyFilters.to;
+            } else {
+                const fromDate = `${selectedYear}-${selectedMonth}-01`;
+                const lastDay = new Date(Number(selectedYear), Number(selectedMonth), 0).getDate();
+                const toDate = `${selectedYear}-${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
+                params.from = fromDate;
+                params.to = toDate;
+            }
+
             const res = await api.get('/cash-flow/history', { params });
             return res.data.data;
         },
@@ -122,7 +188,8 @@ export default function CashRegisterPage() {
 
     const formatCurrency = (value: number | string | null | undefined) => {
         const num = typeof value === 'string' ? parseFloat(value) : (value || 0);
-        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD' }).format(num);
+        const copValue = num * (rates['COP'] || 4100);
+        return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(copValue);
     };
 
     const formatDate = (dateStr: string | null | undefined) => {
@@ -174,13 +241,41 @@ export default function CashRegisterPage() {
                         <form onSubmit={(e) => {
                             e.preventDefault();
                             const formData = new FormData(e.currentTarget);
-                            const val = parseFloat(formData.get('openingAmount') as string);
-                            if (!isNaN(val) && val >= 0) openMutation.mutate(val);
+                            const valCop = parseFloat(formData.get('openingCop') as string) || 0;
+                            const valUsd = parseFloat(formData.get('openingUsd') as string) || 0;
+                            const valVes = parseFloat(formData.get('openingVes') as string) || 0;
+                            
+                            const copRate = rates['COP'] || 4100;
+                            const vesRate = rates['VES'] || 36.50;
+
+                            const amountInUsd = (valCop / copRate) + valUsd + (valVes / vesRate);
+                            if (amountInUsd >= 0) {
+                                openMutation.mutate(amountInUsd);
+                            }
                         }}>
-                            <label className="block text-left text-sm font-bold text-slate-700 mb-2">Monto de Apertura</label>
-                            <div className="relative mb-4">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
-                                <input name="openingAmount" type="number" step="0.01" required defaultValue="0.00" min="0" className="w-full text-right h-11 pl-8 pr-4 rounded-lg border border-slate-300 font-bold text-lg" />
+                            <label className="block text-left text-sm font-bold text-slate-700 mb-2">Monto de Apertura (Físico en Caja)</label>
+                            <div className="space-y-3 mb-4">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-16 font-bold text-slate-600 text-sm">COP</span>
+                                    <div className="relative flex-1">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                        <input name="openingCop" type="number" step="1" required defaultValue="0" min="0" className="w-full text-right h-10 pl-8 pr-4 rounded-lg border border-slate-300 font-bold" />
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="w-16 font-bold text-slate-600 text-sm">USD</span>
+                                    <div className="relative flex-1">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                        <input name="openingUsd" type="number" step="0.01" required defaultValue="0.00" min="0" className="w-full text-right h-10 pl-8 pr-4 rounded-lg border border-slate-300 font-bold" />
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="w-16 font-bold text-slate-600 text-sm">VES</span>
+                                    <div className="relative flex-1">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">Bs.</span>
+                                        <input name="openingVes" type="number" step="0.01" required defaultValue="0.00" min="0" className="w-full text-right h-10 pl-8 pr-4 rounded-lg border border-slate-300 font-bold" />
+                                    </div>
+                                </div>
                             </div>
                             <Button type="submit" disabled={openMutation.isPending} className="w-full h-11 font-bold text-base">
                                 {openMutation.isPending ? 'Abriendo...' : <><Play className="w-4 h-4 mr-2" /> Abrir Caja Ahora</>}
@@ -208,6 +303,7 @@ export default function CashRegisterPage() {
             <>
                 <ExpenseEntryModal open={entryOpen} onClose={() => setEntryOpen(false)} onSave={(data) => addMovementMutation.mutate(data)} />
                 <CashClosureModal open={closureOpen} onClose={() => setClosureOpen(false)} openingBalance={openingAmount} expectedBalance={expectedBalance} onConfirm={(d) => { closeMutation.mutate(d); setClosureOpen(false); }} />
+                <SaleDetailModal sale={selectedSaleDetails || null} open={!!selectedSaleId} onClose={() => setSelectedSaleId(null)} />
                 <div className="flex flex-col gap-6 max-w-350 mx-auto pb-8">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
@@ -232,19 +328,45 @@ export default function CashRegisterPage() {
                         ) : (
                             <div className="divide-y divide-slate-100">
                                 {transactions.map((t: any) => (
-                                    <div key={t.id} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50">
+                                    <div key={t.id} className={cn("px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors group", t.type === 'SALE' && "cursor-pointer")} onClick={() => t.type === 'SALE' && setSelectedSaleId(t.id)}>
                                         <div className="flex items-center gap-3">
-                                            <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', t.type === 'SALE' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}>
+                                            <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', t.type === 'SALE' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}>
                                                 {t.type === 'SALE' ? <TrendingUp className="w-4 h-4" /> : <DollarSign className="w-4 h-4" />}
                                             </div>
                                             <div>
-                                                <p className="text-sm font-medium text-slate-800">{t.type === 'SALE' ? 'Venta' : 'Ajuste'}</p>
-                                                <p className="text-xs text-slate-400">{new Date(t.createdAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-medium text-slate-800">{t.type === 'SALE' ? 'Venta' : 'Ajuste'}</p>
+                                                    {t.type === 'SALE' && (
+                                                        <span 
+                                                            className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono hover:bg-slate-200 transition-colors flex items-center gap-1"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                navigator.clipboard.writeText(t.id);
+                                                                toast.success('Código copiado');
+                                                            }}
+                                                            title="Copiar código de venta"
+                                                        >
+                                                            #{t.id.slice(-6).toUpperCase()}
+                                                            <Copy className="w-3 h-3" />
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                                                    <Calendar className="w-3 h-3" />
+                                                    {new Date(t.createdAt).toLocaleDateString('es-VE')} {new Date(t.createdAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
+                                                </p>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className={cn('text-sm font-bold', t.type === 'SALE' ? 'text-emerald-600' : 'text-amber-600')}>{t.type === 'SALE' ? '+' : ''}{formatCurrency(t.total)}</p>
-                                            <p className="text-xs text-slate-400 capitalize">{t.status.toLowerCase()}</p>
+                                        <div className="text-right flex items-center gap-4">
+                                            <div>
+                                                <p className={cn('text-sm font-bold', t.type === 'SALE' ? 'text-emerald-600' : 'text-amber-600')}>{t.type === 'SALE' ? '+' : ''}{formatCurrency(t.total)}</p>
+                                                <p className="text-[10px] text-slate-400 capitalize font-semibold mt-0.5">{t.status.toLowerCase()}</p>
+                                            </div>
+                                            {t.type === 'SALE' && (
+                                                <div className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-slate-100 rounded-md">
+                                                    <Eye className="w-4 h-4 text-slate-500" />
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
@@ -264,17 +386,63 @@ export default function CashRegisterPage() {
         return (
             <div className="flex flex-col gap-6 pb-8">
                 <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                    <div className="flex items-center gap-4 mb-4 border-b border-slate-100 pb-2">
+                        <button 
+                            onClick={() => setFilterMode('range')} 
+                            className={cn('text-xs font-semibold pb-1 border-b-2 transition-colors', filterMode === 'range' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600')}
+                        >
+                            Por Intervalo
+                        </button>
+                        <button 
+                            onClick={() => setFilterMode('month')} 
+                            className={cn('text-xs font-semibold pb-1 border-b-2 transition-colors', filterMode === 'month' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600')}
+                        >
+                            Por Mes y Año
+                        </button>
+                    </div>
                     <div className="flex flex-wrap items-end gap-4">
-                        <div>
-                            <label className="block text-xs font-medium text-slate-500 mb-1">Desde</label>
-                            <Input type="date" value={historyFilters.from} onChange={(e) => setHistoryFilters(prev => ({ ...prev, from: e.target.value }))} className="w-40" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-slate-500 mb-1">Hasta</label>
-                            <Input type="date" value={historyFilters.to} onChange={(e) => setHistoryFilters(prev => ({ ...prev, to: e.target.value }))} className="w-40" />
-                        </div>
+                        {filterMode === 'range' ? (
+                            <>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-500 mb-1">Desde</label>
+                                    <Input type="date" value={historyFilters.from} onChange={(e) => setHistoryFilters(prev => ({ ...prev, from: e.target.value }))} className="w-40" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-500 mb-1">Hasta</label>
+                                    <Input type="date" value={historyFilters.to} onChange={(e) => setHistoryFilters(prev => ({ ...prev, to: e.target.value }))} className="w-40" />
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-500 mb-1">Mes</label>
+                                    <select 
+                                        value={selectedMonth} 
+                                        onChange={(e) => setSelectedMonth(e.target.value)} 
+                                        className="w-40 h-10 px-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                    >
+                                        {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-500 mb-1">Año</label>
+                                    <select 
+                                        value={selectedYear} 
+                                        onChange={(e) => setSelectedYear(e.target.value)} 
+                                        className="w-40 h-10 px-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                    >
+                                        {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                                    </select>
+                                </div>
+                            </>
+                        )}
                         <Button variant="outline" onClick={() => { setHistoryPage(1); refetchHistory(); }}><Calendar className="w-4 h-4 mr-2" />Filtrar</Button>
-                        <Button variant="ghost" onClick={() => { setHistoryFilters({ from: '', to: '' }); setHistoryPage(1); }}>Limpiar</Button>
+                        <Button variant="ghost" onClick={() => { 
+                            setHistoryFilters({ from: '', to: '' }); 
+                            setSelectedMonth(String(new Date().getMonth() + 1).padStart(2, '0'));
+                            setSelectedYear(String(new Date().getFullYear()));
+                            setHistoryPage(1); 
+                        }}>Limpiar</Button>
                     </div>
                 </div>
 
@@ -299,7 +467,7 @@ export default function CashRegisterPage() {
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {registers.map((reg: any) => (
-                                        <tr key={reg.id} className="hover:bg-slate-50">
+                                        <tr key={reg.id} className="hover:bg-slate-50 cursor-pointer transition-colors" onClick={() => setSelectedHistoryId(reg.id)}>
                                             <td className="px-4 py-3">
                                                 <p className="text-sm font-medium text-slate-800">{formatDate(reg.openedAt)}</p>
                                                 <p className="text-xs text-slate-400">→ {formatDate(reg.closedAt)}</p>
@@ -351,6 +519,12 @@ export default function CashRegisterPage() {
                 </div>
             </div>
             <div className="px-6">
+                <CashRegisterDetailModal 
+                    id={selectedHistoryId} 
+                    open={!!selectedHistoryId} 
+                    onClose={() => setSelectedHistoryId(null)} 
+                    onSaleClick={(saleId) => setSelectedSaleId(saleId)}
+                />
                 {activeTab === 'current' ? renderCurrentTab() : renderHistoryTab()}
             </div>
         </div>

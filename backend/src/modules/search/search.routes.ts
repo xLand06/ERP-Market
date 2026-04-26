@@ -7,21 +7,22 @@ router.use(authMiddleware);
 
 router.get('/', async (req: Request, res: Response) => {
     const q = (req.query.q as string) || '';
-    if (q.length < 2) return res.json({ products: [], categories: [] });
+    if (q.length < 2) return res.json({ products: [], groups: [] });
 
-    const [products, categories] = await Promise.all([
+    const [products, groups] = await Promise.all([
         prisma.product.findMany({
             where: { OR: [{ name: { contains: q, mode: 'insensitive' } }, { barcode: { contains: q } }] },
             take: 10,
-            include: { category: true },
+            include: { subGroup: { include: { group: true } } },
         }),
-        prisma.category.findMany({
+        prisma.group.findMany({
             where: { name: { contains: q, mode: 'insensitive' } },
             take: 5,
+            include: { subGroups: true },
         }),
     ]);
 
-    res.json({ products, categories });
+    res.json({ products, groups });
 });
 
 export default router;

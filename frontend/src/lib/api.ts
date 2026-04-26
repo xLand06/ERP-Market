@@ -35,7 +35,7 @@ const shouldRetry = (error: AxiosError) => {
  * Rutas donde los errores NO deben mostrar toast molesto al usuario.
  * El componente que las usa maneja el estado de error visualmente.
  */
-const SILENT_ENDPOINTS = ['/dashboard/', '/reports/', '/finance/'];
+const SILENT_ENDPOINTS = ['/dashboard/', '/reports/', '/finance/', '/inventory/stock'];
 
 const isSilent = (url?: string) =>
     url ? SILENT_ENDPOINTS.some((path) => url.includes(path)) : false;

@@ -26,16 +26,18 @@ export async function getSyncStatus() {
         where: { syncStatus: 'SYNCED' }
     });
 
-    // Total de productos, categorías, usuarios
+    // Total de productos, grupos, subgrupos, usuarios
     const totalProducts = await localPrisma.product.count();
-    const totalCategories = await localPrisma.category.count();
+    const totalGroups = await localPrisma.group.count();
+    const totalSubGroups = await localPrisma.subGroup.count();
     const totalUsers = await localPrisma.user.count();
     const totalBranches = await localPrisma.branch.count();
 
     return {
         database: {
             products: totalProducts,
-            categories: totalCategories,
+            groups: totalGroups,
+            subGroups: totalSubGroups,
             users: totalUsers,
             branches: totalBranches,
         },

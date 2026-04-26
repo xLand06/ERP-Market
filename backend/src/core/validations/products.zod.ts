@@ -17,7 +17,7 @@ export const createProductSchema = z.object({
     price: z.preprocess((val) => (val === '' || val === null || val === undefined) ? 0 : Number(val), z.number().min(0)),
     cost: z.preprocess((val) => (val === '' || val === null || val === undefined) ? null : Number(val), z.number().min(0).nullable().optional()),
     imageUrl: z.string().nullable().optional().or(z.literal('')),
-    categoryId: z.string().nullable().optional().or(z.literal('')),
+    subGroupId: z.string().nullable().optional().or(z.literal('')),
     isActive: z.boolean().default(true),
     
     // Múltiples Presentaciones
@@ -38,7 +38,7 @@ export const updateProductSchema = createProductSchema.partial();
  * Filtros para listar productos con paginación
  */
 export const productFiltersSchema = paginationSchema.extend({
-    categoryId: z.string().cuid().optional(),
+    subGroupId: z.string().optional(),
     isActive: z.preprocess((val) => val === 'true' || val === true, z.boolean()).optional(),
 });
 

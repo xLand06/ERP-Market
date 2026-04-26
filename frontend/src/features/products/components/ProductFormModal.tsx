@@ -25,7 +25,7 @@ export interface Product {
     price: number;
     cost?: number;
     imageUrl?: string;
-    categoryId?: string;
+    subGroupId?: string;
     isActive: boolean;
     presentations: ProductPresentation[];
 }
@@ -46,7 +46,7 @@ export function ProductFormModal({ open, onClose, product, categories, onSuccess
     const [baseUnit, setBaseUnit] = useState('UNIDAD');
     const [price, setPrice] = useState<number | ''>('');
     const [cost, setCost] = useState<number | ''>('');
-    const [categoryId, setCategoryId] = useState('');
+    const [subGroupId, setSubGroupId] = useState('');
     const [presentations, setPresentations] = useState<ProductPresentation[]>([]);
     
     const [saving, setSaving] = useState(false);
@@ -62,7 +62,7 @@ export function ProductFormModal({ open, onClose, product, categories, onSuccess
                 setBaseUnit(product.baseUnit || 'UNIDAD');
                 setPrice(product.price);
                 setCost(product.cost ?? '');
-                setCategoryId(product.categoryId || '');
+                setSubGroupId(product.subGroupId || '');
                 setPresentations(product.presentations || []);
             } else {
                 setName('');
@@ -71,7 +71,7 @@ export function ProductFormModal({ open, onClose, product, categories, onSuccess
                 setBaseUnit('UNIDAD');
                 setPrice('');
                 setCost('');
-                setCategoryId('');
+                setSubGroupId('');
                 setPresentations([]);
             }
             
@@ -107,7 +107,7 @@ export function ProductFormModal({ open, onClose, product, categories, onSuccess
                 baseUnit,
                 price: Number(price) || 0, 
                 cost: cost ? Number(cost) : null, 
-                categoryId: categoryId || null,
+                subGroupId: subGroupId || null,
                 presentations: presentations
                     .filter(p => p.name.trim() !== '') // Evitar enviar filas vacías
                     .map(p => ({
@@ -188,10 +188,10 @@ export function ProductFormModal({ open, onClose, product, categories, onSuccess
                         </div>
 
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Categoría</label>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Categoría (Subgrupo)</label>
                             <select
-                                value={categoryId}
-                                onChange={(e) => setCategoryId(e.target.value)}
+                                value={subGroupId}
+                                onChange={(e) => setSubGroupId(e.target.value)}
                                 className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm bg-white"
                             >
                                 <option value="">Sin categoría</option>
