@@ -168,6 +168,7 @@ model Product {
   subGroup   SubGroup? @relation(fields: [subGroupId], references: [id])
 
   presentations      ProductPresentation[]
+  barcodes           ProductBarcode[]
   inventory          BranchInventory[]
   transactionItems   TransactionItem[]
   purchaseOrderItems PurchaseOrderItem[]
@@ -194,6 +195,20 @@ model ProductPresentation {
   @@index([productId])
   @@index([barcode])
   @@map("product_presentations")
+}
+
+// Múltiples códigos de barras por producto (EAN, interno, proveedor, etc.)
+model ProductBarcode {
+  id    String  @id @default(cuid())
+  code  String  @unique
+  label String? // Ej: "EAN-13", "Interno", "Proveedor"
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([code])
+  @@map("product_barcodes")
 }
 
 // =============================================================================

@@ -16,10 +16,17 @@ interface Branch {
     isActive: boolean;
 }
 
-interface Category {
+interface Group {
     id: string;
     name: string;
     description?: string;
+}
+
+interface SubGroup {
+    id: string;
+    name: string;
+    description?: string;
+    groupId: string;
 }
 
 type Tab = 'branches' | 'categories' | 'maintenance' | 'system';
@@ -227,26 +234,26 @@ function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () => void 
     );
 }
 
-function CategoryForm({ category, onClose }: { category?: Category; onClose: () => void }) {
-    const [name, setName] = useState(category?.name || '');
-    const [description, setDescription] = useState(category?.description || '');
+function GroupForm({ group, onClose }: { group?: Group; onClose: () => void }) {
+    const [name, setName] = useState(group?.name || '');
+    const [description, setDescription] = useState(group?.description || '');
     const [saving, setSaving] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
         try {
-            if (category) {
-                await api.put(`/categories/${category.id}`, { name, description });
-                toast.success('Categoría actualizada exitosamente');
+            if (group) {
+                await api.put(`/groups/${group.id}`, { name, description });
+                toast.success('Grupo actualizado exitosamente');
             } else {
-                await api.post('/categories', { name, description });
-                toast.success('Categoría creada exitosamente');
+                await api.post('/groups', { name, description });
+                toast.success('Grupo creado exitosamente');
             }
             onClose();
-        } catch (error) {
-            console.error('Error saving category:', error);
-            toast.error('Ocurrió un error al guardar la categoría');
+        } catch (error: any) {
+            console.error('Error saving group:', error);
+            toast.error(error.response?.data?.error || 'Ocurrió un error al guardar el grupo');
         } finally {
             setSaving(false);
         }
@@ -258,11 +265,11 @@ function CategoryForm({ category, onClose }: { category?: Category; onClose: () 
                 className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
                 role="dialog"
                 aria-modal="true"
-                aria-labelledby="category-modal-title"
+                aria-labelledby="group-modal-title"
             >
                 <div className="flex items-center justify-between p-5 border-b border-slate-100">
-                    <h3 id="category-modal-title" className="text-lg font-bold text-slate-800">
-                        {category ? 'Editar Categoría' : 'Nueva Categoría'}
+                    <h3 id="group-modal-title" className="text-lg font-bold text-slate-800">
+                        {group ? 'Editar Grupo' : 'Nuevo Grupo'}
                     </h3>
                     <button
                         onClick={onClose}
@@ -274,9 +281,9 @@ function CategoryForm({ category, onClose }: { category?: Category; onClose: () 
                 </div>
                 <form onSubmit={handleSubmit} className="p-5 space-y-4">
                     <div>
-                        <label htmlFor="categoryName" className="block text-sm font-semibold text-slate-700 mb-1.5">Nombre *</label>
+                        <label htmlFor="groupName" className="block text-sm font-semibold text-slate-700 mb-1.5">Nombre *</label>
                         <input
-                            id="categoryName"
+                            id="groupName"
                             type="text"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
@@ -285,9 +292,9 @@ function CategoryForm({ category, onClose }: { category?: Category; onClose: () 
                         />
                     </div>
                     <div>
-                        <label htmlFor="categoryDescription" className="block text-sm font-semibold text-slate-700 mb-1.5">Descripción</label>
+                        <label htmlFor="groupDescription" className="block text-sm font-semibold text-slate-700 mb-1.5">Descripción</label>
                         <textarea
-                            id="categoryDescription"
+                            id="groupDescription"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium resize-none"
@@ -308,7 +315,97 @@ function CategoryForm({ category, onClose }: { category?: Category; onClose: () 
                             className="flex-1 py-2.5 px-4 font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-sm shadow-indigo-600/20 flex items-center justify-center gap-2 whitespace-nowrap"
                         >
                             <Save className="w-4 h-4" />
-                            {saving ? 'Guardando...' : 'Guardar Categoría'}
+                            {saving ? 'Guardando...' : 'Guardar Grupo'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+function SubGroupForm({ subGroup, groupId, onClose }: { subGroup?: SubGroup; groupId?: string; onClose: () => void }) {
+    const [name, setName] = useState(subGroup?.name || '');
+    const [description, setDescription] = useState(subGroup?.description || '');
+    const [saving, setSaving] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+            if (subGroup) {
+                await api.put(`/groups/subgroups/${subGroup.id}`, { name, description });
+                toast.success('Subgrupo actualizado exitosamente');
+            } else {
+                await api.post('/groups/subgroups', { name, description, groupId });
+                toast.success('Subgrupo creado exitosamente');
+            }
+            onClose();
+        } catch (error: any) {
+            console.error('Error saving subGroup:', error);
+            toast.error(error.response?.data?.error || 'Ocurrió un error al guardar el subgrupo');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div
+                className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="subgroup-modal-title"
+            >
+                <div className="flex items-center justify-between p-5 border-b border-slate-100">
+                    <h3 id="subgroup-modal-title" className="text-lg font-bold text-slate-800">
+                        {subGroup ? 'Editar Subgrupo' : 'Nuevo Subgrupo'}
+                    </h3>
+                    <button
+                        onClick={onClose}
+                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+                        aria-label="Cerrar modal"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                <form onSubmit={handleSubmit} className="p-5 space-y-4">
+                    <div>
+                        <label htmlFor="subGroupName" className="block text-sm font-semibold text-slate-700 mb-1.5">Nombre *</label>
+                        <input
+                            id="subGroupName"
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="subGroupDescription" className="block text-sm font-semibold text-slate-700 mb-1.5">Descripción</label>
+                        <textarea
+                            id="subGroupDescription"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium resize-none"
+                            rows={3}
+                        />
+                    </div>
+                    <div className="flex gap-3 pt-4">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="flex-1 py-2.5 px-4 font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-800 transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={saving}
+                            className="flex-1 py-2.5 px-4 font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-sm shadow-indigo-600/20 flex items-center justify-center gap-2 whitespace-nowrap"
+                        >
+                            <Save className="w-4 h-4" />
+                            {saving ? 'Guardando...' : 'Guardar Subgrupo'}
                         </button>
                     </div>
                 </form>
@@ -321,9 +418,12 @@ export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<Tab>('branches');
     const [search, setSearch] = useState('');
     const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
-    const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+    const [editingGroup, setEditingGroup] = useState<Group | null>(null);
+    const [editingSubGroup, setEditingSubGroup] = useState<SubGroup | null>(null);
+    const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
     const [showBranchForm, setShowBranchForm] = useState(false);
-    const [showCategoryForm, setShowCategoryForm] = useState(false);
+    const [showGroupForm, setShowGroupForm] = useState(false);
+    const [showSubGroupForm, setShowSubGroupForm] = useState(false);
 
     const queryClient = useQueryClient();
 
@@ -336,10 +436,19 @@ export default function SettingsPage() {
         retry: false
     });
 
-    const { data: categories = [] } = useQuery<Category[]>({
-        queryKey: ['categories'],
+    const { data: groups = [] } = useQuery<Group[]>({
+        queryKey: ['groups'],
         queryFn: async () => {
-            const res = await api.get('/categories');
+            const res = await api.get('/groups');
+            return res.data.data;
+        },
+        retry: false
+    });
+
+    const { data: subGroups = [] } = useQuery<SubGroup[]>({
+        queryKey: ['groups', 'subgroups'],
+        queryFn: async () => {
+            const res = await api.get('/groups/subgroups/all');
             return res.data.data;
         },
         retry: false
@@ -355,22 +464,38 @@ export default function SettingsPage() {
         }
     });
 
-    const deleteCategoryMutation = useMutation({
+    const deleteGroupMutation = useMutation({
         mutationFn: async (id: string) => {
-            await api.delete(`/categories/${id}`);
+            await api.delete(`/groups/${id}`);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['categories'] });
-            toast.success('Categoría eliminada');
+            queryClient.invalidateQueries({ queryKey: ['groups'] });
+            toast.success('Grupo eliminado');
+        },
+        onError: (error: any) => {
+            toast.error(error.response?.data?.error || 'Error al eliminar el grupo');
+        }
+    });
+
+    const deleteSubGroupMutation = useMutation({
+        mutationFn: async (id: string) => {
+            await api.delete(`/groups/subgroups/${id}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['groups', 'subgroups'] });
+            toast.success('Subgrupo eliminado');
+        },
+        onError: (error: any) => {
+            toast.error(error.response?.data?.error || 'Error al eliminar el subgrupo');
         }
     });
 
     const filteredBranches = branches.filter(b => b.name.toLowerCase().includes(search.toLowerCase()));
-    const filteredCategories = categories.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
+    const filteredGroups = groups.filter(g => g.name.toLowerCase().includes(search.toLowerCase()));
 
     const tabs = [
         { id: 'branches' as Tab, label: 'Sucursales', icon: Building2, count: branches.length },
-        { id: 'categories' as Tab, label: 'Categorías', icon: Tag, count: categories.length },
+        { id: 'categories' as Tab, label: 'Grupos y Subgrupos', icon: Tag, count: groups.length },
         { id: 'system' as Tab, label: 'Tasa de Cambios', icon: Settings2 },
         { id: 'maintenance' as Tab, label: 'Mantenimiento', icon: AlertTriangle },
     ];
@@ -440,7 +565,7 @@ export default function SettingsPage() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
                     <input
                         type="search"
-                        placeholder={`Buscar en ${activeTab === 'branches' ? 'sucursales' : 'categorías'}...`}
+                        placeholder={`Buscar en ${activeTab === 'branches' ? 'sucursales' : 'grupos'}...`}
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 text-sm font-medium rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm"
@@ -454,8 +579,8 @@ export default function SettingsPage() {
                         </button>
                     )}
                     {activeTab === 'categories' && (
-                        <button onClick={() => { setEditingCategory(null); setShowCategoryForm(true); }} className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-sm shadow-indigo-600/20">
-                            <Plus className="w-4.5 h-4.5" /> Crear Categoría
+                        <button onClick={() => { setEditingGroup(null); setShowGroupForm(true); }} className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-sm shadow-indigo-600/20">
+                            <Plus className="w-4.5 h-4.5" /> Crear Grupo
                         </button>
                     )}
                 </div>
@@ -536,45 +661,89 @@ export default function SettingsPage() {
 
             {activeTab === 'categories' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                    {filteredCategories.length === 0 ? (
+                    {filteredGroups.length === 0 ? (
                         <div className="col-span-full py-12 text-center text-slate-400 bg-white border border-slate-200 rounded-xl shadow-sm">
                             <Tag className="w-10 h-10 mx-auto text-slate-200 mb-3" />
-                            <p className="font-semibold text-slate-600">No hay categorías registradas</p>
+                            <p className="font-semibold text-slate-600">No hay grupos registrados</p>
                         </div>
                     ) : (
-                        filteredCategories.map(category => (
-                            <div key={category.id} className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md hover:border-slate-300 transition-all group flex flex-col">
-                                <div className="flex items-start justify-between mb-3">
-                                    <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-100">
-                                        <Tag className="w-5 h-5" />
+                        filteredGroups.map(group => {
+                            const groupSubGroups = subGroups.filter(sg => sg.groupId === group.id);
+                            return (
+                                <div key={group.id} className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md hover:border-slate-300 transition-all group flex flex-col">
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
+                                            <Tag className="w-5 h-5" />
+                                        </div>
+                                        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={() => { setEditingGroup(group); setShowGroupForm(true); }}
+                                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    if (window.confirm('¿Seguro de eliminar este grupo?')) {
+                                                        deleteGroupMutation.mutate(group.id);
+                                                    }
+                                                }}
+                                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            onClick={() => { setEditingCategory(category); setShowCategoryForm(true); }}
-                                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                        >
-                                            <Edit2 className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                if (window.confirm('¿Seguro de eliminar esta categoría?')) {
-                                                    deleteCategoryMutation.mutate(category.id);
-                                                }
-                                            }}
-                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                    <div className="flex-1">
+                                        <h3 className="font-bold text-slate-800 mb-1">{group.name}</h3>
+                                        <p className="text-xs text-slate-500 font-medium line-clamp-2 leading-relaxed mb-4">
+                                            {group.description || 'Sin descripción adicional para este grupo.'}
+                                        </p>
+                                        
+                                        <div className="mt-4 pt-4 border-t border-slate-100">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Subgrupos</span>
+                                                <button 
+                                                    onClick={() => { setEditingSubGroup(null); setSelectedGroupId(group.id); setShowSubGroupForm(true); }}
+                                                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                                                >
+                                                    <Plus className="w-3 h-3" /> Añadir
+                                                </button>
+                                            </div>
+                                            {groupSubGroups.length === 0 ? (
+                                                <p className="text-xs text-slate-400 italic">No hay subgrupos</p>
+                                            ) : (
+                                                <ul className="space-y-1.5">
+                                                    {groupSubGroups.map(subGroup => (
+                                                        <li key={subGroup.id} className="flex items-center justify-between text-sm bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100">
+                                                            <span className="font-medium text-slate-700">{subGroup.name}</span>
+                                                            <div className="flex gap-1">
+                                                                <button
+                                                                    onClick={() => { setEditingSubGroup(subGroup); setShowSubGroupForm(true); }}
+                                                                    className="p-1 text-slate-400 hover:text-indigo-600 rounded"
+                                                                >
+                                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (window.confirm('¿Seguro de eliminar este subgrupo?')) {
+                                                                            deleteSubGroupMutation.mutate(subGroup.id);
+                                                                        }
+                                                                    }}
+                                                                    className="p-1 text-slate-400 hover:text-red-600 rounded"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                                <div>
-                                    <h3 className="font-bold text-slate-800 mb-1">{category.name}</h3>
-                                    <p className="text-xs text-slate-500 font-medium line-clamp-2 leading-relaxed">
-                                        {category.description || 'Sin descripción adicional para esta categoría.'}
-                                    </p>
-                                </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             )}
@@ -625,10 +794,18 @@ export default function SettingsPage() {
                 />
             )}
 
-            {showCategoryForm && (
-                <CategoryForm
-                    category={editingCategory || undefined}
-                    onClose={() => { setShowCategoryForm(false); setEditingCategory(null); queryClient.invalidateQueries({ queryKey: ['categories'] }); }}
+            {showGroupForm && (
+                <GroupForm
+                    group={editingGroup || undefined}
+                    onClose={() => { setShowGroupForm(false); setEditingGroup(null); queryClient.invalidateQueries({ queryKey: ['groups'] }); }}
+                />
+            )}
+
+            {showSubGroupForm && (
+                <SubGroupForm
+                    subGroup={editingSubGroup || undefined}
+                    groupId={selectedGroupId || undefined}
+                    onClose={() => { setShowSubGroupForm(false); setEditingSubGroup(null); setSelectedGroupId(null); queryClient.invalidateQueries({ queryKey: ['groups', 'subgroups'] }); }}
                 />
             )}
         </div>

@@ -1,3 +1,4 @@
+// Trigger restart for new Prisma schema
 import { prisma } from '../../config/prisma';
 import { PaginationParams } from '../../core/types/api.types';
 import { ProductFiltersInput, CreateProductInput, UpdateProductInput } from '../../core/validations/products.zod';
