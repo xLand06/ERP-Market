@@ -46,10 +46,37 @@ export function CashRegisterDetailModal({ id, open, onClose, onSaleClick }: Prop
     const openingAmount = Number(register.openingAmount);
     const transactions = register.transactions || [];
     let totalIncome = 0, totalExpense = 0;
+    const breakdown = { COP: 0, USD: 0, VES: 0 };
+
     transactions.forEach((t: any) => {
         const amt = Number(t.total) || 0;
-        if (t.type === 'SALE' && t.status === 'COMPLETED') totalIncome += amt;
-        else if (t.type === 'ADJUSTMENT' && t.status === 'COMPLETED') {
+        if (t.type === 'SALE' && t.status === 'COMPLETED') {
+            totalIncome += amt;
+
+            const notes = t.notes || '';
+            const regex = /(Efectivo COP|Efectivo USD|Pago Móvil VES) \((?:\$|Bs\.)(\d+(\.\d+)?)/g;
+            let match;
+            let foundAny = false;
+
+            while ((match = regex.exec(notes)) !== null) {
+                foundAny = true;
+                const type = match[1];
+                const amount = parseFloat(match[2]);
+
+                if (type.includes('COP')) breakdown.COP += amount;
+                if (type.includes('USD')) breakdown.USD += amount;
+                if (type.includes('VES')) breakdown.VES += amount;
+            }
+
+            if (!foundAny) {
+                const currency = t.currency || 'COP';
+                const rate = Number(t.exchangeRate) || 1;
+
+                if (currency === 'COP') breakdown.COP += amt;
+                if (currency === 'USD') breakdown.USD += amt / rate;
+                if (currency === 'VES') breakdown.VES += amt / rate;
+            }
+        } else if (t.type === 'ADJUSTMENT' && t.status === 'COMPLETED') {
             if (amt > 0) totalIncome += amt;
             else totalExpense += Math.abs(amt);
         }
@@ -128,6 +155,30 @@ export function CashRegisterDetailModal({ id, open, onClose, onSaleClick }: Prop
                     </div>
                 </div>
 
+                <div className="bg-white border border-slate-200 rounded-xl p-5 mb-6">
+                    <h3 className="font-bold text-slate-800 mb-4 text-xs uppercase tracking-wider flex items-center gap-2">
+                        <DollarSign className="w-4 h-4 text-indigo-600" /> Desglose de Ventas por Moneda
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Efectivo COP</p>
+                            <p className="text-base font-black text-slate-800 tabular-nums">{fmtCOP(breakdown.COP)}</p>
+                        </div>
+                        <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Efectivo USD</p>
+                            <p className="text-base font-black text-slate-800 tabular-nums">${breakdown.USD.toFixed(2)}</p>
+                        </div>
+                        <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Bolívares VES</p>
+                            <p className="text-base font-black text-slate-800 tabular-nums">Bs. {breakdown.VES.toFixed(2)}</p>
+                        </div>
+                        <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+                            <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider mb-1">Total Ventas (COP)</p>
+                            <p className="text-base font-black text-indigo-900 tabular-nums">{formatCurrency(totalIncome)}</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div>
                     <h3 className="font-bold text-slate-800 mb-3 text-sm uppercase tracking-wider">Movimientos del Turno ({transactions.length})</h3>
                     {transactions.length === 0 ? (
@@ -158,6 +209,11 @@ export function CashRegisterDetailModal({ id, open, onClose, onSaleClick }: Prop
                                                 <Calendar className="w-3 h-3" />
                                                 {new Date(t.createdAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
                                             </p>
+                                            {t.notes && (
+                                                <p className="text-[10px] bg-slate-100/80 text-slate-600 px-2 py-0.5 rounded font-semibold mt-1 border border-slate-200/50 w-fit">
+                                                    {t.notes}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="text-right">

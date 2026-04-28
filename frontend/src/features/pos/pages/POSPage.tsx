@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
-    Search, Barcode, Package, DollarSign, Smartphone, CreditCard, X, Check, Loader2, ShoppingCart, PackagePlus
+    Search, Barcode, Package, DollarSign, Smartphone, X, Check, Loader2, ShoppingCart, PackagePlus, Lock, Play
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,9 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
 import { useInventory } from '@/hooks/useInventory';
 import { useConfigStore } from '@/hooks/useConfigStore';
+import { useAutoOpenRegister } from '@/hooks/useAutoOpenRegister';
+import { StockEntryModal } from '../../inventory/components/StockEntryModal';
+import toast from 'react-hot-toast';
 
 // ─── Types ─────────────────────────────────────────────────────────
 interface ProductPresentation {
@@ -56,7 +59,6 @@ const PAYMENT_OPTIONS = [
     { id:'cash_cop',  label:'Efectivo COP',    icon:DollarSign, currency:'COP' as const },
     { id:'cash_usd',  label:'Efectivo USD',    icon:DollarSign, currency:'USD' as const },
     { id:'pagomovil', label:'Pago Móvil VES',  icon:Smartphone, currency:'VES' as const },
-    { id:'tarjeta',   label:'Tarjeta USD',     icon:CreditCard, currency:'USD' as const },
 ];
 
 // ─── Sub-Components ────────────────────────────────────────────────
@@ -66,15 +68,25 @@ function StockBadge({ stock, unit }: { stock: number, unit: string }) {
     return <Badge variant={v}>{label}</Badge>;
 }
 
-function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product, pres?: ProductPresentation) => void }) {
+function ProductCard({ product, onAdd, onShowPresentations }: { 
+    product: Product; 
+    onAdd: (p: Product, pres?: ProductPresentation) => void;
+    onShowPresentations: (p: Product) => void;
+}) {
     const { fmtCOP, fromCOP } = useConfigStore();
     const [flash, setFlash] = useState(false);
+    
     const handle = () => {
         if (product.stock === 0) return;
-        onAdd(product);
-        setFlash(true);
-        setTimeout(() => setFlash(false), 250);
+        if (product.presentations && product.presentations.length > 0) {
+            onShowPresentations(product);
+        } else {
+            onAdd(product);
+            setFlash(true);
+            setTimeout(() => setFlash(false), 250);
+        }
     };
+    
     const usd = fromCOP(product.price, 'USD');
     return (
         <button
@@ -97,7 +109,12 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product,
                         <p className="text-sm font-black text-slate-900 tabular-nums leading-none">{fmtCOP(product.price)}</p>
                         <p className="text-[11px] font-medium text-slate-400 tabular-nums mt-0.5 sm:hidden lg:block">${usd.toFixed(2)} USD</p>
                     </div>
-                    <div className="sm:opacity-80 group-hover:opacity-100 transition-opacity">
+                    <div className="sm:opacity-80 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
+                        {product.presentations.length > 0 && (
+                            <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-bold whitespace-nowrap">
+                                {product.presentations.length} pres.
+                            </span>
+                        )}
                         <StockBadge stock={product.stock} unit={product.baseUnit} />
                     </div>
                 </div>
@@ -107,11 +124,11 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product,
 }
 
 function HybridPaymentDialog({ open, total, onClose, onConfirm, isSubmitting }: {
-    open: boolean; total: number; onClose: () => void; onConfirm: () => void; isSubmitting: boolean;
+    open: boolean; total: number; onClose: () => void; onConfirm: (notes: string, primaryCurrency: string) => void; isSubmitting: boolean;
 }) {
     const { rates, fmtCOP, fromCOP } = useConfigStore();
-    const copRate = rates['COP'] || 4100;
-    const vesRate = rates['VES'] || 36.50;
+    const usdRate = rates['USD'] || rates['COP'] || 3600;
+    const vesRate = rates['VES'] || 5.5;
     type PaymentRow = { methodId: string; amount: number; currency: string };
     // Por defecto: pago en COP
     const [rows, setRows] = useState<PaymentRow[]>([{ methodId: 'cash_cop', amount: total, currency: 'COP' }]);
@@ -119,8 +136,8 @@ function HybridPaymentDialog({ open, total, onClose, onConfirm, isSubmitting }: 
     // paidTotal siempre en COP
     const paidTotal = rows.reduce((s, r) => {
         if (r.currency === 'COP') return s + r.amount;
-        if (r.currency === 'USD') return s + r.amount * copRate;
-        if (r.currency === 'VES') return s + (r.amount / vesRate) * copRate;
+        if (r.currency === 'USD') return s + r.amount * usdRate;
+        if (r.currency === 'VES') return s + r.amount * vesRate;
         return s;
     }, 0);
     const change = paidTotal - total;
@@ -137,6 +154,25 @@ function HybridPaymentDialog({ open, total, onClose, onConfirm, isSubmitting }: 
 
     const getSymbol = (currency: string) => currency === 'VES' ? 'Bs.' : '$';
 
+    const handleConfirm = () => {
+        const activeRows = rows.filter(r => r.amount > 0);
+        const paymentNotes = activeRows
+            .map(r => {
+                const opt = PAYMENT_OPTIONS.find(o => o.id === r.methodId);
+                const symbol = r.currency === 'VES' ? 'Bs.' : '$';
+                
+                let amountInCop = r.amount;
+                if (r.currency === 'USD') amountInCop = r.amount * usdRate;
+                if (r.currency === 'VES') amountInCop = r.amount * vesRate;
+
+                return `${opt?.label || r.methodId} (${symbol}${r.amount} ➔ ${fmtCOP(amountInCop)})`;
+            })
+            .join(' + ');
+
+        const primaryCurrency = activeRows[0]?.currency || 'COP';
+        onConfirm(paymentNotes, primaryCurrency);
+    };
+
     return (
         <Dialog open={open} onOpenChange={o => !o && onClose()}>
             <DialogContent className="max-w-md">
@@ -151,7 +187,7 @@ function HybridPaymentDialog({ open, total, onClose, onConfirm, isSubmitting }: 
                     </div>
                     <div className="flex justify-end gap-3 mt-1">
                         <p className="text-[11px] text-slate-400 tabular-nums">${fromCOP(total,'USD').toFixed(2)} USD</p>
-                        <p className="text-[11px] text-slate-400 tabular-nums">Bs. {fromCOP(total,'VES').toFixed(0)} VES</p>
+                        <p className="text-[11px] text-slate-400 tabular-nums">Bs. {fromCOP(total,'VES').toFixed(2)} VES</p>
                     </div>
                 </div>
                 <div className="px-6 py-4 flex flex-col gap-3">
@@ -161,8 +197,29 @@ function HybridPaymentDialog({ open, total, onClose, onConfirm, isSubmitting }: 
                                 value={row.methodId}
                                 onChange={e => {
                                     const m = PAYMENT_OPTIONS.find(pm => pm.id === e.target.value)!;
-                                    updateRow(i, 'methodId', e.target.value);
-                                    updateRow(i, 'currency', m.currency);
+                                    setRows(prevRows => prevRows.map((r, idx) => {
+                                        if (idx !== i) return r;
+                                        
+                                        const otherRowsCop = prevRows.reduce((sum, otherR, otherIdx) => {
+                                            if (otherIdx === i) return sum;
+                                            if (otherR.currency === 'COP') return sum + otherR.amount;
+                                            if (otherR.currency === 'USD') return sum + otherR.amount * usdRate;
+                                            if (otherR.currency === 'VES') return sum + otherR.amount * vesRate;
+                                            return sum;
+                                        }, 0);
+                                        
+                                        const remainingCop = Math.max(0, total - otherRowsCop);
+                                        
+                                        let newAmount = remainingCop;
+                                        if (m.currency === 'USD') newAmount = remainingCop / usdRate;
+                                        if (m.currency === 'VES') newAmount = remainingCop / vesRate;
+                                        
+                                        return {
+                                            methodId: e.target.value,
+                                            currency: m.currency,
+                                            amount: Number(newAmount.toFixed(2))
+                                        };
+                                    }));
                                 }}
                                 className="flex-1 h-11 rounded-lg border border-slate-200 px-3 text-sm bg-white"
                             >
@@ -191,7 +248,7 @@ function HybridPaymentDialog({ open, total, onClose, onConfirm, isSubmitting }: 
                 <div className="px-6 pb-6 flex gap-3">
                     <Button variant="outline" className="flex-1" onClick={onClose} disabled={isSubmitting}>Cancelar</Button>
                     <button
-                        onClick={canPay ? onConfirm : undefined}
+                        onClick={canPay ? handleConfirm : undefined}
                         disabled={!canPay}
                         className={cn(
                             'flex-[2] h-11 rounded-lg font-bold text-white transition-all flex items-center justify-center', 
@@ -224,7 +281,9 @@ export default function POSPage() {
     const [category, setCategory]   = useState('Todos');
     const [cart, setCart]           = useState<CartItem[]>([]);
     const [payOpen, setPayOpen]     = useState(false);
+    const [activeProductForPres, setActiveProductForPres] = useState<Product | null>(null);
     const [isSaleMode, setIsSaleMode] = useState(true);
+    const [stockEntryOpen, setStockEntryOpen] = useState(false);
     const [toastMsg, setToastMsg]   = useState('');
     const [toastVis, setToastVis]   = useState(false);
     const [toastErr, setToastErr]   = useState(false);
@@ -234,6 +293,12 @@ export default function POSPage() {
     const selectedBranch = useAuthStore(s => s.selectedBranch);
     const user = useAuthStore(s => s.user);
     const queryClient = useQueryClient();
+
+    // ── Open Register Check ─────────────────────────────────────────────
+    const [openCashOpen, setOpenCashOpen] = useState(false);
+    const [openCopVal, setOpenCopVal] = useState('0');
+    const [openUsdVal, setOpenUsdVal] = useState('0');
+    const [openVesVal, setOpenVesVal] = useState('0');
 
     const { data: branches = [] } = useQuery({
         queryKey: ['branches'],
@@ -251,6 +316,51 @@ export default function POSPage() {
 
     const { iva, fmtCOP, fromCOP, rates } = useConfigStore();
     const effectiveBranch = selectedBranchData?.id || (selectedBranch === 'all' && user?.role === 'OWNER' ? null : selectedBranch);
+
+    // ── Open Register Query ─────────────────────────────────────────────
+    const { data: openRegister, isLoading: registerLoading, refetch: refetchRegister } = useQuery({
+        queryKey: ['openRegister', effectiveBranch],
+        queryFn: async () => {
+            if (!effectiveBranch) return null;
+            try {
+                const res = await api.get(`/cash-flow/current/${effectiveBranch}`);
+                return res.data.data;
+            } catch (err: any) {
+                if (err.response?.status === 404) return null;
+                throw err;
+            }
+        },
+        enabled: !!effectiveBranch,
+        staleTime: 0,
+    });
+
+    const usdRate = rates['USD'] || rates['COP'] || 3600;
+    const vesRate = rates['VES'] || 5.5;
+
+    const openMutation = useMutation({
+        mutationFn: async (openingAmount: number) => {
+            await api.post('/cash-flow/open', { branchId: effectiveBranch, openingAmount });
+        },
+        onSuccess: () => {
+            toast.success('Caja abierta correctamente');
+            setOpenCashOpen(false);
+            setOpenCopVal('0');
+            setOpenUsdVal('0');
+            setOpenVesVal('0');
+            refetchRegister();
+            queryClient.invalidateQueries({ queryKey: ['openRegister'] });
+        },
+        onError: (err: any) => {
+            toast.error(err.response?.data?.error || 'Error al abrir caja');
+        }
+    });
+
+    // Auto-apertura por horario
+    useAutoOpenRegister({
+        branchId: effectiveBranch || null,
+        hasOpenRegister: !!openRegister,
+        onOpened: () => { refetchRegister(); queryClient.invalidateQueries({ queryKey: ['openRegister'] }); },
+    });
 
     const { inventory, isLoading, refetch, isOnline } = useInventory(effectiveBranch || '');
 
@@ -301,7 +411,7 @@ export default function POSPage() {
                 const ex = prev[exIdx];
                 const totalUnitsInCart = prev.filter(i => i.id === p.id).reduce((acc, i) => acc + (i.qty * i.multiplier), 0);
                 
-                if (totalUnitsInCart + multiplier > p.stock) {
+                if (isSaleMode && totalUnitsInCart + multiplier > p.stock) {
                     showToast(`Stock insuficiente para añadir más ${p.name}`, true);
                     return prev;
                 }
@@ -311,7 +421,7 @@ export default function POSPage() {
                 return newCart;
             } else {
                 const totalUnitsInCart = prev.filter(i => i.id === p.id).reduce((acc, i) => acc + (i.qty * i.multiplier), 0);
-                if (totalUnitsInCart + multiplier > p.stock) {
+                if (isSaleMode && totalUnitsInCart + multiplier > p.stock) {
                     showToast(`Stock insuficiente para ${p.name}`, true);
                     return prev;
                 }
@@ -338,7 +448,7 @@ export default function POSPage() {
             if (!item) return prev;
             
             const otherItemsUnits = prev.filter(i => i.id === productId && i.presentationId !== presentationId).reduce((acc, i) => acc + (i.qty * i.multiplier), 0);
-            if (otherItemsUnits + (newQty * item.multiplier) > item.stock) {
+            if (isSaleMode && otherItemsUnits + (newQty * item.multiplier) > item.stock) {
                 showToast(`Stock insuficiente`, true);
                 return prev;
             }
@@ -371,7 +481,7 @@ export default function POSPage() {
 
             // Validar stock
             const otherItemsUnits = prev.filter(i => i.id === productId && i.presentationId !== oldPresId).reduce((acc, i) => acc + (i.qty * i.multiplier), 0);
-            if (otherItemsUnits + (item.qty * multiplier) > product.stock) {
+            if (isSaleMode && otherItemsUnits + (item.qty * multiplier) > product.stock) {
                 showToast(`Stock insuficiente para esta presentación`, true);
                 return prev;
             }
@@ -422,7 +532,7 @@ export default function POSPage() {
         return () => window.removeEventListener('keydown', h);
     }, [cart]);
 
-    const handleCheckout = async () => {
+    const handleCheckout = async (paymentNotes?: string, primaryCurrency?: string) => {
         if (!selectedBranch) {
             showToast('No hay una sede seleccionada', true);
             return;
@@ -437,15 +547,21 @@ export default function POSPage() {
                 unitPrice: c.currentPrice, // en COP
             }));
 
-            const copRate = rates['COP'] || 4100;
+            const usdRate = rates['USD'] || rates['COP'] || 3600;
+            const vesRate = rates['VES'] || 5.5;
+
+            let rateToSave = 1;
+            if (primaryCurrency === 'USD') rateToSave = usdRate;
+            if (primaryCurrency === 'VES') rateToSave = vesRate;
 
             if (isOnline) {
                 await api.post('/pos/transactions', {
                     type: isSaleMode ? 'SALE' : 'INVENTORY_IN',
                     branchId: effectiveBranch,
                     items,
-                    currency: 'COP',
-                    exchangeRate: copRate,
+                    currency: primaryCurrency || 'COP',
+                    exchangeRate: rateToSave,
+                    notes: paymentNotes || undefined,
                 });
             } else {
                 throw new Error('Sin conexión.');
@@ -480,6 +596,81 @@ export default function POSPage() {
 
     if (!selectedBranch) {
         return <div className="h-full flex items-center justify-center text-slate-500 pb-20">Por favor, seleccione una sede en la configuración.</div>;
+    }
+
+    // ── CAJA CERRADA — Pantalla de bloqueo ──────────────────────────────
+    if (!registerLoading && !openRegister) {
+        return (
+            <div className="flex items-center justify-center h-full pb-20">
+                <div className="flex flex-col items-center gap-5 max-w-sm w-full text-center">
+                    <div className="w-20 h-20 rounded-2xl bg-amber-50 border-2 border-amber-200 flex items-center justify-center">
+                        <Lock className="w-9 h-9 text-amber-500" />
+                    </div>
+                    <div>
+                        <h2 className="text-2xl font-black text-slate-800">Caja Cerrada</h2>
+                        <p className="text-slate-500 text-sm mt-1">No puedes realizar ventas sin un turno de caja activo.</p>
+                    </div>
+                    <Button
+                        size="lg"
+                        className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 font-bold text-base"
+                        onClick={() => setOpenCashOpen(true)}
+                    >
+                        <Play className="w-5 h-5 mr-2" /> Abrir Caja Ahora
+                    </Button>
+                </div>
+
+                {/* Diálogo de apertura de caja con montos */}
+                <Dialog open={openCashOpen} onOpenChange={(o) => !o && setOpenCashOpen(false)}>
+                    <DialogContent className="max-w-sm">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <Play className="w-5 h-5 text-emerald-600" /> Abrir Turno de Caja
+                            </DialogTitle>
+                            <DialogDescription>Ingresa el efectivo físico disponible al inicio del turno.</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-3">
+                            {([
+                                { label: 'COP', symbol: '$', val: openCopVal, set: setOpenCopVal, step: '1' },
+                                { label: 'USD', symbol: '$', val: openUsdVal, set: setOpenUsdVal, step: '0.01' },
+                                { label: 'VES (Bs.)', symbol: 'Bs.', val: openVesVal, set: setOpenVesVal, step: '0.01' },
+                            ] as const).map((f) => (
+                                <div key={f.label} className="flex items-center gap-3">
+                                    <span className="w-20 font-bold text-slate-600 text-sm shrink-0">{f.label}</span>
+                                    <div className="relative flex-1">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">{f.symbol}</span>
+                                        <input
+                                            type="number"
+                                            step={f.step}
+                                            min="0"
+                                            value={f.val}
+                                            onChange={e => f.set(e.target.value)}
+                                            className="w-full text-right h-10 pl-10 pr-4 rounded-lg border border-slate-300 font-bold outline-none focus:ring-2 focus:ring-emerald-400"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                            <Button variant="outline" className="flex-1" onClick={() => setOpenCashOpen(false)}>Cancelar</Button>
+                            <Button
+                                className="flex-[2] bg-emerald-600 hover:bg-emerald-700"
+                                disabled={openMutation.isPending}
+                                onClick={() => {
+                                    const cop = parseFloat(openCopVal) || 0;
+                                    const usd = parseFloat(openUsdVal) || 0;
+                                    const ves = parseFloat(openVesVal) || 0;
+                                    const total = cop + (usd * usdRate) + (ves * vesRate);
+                                    openMutation.mutate(total);
+                                }}
+                            >
+                                {openMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+                                {openMutation.isPending ? 'Abriendo...' : 'Confirmar Apertura'}
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </div>
+        );
     }
 
     return (
@@ -541,21 +732,11 @@ export default function POSPage() {
                     ) : (
                         filtered.map(p => (
                             <div key={p.id} className="relative group">
-                                <ProductCard product={p} onAdd={addToCart} />
-                                {p.presentations.length > 0 && (
-                                    <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                        {p.presentations.map(pres => (
-                                            <button
-                                                key={pres.id}
-                                                onClick={(e) => { e.stopPropagation(); addToCart(p, pres); }}
-                                                className="bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg hover:bg-indigo-700 active:scale-95"
-                                                title={`Añadir ${pres.name}`}
-                                            >
-                                                +{pres.name.split(' ')[0]}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
+                                <ProductCard 
+                                    product={p} 
+                                    onAdd={addToCart} 
+                                    onShowPresentations={(prod) => setActiveProductForPres(prod)}
+                                />
                             </div>
                         ))
                     )}
@@ -652,11 +833,28 @@ export default function POSPage() {
                 <div className="px-5 pb-6 pt-4">
                     <Button
                         size="lg"
-                        className="w-full h-14 font-black text-base bg-emerald-600 hover:bg-emerald-700"
-                        disabled={cart.length === 0}
-                        onClick={() => setPayOpen(true)}
+                        className={cn(
+                            "w-full h-14 font-black text-base transition-colors",
+                            isSaleMode 
+                                ? "bg-emerald-600 hover:bg-emerald-700" 
+                                : "bg-indigo-600 hover:bg-indigo-700"
+                        )}
+                        disabled={cart.length === 0 || isSubmitting}
+                        onClick={() => {
+                            if (isSaleMode) {
+                                setPayOpen(true);
+                            } else {
+                                setStockEntryOpen(true);
+                            }
+                        }}
                     >
-                        Pagar [Ctrl+Enter]
+                        {isSubmitting ? (
+                            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                        ) : isSaleMode ? (
+                            'Pagar [Ctrl+Enter]'
+                        ) : (
+                            'Registrar Entrada'
+                        )}
                     </Button>
                 </div>
             </div>
@@ -668,6 +866,72 @@ export default function POSPage() {
                 isSubmitting={isSubmitting}
                 onConfirm={handleCheckout} 
             />
+
+            <StockEntryModal
+                open={stockEntryOpen}
+                onClose={() => setStockEntryOpen(false)}
+                branchId={effectiveBranch || undefined}
+                preloadedItems={cart.map(c => ({
+                    productId: c.id,
+                    productName: c.name,
+                    quantity: c.qty * c.multiplier,
+                    suggestedCost: c.basePrice,
+                }))}
+                onSuccess={() => {
+                    setCart([]);
+                    setStockEntryOpen(false);
+                    refetch();
+                }}
+            />
+
+            <Dialog open={!!activeProductForPres} onOpenChange={(open) => !open && setActiveProductForPres(null)}>
+                <DialogContent className="max-w-md p-6">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-black text-slate-900">{activeProductForPres?.name}</DialogTitle>
+                        <DialogDescription className="text-xs font-medium text-slate-400">Selecciona la presentación a agregar</DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="grid gap-3 py-4">
+                        {activeProductForPres && (
+                            <button 
+                                onClick={() => {
+                                    addToCart(activeProductForPres);
+                                    setActiveProductForPres(null);
+                                    showToast(`✓ ${activeProductForPres.name} añadido`);
+                                }}
+                                className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] font-bold text-slate-800"
+                            >
+                                <div className="flex flex-col text-left">
+                                    <span className="text-sm">Base ({activeProductForPres.baseUnit})</span>
+                                </div>
+                                <span className="text-sm font-black text-slate-900">{fmtCOP(activeProductForPres.price)}</span>
+                            </button>
+                        )}
+                        
+                        {activeProductForPres?.presentations.map(pres => (
+                            <button 
+                                key={pres.id}
+                                onClick={() => {
+                                    addToCart(activeProductForPres, pres);
+                                    setActiveProductForPres(null);
+                                    showToast(`✓ ${activeProductForPres.name} (${pres.name}) añadido`);
+                                }}
+                                className="flex items-center justify-between p-4 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 hover:border-indigo-200 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] font-bold text-indigo-900"
+                            >
+                                <div className="flex flex-col text-left">
+                                    <span className="text-sm">{pres.name}</span>
+                                    <span className="text-[10px] text-indigo-500 font-semibold mt-0.5">Equivale a {pres.multiplier} {activeProductForPres.baseUnit}</span>
+                                </div>
+                                <span className="text-sm font-black text-indigo-900">{fmtCOP(pres.price)}</span>
+                            </button>
+                        ))}
+                    </div>
+                    
+                    <div className="flex justify-end pt-2">
+                        <Button variant="ghost" onClick={() => setActiveProductForPres(null)}>Cancelar</Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
             <Toast message={toastMsg} visible={toastVis} isError={toastErr} />
         </div>
     );

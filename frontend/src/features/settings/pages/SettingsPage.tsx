@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
     Plus, Edit2, Trash2, Building2, Tag, Search, X, Settings2, DollarSign, 
-    Percent, AlertTriangle, Database, Save 
+    Percent, AlertTriangle, Database, Save, Clock
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -32,18 +32,20 @@ interface SubGroup {
 type Tab = 'branches' | 'categories' | 'maintenance' | 'system';
 
 function SystemSettings() {
-    const { rates, iva, updateRate, setIva } = useConfigStore();
-    const [localVes, setLocalVes] = useState(rates['VES']?.toString() || '36.50');
-    const [localCop, setLocalCop] = useState(rates['COP']?.toString() || '4100');
+    const { rates, iva, autoOpenTime, updateRate, setIva, setAutoOpenTime } = useConfigStore();
+    const [localVes, setLocalVes] = useState(rates['VES']?.toString() || '5.5');
+    const [localUsd, setLocalUsd] = useState((rates['USD'] || rates['COP'])?.toString() || '3600');
     const [localIva, setLocalIva] = useState((iva * 100).toString());
+    const [localOpenTime, setLocalOpenTime] = useState(autoOpenTime || '');
     const [saving, setSaving] = useState(false);
 
     const handleSave = async () => {
         setSaving(true);
         try {
             await updateRate('VES', parseFloat(localVes) || 0);
-            await updateRate('COP', parseFloat(localCop) || 0);
+            await updateRate('USD', parseFloat(localUsd) || 0);
             setIva((parseFloat(localIva) || 0) / 100);
+            setAutoOpenTime(localOpenTime.trim() || null);
             toast.success('Configuración guardada en el servidor');
         } catch (error) {
             toast.error('Error al guardar la configuración');
@@ -68,7 +70,23 @@ function SystemSettings() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                         <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                            <DollarSign className="w-4 h-4 text-emerald-500" /> Tasa del Dólar (VES)
+                            <DollarSign className="w-4 h-4 text-emerald-500" /> Tasa COP a USD (Dólares)
+                        </label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">$</span>
+                            <input
+                                type="number"
+                                step="1"
+                                value={localUsd}
+                                onChange={(e) => setLocalUsd(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-mono"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                            <DollarSign className="w-4 h-4 text-blue-500" /> Tasa COP a VES (Bolívares)
                         </label>
                         <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">Bs.</span>
@@ -77,22 +95,6 @@ function SystemSettings() {
                                 step="0.01"
                                 value={localVes}
                                 onChange={(e) => setLocalVes(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-mono"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                            <DollarSign className="w-4 h-4 text-blue-500" /> Tasa del Dólar (COP)
-                        </label>
-                        <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">$</span>
-                            <input
-                                type="number"
-                                step="1"
-                                value={localCop}
-                                onChange={(e) => setLocalCop(e.target.value)}
                                 className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-mono"
                             />
                         </div>
@@ -112,6 +114,27 @@ function SystemSettings() {
                             />
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">%</span>
                         </div>
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                            <Clock className="w-4 h-4 text-amber-500" /> Hora de Apertura Automática de Caja
+                        </label>
+                        <p className="text-xs text-slate-400">Si configuras una hora, la caja se abrirá automáticamente cada día (monto de apertura $0). Deja vacío para desactivar.</p>
+                        <div className="relative">
+                            <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input
+                                type="time"
+                                value={localOpenTime}
+                                onChange={(e) => setLocalOpenTime(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all font-mono"
+                            />
+                        </div>
+                        {localOpenTime && (
+                            <p className="text-xs text-amber-600 font-semibold">
+                                ⚠️ La caja se abrirá automáticamente a las {localOpenTime} hrs cada día.
+                            </p>
+                        )}
                     </div>
                 </div>
 

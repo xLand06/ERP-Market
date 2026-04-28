@@ -5,6 +5,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useConfigStore } from '@/hooks/useConfigStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SaleItem {
@@ -24,6 +25,9 @@ export interface Sale {
     subtotal: number;
     discount: number;
     total: number;
+    notes?: string;
+    currency?: string;
+    exchangeRate?: number;
 }
 
 interface SaleDetailModalProps {
@@ -41,11 +45,12 @@ const PAYMENT_COLORS: Record<string, string> = {
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 export function SaleDetailModal({ sale, open, onClose }: SaleDetailModalProps) {
+    const { fmtCOP } = useConfigStore();
     if (!sale) return null;
 
     return (
         <Dialog open={open} onOpenChange={o => !o && onClose()}>
-            <DialogContent className="sm:max-w-125">
+            <DialogContent className="sm:max-w-xl">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
@@ -62,7 +67,7 @@ export function SaleDetailModal({ sale, open, onClose }: SaleDetailModalProps) {
 
                 <div className="px-6 py-4 space-y-5">
                     {/* Meta info */}
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Cajero</p>
                             <p className="text-sm font-semibold text-slate-800">{sale.cashier}</p>
@@ -73,11 +78,24 @@ export function SaleDetailModal({ sale, open, onClose }: SaleDetailModalProps) {
                         </div>
                         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Método</p>
-                            <span className={cn('text-xs font-bold px-2 py-0.5 rounded-lg', PAYMENT_COLORS[sale.paymentMethod] ?? 'bg-slate-100 text-slate-600')}>
+                            <span className={cn('text-xs font-bold px-2 py-0.5 rounded-lg w-fit block', PAYMENT_COLORS[sale.paymentMethod] ?? 'bg-slate-100 text-slate-600')}>
                                 {sale.paymentMethod}
                             </span>
                         </div>
                     </div>
+
+                    {/* Split payment breakdown */}
+                    {sale.notes && (
+                        <div className="bg-amber-50/50 border border-amber-200 rounded-xl p-3.5">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600 mb-1">Monedas de Pago Registradas</p>
+                            <p className="text-sm font-bold text-amber-900 leading-snug">{sale.notes}</p>
+                            {sale.exchangeRate && sale.currency && sale.currency !== 'COP' && (
+                                <p className="text-[11px] font-medium text-amber-600/80 mt-1.5 flex items-center gap-1">
+                                    <span>💡</span> Tasa = {sale.exchangeRate.toFixed(2)}
+                                </p>
+                            )}
+                        </div>
+                    )}
 
                     {/* Line items */}
                     <div className="overflow-x-auto rounded-xl border border-slate-200">
@@ -95,9 +113,9 @@ export function SaleDetailModal({ sale, open, onClose }: SaleDetailModalProps) {
                                     <tr key={i} className="border-b border-slate-100 last:border-0">
                                         <td className="py-2.5 px-4 text-sm text-slate-800">{item.name}</td>
                                         <td className="py-2.5 px-3 text-center text-sm tabular-nums text-slate-500">{item.qty}</td>
-                                        <td className="py-2.5 px-4 text-right text-sm tabular-nums text-slate-600">${item.unitPrice.toFixed(2)}</td>
+                                        <td className="py-2.5 px-4 text-right text-sm tabular-nums text-slate-600">{fmtCOP(item.unitPrice)}</td>
                                         <td className="py-2.5 px-4 text-right text-sm tabular-nums font-semibold text-slate-900">
-                                            ${(item.qty * item.unitPrice).toFixed(2)}
+                                            {fmtCOP(item.qty * item.unitPrice)}
                                         </td>
                                     </tr>
                                 ))}
@@ -109,17 +127,17 @@ export function SaleDetailModal({ sale, open, onClose }: SaleDetailModalProps) {
                     <div className="space-y-1.5 text-sm">
                         <div className="flex justify-between text-slate-500">
                             <span>Subtotal</span>
-                            <span className="tabular-nums">${sale.subtotal.toFixed(2)}</span>
+                            <span className="tabular-nums font-medium">{fmtCOP(sale.subtotal)}</span>
                         </div>
                         {sale.discount > 0 && (
                             <div className="flex justify-between text-emerald-600">
-                                <span className="flex items-center gap-1"><Tag className="w-3.5 h-3.5" /> Descuento</span>
-                                <span className="tabular-nums">-${sale.discount.toFixed(2)}</span>
+                                <span className="flex items-center gap-1 font-medium"><Tag className="w-3.5 h-3.5" /> Descuento</span>
+                                <span className="tabular-nums font-medium">-{fmtCOP(sale.discount)}</span>
                             </div>
                         )}
                         <div className="flex justify-between font-black text-base text-slate-900 pt-2 border-t border-slate-200">
                             <span>Total</span>
-                            <span className="tabular-nums text-emerald-700">${sale.total.toFixed(2)}</span>
+                            <span className="tabular-nums text-emerald-700">{fmtCOP(sale.total)}</span>
                         </div>
                     </div>
                 </div>

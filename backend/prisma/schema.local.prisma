@@ -1,6 +1,7 @@
 // =============================================================================
 // ERP-MARKET - SCHEMA LOCAL (SQLite - Desktop Offline)
-// Copia exacta del schema.prisma (cloud) con适配 para SQLite
+// Espejo del schema.prisma (cloud) adaptado para SQLite.
+// SQLite no soporta @db.Decimal ni @db.Timestamptz → usar Float y DateTime.
 // =============================================================================
 
 generator client {
@@ -13,7 +14,7 @@ datasource db {
 }
 
 // =============================================================================
-// ENUMS - mismos valores que el schema cloud
+// ENUMS
 // =============================================================================
 
 enum Role {
@@ -60,8 +61,8 @@ enum CedulaType {
 // =============================================================================
 
 model User {
-  id         String    @id @default(cuid())
-  username   String    @unique
+  id         String     @id @default(cuid())
+  username   String     @unique
   cedula     String
   cedulaType CedulaType @default(V)
   nombre     String
@@ -69,17 +70,17 @@ model User {
   email      String?
   password   String
   telefono   String?
-  role       Role      @default(SELLER)
-  isActive   Boolean   @default(true)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  role       Role       @default(SELLER)
+  isActive   Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
-  branchId    String?
-  branch     Branch?   @relation(fields: [branchId], references: [id])
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id])
 
   transactions  Transaction[]
   cashRegisters CashRegister[]
-  auditLogs     AuditLog[]  // relación inversa (userId es opcional en AuditLog)
+  auditLogs     AuditLog[]
 
   @@index([username])
   @@index([cedula])
@@ -94,23 +95,22 @@ model User {
 // =============================================================================
 
 model Branch {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   name      String
   code      String?
   address   String?
   phone     String?
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  users         User[]
-  inventory     BranchInventory[]
-  transactions  Transaction[]
-  cashRegisters CashRegister[]
+  users          User[]
+  inventory      BranchInventory[]
+  transactions   Transaction[]
+  cashRegisters  CashRegister[]
   purchaseOrders PurchaseOrder[]
 
   @@index([isActive])
-  @@index([code])
   @@map("branches")
 }
 
@@ -152,23 +152,23 @@ model SubGroup {
 // =============================================================================
 
 model Product {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   name        String
   description String?
-  barcode     String?   @unique
+  barcode     String?  @unique
   price       Float
   cost        Float?
-  baseUnit    String    @default("UNIDAD")
+  baseUnit    String   @default("UNIDAD")
   imageUrl    String?
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   subGroupId String?
   subGroup   SubGroup? @relation(fields: [subGroupId], references: [id])
 
-  presentations      ProductPresentation[]
   barcodes           ProductBarcode[]
+  presentations      ProductPresentation[]
   inventory          BranchInventory[]
   transactionItems   TransactionItem[]
   purchaseOrderItems PurchaseOrderItem[]
@@ -197,11 +197,10 @@ model ProductPresentation {
   @@map("product_presentations")
 }
 
-// Múltiples códigos de barras por producto (EAN, interno, proveedor, etc.)
 model ProductBarcode {
   id    String  @id @default(cuid())
   code  String  @unique
-  label String? // Ej: "EAN-13", "Interno", "Proveedor"
+  label String?
 
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -250,6 +249,11 @@ model Transaction {
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
 
+  // Multi-moneda (espejo del schema cloud)
+  currency      String?  // 'COP' | 'USD' | 'VES'
+  exchangeRate  Float?   // tasa COP/currency usada al momento
+  invoiceNumber String?  // Nº factura para INVENTORY_IN
+
   userId String
   user   User   @relation(fields: [userId], references: [id])
 
@@ -257,12 +261,13 @@ model Transaction {
   branch   Branch @relation(fields: [branchId], references: [id])
 
   cashRegisterId String?
-  cashRegister  CashRegister? @relation(fields: [cashRegisterId], references: [id])
+  cashRegister   CashRegister? @relation(fields: [cashRegisterId], references: [id])
 
   items TransactionItem[]
 
   @@index([branchId, createdAt])
   @@index([userId])
+  @@index([cashRegisterId])
   @@index([type, status])
   @@index([syncStatus])
   @@index([createdAt])
@@ -277,14 +282,17 @@ model TransactionItem {
   subtotal       Float
 
   transactionId String
-  transaction  Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 
   productId String
-  product  Product @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
 
   presentationId String?
   presentation   ProductPresentation? @relation(fields: [presentationId], references: [id], onDelete: SetNull)
 
+  @@index([transactionId])
+  @@index([productId])
+  @@index([presentationId])
   @@map("transaction_items")
 }
 
@@ -300,13 +308,13 @@ model CashRegister {
   expectedAmount Float?
   difference     Float?
   notes          String?
-  syncStatus     SyncStatus        @default(PENDING)
+  syncStatus     SyncStatus         @default(PENDING)
   syncedAt       DateTime?
-  openedAt       DateTime          @default(now())
+  openedAt       DateTime           @default(now())
   closedAt       DateTime?
 
   userId String
-  user   User @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
   branchId String
   branch   Branch @relation(fields: [branchId], references: [id])
@@ -314,6 +322,7 @@ model CashRegister {
   transactions Transaction[]
 
   @@index([branchId])
+  @@index([userId])
   @@index([status])
   @@index([syncStatus])
   @@map("cash_registers")
@@ -332,7 +341,6 @@ model AuditLog {
   userAgent String?
   createdAt DateTime @default(now())
 
-  // userId es opcional para permitir logs de intentos fallidos (usuario no existe)
   userId String?
   user   User?   @relation(fields: [userId], references: [id])
 
@@ -384,6 +392,8 @@ model PurchaseOrder {
 
   items PurchaseOrderItem[]
 
+  @@index([supplierId])
+  @@index([branchId])
   @@map("purchase_orders")
 }
 
@@ -398,8 +408,10 @@ model PurchaseOrderItem {
   product   Product @relation(fields: [productId], references: [id])
 
   purchaseOrderId String
-  purchaseOrder  PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
 
+  @@index([purchaseOrderId])
+  @@index([productId])
   @@map("purchase_order_items")
 }
 
@@ -409,10 +421,9 @@ model PurchaseOrderItem {
 
 model ExchangeRate {
   id        String   @id @default(cuid())
-  code      String   @unique // 'VES', 'COP', etc.
+  code      String   @unique // 'VES', 'USD', etc.
   rate      Float
   updatedAt DateTime @updatedAt
 
   @@map("exchange_rates")
 }
-

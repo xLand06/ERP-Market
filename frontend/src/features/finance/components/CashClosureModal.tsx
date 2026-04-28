@@ -34,14 +34,14 @@ export function CashClosureModal({
     const [notes, setNotes] = useState('');
     const [error, setError] = useState('');
 
-    const copRate = rates['COP'] || 4100;
-    const vesRate = rates['VES'] || 36.50;
+    const usdRate = rates['USD'] || rates['COP'] || 3600;
+    const vesRate = rates['VES'] || 5.5;
 
     const countedCopNum = parseFloat(countedCop) || 0;
     const countedUsdNum = parseFloat(countedUsd) || 0;
     const countedVesNum = parseFloat(countedVes) || 0;
 
-    const totalCountedCop = countedCopNum + (countedUsdNum * copRate) + ((countedVesNum / vesRate) * copRate);
+    const totalCountedCop = countedCopNum + (countedUsdNum * usdRate) + (countedVesNum * vesRate);
 
     const difference = totalCountedCop - expectedBalance;
     const isShort = difference < 0;

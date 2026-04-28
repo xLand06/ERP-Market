@@ -18,7 +18,6 @@ const CashRegisterPage       = lazy(() => import('../features/finance/pages/Cash
 const ProductsPage           = lazy(() => import('../features/products/pages/ProductsPage'));
 const CategoriesPage         = lazy(() => import('../features/products/pages/CategoriesPage'));
 const SuppliersPage          = lazy(() => import('../features/suppliers/pages/SuppliersPage'));
-const UsersPage              = lazy(() => import('../features/users/pages/UsersPage'));
 const ReportsPage            = lazy(() => import('../features/reports/pages/ReportsPage'));
 const NotFoundPage           = lazy(() => import('../features/notFound/pages/NotFoundPage'));
 
@@ -56,11 +55,10 @@ export const router = createBrowserRouter([
             { path: 'products',            element: wrap(ProductsPage) },
             { path: 'products/categories', element: wrap(CategoriesPage) },
             { path: 'suppliers',           element: wrap(SuppliersPage) },
-            { path: 'users',               element: wrap(UsersPage) },
+            { path: 'users',               element: wrap(EmployeeDirectoryPage) },
             { path: 'reports',             element: wrap(ReportsPage) },
             // ─── Plan Medio ───────────────────────────────────────────────
             { path: 'purchases',           element: wrap(PurchasesPage) },
-            { path: 'directory',           element: wrap(EmployeeDirectoryPage) },
             { path: 'audit',               element: wrap(AuditLogsPage) },
             { path: 'settings',          element: wrap(SettingsPage) },
         ],

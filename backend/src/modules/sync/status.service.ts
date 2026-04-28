@@ -1,39 +1,40 @@
 import { getLocalPrisma } from '../../config/prisma';
+import { getLastSuccessfulSync } from './sync-worker';
 
 /**
- * Obtiene el estado actual de sincronización.
- * Muestra cuántos registros están pending, synced, y failed.
+ * Obtiene el estado de sincronización actual.
  */
 export async function getSyncStatus() {
     const localPrisma = getLocalPrisma();
 
-    // Contar transactions por syncStatus
-    const pendingTransactions = await localPrisma.transaction.count({
-        where: { syncStatus: 'PENDING' }
-    });
-    const syncedTransactions = await localPrisma.transaction.count({
-        where: { syncStatus: 'SYNCED' }
-    });
-    const failedTransactions = await localPrisma.transaction.count({
-        where: { syncStatus: 'FAILED' }
-    });
+    const [
+        pendingTransactions,
+        syncedTransactions,
+        failedTransactions,
+        pendingRegisters,
+        syncedRegisters,
+        totalProducts,
+        totalGroups,
+        totalSubGroups,
+        totalUsers,
+        totalBranches,
+    ] = await Promise.all([
+        localPrisma.transaction.count({ where: { syncStatus: 'PENDING' } }),
+        localPrisma.transaction.count({ where: { syncStatus: 'SYNCED' } }),
+        localPrisma.transaction.count({ where: { syncStatus: 'FAILED' } }),
+        localPrisma.cashRegister.count({ where: { syncStatus: 'PENDING', status: 'CLOSED' } }),
+        localPrisma.cashRegister.count({ where: { syncStatus: 'SYNCED' } }),
+        localPrisma.product.count(),
+        localPrisma.group.count(),
+        localPrisma.subGroup.count(),
+        localPrisma.user.count(),
+        localPrisma.branch.count(),
+    ]);
 
-    // Contar cashRegisters por syncStatus
-    const pendingRegisters = await localPrisma.cashRegister.count({
-        where: { syncStatus: 'PENDING', status: 'CLOSED' }
-    });
-    const syncedRegisters = await localPrisma.cashRegister.count({
-        where: { syncStatus: 'SYNCED' }
-    });
-
-    // Total de productos, grupos, subgrupos, usuarios
-    const totalProducts = await localPrisma.product.count();
-    const totalGroups = await localPrisma.group.count();
-    const totalSubGroups = await localPrisma.subGroup.count();
-    const totalUsers = await localPrisma.user.count();
-    const totalBranches = await localPrisma.branch.count();
+    const lastSync = getLastSuccessfulSync();
 
     return {
+        lastSyncAt: lastSync ? lastSync.toISOString() : null,
         database: {
             products: totalProducts,
             groups: totalGroups,
@@ -55,7 +56,7 @@ export async function getSyncStatus() {
         },
         config: {
             useLocalDb: process.env.USE_LOCAL_DB === 'true',
-            syncIntervalMs: 900000, // 15 minutos
-        }
+            syncIntervalMs: 15 * 60_000,
+        },
     };
 }

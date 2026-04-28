@@ -1,13 +1,14 @@
 import { useState, useMemo } from 'react';
 import {
     TrendingUp, TrendingDown, DollarSign, ArrowUpCircle,
-    Plus, Lock, Circle, Play, History, ChevronLeft, ChevronRight, Calendar, Copy, Eye
+    Plus, Lock, Circle, Play, History, ChevronLeft, ChevronRight, Calendar, Copy, Eye, ShoppingBag, PackageMinus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { ExpenseEntryModal } from '../components/ExpenseEntryModal';
+import { PurchaseHistoryPanel } from '../components/PurchaseHistoryPanel';
 import { CashClosureModal } from '../components/CashClosureModal';
 import { CashRegisterDetailModal } from '../components/CashRegisterDetailModal';
 import { SaleDetailModal, Sale } from '../../sales/components/SaleDetailModal';
@@ -15,6 +16,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
 import { useConfigStore } from '@/hooks/useConfigStore';
+import { useAutoOpenRegister } from '@/hooks/useAutoOpenRegister';
 
 function StatCard({ icon: Icon, label, value, color, bg }: {
     icon: React.ElementType; label: string; value: string; color: string; bg: string;
@@ -37,7 +39,7 @@ export default function CashRegisterPage() {
     const setSelectedBranch = useAuthStore(s => s.setSelectedBranch);
     const [entryOpen, setEntryOpen] = useState(false);
     const [closureOpen, setClosureOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
+    const [activeTab, setActiveTab] = useState<'current' | 'history' | 'egresos'>('current');
     const [historyPage, setHistoryPage] = useState(1);
     const [historyFilters, setHistoryFilters] = useState({ from: '', to: '' });
     const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
@@ -86,7 +88,10 @@ export default function CashRegisterPage() {
                 })),
                 subtotal: Number(tx.total),
                 discount: 0,
-                total: Number(tx.total)
+                total: Number(tx.total),
+                notes: tx.notes,
+                currency: tx.currency,
+                exchangeRate: tx.exchangeRate
             };
             return sale;
         },
@@ -158,6 +163,13 @@ export default function CashRegisterPage() {
             await api.post(`/cash-flow/${openRegister.id}/movement`, { branchId: effectiveBranch, subType, amount, notes });
         },
         onSuccess: () => { setEntryOpen(false); refetch(); }
+    });
+
+    // Auto-apertura por horario configurado en Settings
+    useAutoOpenRegister({
+        branchId: effectiveBranch || null,
+        hasOpenRegister: !!openRegister,
+        onOpened: refetch,
     });
 
     const historyBranchId = selectedBranch === 'all' ? undefined : effectiveBranch;
@@ -244,12 +256,12 @@ export default function CashRegisterPage() {
                             const valUsd = parseFloat(formData.get('openingUsd') as string) || 0;
                             const valVes = parseFloat(formData.get('openingVes') as string) || 0;
                             
-                            const copRate = rates['COP'] || 4100;
-                            const vesRate = rates['VES'] || 36.50;
+                            const usdRate = rates['USD'] || rates['COP'] || 3600;
+                            const vesRate = rates['VES'] || 5.5;
 
-                            const amountInUsd = (valCop / copRate) + valUsd + (valVes / vesRate);
-                            if (amountInUsd >= 0) {
-                                openMutation.mutate(amountInUsd);
+                            const amountInCop = valCop + (valUsd * usdRate) + (valVes * vesRate);
+                            if (amountInCop >= 0) {
+                                openMutation.mutate(amountInCop);
                             }
                         }}>
                             <label className="block text-left text-sm font-bold text-slate-700 mb-2">Monto de Apertura (Físico en Caja)</label>
@@ -320,6 +332,60 @@ export default function CashRegisterPage() {
                         <StatCard icon={TrendingDown} label="Gastos" value={formatCurrency(totalExpense)} color="text-red-600" bg="bg-red-50" />
                         <StatCard icon={ArrowUpCircle} label="Esperado" value={formatCurrency(expectedBalance)} color="text-indigo-600" bg="bg-indigo-50" />
                     </div>
+
+                    {/* ── Desglose de ventas por moneda ── */}
+                    {(() => {
+                        const breakdown = { COP: 0, USD: 0, VES: 0 };
+                        let salesCount = 0;
+
+                        transactions.forEach((t: any) => {
+                            if (t.type !== 'SALE' || t.status !== 'COMPLETED') return;
+                            salesCount++;
+                            const amt = Number(t.total) || 0;
+                            const notes = t.notes || '';
+                            const regex = /(Efectivo COP|Efectivo USD|Pago Móvil VES) \((?:\$|Bs\.)(\d+(\.\d+)?)/g;
+                            let match;
+                            let foundAny = false;
+                            while ((match = regex.exec(notes)) !== null) {
+                                foundAny = true;
+                                const type = match[1];
+                                const amount = parseFloat(match[2]);
+                                if (type.includes('COP')) breakdown.COP += amount;
+                                if (type.includes('USD')) breakdown.USD += amount;
+                                if (type.includes('VES')) breakdown.VES += amount;
+                            }
+                            if (!foundAny) {
+                                const currency = t.currency || 'COP';
+                                const rate = Number(t.exchangeRate) || 1;
+                                if (currency === 'COP') breakdown.COP += amt;
+                                if (currency === 'USD') breakdown.USD += amt / rate;
+                                if (currency === 'VES') breakdown.VES += amt / rate;
+                            }
+                        });
+
+                        return (
+                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <ShoppingBag className="w-4 h-4 text-indigo-500" />
+                                    <h3 className="font-bold text-slate-800 text-sm">Resumen de Ventas — {salesCount} transacciones</h3>
+                                </div>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 text-center">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">COP</p>
+                                        <p className="text-base font-black text-slate-800 tabular-nums">{formatCurrency(breakdown.COP)}</p>
+                                    </div>
+                                    <div className="bg-blue-50 rounded-xl p-3 border border-blue-100 text-center">
+                                        <p className="text-[10px] font-bold text-blue-400 uppercase mb-1">USD</p>
+                                        <p className="text-base font-black text-blue-800 tabular-nums">${breakdown.USD.toFixed(2)}</p>
+                                    </div>
+                                    <div className="bg-amber-50 rounded-xl p-3 border border-amber-100 text-center">
+                                        <p className="text-[10px] font-bold text-amber-400 uppercase mb-1">VES</p>
+                                        <p className="text-base font-black text-amber-800 tabular-nums">Bs. {breakdown.VES.toFixed(2)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
                         <div className="px-5 py-4 border-b border-slate-100"><h2 className="font-bold text-slate-800">Movimientos del Día</h2></div>
                         {transactions.length === 0 ? (
@@ -354,6 +420,11 @@ export default function CashRegisterPage() {
                                                     <Calendar className="w-3 h-3" />
                                                     {new Date(t.createdAt).toLocaleDateString('es-VE')} {new Date(t.createdAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
                                                 </p>
+                                                {t.notes && (
+                                                    <p className="text-[10px] bg-slate-100/80 text-slate-600 px-2 py-0.5 rounded font-semibold mt-1 border border-slate-200/50 w-fit">
+                                                        {t.notes}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="text-right flex items-center gap-4">
@@ -514,6 +585,9 @@ export default function CashRegisterPage() {
                         <button onClick={() => { setActiveTab('history'); setHistoryPage(1); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors', activeTab === 'history' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
                             <History className="w-4 h-4" />Historial
                         </button>
+                        <button onClick={() => setActiveTab('egresos')} className={cn('flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors', activeTab === 'egresos' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
+                            <PackageMinus className="w-4 h-4" />Egresos
+                        </button>
                     </div>
                 </div>
             </div>
@@ -524,7 +598,7 @@ export default function CashRegisterPage() {
                     onClose={() => setSelectedHistoryId(null)} 
                     onSaleClick={(saleId) => setSelectedSaleId(saleId)}
                 />
-                {activeTab === 'current' ? renderCurrentTab() : renderHistoryTab()}
+                {activeTab === 'current' ? renderCurrentTab() : activeTab === 'history' ? renderHistoryTab() : <PurchaseHistoryPanel branchId={effectiveBranch} />}
             </div>
         </div>
     );

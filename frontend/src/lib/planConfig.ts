@@ -28,6 +28,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             '/sales',
             '/finance/cash-register',
             '/audit',
+            '/users',
             '/settings'
         ]
     },
@@ -66,6 +67,7 @@ export const ROLE_CONFIG: Record<RoleType, RoleConfig> = {
             '/finance',
             '/finance/cash-register',
             '/audit',
+            '/users',
             '/settings'
         ]
     },

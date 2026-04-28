@@ -24,9 +24,8 @@ const navItems: NavItem[] = [
     { name: 'Flujo de Caja', path: '/finance/cash-register', icon: Coins },
     { name: 'Configuración', path: '/settings', icon: Settings, roles: ['OWNER'] },
     { name: 'Auditoría', path: '/audit', icon: ShieldCheck, roles: ['OWNER'] },
-    { name: 'Empleados', path: '/directory', icon: Users },
+    { name: 'Usuarios', path: '/users', icon: Users, roles: ['OWNER'] },
     { name: 'Compras', path: '/purchases', icon: Truck },
-    { name: 'Finanzas', path: '/finance', icon: Coins },
     { name: 'Reportes', path: '/reports', icon: BarChart2 },
     { name: 'Proveedores', path: '/suppliers', icon: Users },
 ];

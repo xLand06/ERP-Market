@@ -17,6 +17,9 @@ export interface User {
     role: 'OWNER' | 'SELLER';
     branchId?: string;
     isActive: boolean;
+    cedula?: string;
+    cedulaType?: 'V' | 'E';
+    telefono?: string;
 }
 
 interface UserFormModalProps {
@@ -37,6 +40,11 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
     const [role, setRole] = useState<'OWNER' | 'SELLER'>('SELLER');
     const [branchId, setBranchId] = useState('');
     
+    // Additional Fields for Backend
+    const [cedulaType, setCedulaType] = useState<'V' | 'E'>('V');
+    const [cedulaNumber, setCedulaNumber] = useState('');
+    const [telefono, setTelefono] = useState('');
+    
     const [saving, setSaving] = useState(false);
     const initialFocusRef = useRef<HTMLInputElement>(null);
 
@@ -51,6 +59,22 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                 setEmail(user.email || '');
                 setRole(user.role || 'SELLER');
                 setBranchId(user.branchId || '');
+                setTelefono(user.telefono || '');
+                
+                // Parse cedula e.g. "V-12345678"
+                if (user.cedula) {
+                    const parts = user.cedula.split('-');
+                    if (parts.length === 2) {
+                        setCedulaType(parts[0] as 'V' | 'E');
+                        setCedulaNumber(parts[1]);
+                    } else {
+                        setCedulaNumber(user.cedula);
+                        setCedulaType(user.cedulaType || 'V');
+                    }
+                } else {
+                    setCedulaNumber('');
+                    setCedulaType('V');
+                }
             } else {
                 setUsername('');
                 setPassword('');
@@ -59,6 +83,9 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                 setEmail('');
                 setRole('SELLER');
                 setBranchId('');
+                setCedulaType('V');
+                setCedulaNumber('');
+                setTelefono('');
             }
             
             // Focus first input after render
@@ -83,7 +110,19 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
         e.preventDefault();
         setSaving(true);
         try {
-            const data: any = { nombre, apellido, email, role, branchId: branchId || null };
+            // Build full cedula "V-12345678"
+            const fullCedula = `${cedulaType}-${cedulaNumber.trim()}`;
+            
+            const data: any = { 
+                nombre, 
+                apellido: apellido.trim() || null, 
+                email: email.trim() || null, 
+                role, 
+                branchId: branchId || null,
+                cedula: fullCedula,
+                cedulaType,
+                telefono: telefono.trim() || null
+            };
             
             if (user) {
                 // Update
@@ -109,7 +148,8 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
             }
         } catch (error: any) {
             console.error('Error saving user:', error);
-            toast.error(error?.response?.data?.message || 'Error al guardar el usuario');
+            const backendMsg = error?.response?.data?.error;
+            toast.error(backendMsg || 'Error al guardar el usuario. Verifica los campos.');
         } finally {
             setSaving(false);
         }
@@ -165,6 +205,43 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                         </div>
                     </div>
 
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="cedulaNumber" className="block text-sm font-semibold text-slate-700 mb-1.5">Cédula *</label>
+                            <div className="flex gap-2">
+                                <select
+                                    id="cedulaType"
+                                    value={cedulaType}
+                                    onChange={(e) => setCedulaType(e.target.value as 'V' | 'E')}
+                                    className="px-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm bg-white font-bold"
+                                >
+                                    <option value="V">V</option>
+                                    <option value="E">E</option>
+                                </select>
+                                <input
+                                    id="cedulaNumber"
+                                    type="text"
+                                    value={cedulaNumber}
+                                    onChange={(e) => setCedulaNumber(e.target.value.replace(/\D/g, ''))}
+                                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm font-mono"
+                                    required
+                                    placeholder="12345678"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label htmlFor="telefono" className="block text-sm font-semibold text-slate-700 mb-1.5">Teléfono</label>
+                            <input
+                                id="telefono"
+                                type="text"
+                                value={telefono}
+                                onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
+                                placeholder="04121234567"
+                            />
+                        </div>
+                    </div>
+
                     {!user && (
                         <div>
                             <label htmlFor="username" className="block text-sm font-semibold text-slate-700 mb-1.5">Nombre de Usuario *</label>
@@ -172,8 +249,8 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                 id="username"
                                 type="text"
                                 value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
+                                onChange={(e) => setUsername(e.target.value.toLowerCase())}
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm font-mono"
                                 required
                                 aria-required="true"
                                 placeholder="Ej: mgonzalez"
@@ -204,12 +281,13 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
+                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm font-mono"
                             required={!user}
                             aria-required={!user}
                             placeholder={user ? 'Dejar en blanco para no cambiar' : '••••••••'}
                             autoComplete="new-password"
                         />
+                        {!user && <p className="text-[10px] text-slate-400 mt-1">Mín. 8 caracteres, 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial.</p>}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

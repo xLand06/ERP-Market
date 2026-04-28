@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { ProductFormModal } from '../components/ProductFormModal';
 import { StockAdjustmentModal } from '../components/StockAdjustmentModal';
+import { StockEntryModal } from '../components/StockEntryModal';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
@@ -38,6 +39,7 @@ export default function InventoryPage() {
     const [selected, setSelected]   = useState<Set<string>>(new Set());
     const [editTarget, setEditTarget] = useState<Product | null>(null);
     const [adjustmentOpen, setAdjustmentOpen] = useState(false);
+    const [stockEntryOpen, setStockEntryOpen] = useState(false);
 
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(25);
@@ -214,6 +216,15 @@ export default function InventoryPage() {
                 setTimeout(refetch, 500);
             }}
         />
+        <StockEntryModal
+            open={stockEntryOpen}
+            onClose={() => setStockEntryOpen(false)}
+            branchId={effectiveBranch || undefined}
+            onSuccess={() => {
+                setStockEntryOpen(false);
+                setTimeout(refetch, 500);
+            }}
+        />
         <div className="flex flex-col gap-6 max-w-400 mx-auto pb-8">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -232,9 +243,9 @@ export default function InventoryPage() {
                     <Button
                         size="lg"
                         className="h-11 sm:h-10 font-bold shadow-lg shadow-indigo-500/20 sm:px-4 bg-indigo-600 hover:bg-indigo-700 text-white"
-                        onClick={() => setAdjustmentOpen(true)}
+                        onClick={() => setStockEntryOpen(true)}
                     >
-                        <Plus className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Entrada Manual
+                        <Plus className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Entrada de Mercancía
                     </Button>
                 </div>
             </div>

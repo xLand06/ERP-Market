@@ -7,12 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
-import { ProductFormModal, Product, Category } from '../components/ProductFormModal';
+import { ProductFormModal, Product } from '../components/ProductFormModal';
 import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
 import { useConfigStore } from '@/hooks/useConfigStore';
 
 export default function ProductsPage() {
     const [search, setSearch] = useState('');
+    const [filterGroup, setFilterGroup] = useState<string>('all');
     const [filterCategory, setFilterCategory] = useState<string>('all');
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('active');
     
@@ -52,10 +53,19 @@ export default function ProductsPage() {
 
     const products = data?.data || [];
 
-    const { data: categories = [] } = useQuery<Category[]>({
+    const { data: subgroups = [] } = useQuery<any[]>({
         queryKey: ['subgroups'],
         queryFn: async () => {
             const res = await api.get('/groups/subgroups/all');
+            return res.data.data;
+        },
+        retry: false,
+    });
+
+    const { data: groups = [] } = useQuery<any[]>({
+        queryKey: ['groups'],
+        queryFn: async () => {
+            const res = await api.get('/groups');
             return res.data.data;
         },
         retry: false,
@@ -93,7 +103,8 @@ export default function ProductsPage() {
                 open={modalOpen}
                 onClose={() => setModalOpen(false)}
                 product={selectedProduct}
-                categories={categories}
+                groups={groups}
+                subgroups={subgroups}
                 onSuccess={() => queryClient.invalidateQueries({ queryKey: ['products'] })}
             />
 
@@ -131,16 +142,32 @@ export default function ProductsPage() {
                         />
                     </div>
                     
-                    <div className="flex gap-3 w-full md:w-auto">
+                    <div className="flex gap-3 w-full md:w-auto flex-wrap sm:flex-nowrap">
+                        <select 
+                            value={filterGroup}
+                            onChange={(e) => { 
+                                setFilterGroup(e.target.value); 
+                                setFilterCategory('all'); 
+                                setPage(1); 
+                            }}
+                            aria-label="Filtrar por Grupo"
+                            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-[140px]"
+                        >
+                            <option value="all">Todos los Grupos</option>
+                            {groups.map((g: any) => (
+                                <option key={g.id} value={g.id}>{g.name}</option>
+                            ))}
+                        </select>
+
                         <select 
                             value={filterCategory}
                             onChange={(e) => { setFilterCategory(e.target.value); setPage(1); }}
-                            aria-label="Filtrar por categoría"
+                            aria-label="Filtrar por Subgrupo"
                             className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-[140px]"
                         >
-                            <option value="all">Todas las Categorías</option>
-                            {categories.map(c => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
+                            <option value="all">Todos los Subgrupos</option>
+                            {(filterGroup === 'all' ? subgroups : subgroups.filter((s: any) => s.groupId === filterGroup)).map((s: any) => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
                             ))}
                         </select>
                         <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
@@ -178,7 +205,7 @@ export default function ProductsPage() {
                                 <tr>
                                     <th className="w-8"></th>
                                     <th>Producto</th>
-                                    <th>Categoría</th>
+                                    <th>Grupo / Subgrupo</th>
                                     <th>C. Barras</th>
                                     <th className="text-right">Costo</th>
                                     <th className="text-right">Precio Venta</th>
@@ -208,7 +235,11 @@ export default function ProductsPage() {
                                         </td>
                                         <td>
                                             <span className="text-xs font-medium bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md">
-                                                {categories.find(c => c.id === prod.subGroupId)?.name || 'N/A'}
+                                                {(() => {
+                                                    const sg = subgroups.find((s: any) => s.id === prod.subGroupId);
+                                                    const g = groups.find((gr: any) => gr.id === sg?.groupId);
+                                                    return g ? `${g.name} / ${sg?.name || 'N/A'}` : (sg?.name || 'N/A');
+                                                })()}
                                             </span>
                                         </td>
                                         <td>

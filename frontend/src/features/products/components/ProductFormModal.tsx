@@ -42,7 +42,8 @@ interface ProductFormModalProps {
     open: boolean;
     onClose: () => void;
     product?: Product | null;
-    categories: Category[];
+    groups: any[];
+    subgroups: any[];
     onSuccess: () => void;
 }
 
@@ -63,23 +64,23 @@ function PriceField({
     id: string;
 }) {
     const { rates } = useConfigStore();
-    const copRate = rates['COP'] || 4100;
-    const vesRate = rates['VES'] || 36.50;
+    const usdRate = rates['USD'] || rates['COP'] || 3600;
+    const vesRate = rates['VES'] || 5.5;
 
     const copNum = valueCOP === '' ? 0 : Number(valueCOP);
-    const usdVal = copNum > 0 ? (copNum / copRate).toFixed(2) : '';
-    const vesVal = copNum > 0 ? ((copNum / copRate) * vesRate).toFixed(2) : '';
+    const usdVal = copNum > 0 ? (copNum / usdRate).toFixed(2) : '';
+    const vesVal = copNum > 0 ? (copNum / vesRate).toFixed(2) : '';
 
     const handleUsdChange = (v: string) => {
         const n = parseFloat(v);
         if (isNaN(n)) { onChange(''); return; }
-        onChange(Math.round(n * copRate));
+        onChange(Math.round(n * usdRate));
     };
 
     const handleVesChange = (v: string) => {
         const n = parseFloat(v);
         if (isNaN(n)) { onChange(''); return; }
-        onChange(Math.round((n / vesRate) * copRate));
+        onChange(Math.round(n * vesRate));
     };
 
     return (
@@ -134,7 +135,7 @@ function PriceField({
 }
 
 // ─── Modal Principal ──────────────────────────────────────────────────────────
-export function ProductFormModal({ open, onClose, product, categories, onSuccess }: ProductFormModalProps) {
+export function ProductFormModal({ open, onClose, product, groups, subgroups, onSuccess }: ProductFormModalProps) {
     const { fmtCOP } = useConfigStore();
 
     const [name, setName] = useState('');
@@ -142,6 +143,7 @@ export function ProductFormModal({ open, onClose, product, categories, onSuccess
     const [baseUnit, setBaseUnit] = useState('UNIDAD');
     const [cost, setCost] = useState<number | ''>('');
     const [price, setPrice] = useState<number | ''>('');
+    const [selectedGroupId, setSelectedGroupId] = useState('');
     const [subGroupId, setSubGroupId] = useState('');
     const [barcodes, setBarcodes] = useState<ProductBarcode[]>([]);
     const [presentations, setPresentations] = useState<ProductPresentation[]>([]);
@@ -164,6 +166,8 @@ export function ProductFormModal({ open, onClose, product, categories, onSuccess
                 setCost(product.cost ?? '');
                 setPrice(product.price ?? '');
                 setSubGroupId(product.subGroupId || '');
+                const sg = subgroups.find((s: any) => s.id === product.subGroupId);
+                setSelectedGroupId(sg?.groupId || '');
                 setBarcodes(product.barcodes?.length > 0 ? product.barcodes : []);
                 setPresentations(product.presentations || []);
             } else {
@@ -172,6 +176,7 @@ export function ProductFormModal({ open, onClose, product, categories, onSuccess
                 setBaseUnit('UNIDAD');
                 setCost('');
                 setPrice('');
+                setSelectedGroupId('');
                 setSubGroupId('');
                 setBarcodes([]);
                 setPresentations([]);
@@ -293,14 +298,40 @@ export function ProductFormModal({ open, onClose, product, categories, onSuccess
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Categoría</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Grupo</label>
+                                <select
+                                    value={selectedGroupId}
+                                    onChange={(e) => {
+                                        setSelectedGroupId(e.target.value);
+                                        setSubGroupId('');
+                                    }}
+                                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm bg-white"
+                                >
+                                    <option value="">Sin grupo</option>
+                                    {groups.map((g: any) => (
+                                        <option key={g.id} value={g.id}>
+                                            {g.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Subgrupo</label>
                                 <select
                                     value={subGroupId}
                                     onChange={(e) => setSubGroupId(e.target.value)}
                                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm bg-white"
+                                    disabled={!selectedGroupId}
                                 >
-                                    <option value="">Sin categoría</option>
-                                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    <option value="">Sin subgrupo</option>
+                                    {subgroups
+                                        .filter((s: any) => s.groupId === selectedGroupId)
+                                        .map((s: any) => (
+                                            <option key={s.id} value={s.id}>
+                                                {s.name}
+                                            </option>
+                                        ))
+                                    }
                                 </select>
                             </div>
                         </div>

@@ -1,103 +1,285 @@
 import { prismaCloud, getLocalPrisma } from '../../config/prisma';
-import { checkElectronConnection } from './electron-api.client';
 import { logger } from '../../core/utils/logger';
 
 /**
- * Service to pull global catalog data from cloud to local.
- * 
- * NOTE: Para la arquitectura de múltiples sucursales Electron, el pull NO es necesario
- * porque cada sucursal tiene su propia DB local. Solo se hace PUSH de ventas.
- * Esta función queda para el caso de configuración única o desarrollo.
+ * Descarga el catálogo y datos operativos desde Supabase (cloud) hacia SQLite (local).
+ *
+ * Siempre se ejecuta, tanto en Electron como en modo standalone.
+ *
+ * Qué se descarga:
+ *   1. Groups + SubGroups (catálogo)
+ *   2. Products + Presentations + Barcodes (catálogo)
+ *   3. Branches (sedes)
+ *   4. Users (empleados)
+ *   5. ExchangeRates (tasas de cambio)
+ *   6. Transactions + Items (ventas) — solo las marcadas SYNCED en cloud
+ *      → Esto permite que el dueño vea ventas de TODAS las sucursales.
  */
 export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: number; error?: string }> {
-    
-    const isConnected = await checkElectronConnection();
-    if (isConnected) {
-        console.log('[Sync] Electron detected - Pull catalog skipped (not needed for multi-branch setup)');
-        console.log('[Sync] Each branch has local data, only PUSH is required');
-        return { success: true, pulledItems: 0 };
-    }
-    
     const localPrisma = getLocalPrisma();
+    const cloud = prismaCloud; // lanza si no hay cloud, manejado por el llamador
     
-    try {
-        console.log('[Sync] Starting Pull Catalog (standalone mode)...');
+    let pulledCount = 0;
 
-        const cloudGroups = await prismaCloud.group.findMany();
+    try {
+        logger.info('[Sync] Iniciando Pull desde cloud...');
+
+        // ─── 1. GROUPS ─────────────────────────────────────────────────────────
+        const cloudGroups = await cloud.group.findMany();
         for (const group of cloudGroups) {
             try {
                 await localPrisma.group.upsert({
                     where: { id: group.id },
-                    update: { name: group.name },
-                    create: { id: group.id, name: group.name },
+                    update: { name: group.name, description: group.description ?? undefined },
+                    create: { id: group.id, name: group.name, description: group.description ?? undefined },
                 });
-            } catch (e) {
-                // Ignore
-            }
+                pulledCount++;
+            } catch { /* Ignorar conflictos individuales */ }
         }
 
-        const cloudSubGroups = await prismaCloud.subGroup.findMany();
-        for (const subGroup of cloudSubGroups) {
+        // ─── 2. SUBGROUPS ───────────────────────────────────────────────────────
+        const cloudSubGroups = await cloud.subGroup.findMany();
+        for (const sg of cloudSubGroups) {
             try {
                 await localPrisma.subGroup.upsert({
-                    where: { id: subGroup.id },
-                    update: { name: subGroup.name, groupId: subGroup.groupId },
-                    create: { id: subGroup.id, name: subGroup.name, groupId: subGroup.groupId },
+                    where: { id: sg.id },
+                    update: { name: sg.name, groupId: sg.groupId },
+                    create: { id: sg.id, name: sg.name, groupId: sg.groupId },
                 });
-            } catch (e) {
-                // Ignore
-            }
+                pulledCount++;
+            } catch { /* Ignorar conflictos individuales */ }
         }
 
-        const cloudProducts = await prismaCloud.product.findMany({
-            include: { subGroup: true, presentations: true }
+        // ─── 3. PRODUCTS + PRESENTATIONS + BARCODES ────────────────────────────
+        const cloudProducts = await cloud.product.findMany({
+            include: { presentations: true, barcodes: true },
         });
+
         for (const prod of cloudProducts) {
             try {
                 await localPrisma.product.upsert({
                     where: { id: prod.id },
                     update: {
                         name: prod.name,
-                        barcode: prod.barcode,
+                        description: prod.description ?? undefined,
+                        barcode: prod.barcode ?? undefined,
                         price: Number(prod.price),
-                        cost: Number(prod.cost),
+                        cost: prod.cost != null ? Number(prod.cost) : undefined,
                         baseUnit: prod.baseUnit,
-                        subGroupId: prod.subGroupId,
+                        imageUrl: prod.imageUrl ?? undefined,
                         isActive: prod.isActive,
+                        subGroupId: prod.subGroupId ?? undefined,
                     },
                     create: {
                         id: prod.id,
                         name: prod.name,
-                        barcode: prod.barcode,
+                        description: prod.description ?? undefined,
+                        barcode: prod.barcode ?? undefined,
                         price: Number(prod.price),
-                        cost: Number(prod.cost),
+                        cost: prod.cost != null ? Number(prod.cost) : undefined,
                         baseUnit: prod.baseUnit,
-                        subGroupId: prod.subGroupId,
+                        imageUrl: prod.imageUrl ?? undefined,
                         isActive: prod.isActive,
-                    }
+                        subGroupId: prod.subGroupId ?? undefined,
+                    },
                 });
-            } catch (e) {
-                // Ignore
+                pulledCount++;
+            } catch { /* Ignorar conflictos individuales */ }
+
+            // Presentations
+            for (const pres of prod.presentations) {
+                try {
+                    await localPrisma.productPresentation.upsert({
+                        where: { id: pres.id },
+                        update: {
+                            name: pres.name,
+                            multiplier: Number(pres.multiplier),
+                            price: Number(pres.price),
+                            barcode: pres.barcode ?? undefined,
+                        },
+                        create: {
+                            id: pres.id,
+                            name: pres.name,
+                            multiplier: Number(pres.multiplier),
+                            price: Number(pres.price),
+                            barcode: pres.barcode ?? undefined,
+                            productId: pres.productId,
+                        },
+                    });
+                } catch { /* Ignorar */ }
+            }
+
+            // Barcodes adicionales
+            for (const bc of prod.barcodes) {
+                try {
+                    await localPrisma.productBarcode.upsert({
+                        where: { id: bc.id },
+                        update: { code: bc.code, label: bc.label ?? undefined },
+                        create: { id: bc.id, code: bc.code, label: bc.label ?? undefined, productId: bc.productId },
+                    });
+                } catch { /* Ignorar */ }
             }
         }
 
-        const cloudBranches = await prismaCloud.branch.findMany();
+        // ─── 4. BRANCHES ────────────────────────────────────────────────────────
+        const cloudBranches = await cloud.branch.findMany();
         for (const branch of cloudBranches) {
             try {
                 await localPrisma.branch.upsert({
                     where: { id: branch.id },
-                    update: { name: branch.name, code: branch.code || '', address: branch.address, phone: branch.phone },
-                    create: { id: branch.id, name: branch.name, code: branch.code || '', address: branch.address, phone: branch.phone }
+                    update: {
+                        name: branch.name,
+                        code: branch.code ?? '',
+                        address: branch.address ?? undefined,
+                        phone: branch.phone ?? undefined,
+                        isActive: branch.isActive,
+                    },
+                    create: {
+                        id: branch.id,
+                        name: branch.name,
+                        code: branch.code ?? '',
+                        address: branch.address ?? undefined,
+                        phone: branch.phone ?? undefined,
+                        isActive: branch.isActive,
+                    },
                 });
-            } catch (e) {
-                // Ignore
-            }
+                pulledCount++;
+            } catch { /* Ignorar */ }
         }
 
-        console.log('[Sync] Pull Catalog Completed (standalone)');
-        return { success: true, pulledItems: cloudProducts.length };
+        // ─── 5. USERS ───────────────────────────────────────────────────────────
+        const cloudUsers = await cloud.user.findMany({ where: { isActive: true } });
+        for (const user of cloudUsers) {
+            try {
+                await localPrisma.user.upsert({
+                    where: { id: user.id },
+                    update: {
+                        username: user.username,
+                        nombre: user.nombre,
+                        apellido: user.apellido ?? undefined,
+                        email: user.email ?? undefined,
+                        role: user.role as any,
+                        isActive: user.isActive,
+                        branchId: user.branchId ?? undefined,
+                    },
+                    create: {
+                        id: user.id,
+                        username: user.username,
+                        cedula: user.cedula,
+                        cedulaType: user.cedulaType as any,
+                        nombre: user.nombre,
+                        apellido: user.apellido ?? undefined,
+                        email: user.email ?? undefined,
+                        password: user.password,
+                        telefono: user.telefono ?? undefined,
+                        role: user.role as any,
+                        isActive: user.isActive,
+                        branchId: user.branchId ?? undefined,
+                    },
+                });
+                pulledCount++;
+            } catch { /* Ignorar */ }
+        }
+
+        // ─── 6. EXCHANGE RATES ──────────────────────────────────────────────────
+        const cloudRates = await cloud.exchangeRate.findMany();
+        for (const rate of cloudRates) {
+            try {
+                await localPrisma.exchangeRate.upsert({
+                    where: { id: rate.id },
+                    update: { rate: Number(rate.rate) },
+                    create: { id: rate.id, code: rate.code, rate: Number(rate.rate) },
+                });
+                pulledCount++;
+            } catch { /* Ignorar */ }
+        }
+
+        // ─── 7. TRANSACTIONS (solo SYNCED → para vista del dueño) ──────────────
+        // Pull de transacciones ya sincronizadas desde otras sucursales.
+        // Esto NO sobreescribe las transacciones locales PENDING (ventas propias sin subir).
+        const cloudTxs = await cloud.transaction.findMany({
+            where: { syncStatus: 'SYNCED' },
+            include: { items: true },
+            orderBy: { createdAt: 'desc' },
+            take: 500, // Últimas 500 ventas
+        });
+
+        for (const tx of cloudTxs) {
+            try {
+                // Solo pull si no existe localmente, o si la local ya está SYNCED
+                const existing = await localPrisma.transaction.findUnique({ where: { id: tx.id } });
+                if (existing && existing.syncStatus === 'PENDING') continue; // No tocar ventas locales pendientes
+
+                await localPrisma.transaction.upsert({
+                    where: { id: tx.id },
+                    update: {
+                        type: tx.type as any,
+                        status: tx.status as any,
+                        total: Number(tx.total),
+                        notes: tx.notes ?? undefined,
+                        currency: (tx as any).currency ?? 'COP',
+                        exchangeRate: (tx as any).exchangeRate ? Number((tx as any).exchangeRate) : undefined,
+                        invoiceNumber: (tx as any).invoiceNumber ?? undefined,
+                        syncStatus: 'SYNCED',
+                        syncedAt: tx.syncedAt ?? new Date(),
+                        createdAt: tx.createdAt,
+                        userId: tx.userId,
+                        branchId: tx.branchId,
+                        cashRegisterId: tx.cashRegisterId ?? undefined,
+                    },
+                    create: {
+                        id: tx.id,
+                        type: tx.type as any,
+                        status: tx.status as any,
+                        total: Number(tx.total),
+                        notes: tx.notes ?? undefined,
+                        ipAddress: tx.ipAddress ?? undefined,
+                        currency: (tx as any).currency ?? 'COP',
+                        exchangeRate: (tx as any).exchangeRate ? Number((tx as any).exchangeRate) : undefined,
+                        invoiceNumber: (tx as any).invoiceNumber ?? undefined,
+                        syncStatus: 'SYNCED',
+                        syncedAt: tx.syncedAt ?? new Date(),
+                        createdAt: tx.createdAt,
+                        userId: tx.userId,
+                        branchId: tx.branchId,
+                        cashRegisterId: tx.cashRegisterId ?? undefined,
+                    },
+                });
+
+                // Pull items de la transacción
+                for (const item of tx.items) {
+                    try {
+                        await localPrisma.transactionItem.upsert({
+                            where: { id: item.id },
+                            update: {
+                                quantity: Number(item.quantity),
+                                multiplierUsed: Number(item.multiplierUsed),
+                                unitPrice: Number(item.unitPrice),
+                                subtotal: Number(item.subtotal),
+                            },
+                            create: {
+                                id: item.id,
+                                transactionId: item.transactionId,
+                                productId: item.productId,
+                                presentationId: item.presentationId ?? undefined,
+                                quantity: Number(item.quantity),
+                                multiplierUsed: Number(item.multiplierUsed),
+                                unitPrice: Number(item.unitPrice),
+                                subtotal: Number(item.subtotal),
+                            },
+                        });
+                    } catch { /* Ignorar */ }
+                }
+
+                pulledCount++;
+            } catch { /* Ignorar */ }
+        }
+
+        logger.info(`[Sync] Pull completado — ${pulledCount} registros actualizados`);
+        return { success: true, pulledItems: pulledCount };
+
     } catch (error: any) {
-        console.error('[Sync] Error Pulling Catalog:', error);
+        logger.error('[Sync] Error en Pull:', error.message);
         return { success: false, error: error.message };
     }
 }

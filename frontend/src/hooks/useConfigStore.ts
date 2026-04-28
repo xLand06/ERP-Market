@@ -10,6 +10,7 @@ interface ExchangeRate {
 interface ConfigState {
     rates: Record<string, number>;
     iva: number;
+    autoOpenTime: string | null; // 'HH:mm' o null para desactivado
     // Convenience getters
     vesRate: number;
     copRate: number;
@@ -18,6 +19,7 @@ interface ConfigState {
     fetchRates: () => Promise<void>;
     updateRate: (code: string, rate: number) => Promise<void>;
     setIva: (iva: number) => void;
+    setAutoOpenTime: (time: string | null) => void;
 
     // Helpers de conversión (COP es la moneda base del sistema)
     /** Convierte desde cualquier moneda a COP */
@@ -38,29 +40,30 @@ export const useConfigStore = create<ConfigState>()(
     persist(
         (set, get) => ({
             rates: {
-                VES: 36.50,
-                COP: 4100,
-                USD: 1,
+                VES: 5.5,
+                USD: 3600,
+                COP: 1,
             },
             iva: 0,
+            autoOpenTime: null,
 
-            get vesRate() { return get().rates['VES'] || 36.50; },
-            get copRate() { return get().rates['COP'] || 4100; },
+            get vesRate() { return get().rates['VES'] || 5.5; },
+            get copRate() { return get().rates['USD'] || get().rates['COP'] || 3600; },
 
             // ── Conversiones ────────────────────────────────────────────────
             toCOP: (amount: number, currency: string) => {
                 const r = get().rates;
                 if (currency === 'COP') return amount;
-                if (currency === 'USD') return amount * (r['COP'] || 4100);
-                if (currency === 'VES') return (amount / (r['VES'] || 36.50)) * (r['COP'] || 4100);
+                if (currency === 'USD') return amount * (r['USD'] || r['COP'] || 3600);
+                if (currency === 'VES') return amount * (r['VES'] || 5.5);
                 return amount;
             },
 
             fromCOP: (copAmount: number, targetCurrency: string) => {
                 const r = get().rates;
                 if (targetCurrency === 'COP') return copAmount;
-                if (targetCurrency === 'USD') return copAmount / (r['COP'] || 4100);
-                if (targetCurrency === 'VES') return (copAmount / (r['COP'] || 4100)) * (r['VES'] || 36.50);
+                if (targetCurrency === 'USD') return copAmount / (r['USD'] || r['COP'] || 3600);
+                if (targetCurrency === 'VES') return copAmount / (r['VES'] || 5.5);
                 return copAmount;
             },
 
@@ -122,6 +125,7 @@ export const useConfigStore = create<ConfigState>()(
             },
 
             setIva: (iva) => set({ iva }),
+            setAutoOpenTime: (time) => set({ autoOpenTime: time }),
         }),
         {
             name: 'erp-config-storage',
