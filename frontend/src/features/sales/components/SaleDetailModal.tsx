@@ -146,9 +146,9 @@ export function SaleDetailModal({ sale, open, onClose }: SaleDetailModalProps) {
                     <Button variant="outline" className="gap-2" onClick={onClose}>
                         <X className="w-4 h-4" /> Cerrar
                     </Button>
-                    <Button className="gap-2">
+                    {/* <Button className="gap-2">
                         Reimprimir Ticket
-                    </Button>
+                    </Button> */}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

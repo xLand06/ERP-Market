@@ -304,6 +304,13 @@ export interface AuditLogListParams {
 // DASHBOARD DTOs
 // =============================================================================
 
+export interface CurrencySaleDTO {
+    currency: string;
+    totalSales: number;
+    totalProfit: number;
+    count: number;
+}
+
 export interface KPIsDTO {
     sales: {
         today: { total: number; count: number };
@@ -313,12 +320,14 @@ export interface KPIsDTO {
     inventory: { totalProducts: number; lowStockAlerts: number };
     cashRegister: { id: string; openingAmount: number; openedAt: Date } | null;
     transactionsToday: number;
+    salesByCurrency: CurrencySaleDTO[];
 }
 
 export interface SalesTrendDTO {
     day: string;
     total: number;
     count: number;
+    [key: string]: any;
 }
 
 export interface TopProductDTO {

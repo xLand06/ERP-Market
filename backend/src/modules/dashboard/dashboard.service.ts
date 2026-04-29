@@ -43,6 +43,7 @@ export const getDashboardKPIs = async (client: any, branchId?: string): Promise<
         lowStockCount,
         openRegister,
         transactionsToday,
+        monthlyTransactions,
     ] = await Promise.all([
         client.transaction.aggregate({
             where: {
@@ -94,7 +95,67 @@ export const getDashboardKPIs = async (client: any, branchId?: string): Promise<
                 ...(branchId && { branchId }),
             },
         }),
+
+        client.transaction.findMany({
+            where: {
+                type: 'SALE',
+                status: 'COMPLETED',
+                createdAt: { gte: startOfMonth },
+                ...(branchId && { branchId }),
+            },
+            select: {
+                total: true,
+                currency: true,
+                exchangeRate: true,
+                items: {
+                    select: {
+                        quantity: true,
+                        product: {
+                            select: { cost: true }
+                        }
+                    }
+                }
+            }
+        }),
     ]);
+
+    // Calcular totales y ganancias por moneda en memoria
+    const currencyMap: Record<string, { totalSales: number; totalProfit: number; count: number }> = {};
+
+    for (const tx of monthlyTransactions) {
+        const curr = tx.currency || 'COP';
+        const rate = tx.exchangeRate ? Number(tx.exchangeRate) : 1;
+        const totalCOP = Number(tx.total);
+        
+        let costCOP = 0;
+        for (const item of tx.items) {
+            const qty = Number(item.quantity);
+            const cost = Number(item.product?.cost || 0);
+            costCOP += qty * cost;
+        }
+
+        const profitCOP = totalCOP - costCOP;
+
+        // Convertir a la moneda original
+        // Si rate es 0 o 1 (ej: COP), se deja igual
+        const totalOrig = (curr === 'COP' || rate <= 1) ? totalCOP : totalCOP / rate;
+        const profitOrig = (curr === 'COP' || rate <= 1) ? profitCOP : profitCOP / rate;
+
+        if (!currencyMap[curr]) {
+            currencyMap[curr] = { totalSales: 0, totalProfit: 0, count: 0 };
+        }
+
+        currencyMap[curr].totalSales += totalOrig;
+        currencyMap[curr].totalProfit += profitOrig;
+        currencyMap[curr].count += 1;
+    }
+
+    const salesByCurrency = Object.entries(currencyMap).map(([currency, data]) => ({
+        currency,
+        totalSales: data.totalSales,
+        totalProfit: data.totalProfit,
+        count: data.count,
+    }));
 
     return {
         sales: {
@@ -114,6 +175,7 @@ export const getDashboardKPIs = async (client: any, branchId?: string): Promise<
         },
         cashRegister: openRegister as KPIsDTO['cashRegister'],
         transactionsToday,
+        salesByCurrency,
     };
 };
 
@@ -122,44 +184,49 @@ export const getSalesTrend = async (client: any, branchId?: string, days = 30): 
     const since = new Date();
     since.setDate(since.getDate() - days);
 
-    const isSQLite = (client as any)._activeProvider === 'sqlite' || process.env.ELECTRON === 'true';
+    const transactions = await client.transaction.findMany({
+        where: {
+            type: 'SALE',
+            status: 'COMPLETED',
+            createdAt: { gte: since },
+            ...(branchId && { branchId }),
+        },
+        select: {
+            createdAt: true,
+            total: true,
+            currency: true,
+            exchangeRate: true,
+        },
+    });
 
-    let data;
-    if (isSQLite) {
-        data = await client.$queryRaw<{ day: string; total: number; count: bigint }[]>`
-            SELECT 
-                strftime('%Y-%m-%d', createdAt) as day,
-                SUM(total) as total,
-                COUNT(*) as count
-            FROM transactions
-            WHERE type = 'SALE'
-              AND status = 'COMPLETED'
-              AND createdAt > ${since}
-              ${branchId ? require('@prisma/client').Prisma.sql`AND branchId = ${branchId}` : require('@prisma/client').Prisma.empty}
-            GROUP BY day
-            ORDER BY day ASC
-        `;
-    } else {
-        data = await client.$queryRaw<{ day: string; total: number; count: bigint }[]>`
-            SELECT 
-                DATE("createdAt") as day,
-                SUM(total)::float as total,
-                COUNT(*) as count
-            FROM transactions
-            WHERE type = 'SALE'
-              AND status = 'COMPLETED'
-              AND "createdAt" > ${since}
-              ${branchId ? require('@prisma/client').Prisma.sql`AND "branchId" = ${branchId}` : require('@prisma/client').Prisma.empty}
-            GROUP BY DATE("createdAt")
-            ORDER BY day ASC
-        `;
+    const dayMap: Record<string, { total: number; count: number; [currency: string]: any }> = {};
+
+    for (const tx of transactions) {
+        const dateStr = tx.createdAt.toISOString().split('T')[0];
+        const curr = tx.currency || 'COP';
+        const rate = tx.exchangeRate ? Number(tx.exchangeRate) : 1;
+        const totalCOP = Number(tx.total);
+        const totalOrig = (curr === 'COP' || rate <= 1) ? totalCOP : totalCOP / rate;
+
+        if (!dayMap[dateStr]) {
+            dayMap[dateStr] = { total: 0, count: 0 };
+        }
+
+        dayMap[dateStr].total += totalCOP;
+        dayMap[dateStr].count += 1;
+
+        if (!dayMap[dateStr][curr]) {
+            dayMap[dateStr][curr] = 0;
+        }
+        dayMap[dateStr][curr] += totalOrig;
     }
 
-    return (data as any).map((d: any) => ({
-        day: d.day,
-        total: d.total ?? 0,
-        count: Number(d.count),
+    const result = Object.entries(dayMap).map(([day, data]) => ({
+        day,
+        ...data,
     }));
+
+    return result.sort((a, b) => a.day.localeCompare(b.day));
 };
 
 /** Top 10 productos más vendidos (por unidades) */

@@ -15,7 +15,7 @@ import {
 
 const SYMBOLS: Record<string, string> = { USD: '$', VES: 'Bs.', COP: '$' };
 type Currency = 'USD' | 'VES' | 'COP';
-const CURRENCIES: Currency[] = ['USD', 'VES', 'COP'];
+const CURRENCIES: Currency[] = ['COP', 'USD', 'VES'];
 
 interface TopBarProps {
     onToggleSidebar?: () => void;
@@ -23,9 +23,9 @@ interface TopBarProps {
 }
 
 export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
-    const { rates } = useConfigStore();
+    const { toCOP, fromCOP } = useConfigStore();
     const { user, logout } = useAuthStore();
-    const [base, setBase] = useState<Currency>('USD');
+    const [base, setBase] = useState<Currency>('COP');
     const [profileOpen, setProfileOpen] = useState(false);
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
     const navigate = useNavigate();
@@ -36,9 +36,11 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     };
 
     const formatRate = (from: Currency, to: Currency) => {
-        const fromRate = rates[from] || 1;
-        const toRate = rates[to] || 1;
-        const rate = toRate / fromRate;
+        // Convertimos 1 unidad de "from" a COP
+        const copAmount = toCOP(1, from);
+        // Convertimos los COP a "to"
+        const rate = fromCOP(copAmount, to);
+
         return rate >= 1000
             ? rate.toLocaleString('es-VE', { maximumFractionDigits: 0 })
             : rate.toFixed(2);
@@ -107,11 +109,11 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                         <div key={cur} className="flex items-center">
                             {i > 0 && <div className="w-px h-4 bg-slate-200 mx-2" />}
                             <span className="px-2 tabular-nums text-slate-500">
-                                <span className="text-slate-400">{SYMBOLS[cur]}1 = </span>
+                                <span className="text-slate-400">{SYMBOLS[base]}1 = </span>
                                 <span className="font-bold text-slate-900">
-                                    {SYMBOLS[base]}{formatRate(cur, base)}
+                                    {SYMBOLS[cur]}{formatRate(base, cur)}
                                 </span>
-                                <span className="text-slate-400"> {base}</span>
+                                <span className="text-slate-400"> {cur}</span>
                             </span>
                         </div>
                     ))}

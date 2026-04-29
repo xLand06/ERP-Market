@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { useKPIs, useSalesTrend, useTopProducts, useSalesByBranch, formatCurrency, formatNumber } from '../api/useDashboard';
 import { 
     TrendingUp, TrendingDown, AlertTriangle, ShoppingCart,
-    DollarSign, Package, PackageOpen, Users,
+    DollarSign, Package, PackageOpen, Users, Percent
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -61,20 +62,167 @@ function KPICard({ title, value, subvalue, change, icon: Icon, iconBg, color }: 
     );
 }
 
+interface CurrencySaleDTO {
+    currency: string;
+    totalSales: number;
+    totalProfit: number;
+    count: number;
+}
+
+function CurrencySalesGrid({ data }: { data: CurrencySaleDTO[] }) {
+    const [selectedCurrency, setSelectedCurrency] = useState<string>('all');
+
+    if (!data || data.length === 0) return null;
+
+    const filteredData = selectedCurrency === 'all' 
+        ? data 
+        : data.filter(d => d.currency === selectedCurrency);
+
+    const formatOrigCurrency = (val: number, curr: string) => {
+        if (curr === 'COP') return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
+        if (curr === 'USD') return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+        if (curr === 'VES') return `Bs. ${new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2 }).format(val)}`;
+        return `${curr} ${val.toFixed(2)}`;
+    };
+
+    return (
+        <Card className="w-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-slate-100">
+                <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-emerald-600" />
+                    Ventas por Moneda (Mes Actual)
+                </CardTitle>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setSelectedCurrency('all')}
+                        className={`text-xs px-2.5 py-1 rounded-md font-medium transition-all ${
+                            selectedCurrency === 'all' 
+                                ? 'bg-slate-900 text-white' 
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                    >
+                        Todas
+                    </button>
+                    {data.map(d => (
+                        <button
+                            key={d.currency}
+                            onClick={() => setSelectedCurrency(d.currency)}
+                            className={`text-xs px-2.5 py-1 rounded-md font-medium transition-all ${
+                                selectedCurrency === d.currency 
+                                    ? 'bg-slate-900 text-white' 
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            {d.currency}
+                        </button>
+                    ))}
+                </div>
+            </CardHeader>
+            <CardContent className="pt-5">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {filteredData.map(d => {
+                        const margin = d.totalSales > 0 ? (d.totalProfit / d.totalSales) * 100 : 0;
+                        return (
+                            <div 
+                                key={d.currency} 
+                                className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 flex flex-col gap-3 relative overflow-hidden shadow-sm"
+                            >
+                                <div className="absolute -right-4 -bottom-4 opacity-5 text-slate-400 font-black text-6xl select-none">
+                                    {d.currency}
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{d.currency}</span>
+                                    <Badge variant="outline" className="text-[10px] font-bold bg-white">{d.count} Ventas</Badge>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-semibold text-slate-400 block">Total Facturado</span>
+                                    <span className="text-xl font-black text-slate-800">
+                                        {formatOrigCurrency(d.totalSales, d.currency)}
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 border-t border-slate-200/60 pt-2.5">
+                                    <div>
+                                        <span className="text-[10px] font-semibold text-slate-400 block">Ganancia</span>
+                                        <span className="text-xs font-bold text-emerald-600">
+                                            {formatOrigCurrency(d.totalProfit, d.currency)}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-semibold text-slate-400 block">Margen</span>
+                                        <span className="text-xs font-bold text-blue-600 flex items-center gap-0.5">
+                                            <Percent className="w-3 h-3" /> {margin.toFixed(1)}%
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
 function SalesTrendChart({ data, loading }: { data: any[]; loading: boolean }) {
+    const [selectedCurrency, setSelectedCurrency] = useState<string>('total');
+
     if (loading) {
         return <div className="h-64 bg-slate-100 rounded-lg animate-pulse" />;
     }
 
+    const currencies = Array.from(
+        new Set(
+            data.flatMap(d => Object.keys(d).filter(k => !['day', 'total', 'count', 'formattedDate'].includes(k)))
+        )
+    ).sort();
+
     const chartData = data.map(d => ({
         ...d,
-        formattedDate: new Date(d.day).toLocaleDateString('es-VE', { day: 'numeric', month: 'short' }),
+        formattedDate: new Date(d.day + 'T00:00:00').toLocaleDateString('es-VE', { day: 'numeric', month: 'short' }),
     }));
+
+    const formatValue = (val: number) => {
+        if (selectedCurrency === 'total' || selectedCurrency === 'COP') {
+            return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
+        }
+        if (selectedCurrency === 'USD') {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+        }
+        if (selectedCurrency === 'VES') {
+            return `Bs. ${new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2 }).format(val)}`;
+        }
+        return `${selectedCurrency} ${val.toFixed(2)}`;
+    };
 
     return (
         <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between pb-4">
                 <CardTitle className="text-sm font-semibold">Tendencia de Ventas</CardTitle>
+                <div className="flex gap-1 flex-wrap">
+                    <button
+                        onClick={() => setSelectedCurrency('total')}
+                        className={`text-[10px] px-2 py-0.5 rounded font-bold transition-all ${
+                            selectedCurrency === 'total' 
+                                ? 'bg-slate-900 text-white' 
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                    >
+                        Total (COP)
+                    </button>
+                    {currencies.map(curr => (
+                        <button
+                            key={curr}
+                            onClick={() => setSelectedCurrency(curr)}
+                            className={`text-[10px] px-2 py-0.5 rounded font-bold transition-all ${
+                                selectedCurrency === curr 
+                                    ? 'bg-slate-900 text-white' 
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            {curr}
+                        </button>
+                    ))}
+                </div>
             </CardHeader>
             <CardContent>
                 <ResponsiveContainer width="100%" height={250}>
@@ -86,13 +234,17 @@ function SalesTrendChart({ data, loading }: { data: any[]; loading: boolean }) {
                             </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                        <XAxis dataKey="formattedDate" fontSize={12} stroke="#94a3b8" />
-                        <YAxis fontSize={12} stroke="#94a3b8" tickFormatter={(v) => `$${v}`} />
-                        <Tooltip 
-                            formatter={(value: number) => [formatCurrency(value), 'Ventas']}
-                            contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                        <XAxis dataKey="formattedDate" fontSize={11} stroke="#94a3b8" />
+                        <YAxis 
+                            fontSize={11} 
+                            stroke="#94a3b8" 
+                            tickFormatter={(v) => selectedCurrency === 'USD' ? `$${v}` : selectedCurrency === 'VES' ? `Bs${v}` : `$${v}`} 
                         />
-                        <Area type="monotone" dataKey="total" stroke="#3B82F6" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
+                        <Tooltip 
+                            formatter={(value: number) => [formatValue(value), 'Ventas']}
+                            contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '11px' }}
+                        />
+                        <Area type="monotone" dataKey={selectedCurrency} stroke="#3B82F6" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
                     </AreaChart>
                 </ResponsiveContainer>
             </CardContent>
@@ -314,6 +466,11 @@ export default function DashboardPage() {
                     </>
                 )}
             </div>
+
+            {/* Multi-currency breakdown */}
+            {!loading && kpis?.salesByCurrency && (
+                <CurrencySalesGrid data={kpis.salesByCurrency} />
+            )}
 
             {/* Charts Row 1 */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

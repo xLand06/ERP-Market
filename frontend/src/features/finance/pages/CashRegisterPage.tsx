@@ -44,6 +44,8 @@ export default function CashRegisterPage() {
     const [historyFilters, setHistoryFilters] = useState({ from: '', to: '' });
     const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
     const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
+    const [searchTxId, setSearchTxId] = useState('');
+    const [searchLoading, setSearchLoading] = useState(false);
     
     const { rates } = useConfigStore();
     const [filterMode, setFilterMode] = useState<'range' | 'month'>('range');
@@ -198,6 +200,26 @@ export default function CashRegisterPage() {
     });
 
     const { fmtCOP } = useConfigStore();
+
+    const handleSearchTx = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!searchTxId.trim()) return;
+        setSearchLoading(true);
+        try {
+            const res = await api.get(`/sales/${searchTxId.trim()}`);
+            if (res.data && res.data.id) {
+                setSelectedSaleId(res.data.id);
+                toast.success('Transacción encontrada');
+                setSearchTxId('');
+            } else {
+                toast.error('No se encontró la transacción');
+            }
+        } catch (err) {
+            toast.error('No se encontró la transacción con ese ID');
+        } finally {
+            setSearchLoading(false);
+        }
+    };
     const formatCurrency = (value: number | string | null | undefined) => {
         const num = typeof value === 'string' ? parseFloat(value) : (value || 0);
         return fmtCOP(num);
@@ -577,8 +599,8 @@ export default function CashRegisterPage() {
     return (
         <div className="min-h-full">
             <div className="bg-white border-b border-slate-200 mb-6">
-                <div className="px-6 py-4">
-                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg w-fit">
+                <div className="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg w-fit shrink-0">
                         <button onClick={() => setActiveTab('current')} className={cn('flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors', activeTab === 'current' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
                             <Circle className="w-4 h-4" />Caja Actual
                         </button>
@@ -589,6 +611,23 @@ export default function CashRegisterPage() {
                             <PackageMinus className="w-4 h-4" />Egresos
                         </button>
                     </div>
+
+                    <form onSubmit={handleSearchTx} className="flex items-center gap-2 w-full md:max-w-md">
+                        <Input 
+                            type="text" 
+                            placeholder="Buscar por ID de transacción..." 
+                            value={searchTxId}
+                            onChange={(e) => setSearchTxId(e.target.value)}
+                            className="h-10 text-sm focus-visible:ring-indigo-500 border-slate-200"
+                        />
+                        <Button 
+                            type="submit" 
+                            disabled={searchLoading || !searchTxId.trim()} 
+                            className="h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shrink-0"
+                        >
+                            {searchLoading ? 'Buscando...' : 'Buscar'}
+                        </Button>
+                    </form>
                 </div>
             </div>
             <div className="px-6">

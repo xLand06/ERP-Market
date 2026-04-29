@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
 import { useConfigStore } from '@/hooks/useConfigStore';
+import { useInventory } from '@/hooks/useInventory';
 import toast from 'react-hot-toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -61,7 +62,6 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
 
     // Product search
     const [productSearch, setProductSearch] = useState('');
-    const [allProducts, setAllProducts] = useState<any[]>([]);
     const [searchFocused, setSearchFocused] = useState(false);
 
     // When currency changes, update default rate
@@ -71,16 +71,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
         else if (currency === 'VES') setCustomRate(String(defaultVESRate));
     }, [currency, defaultUSDRate, defaultVESRate]);
 
-    // Load products for search
-    useEffect(() => {
-        if (!open) return;
-        api.get('/inventory', { params: { branchId: effectiveBranchId || undefined } })
-            .then(res => {
-                const inv = res.data?.data || res.data || [];
-                setAllProducts(inv);
-            })
-            .catch(() => setAllProducts([]));
-    }, [open, effectiveBranchId]);
+    const { inventory: allProducts = [] } = useInventory(effectiveBranchId || '');
 
     // Pre-load items from POS cart
     useEffect(() => {

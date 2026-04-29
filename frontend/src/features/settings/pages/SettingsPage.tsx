@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { 
     Plus, Edit2, Trash2, Building2, Tag, Search, X, Settings2, DollarSign, 
-    Percent, AlertTriangle, Database, Save, Clock
+    Percent, AlertTriangle, Database, Save, Clock, HardDrive
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import toast from 'react-hot-toast';
+import { BackupPanel } from '@/features/backup/BackupPanel';
 
 interface Branch {
     id: string;
@@ -29,7 +30,7 @@ interface SubGroup {
     groupId: string;
 }
 
-type Tab = 'branches' | 'categories' | 'maintenance' | 'system';
+type Tab = 'branches' | 'categories' | 'maintenance' | 'system' | 'backup';
 
 function SystemSettings() {
     const { rates, iva, autoOpenTime, updateRate, setIva, setAutoOpenTime } = useConfigStore();
@@ -521,6 +522,7 @@ export default function SettingsPage() {
         { id: 'categories' as Tab, label: 'Grupos y Subgrupos', icon: Tag, count: groups.length },
         { id: 'system' as Tab, label: 'Tasa de Cambios', icon: Settings2 },
         { id: 'maintenance' as Tab, label: 'Mantenimiento', icon: AlertTriangle },
+        { id: 'backup' as Tab, label: 'Backup & Nube', icon: HardDrive },
     ];
 
     const isElectron = window.hasOwnProperty('electron');
@@ -809,6 +811,8 @@ export default function SettingsPage() {
             )}
 
             {activeTab === 'system' && <SystemSettings />}
+
+            {activeTab === 'backup' && <BackupPanel />}
 
             {showBranchForm && (
                 <BranchForm

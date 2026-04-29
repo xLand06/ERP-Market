@@ -22,11 +22,19 @@ export interface CashRegisterKPIs {
     openedAt: string;
 }
 
+export interface CurrencySaleData {
+    currency: string;
+    totalSales: number;
+    totalProfit: number;
+    count: number;
+}
+
 export interface KPIsData {
     sales: SalesKPIs;
     inventory: InventoryKPIs;
     cashRegister: CashRegisterKPIs | null;
     transactionsToday: number;
+    salesByCurrency?: CurrencySaleData[];
 }
 
 export interface SalesTrendItem {
