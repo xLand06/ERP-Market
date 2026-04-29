@@ -76,7 +76,7 @@ app.whenReady().then(async () => {
 
     // Configurar la URL de la base de datos local (SQLite vía Prisma en el backend)
     const dbFileName = 'erp-market.db';
-    const fullDbPath = join(userDataPath, dbFileName);
+    const fullDbPath = join(userDataPath, dbFileName).replace(/\\/g, '/');
     process.env.LOCAL_DATABASE_URL = `file:${fullDbPath}`;
 
     console.log(`[Electron] SQLite DB: ${fullDbPath}`);

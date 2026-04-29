@@ -151,32 +151,46 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
         const cloudUsers = await cloud.user.findMany({ where: { isActive: true } });
         for (const user of cloudUsers) {
             try {
-                await localPrisma.user.upsert({
-                    where: { id: user.id },
-                    update: {
-                        username: user.username,
-                        nombre: user.nombre,
-                        apellido: user.apellido ?? undefined,
-                        email: user.email ?? undefined,
-                        role: user.role as any,
-                        isActive: user.isActive,
-                        branchId: user.branchId ?? undefined,
-                    },
-                    create: {
-                        id: user.id,
-                        username: user.username,
-                        cedula: user.cedula,
-                        cedulaType: user.cedulaType as any,
-                        nombre: user.nombre,
-                        apellido: user.apellido ?? undefined,
-                        email: user.email ?? undefined,
-                        password: user.password,
-                        telefono: user.telefono ?? undefined,
-                        role: user.role as any,
-                        isActive: user.isActive,
-                        branchId: user.branchId ?? undefined,
-                    },
+                const existingUser = await localPrisma.user.findFirst({
+                    where: {
+                        OR: [
+                            { id: user.id },
+                            { username: user.username }
+                        ]
+                    }
                 });
+
+                if (existingUser) {
+                    await localPrisma.user.update({
+                        where: { id: existingUser.id },
+                        data: {
+                            username: user.username,
+                            nombre: user.nombre,
+                            apellido: user.apellido ?? undefined,
+                            email: user.email ?? undefined,
+                            role: user.role as any,
+                            isActive: user.isActive,
+                            branchId: user.branchId ?? undefined,
+                        },
+                    });
+                } else {
+                    await localPrisma.user.create({
+                        data: {
+                            id: user.id,
+                            username: user.username,
+                            cedula: user.cedula,
+                            cedulaType: user.cedulaType as any,
+                            nombre: user.nombre,
+                            apellido: user.apellido ?? undefined,
+                            email: user.email ?? undefined,
+                            password: user.password,
+                            telefono: user.telefono ?? undefined,
+                            role: user.role as any,
+                            isActive: user.isActive,
+                            branchId: user.branchId ?? undefined,
+                        },
+                    });
+                }
                 pulledCount++;
             } catch { /* Ignorar */ }
         }
@@ -192,6 +206,48 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
                 });
                 pulledCount++;
             } catch { /* Ignorar */ }
+        }
+
+        // ─── 6.5. CASH REGISTERS ────────────────────────────────────────────────
+        const cloudCashRegisters = await cloud.cashRegister.findMany();
+        for (const cr of cloudCashRegisters) {
+            try {
+                await localPrisma.cashRegister.upsert({
+                    where: { id: cr.id },
+                    update: {
+                        status: cr.status as any,
+                        openingAmount: Number(cr.openingAmount),
+                        closingAmount: cr.closingAmount != null ? Number(cr.closingAmount) : undefined,
+                        expectedAmount: cr.expectedAmount != null ? Number(cr.expectedAmount) : undefined,
+                        difference: cr.difference != null ? Number(cr.difference) : undefined,
+                        notes: cr.notes ?? undefined,
+                        syncStatus: 'SYNCED',
+                        syncedAt: cr.syncedAt ?? new Date(),
+                        openedAt: cr.openedAt,
+                        closedAt: cr.closedAt ?? undefined,
+                        userId: cr.userId,
+                        branchId: cr.branchId,
+                    },
+                    create: {
+                        id: cr.id,
+                        status: cr.status as any,
+                        openingAmount: Number(cr.openingAmount),
+                        closingAmount: cr.closingAmount != null ? Number(cr.closingAmount) : undefined,
+                        expectedAmount: cr.expectedAmount != null ? Number(cr.expectedAmount) : undefined,
+                        difference: cr.difference != null ? Number(cr.difference) : undefined,
+                        notes: cr.notes ?? undefined,
+                        syncStatus: 'SYNCED',
+                        syncedAt: cr.syncedAt ?? new Date(),
+                        openedAt: cr.openedAt,
+                        closedAt: cr.closedAt ?? undefined,
+                        userId: cr.userId,
+                        branchId: cr.branchId,
+                    },
+                });
+                pulledCount++;
+            } catch (e) {
+                logger.error("[Sync] Error upsert CashRegister: " + (e as Error).message);
+            }
         }
 
         // ─── 7. TRANSACTIONS (solo SYNCED → para vista del dueño) ──────────────

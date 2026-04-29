@@ -1,4 +1,4 @@
-import { createBrowserRouter, redirect } from 'react-router-dom';
+import { createBrowserRouter, createHashRouter, redirect } from 'react-router-dom';
 import { AppShellLayout } from '../components/layout/AppShell';
 import { PrivateRoute } from '../components/guards/PrivateRoute';
 import { PlanGuard } from '../components/guards/PlanGuard';
@@ -33,7 +33,9 @@ const wrap = (Component: React.ComponentType) => (
     </Suspense>
 );
 
-export const router = createBrowserRouter([
+const createRouter = window.location.protocol === 'file:' ? createHashRouter : createBrowserRouter;
+
+export const router = createRouter([
     { 
         path: '/login', 
         element: wrap(LoginPage),

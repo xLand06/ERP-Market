@@ -92,6 +92,35 @@ app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'ERP-MARKET API' });
 });
 
+// ─── LOCAL DB STATS (Electron only) ─────────────────────────────────────────
+app.get('/api/electron/local-stats', async (_req, res) => {
+    try {
+        const { getLocalPrisma } = await import('./config/prisma');
+        const db = getLocalPrisma();
+        const [branchCount, productCount, transactionCount, saleCount, purchaseCount, registerCount] = await Promise.all([
+            db.branch.count(),
+            db.product.count(),
+            db.transaction.count(),
+            db.transaction.count({ where: { type: 'SALE' } }),
+            db.transaction.count({ where: { type: 'INVENTORY_IN' } }),
+            db.cashRegister.count(),
+        ]);
+        res.json({ success: true, data: { branchCount, productCount, transactionCount, saleCount, purchaseCount, registerCount } });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/electron/clear-pending', async (_req, res) => {
+    try {
+        const { getLocalPrisma } = await import('./config/prisma');
+        const result = await getLocalPrisma().transaction.deleteMany({ where: { syncStatus: 'SYNCED' } });
+        res.json({ success: true, message: `Removed ${result.count} synced transactions` });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // ─── API ROUTES ───────────────────────────────────────────────────────────
 app.use('/api/auth',       authRouter);
 app.use('/api/users',      usersRouter);

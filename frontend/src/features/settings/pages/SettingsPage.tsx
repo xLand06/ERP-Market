@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Settings2, Building2, Tag, AlertTriangle, HardDrive } from 'lucide-react';
-import { SystemSettings, BranchesTab, CategoriesTab } from '../components';
+import { SystemSettings, BranchesTab, CategoriesTab, MaintenanceTab } from '../components';
 import { BackupPanel } from '@/features/backup/BackupPanel';
 
 type Tab = 'branches' | 'categories' | 'maintenance' | 'system' | 'backup';
@@ -47,12 +47,7 @@ export default function SettingsPage() {
             case 'backup':
                 return <BackupPanel />;
             case 'maintenance':
-                return (
-                    <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-                        <h3 className="text-lg font-bold text-slate-900 mb-4">Mantenimiento del Sistema</h3>
-                        <p className="text-slate-500">Opciones de mantenimientocoming soon.</p>
-                    </div>
-                );
+                return <MaintenanceTab />;
             default:
                 return null;
         }

@@ -1,7 +1,15 @@
 import * as dotenv from 'dotenv';
 import path from 'path';
 
+// 1. Cargar el .env de desarrollo (en backend/.env)
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+// 2. Cargar el .env de producción empaquetado (en resources/backend/.env)
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
+// 3. Cargar un .env externo al lado del EXE para configuraciones dinámicas del cliente
+const exeDir = process.env.ELECTRON === 'true' ? path.dirname(process.execPath) : process.cwd();
+dotenv.config({ path: path.resolve(exeDir, '.env') });
 
 export const env = {
     PORT: process.env.PORT || '3000',

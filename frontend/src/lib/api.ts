@@ -7,7 +7,10 @@ import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { useAuthStore } from '../features/auth/store/authStore';
 import toast from 'react-hot-toast';
 
-const baseURL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3000/api';
+const baseURL = import.meta.env.VITE_API_URL || 
+    (window.location.protocol === 'file:' || (window as any).erpApi?.isElectron
+        ? 'http://127.0.0.1:3001/api' 
+        : 'http://127.0.0.1:3000/api');
 
 export const api = axios.create({
     baseURL,
