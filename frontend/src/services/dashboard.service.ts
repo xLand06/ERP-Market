@@ -6,14 +6,15 @@ import api from '../lib/api';
 import type { ApiResponse, ListParams } from '../types';
 
 export interface SalesKPIs {
-    today: { total: number; count: number };
-    thisMonth: { total: number; count: number };
+    today: { total: number; count: number; change?: number };
+    thisMonth: { total: number; count: number; change?: number };
     weekSales?: number;
 }
 
 export interface InventoryKPIs {
     totalProducts: number;
     lowStockAlerts: number;
+    change?: number;
 }
 
 export interface CashRegisterKPIs {
@@ -34,6 +35,7 @@ export interface KPIsData {
     inventory: InventoryKPIs;
     cashRegister: CashRegisterKPIs | null;
     transactionsToday: number;
+    transactionsTodayChange?: number;
     salesByCurrency?: CurrencySaleData[];
 }
 
@@ -84,9 +86,9 @@ export const dashboardApi = {
 };
 
 export const formatCurrency = (value: number): string => {
-    return new Intl.NumberFormat('es-VE', {
+    return new Intl.NumberFormat('es-CO', {
         style: 'currency',
-        currency: 'VES',
+        currency: 'COP',
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
     }).format(value);

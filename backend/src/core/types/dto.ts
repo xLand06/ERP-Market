@@ -313,13 +313,14 @@ export interface CurrencySaleDTO {
 
 export interface KPIsDTO {
     sales: {
-        today: { total: number; count: number };
-        thisMonth: { total: number; count: number };
+        today: { total: number; count: number; change?: number };
+        thisMonth: { total: number; count: number; change?: number };
         weekSales: number;
     };
-    inventory: { totalProducts: number; lowStockAlerts: number };
+    inventory: { totalProducts: number; lowStockAlerts: number; change?: number };
     cashRegister: { id: string; openingAmount: number; openedAt: Date } | null;
     transactionsToday: number;
+    transactionsTodayChange?: number;
     salesByCurrency: CurrencySaleDTO[];
 }
 

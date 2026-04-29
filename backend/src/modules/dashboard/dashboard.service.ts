@@ -23,13 +23,25 @@ export const getPreferredClient = (role?: string): any => {
     return prisma;
 };
 
+/** Helper para calcular porcentaje de cambio */
+const calculateChange = (current: number, previous: number): number => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return ((current - previous) / previous) * 100;
+};
+
 /** KPIs principales del dashboard */
 export const getDashboardKPIs = async (client: any, branchId?: string): Promise<KPIsDTO> => {
     const now = new Date();
     const startOfToday = new Date(now);
     startOfToday.setHours(0, 0, 0, 0);
 
+    const startOfYesterday = new Date(now);
+    startOfYesterday.setDate(now.getDate() - 1);
+    startOfYesterday.setHours(0, 0, 0, 0);
+
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - 7);
 
@@ -44,6 +56,10 @@ export const getDashboardKPIs = async (client: any, branchId?: string): Promise<
         openRegister,
         transactionsToday,
         monthlyTransactions,
+        salesYesterday,
+        salesLastMonth,
+        transactionsYesterday,
+        productsYesterday,
     ] = await Promise.all([
         client.transaction.aggregate({
             where: {
@@ -117,6 +133,44 @@ export const getDashboardKPIs = async (client: any, branchId?: string): Promise<
                 }
             }
         }),
+
+        // salesYesterday
+        client.transaction.aggregate({
+            where: {
+                type: 'SALE',
+                status: 'COMPLETED',
+                createdAt: { gte: startOfYesterday, lt: startOfToday },
+                ...(branchId && { branchId }),
+            },
+            _sum: { total: true },
+        }),
+
+        // salesLastMonth
+        client.transaction.aggregate({
+            where: {
+                type: 'SALE',
+                status: 'COMPLETED',
+                createdAt: { gte: startOfLastMonth, lt: startOfMonth },
+                ...(branchId && { branchId }),
+            },
+            _sum: { total: true },
+        }),
+
+        // transactionsYesterday
+        client.transaction.count({
+            where: {
+                createdAt: { gte: startOfYesterday, lt: startOfToday },
+                ...(branchId && { branchId }),
+            },
+        }),
+
+        // productsYesterday
+        client.product.count({
+            where: {
+                isActive: true,
+                createdAt: { lt: startOfToday }
+            }
+        }),
     ]);
 
     // Calcular totales y ganancias por moneda en memoria
@@ -137,7 +191,6 @@ export const getDashboardKPIs = async (client: any, branchId?: string): Promise<
         const profitCOP = totalCOP - costCOP;
 
         // Convertir a la moneda original
-        // Si rate es 0 o 1 (ej: COP), se deja igual
         const totalOrig = (curr === 'COP' || rate <= 1) ? totalCOP : totalCOP / rate;
         const profitOrig = (curr === 'COP' || rate <= 1) ? profitCOP : profitCOP / rate;
 
@@ -157,24 +210,33 @@ export const getDashboardKPIs = async (client: any, branchId?: string): Promise<
         count: data.count,
     }));
 
+    const totalSalesToday = salesToday._sum.total ? Number(salesToday._sum.total) : 0;
+    const totalSalesYesterday = salesYesterday._sum.total ? Number(salesYesterday._sum.total) : 0;
+    const totalSalesThisMonth = salesThisMonth._sum.total ? Number(salesThisMonth._sum.total) : 0;
+    const totalSalesLastMonth = salesLastMonth._sum.total ? Number(salesLastMonth._sum.total) : 0;
+
     return {
         sales: {
             today: {
-                total: salesToday._sum.total ? Number(salesToday._sum.total) : 0,
+                total: totalSalesToday,
                 count: salesToday._count,
+                change: calculateChange(totalSalesToday, totalSalesYesterday),
             },
             thisMonth: {
-                total: salesThisMonth._sum.total ? Number(salesThisMonth._sum.total) : 0,
+                total: totalSalesThisMonth,
                 count: salesThisMonth._count,
+                change: calculateChange(totalSalesThisMonth, totalSalesLastMonth),
             },
             weekSales: salesThisWeek._sum.total ? Number(salesThisWeek._sum.total) : 0,
         },
         inventory: {
             totalProducts,
             lowStockAlerts: Number((lowStockCount as any)?.[0]?.count ?? 0),
+            change: calculateChange(totalProducts, productsYesterday),
         },
         cashRegister: openRegister as KPIsDTO['cashRegister'],
         transactionsToday,
+        transactionsTodayChange: calculateChange(transactionsToday, transactionsYesterday),
         salesByCurrency,
     };
 };

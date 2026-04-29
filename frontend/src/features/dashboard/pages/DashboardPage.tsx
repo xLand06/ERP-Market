@@ -432,7 +432,7 @@ export default function DashboardPage() {
                             title="Ventas del Día"
                             value={formatCurrency(kpis?.sales.today.total || 0)}
                             subvalue={`${kpis?.sales.today.count || 0} transacciones`}
-                            change={8.2}
+                            change={kpis?.sales.today.change || 0}
                             icon={DollarSign}
                             iconBg="bg-emerald-50"
                             color="#10B981"
@@ -441,7 +441,7 @@ export default function DashboardPage() {
                             title="Ventas del Mes"
                             value={formatCurrency(kpis?.sales.thisMonth.total || 0)}
                             subvalue={`${kpis?.sales.thisMonth.count || 0} transacciones`}
-                            change={12.5}
+                            change={kpis?.sales.thisMonth.change || 0}
                             icon={ShoppingCart}
                             iconBg="bg-blue-50"
                             color="#3B82F6"
@@ -450,7 +450,7 @@ export default function DashboardPage() {
                             title="Productos en Stock"
                             value={formatNumber(kpis?.inventory.totalProducts || 0)}
                             subvalue={`${kpis?.inventory.lowStockAlerts || 0} alertas`}
-                            change={-2.1}
+                            change={kpis?.inventory.change || 0}
                             icon={Package}
                             iconBg="bg-violet-50"
                             color="#8B5CF6"
@@ -458,7 +458,7 @@ export default function DashboardPage() {
                         <KPICard
                             title="Transacciones Hoy"
                             value={formatNumber(kpis?.transactionsToday || 0)}
-                            change={5.3}
+                            change={kpis?.transactionsTodayChange || 0}
                             icon={Users}
                             iconBg="bg-amber-50"
                             color="#F59E0B"
