@@ -1,35 +1,25 @@
 import { useState, useId, useMemo, useEffect } from 'react';
-import { Search, Plus, Download, Pencil, Check, X, Package, Loader2, Wifi, WifiOff } from 'lucide-react';
+import { Search, Plus, Download, Pencil, Check, X, Package, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import toast from 'react-hot-toast';
 import { ProductFormModal } from '../components/ProductFormModal';
 import { StockAdjustmentModal } from '../components/StockAdjustmentModal';
 import { StockEntryModal } from '../components/StockEntryModal';
-import { useMutation } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { useAuthStore } from '../../auth/store/authStore';
-import { useInventory } from '@/hooks/useInventory';
+import { useAuthStore } from '@/features/auth/store/authStore';
+import { useInventory, useUpdatePrice } from '../hooks';
 import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
-import toast from 'react-hot-toast';
+import type { InventoryProduct } from '../types';
 
-interface Product {
-    id: string; code: string; name: string; category: string;
-    cost: number; price: number; stock: number; minStock: number;
-    baseUnit: string;
-    isActive?: boolean;
-    presentations?: any[];
-}
-
-type StockLevel = 'normal' | 'warning' | 'critical';
-const stockLevel = (stock: number, min: number): StockLevel =>
+const stockLevel = (stock: number, min: number): 'normal' | 'warning' | 'critical' =>
     stock <= min * 0.15 ? 'critical' : stock <= min * 0.6 ? 'warning' : 'normal';
 
-const getBadgeVariant = (level: StockLevel) =>
+const getBadgeVariant = (level: 'normal' | 'warning' | 'critical') =>
     level === 'critical' ? 'destructive' : level === 'warning' ? 'warning' : 'success';
 
-const STATUS_LABELS: Record<StockLevel, string> = { normal:'Normal', warning:'Alerta', critical:'Crítico' };
+const STATUS_LABELS: Record<string, string> = { normal:'Normal', warning:'Alerta', critical:'Crítico' };
 
 export default function InventoryPage() {
     const [search, setSearch]       = useState('');
@@ -37,7 +27,7 @@ export default function InventoryPage() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editPrice, setEditPrice] = useState('');
     const [selected, setSelected]   = useState<Set<string>>(new Set());
-    const [editTarget, setEditTarget] = useState<Product | null>(null);
+    const [editTarget, setEditTarget] = useState<InventoryProduct | null>(null);
     const [adjustmentOpen, setAdjustmentOpen] = useState(false);
     const [stockEntryOpen, setStockEntryOpen] = useState(false);
 
@@ -53,29 +43,11 @@ export default function InventoryPage() {
     const isOwner = user?.role === 'OWNER';
     const effectiveBranch = selectedBranch === 'all' && isOwner ? null : selectedBranch;
 
-    const { inventory, isLoading, refetch, isOnline, updateStock } = useInventory(effectiveBranch || '');
+    const { inventory, isLoading, refetch } = useInventory(effectiveBranch || '');
+    const updatePriceMutation = useUpdatePrice();
 
     useBarcodeScanner((barcode) => {
         setSearch(barcode);
-        
-        const product = PRODUCTS.find(p => p.code === barcode);
-        if (product) {
-            updateStock({ product: { id: product.id }, quantity: product.stock + 1, minStock: product.minStock });
-            toast.success(`+1 añadido a ${product.name}`);
-            return;
-        }
-
-        for (const p of PRODUCTS) {
-            const pres = p.presentations?.find((pr: any) => pr.barcode === barcode);
-            if (pres) {
-                const added = Number(pres.multiplier);
-                updateStock({ product: { id: p.id }, quantity: p.stock + added, minStock: p.minStock });
-                toast.success(`+${added} añadido a ${p.name} (${pres.name})`);
-                return;
-            }
-        }
-
-        toast.error(`⚠️ Código ${barcode} no encontrado en catálogo`);
     });
 
     useEffect(() => {
@@ -84,47 +56,12 @@ export default function InventoryPage() {
         }
     }, [inventory.length]);
 
-    const PRODUCTS: Product[] = useMemo(() => {
-        return inventory.map(item => ({
-            id: item.product.id,
-            code: item.product.barcode || '',
-            name: item.product.name,
-            cost: Number(item.product.cost || 0),
-            price: Number(item.product.price || 0),
-            stock: Number(item.stock || 0),
-            minStock: Number(item.minStock || 0),
-            baseUnit: item.product.baseUnit || 'UNIDAD',
-            category: item.product.subGroup || 'Varios',
-            presentations: item.product.presentations || [],
-        }));
-    }, [inventory]);
-
-    const CATEGORIES = useMemo(() => {
-        const cats = new Set(PRODUCTS.map(p => p.category));
-        return ['Todos', ...Array.from(cats)].sort();
-    }, [PRODUCTS]);
-
-    // Mutation to update price
-    const updatePriceMutation = useMutation({
-        mutationFn: async ({ id, price }: { id: string, price: number }) => {
-            await api.put(`/products/${id}`, { price });
-        },
-        onSuccess: () => {
-            toast.success('Precio actualizado');
-            setEditingId(null);
-            refetch();
-        },
-        onError: () => {
-            toast.error('Error al actualizar precio');
-        }
-    });
-
-    
-
-    const filtered = PRODUCTS.filter(p =>
-        (category === 'Todos' || p.category === category) &&
-        (p.name.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase()))
-    );
+    const filtered = useMemo(() => {
+        return inventory.filter(p =>
+            (category === 'Todos' || p.category === category) &&
+            (p.name.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase()))
+        );
+    }, [inventory, category, search]);
 
     const paginated = useMemo(() => {
         const start = (currentPage - 1) * pageSize;
@@ -156,12 +93,12 @@ export default function InventoryPage() {
         });
     };
 
-    const startEdit = (p: Product) => {
+    const startEdit = (p: InventoryProduct) => {
         setEditingId(p.id);
         setEditPrice(p.price.toFixed(2));
     };
 
-    const confirmEdit = (p: Product) => {
+    const confirmEdit = (p: InventoryProduct) => {
         const val = parseFloat(editPrice);
         if (!isNaN(val) && val >= 0) {
             updatePriceMutation.mutate({ id: p.id, price: val });
@@ -181,24 +118,15 @@ export default function InventoryPage() {
     return (
         <>
         <div className="flex items-center gap-2 mb-4">
-            {isOnline ? (
-                <span className="flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-                    <Wifi className="w-3 h-3" /> En línea
-                </span>
-            ) : (
-                <span className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
-                    <WifiOff className="w-3 h-3" /> Sin conexión
-                </span>
-            )}
             <span className="text-xs text-slate-400">
-                {PRODUCTS.length} productos
+                {inventory.length} productos
             </span>
         </div>
         <ProductFormModal
             open={!!editTarget}
             onClose={() => setEditTarget(null)}
             product={editTarget}
-            categories={CATEGORIES.map(c => ({ id: c, name: c })).filter(c => c.id !== 'Todos')}
+            categories={inventory.map(c => ({ id: c.category, name: c.category })).filter((c, i, arr) => arr.findIndex(x => x.id === c.id) === i)}
             initialStock={editTarget?.stock}
             initialMinStock={editTarget?.minStock}
             onSuccess={() => {
@@ -209,8 +137,7 @@ export default function InventoryPage() {
         <StockAdjustmentModal 
             open={adjustmentOpen}
             onClose={() => setAdjustmentOpen(false)}
-            onSave={({ product, quantity, minStock }) => {
-                updateStock({ product, quantity, minStock });
+            onSave={({ minStock: _minStock }) => {
                 toast.success('Entrada de inventario registrada con éxito');
                 setAdjustmentOpen(false);
                 setTimeout(refetch, 500);
@@ -226,14 +153,13 @@ export default function InventoryPage() {
             }}
         />
         <div className="flex flex-col gap-6 max-w-400 mx-auto pb-8">
-            {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
                         Gestión de Inventario
                     </h1>
                     <p className="text-xs text-slate-400 mt-1 font-medium" aria-live="polite">
-                        {filtered.length} de {PRODUCTS.length} productos mostrados
+                        {filtered.length} de {inventory.length} productos mostrados
                     </p>
                 </div>
                 <div className="flex flex-col xs:flex-row gap-2.5 w-full sm:w-auto">
@@ -250,7 +176,6 @@ export default function InventoryPage() {
                 </div>
             </div>
 
-            {/* Filters */}
             <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
                 <div className="flex gap-3 items-center flex-wrap">
                     <div className="relative flex-1 min-w-50">
@@ -266,7 +191,7 @@ export default function InventoryPage() {
                         />
                     </div>
                     <div className="flex gap-1.5 flex-wrap" role="group" aria-label="Filtrar por categoría">
-                        {CATEGORIES.map(cat => (
+                        {[...new Set(inventory.map(p => p.category))].sort().map(cat => (
                             <button
                                 key={cat}
                                 onClick={() => { setCategory(cat); setCurrentPage(1); }}
@@ -284,7 +209,6 @@ export default function InventoryPage() {
                 </div>
             </div>
 
-            {/* Table */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[400px] relative">
                 {isLoading && (
                     <div className="absolute inset-0 z-10 bg-white/50 backdrop-blur-[2px] flex items-center justify-center">
@@ -411,7 +335,6 @@ export default function InventoryPage() {
                     </table>
                 </div>
 
-                {/* Pagination */}
                 <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50 mt-auto">
                     <p className="text-xs text-slate-500">
                         Mostrando {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, filtered.length)} de {filtered.length} productos

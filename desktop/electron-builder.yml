@@ -12,30 +12,28 @@ files:
   - "!node_modules/electron/**"
   - "!node_modules/electron-builder/**"
   - "!node_modules/electron-vite/**"
+  - "!node_modules/ts-node/**"
 
 extraFiles:
-  # Incluye el frontend construido
-  - from: "../frontend/dist"
-    to: "frontend/dist"
-  # Incluye el backend construido (JS compilado)
   - from: "../backend/dist"
-    to: "backend"
-  # Incluye las dependencias del backend (necesario para Express y Prisma)
+    to: "resources/backend"
+    filter:
+      - "**/*"
   - from: "../backend/node_modules"
-    to: "backend/node_modules"
+    to: "resources/backend/node_modules"
+    filter:
+      - "**/*"
+      - ".prisma/**/*"
+      - "!prisma/**"
+  - from: "../node_modules/@prisma"
+    to: "resources/backend/node_modules/@prisma"
+    filter:
+      - "**/*"
 
 win:
-  icon: resources/icon.ico
   target:
-    - target: nsis
+    - target: dir
       arch:
         - x64
-
-nsis:
-  oneClick: false
-  allowToChangeInstallationDirectory: true
-  installerIcon: resources/icon.ico
-  uninstallerIcon: resources/icon.ico
-  installQuote: "Instalando ERP-Market — Abastos Sofimar"
 
 publish: null

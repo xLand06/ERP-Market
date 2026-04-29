@@ -1,91 +1,44 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, PackageX, PackageCheck, AlertCircle, Download, PackageSearch } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { api } from '@/lib/api';
-import toast from 'react-hot-toast';
-import { ProductFormModal, Product } from '../components/ProductFormModal';
+import { ProductFormModal } from '../components/ProductFormModal';
+import type { Product } from '../types';
 import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
 import { useConfigStore } from '@/hooks/useConfigStore';
+import { useProducts, useGroups, useSubgroups, useToggleProductStatus } from '../hooks';
 
 export default function ProductsPage() {
     const [search, setSearch] = useState('');
     const [filterGroup, setFilterGroup] = useState<string>('all');
     const [filterCategory, setFilterCategory] = useState<string>('all');
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('active');
-    
-    // Pagination State
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(25);
-    
+    const [modalOpen, setModalOpen] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
     const { fmtCOP } = useConfigStore();
-    
+
     useBarcodeScanner((barcode) => {
         setSearch(barcode);
     });
 
-    // Modal State
-    const [modalOpen, setModalOpen] = useState(false);
-    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-
-    const queryClient = useQueryClient();
-
-    // Data Fetching
-    const { data, isLoading, isError } = useQuery<{ data: Product[], meta: any }>({
-        queryKey: ['products', search, filterCategory, filterStatus, page, limit],
-        queryFn: async () => {
-            const params: any = { 
-                page, 
-                limit,
-                search: search || undefined
-            };
-            if (filterCategory !== 'all') params.subGroupId = filterCategory;
-            if (filterStatus !== 'all') params.isActive = filterStatus === 'active';
-            
-            const res = await api.get('/products', { params });
-            return res.data;
-        },
-        retry: false,
+    const { data, isLoading, isError, refetch } = useProducts({
+        page,
+        limit,
+        search: search || undefined,
+        subGroupId: filterCategory !== 'all' ? filterCategory : undefined,
+        isActive: filterStatus === 'all' ? undefined : filterStatus === 'active',
     });
+
+    const { data: subgroups = [] } = useSubgroups();
+    const { data: groups = [] } = useGroups();
+    const toggleStatusMutation = useToggleProductStatus();
 
     const products = data?.data || [];
-
-    const { data: subgroups = [] } = useQuery<any[]>({
-        queryKey: ['subgroups'],
-        queryFn: async () => {
-            const res = await api.get('/groups/subgroups/all');
-            return res.data.data;
-        },
-        retry: false,
-    });
-
-    const { data: groups = [] } = useQuery<any[]>({
-        queryKey: ['groups'],
-        queryFn: async () => {
-            const res = await api.get('/groups');
-            return res.data.data;
-        },
-        retry: false,
-    });
-
-    // Mutations
-    const toggleStatusMutation = useMutation({
-        mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-            await api.put(`/products/${id}`, { isActive });
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['products'] });
-            toast.success('Estado del producto actualizado');
-        },
-        onError: () => {
-            toast.error('Error al actualizar producto. Verifica la conexión.');
-        }
-    });
-
-    const filtered = products;
 
     const handleOpenCreate = () => {
         setSelectedProduct(null);
@@ -97,6 +50,19 @@ export default function ProductsPage() {
         setModalOpen(true);
     };
 
+    const handleSuccess = () => {
+        refetch();
+    };
+
+    useEffect(() => {
+        if (search) setPage(1);
+    }, [search]);
+
+    useEffect(() => {
+        if (filterGroup) setFilterCategory('all');
+        if (filterGroup || filterCategory || filterStatus) setPage(1);
+    }, [filterGroup, filterCategory, filterStatus]);
+
     return (
         <>
             <ProductFormModal 
@@ -105,11 +71,10 @@ export default function ProductsPage() {
                 product={selectedProduct}
                 groups={groups}
                 subgroups={subgroups}
-                onSuccess={() => queryClient.invalidateQueries({ queryKey: ['products'] })}
+                onSuccess={handleSuccess}
             />
 
             <div className="flex flex-col gap-6 max-w-[1400px] mx-auto pb-8">
-                {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
@@ -129,7 +94,6 @@ export default function ProductsPage() {
                     </div>
                 </div>
 
-                {/* Filters */}
                 <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row gap-4 items-center">
                     <div className="relative flex-1 w-full">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -197,7 +161,6 @@ export default function ProductsPage() {
                     </div>
                 )}
 
-                {/* Table */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full erp-table min-w-[800px]" aria-label="Catálogo de Productos">
@@ -220,7 +183,7 @@ export default function ProductsPage() {
                                             Cargando productos...
                                         </td>
                                     </tr>
-                                ) : filtered.map((prod: Product) => (
+                                ) : products.map((prod: Product) => (
                                     <tr key={prod.id} className={cn(!prod.isActive && 'opacity-60 bg-slate-50')}>
                                         <td className="pr-0">
                                             <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center border border-slate-200 shrink-0">
@@ -305,7 +268,7 @@ export default function ProductsPage() {
                                         </td>
                                     </tr>
                                 ))}
-                                {!isLoading && filtered.length === 0 && !isError && (
+                                {!isLoading && products.length === 0 && !isError && (
                                     <tr>
                                         <td colSpan={8} className="text-center py-12">
                                             <PackageX className="w-10 h-10 text-slate-300 mx-auto mb-3" />
@@ -318,7 +281,6 @@ export default function ProductsPage() {
                         </table>
                     </div>
 
-                    {/* Pagination UI */}
                     <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50 mt-auto">
                         <p className="text-xs text-slate-500">
                             Mostrando {((page - 1) * limit) + 1}–{Math.min(page * limit, data?.meta?.total || 0)} de {data?.meta?.total || 0} productos

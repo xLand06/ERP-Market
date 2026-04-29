@@ -3,47 +3,14 @@ import { X, Save, Barcode, PackageOpen, Plus, Trash2, Layers, DollarSign, Refres
 import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { useConfigStore } from '@/hooks/useConfigStore';
-
-export interface Category {
-    id: string;
-    name: string;
-}
-
-export interface ProductBarcode {
-    id?: string;
-    code: string;
-    label?: string;
-}
-
-export interface ProductPresentation {
-    id?: string;
-    name: string;
-    multiplier: number;
-    price: number; // en COP
-    barcode?: string;
-}
-
-export interface Product {
-    id: string;
-    name: string;
-    description?: string;
-    barcode?: string;
-    baseUnit: string;
-    price: number;  // en COP
-    cost?: number;  // en COP
-    imageUrl?: string;
-    subGroupId?: string;
-    isActive: boolean;
-    barcodes: ProductBarcode[];
-    presentations: ProductPresentation[];
-}
+import type { Product, ProductBarcode, ProductPresentation, Group, Category } from '../types';
 
 interface ProductFormModalProps {
     open: boolean;
     onClose: () => void;
     product?: Product | null;
-    groups: any[];
-    subgroups: any[];
+    groups: Group[];
+    subgroups: Category[];
     onSuccess: () => void;
 }
 

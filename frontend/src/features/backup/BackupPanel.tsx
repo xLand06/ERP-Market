@@ -314,6 +314,7 @@ function CloudPurgeSection() {
         staleTime: 60_000,
     });
 
+    console.log('stats', stats);
     const totalToDelete = stats?.reduce((s, r) => s + r.count, 0) ?? 0;
 
     const handlePurge = async () => {

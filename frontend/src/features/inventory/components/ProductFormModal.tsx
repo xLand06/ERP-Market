@@ -2,11 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Save, DollarSign, Barcode, PackageOpen, AlertTriangle } from 'lucide-react';
 import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
-
-export interface Category {
-    id: string;
-    name: string;
-}
+import type { Category } from '../../products/types';
 
 export interface Product {
     id: string;

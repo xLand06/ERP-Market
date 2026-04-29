@@ -1,0 +1,1 @@
+export { useInventory, useUpdateStock, useUpdatePrice } from './useInventory';

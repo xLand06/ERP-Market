@@ -1,68 +1,34 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Eye, EyeOff, Lock, User, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/features/auth/store/authStore';
-import { authApi } from '@/services';
-import toast from 'react-hot-toast';
-
-interface FormErrors {
-    username?: string;
-    password?: string;
-    general?: string;
-}
+import { useLoginForm, useLogin } from '@/features/auth/hooks';
+import type { LoginPayload } from '@/features/auth/types';
 
 export default function LoginPage() {
     const [showPw, setShowPw] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [errors, setErrors] = useState<FormErrors>({});
-    const navigate = useNavigate();
-    const setAuth = useAuthStore((s) => s.setAuth);
+    const { form, errors, validate, updateField } = useLoginForm();
+    const { login, loading, parseError } = useLogin();
+    const [generalError, setGeneralError] = useState<string>('');
 
-    const [form, setForm] = useState({ username: '', password: '' });
-
-    const validate = (): boolean => {
-        const newErrors: FormErrors = {};
-        
-        if (!form.username) {
-            newErrors.username = 'El usuario es requerido';
-        }
-        
-        if (!form.password) {
-            newErrors.password = 'La contraseña es requerida';
-        }
-        
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
+        setGeneralError('');
         
         if (!validate()) return;
         
-        setLoading(true);
-        setErrors({});
-        
         try {
-            const { token, user } = await authApi.login(form);
-            setAuth(token, user);
-            toast.success(`Bienvenido, ${user.nombre}!`);
-            navigate('/dashboard');
+            await login(form as LoginPayload);
         } catch (err) {
-            const msg = err instanceof Error ? err.message : 'Error de autenticación';
-            if (msg.includes('usuario') || msg.includes('Usuario') || msg.includes('username')) {
-                setErrors({ username: msg });
-            } else if (msg.includes('contrase') || msg.includes('password')) {
-                setErrors({ password: msg });
-            } else {
-                setErrors({ general: msg });
+            if (err instanceof Error) {
+                const parsed = parseError(err);
+                if (parsed.username || parsed.password) {
+                    return;
+                }
+                setGeneralError(err.message);
             }
-        } finally {
-            setLoading(false);
         }
-    };
+    }, [form, validate, login, parseError]);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 flex items-center justify-center p-4">
@@ -78,9 +44,9 @@ export default function LoginPage() {
                 <form onSubmit={handleSubmit} className="bg-white/[0.06] border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-2xl">
                     <h2 className="text-base font-bold text-white mb-5">Iniciar sesión</h2>
                     
-                    {errors.general && (
+                    {generalError && (
                         <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm" role="alert">
-                            {errors.general}
+                            {generalError}
                         </div>
                     )}
                     
@@ -100,7 +66,7 @@ export default function LoginPage() {
                                     aria-invalid={!!errors.username}
                                     placeholder="admin o V-12345678"
                                     value={form.username}
-                                    onChange={(e) => setForm({ ...form, username: e.target.value })}
+                                    onChange={(e) => updateField('username', e.target.value)}
                                     className={`pl-9 bg-slate-900/60 border-slate-700 text-white placeholder:text-slate-600 focus:border-emerald-500 ${errors.username ? 'border-red-500' : ''}`}
                                 />
                             </div>
@@ -125,7 +91,7 @@ export default function LoginPage() {
                                     aria-invalid={!!errors.password}
                                     placeholder="Tu contraseña"
                                     value={form.password}
-                                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                                    onChange={(e) => updateField('password', e.target.value)}
                                     className={`pl-9 pr-10 bg-slate-900/60 border-slate-700 text-white placeholder:text-slate-600 focus:border-emerald-500 ${errors.password ? 'border-red-500' : ''}`}
                                 />
                                 <button
