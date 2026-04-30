@@ -28,9 +28,21 @@ const AuditLogsPage          = lazy(() => import('../features/audit/pages/AuditL
 const SettingsPage           = lazy(() => import('../features/settings/pages/SettingsPage'));
 
 const wrap = (Component: React.ComponentType) => (
-    <Suspense fallback={<div>Cargando...</div>}>
+    <Suspense fallback={<PageSkeleton />}>
         <Component />
     </Suspense>
+);
+
+const PageSkeleton = () => (
+    <div className="animate-pulse space-y-4 p-4">
+        <div className="h-8 w-48 bg-slate-200 rounded-lg" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+                <div key={i} className="h-32 bg-slate-200 rounded-xl" />
+            ))}
+        </div>
+        <div className="h-64 bg-slate-200 rounded-xl" />
+    </div>
 );
 
 const createRouter = window.location.protocol === 'file:' ? createHashRouter : createBrowserRouter;

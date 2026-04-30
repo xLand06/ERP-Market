@@ -1,6 +1,7 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import crypto from 'crypto';
 import { errorHandler, notFoundHandler } from './core/middlewares/errorHandler';
 import logger from './core/utils/logger';
 
@@ -26,6 +27,16 @@ import { startSyncWorker } from './modules/sync/sync-worker';
 import backupRouter from './modules/backup/backup.routes';
 
 const app = express();
+
+/**
+ * Request ID middleware - genera UUID único para cada petición
+ */
+app.use((req: Request, res: Response, next: NextFunction) => {
+    const requestId = (req.headers['x-request-id'] as string) || crypto.randomUUID();
+    res.setHeader('X-Request-ID', requestId);
+    (req as any).requestId = requestId;
+    next();
+});
 
 // ─── BACKGROUND SYNC (Sistema Híbrido) ─────────────────────────────────────────
 // Sync worker para sistema híbrido SQLite + Supabase
@@ -88,8 +99,29 @@ app.use((req, res, next) => {
 });
 
 // ─── HEALTH CHECK ──────────────────────────────────────────────────────────
-app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'ERP-MARKET API' });
+app.get('/api/health', async (_req, res) => {
+    let dbStatus = 'connected';
+    let dbResponseTime = 0;
+    
+    try {
+        const start = Date.now();
+        const { getLocalPrisma } = await import('./config/prisma');
+        await getLocalPrisma().$queryRaw`SELECT 1`;
+        dbResponseTime = Date.now() - start;
+    } catch (err: any) {
+        dbStatus = 'error';
+        dbResponseTime = -1;
+    }
+    
+    res.json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(), 
+        service: 'ERP-MARKET API',
+        database: {
+            status: dbStatus,
+            responseTime: dbResponseTime > 0 ? `${dbResponseTime}ms` : 'N/A'
+        }
+    });
 });
 
 // ─── LOCAL DB STATS (Electron only) ─────────────────────────────────────────

@@ -57,6 +57,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                     <button
                         onClick={onToggleDesktop || onCloseMobile}
                         className="p-1.5 lg:p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors hidden lg:block min-w-10 min-h-10"
+                        aria-label="Colapsar sidebar"
                     >
                         <PanelLeftClose className="w-5 h-5" />
                     </button>
@@ -65,6 +66,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                     <button
                         onClick={onCloseMobile}
                         className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors lg:hidden min-w-11 min-h-11"
+                        aria-label="Cerrar menú"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -82,6 +84,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                         <button
                             onClick={onToggleDesktop}
                             className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0 hidden lg:flex min-w-11 min-h-11"
+                            aria-label="Expandir sidebar"
                             title="Expandir"
                         >
                             <PanelLeftOpen className="w-5 h-5" />
