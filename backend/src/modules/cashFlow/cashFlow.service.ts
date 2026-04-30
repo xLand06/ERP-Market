@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma';
+import { parseDateRange } from '../../core/utils/helpers';
 
 export const openCashRegister = async (data: {
     branchId: string;
@@ -88,12 +89,15 @@ export const getCashRegisterHistory = async (filters: {
     const whereClause = {
         ...(branchId && { branchId }),
         ...(from || to
-            ? {
-                  openedAt: {
-                      ...(from && { gte: new Date(from) }),
-                      ...(to && { lte: new Date(to) }),
-                  },
-              }
+            ? (() => {
+                  const { fromDate, toDate } = parseDateRange(from, to);
+                  return {
+                      openedAt: {
+                          ...(fromDate && { gte: fromDate }),
+                          ...(toDate && { lte: toDate }),
+                      },
+                  };
+              })()
             : {}),
     };
 

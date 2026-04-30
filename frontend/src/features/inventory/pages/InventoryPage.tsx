@@ -9,7 +9,7 @@ import { ProductFormModal } from '../components/ProductFormModal';
 import { StockAdjustmentModal } from '../components/StockAdjustmentModal';
 import { StockEntryModal } from '../components/StockEntryModal';
 import { useAuthStore } from '@/features/auth/store/authStore';
-import { useInventory, useUpdatePrice } from '../hooks';
+import { useInventory, useUpdatePrice, useUpdateStock } from '../hooks';
 import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
 import type { InventoryProduct } from '../types';
 
@@ -45,6 +45,7 @@ export default function InventoryPage() {
 
     const { inventory, isLoading, refetch } = useInventory(effectiveBranch || '');
     const updatePriceMutation = useUpdatePrice();
+    const updateStockMutation = useUpdateStock();
 
     useBarcodeScanner((barcode) => {
         setSearch(barcode);
@@ -137,10 +138,26 @@ export default function InventoryPage() {
         <StockAdjustmentModal 
             open={adjustmentOpen}
             onClose={() => setAdjustmentOpen(false)}
-            onSave={({ minStock: _minStock }) => {
-                toast.success('Entrada de inventario registrada con éxito');
-                setAdjustmentOpen(false);
-                setTimeout(refetch, 500);
+            onSave={({ product, quantity, minStock }) => {
+                if (!effectiveBranch) {
+                    toast.error('Seleccione una sede específica');
+                    return;
+                }
+                updateStockMutation.mutate({ 
+                    product: { id: product.id }, 
+                    quantity, 
+                    minStock,
+                    branchId: effectiveBranch
+                }, {
+                    onSuccess: () => {
+                        toast.success('Inventario actualizado con éxito');
+                        setAdjustmentOpen(false);
+                        refetch();
+                    },
+                    onError: (err: any) => {
+                        toast.error(err?.response?.data?.error || 'Error al actualizar stock');
+                    }
+                });
             }}
         />
         <StockEntryModal
@@ -169,7 +186,13 @@ export default function InventoryPage() {
                     <Button
                         size="lg"
                         className="h-11 sm:h-10 font-bold shadow-lg shadow-indigo-500/20 sm:px-4 bg-indigo-600 hover:bg-indigo-700 text-white"
-                        onClick={() => setStockEntryOpen(true)}
+                        onClick={() => {
+                            if (!effectiveBranch) {
+                                toast.error('Seleccione una sede específica para registrar la entrada');
+                                return;
+                            }
+                            setStockEntryOpen(true);
+                        }}
                     >
                         <Plus className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Entrada de Mercancía
                     </Button>

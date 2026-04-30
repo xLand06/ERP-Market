@@ -5,6 +5,7 @@
 
 import { prisma } from '../../config/prisma';
 import { CreatePurchaseOrderInput, UpdatePurchaseOrderStatusInput, PurchaseOrderFiltersInput } from '../../core/validations/purchases.zod';
+import { parseDateRange } from '../../core/utils/helpers';
 
 /**
  * Listar órdenes de compra con filtros
@@ -17,12 +18,15 @@ export const getAllOrders = async (filters: PurchaseOrderFiltersInput) => {
             ...(supplierId && { supplierId }),
             ...(branchId && { branchId }),
             ...(status && { status }),
-            ...(from || to ? {
-                createdAt: {
-                    ...(from && { gte: new Date(from) }),
-                    ...(to && { lte: new Date(to) }),
-                }
-            } : {}),
+            ...(from || to ? (() => {
+                const { fromDate, toDate } = parseDateRange(from, to);
+                return {
+                    createdAt: {
+                        ...(fromDate && { gte: fromDate }),
+                        ...(toDate && { lte: toDate }),
+                    }
+                };
+            })() : {}),
         },
         orderBy: { createdAt: 'desc' },
         include: {

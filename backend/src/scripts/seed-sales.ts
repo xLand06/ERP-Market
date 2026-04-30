@@ -1,19 +1,84 @@
 import { getLocalPrisma } from '../config/prisma';
+import bcrypt from 'bcryptjs';
 
 async function seedSales() {
     const local = getLocalPrisma();
     
-    // 1. Obtener datos necesarios
-    const user = await local.user.findFirst({ where: { isActive: true } });
-    const branch = await local.branch.findFirst({ where: { isActive: true } });
-    const products = await local.product.findMany({ where: { isActive: true }, take: 10 });
+    console.log('🔍 Verificando datos base en SQLite...');
 
-    if (!user || !branch || products.length === 0) {
-        console.error('⚠️ Error: Debes tener al menos un usuario activo, una sucursal activa y productos en el sistema para generar ventas.');
-        process.exit(1);
+    // 1. Asegurar Sucursal
+    let branch = await local.branch.findFirst({ where: { isActive: true } });
+    if (!branch) {
+        console.log('🏪 Creando sucursal por defecto...');
+        branch = await local.branch.create({
+            data: {
+                id: 'branch-default',
+                name: 'Sede Central Test',
+                code: 'SEDE-TEST',
+                address: 'Calle Ficticia 123',
+                phone: '555-TEST'
+            }
+        });
     }
 
-    console.log(`🚀 [Seed] Iniciando generación de 1000 ventas de prueba...`);
+    // 2. Asegurar Usuario
+    let user = await local.user.findFirst({ where: { isActive: true } });
+    if (!user) {
+        console.log('👤 Creando usuario por defecto...');
+        const hashedPassword = await bcrypt.hash('admin123', 10);
+        user = await local.user.create({
+            data: {
+                id: 'user-default',
+                username: 'admin_test',
+                cedula: '12345678',
+                cedulaType: 'V',
+                nombre: 'Admin Test',
+                password: hashedPassword,
+                role: 'OWNER',
+                branchId: branch.id
+            }
+        });
+    }
+
+    // 3. Asegurar Productos
+    let products = await local.product.findMany({ where: { isActive: true }, take: 10 });
+    if (products.length === 0) {
+        console.log('📦 Creando productos de prueba...');
+        let group = await local.group.findFirst();
+        if (!group) {
+            group = await local.group.create({
+                data: {
+                    id: 'group-default',
+                    name: 'General',
+                    description: 'Categoría general'
+                }
+            });
+        }
+
+        let subGroup = await local.subGroup.findFirst();
+        if (!subGroup) {
+            subGroup = await local.subGroup.create({
+                data: {
+                    id: 'subgroup-default',
+                    name: 'Varios',
+                    groupId: group.id
+                }
+            });
+        }
+
+        const dummyProducts = [
+            { id: 'prod-test-1', name: 'Coca Cola 600ml', price: 3500, cost: 2000, barcode: '7501055360372', subGroupId: subGroup.id },
+            { id: 'prod-test-2', name: 'Arroz 1kg', price: 4000, cost: 2500, barcode: '7702213001082', subGroupId: subGroup.id },
+            { id: 'prod-test-3', name: 'Pan Tajado', price: 5000, cost: 3000, barcode: '7702213001083', subGroupId: subGroup.id },
+        ];
+
+        for (const p of dummyProducts) {
+            const prod = await local.product.create({ data: p });
+            products.push(prod);
+        }
+    }
+
+    console.log(`\n🚀 [Seed] Iniciando generación de 1000 ventas de prueba...`);
     console.log(`👤 Usuario: ${user.username}`);
     console.log(`🏪 Sucursal: ${branch.name}`);
     console.log(`📦 Productos disponibles para testear: ${products.length}`);

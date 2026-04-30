@@ -11,12 +11,23 @@ router.get('/', async (req: Request, res: Response) => {
 
     const [products, groups] = await Promise.all([
         prisma.product.findMany({
-            where: { OR: [{ name: { contains: q, mode: 'insensitive' } }, { barcode: { contains: q } }] },
-            take: 10,
-            include: { subGroup: { include: { group: true } } },
+            where: {
+                OR: [
+                    { name: { contains: q } },
+                    { barcode: { contains: q } },
+                    { barcodes: { some: { code: { contains: q } } } },
+                    { presentations: { some: { barcode: { contains: q } } } }
+                ]
+            },
+            take: 15,
+            include: { 
+                subGroup: { include: { group: true } },
+                barcodes: true,
+                presentations: true
+            },
         }),
         prisma.group.findMany({
-            where: { name: { contains: q, mode: 'insensitive' } },
+            where: { name: { contains: q } },
             take: 5,
             include: { subGroups: true },
         }),

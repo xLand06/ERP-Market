@@ -1,5 +1,6 @@
 import { prisma } from '../../config/prisma';
 import { TransactionType, TransactionStatus } from '@prisma/client';
+import { parseDateRange } from '../../core/utils/helpers';
 
 export interface TransactionItemInput {
     productId: string;
@@ -153,12 +154,15 @@ export const getTransactions = (filters: {
             ...(branchId && { branchId }),
             ...(userId && { userId }),
             ...(from || to
-                ? {
-                      createdAt: {
-                          ...(from && { gte: new Date(from) }),
-                          ...(to && { lte: new Date(to) }),
-                      },
-                  }
+                ? (() => {
+                      const { fromDate, toDate } = parseDateRange(from, to);
+                      return {
+                          createdAt: {
+                              ...(fromDate && { gte: fromDate }),
+                              ...(toDate && { lte: toDate }),
+                          },
+                      };
+                  })()
                 : {}),
         },
         include: {

@@ -5,6 +5,7 @@
 
 import { prisma } from '../../config/prisma';
 import { Prisma } from '@prisma/client';
+import { parseDateRange } from '../../core/utils/helpers';
 
 export const getAuditLogs = (filters: {
     userId?: string;
@@ -23,12 +24,15 @@ export const getAuditLogs = (filters: {
             ...(action && { action: { contains: action, mode: 'insensitive' } }),
             ...(module && { module }),
             ...(from || to
-                ? {
-                      createdAt: {
-                          ...(from && { gte: new Date(from) }),
-                          ...(to && { lte: new Date(to) }),
-                      },
-                  }
+                ? (() => {
+                      const { fromDate, toDate } = parseDateRange(from, to);
+                      return {
+                          createdAt: {
+                              ...(fromDate && { gte: fromDate }),
+                              ...(toDate && { lte: toDate }),
+                          },
+                      };
+                  })()
                 : {}),
         },
         include: {

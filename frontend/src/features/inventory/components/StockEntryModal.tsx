@@ -20,6 +20,7 @@ export interface StockEntryItem {
     quantity: number;
     unitCost: number;      // En la moneda seleccionada
     unitCostCOP: number;   // Equivalente en COP (calculado)
+    baseUnit?: string;
 }
 
 export interface StockEntryPreloadItem {
@@ -27,6 +28,7 @@ export interface StockEntryPreloadItem {
     productName: string;
     quantity: number;
     suggestedCost?: number; // Costo en COP del catálogo
+    baseUnit?: string;
 }
 
 interface StockEntryModalProps {
@@ -63,6 +65,8 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
     // Product search
     const [productSearch, setProductSearch] = useState('');
     const [searchFocused, setSearchFocused] = useState(false);
+    const [catalogResults, setCatalogResults] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
 
     // When currency changes, update default rate
     useEffect(() => {
@@ -90,6 +94,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                 quantity: pi.quantity,
                 unitCost: pi.suggestedCost ?? 0,
                 unitCostCOP: pi.suggestedCost ?? 0,
+                baseUnit: pi.baseUnit || 'UNIDAD',
             })));
         }
     }, [open, preloadedItems]);
@@ -114,19 +119,40 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
         [items, currency, rate, toCOP]
     );
 
-    // Search results
+    // Dynamic search effect
+    useEffect(() => {
+        const q = productSearch.trim();
+        if (q.length < 2) {
+            setCatalogResults([]);
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            setIsSearching(true);
+            try {
+                const res = await api.get('/search', { params: { q } });
+                setCatalogResults(res.data.products || []);
+            } catch (err) {
+                console.error('[StockEntryModal] Search error:', err);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [productSearch]);
+
+    // Combined search results (Catalog + local inventory data for stock info)
     const searchResults = useMemo(() => {
-        if (!productSearch.trim() || productSearch.length < 2) return [];
-        const q = productSearch.toLowerCase();
-        return allProducts
-            .filter((inv: any) => {
-                const p = inv.product || inv;
-                const name = (p.name || '').toLowerCase();
-                const code = (p.barcode || p.code || '').toLowerCase();
-                return name.includes(q) || code.includes(q);
-            })
-            .slice(0, 8);
-    }, [productSearch, allProducts]);
+        return catalogResults.map(p => {
+            // Find if product exists in current branch inventory to show stock
+            const invItem = allProducts.find((inv: any) => (inv.product?.id || inv.id) === p.id);
+            return {
+                ...p,
+                stock: invItem ? Number(invItem.stock) : 0
+            };
+        });
+    }, [catalogResults, allProducts]);
 
     const addProduct = (inv: any) => {
         const p = inv.product || inv;
@@ -140,6 +166,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                 quantity: 1,
                 unitCost: Number(p.cost || p.price || 0),
                 unitCostCOP: Number(p.cost || p.price || 0),
+                baseUnit: p.baseUnit || 'UNIDAD',
             }]);
         }
         setProductSearch('');
@@ -257,25 +284,25 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                         <div className="relative">
                             <div className="flex gap-2 items-center border border-slate-200 rounded-xl bg-white px-3 py-2 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/10">
                                 <Plus className="w-4 h-4 text-slate-400 shrink-0" />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar por nombre o código..."
-                                    value={productSearch}
-                                    onChange={e => setProductSearch(e.target.value)}
-                                    onFocus={() => setSearchFocused(true)}
-                                    onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
-                                    className="flex-1 text-sm outline-none bg-transparent"
-                                />
-                            </div>
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar por nombre o código..."
+                                        value={productSearch}
+                                        onChange={e => setProductSearch(e.target.value)}
+                                        onFocus={() => setSearchFocused(true)}
+                                        onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
+                                        className="flex-1 text-sm outline-none bg-transparent"
+                                    />
+                                    {isSearching && <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />}
+                                </div>
                             {searchFocused && searchResults.length > 0 && (
                                 <div className="absolute top-full mt-1.5 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden max-h-56 overflow-y-auto">
-                                    {searchResults.map((inv: any) => {
-                                        const p = inv.product || inv;
-                                        const stock = Number(inv.stock ?? 0);
+                                    {searchResults.map((p: any) => {
+                                        const stock = Number(p.stock ?? 0);
                                         return (
                                             <button
                                                 key={p.id}
-                                                onMouseDown={() => addProduct(inv)}
+                                                onMouseDown={() => addProduct(p)}
                                                 className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-indigo-50 transition-colors"
                                             >
                                                 <div className="flex-1 min-w-0">
@@ -288,7 +315,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                                     })}
                                 </div>
                             )}
-                            {searchFocused && productSearch.length >= 2 && searchResults.length === 0 && (
+                            {searchFocused && productSearch.length >= 2 && !isSearching && searchResults.length === 0 && (
                                 <div className="absolute top-full mt-1.5 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl z-50 px-4 py-3 text-sm text-slate-400 flex items-center gap-2">
                                     <AlertCircle className="w-4 h-4" /> No se encontraron productos
                                 </div>
@@ -320,10 +347,14 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                                     </div>
                                     <input
                                         type="number"
-                                        min="0.01"
-                                        step="0.01"
+                                        min={item.baseUnit?.toUpperCase() === 'UNIDAD' ? "1" : "0.01"}
+                                        step={item.baseUnit?.toUpperCase() === 'UNIDAD' ? "1" : "0.01"}
                                         value={item.quantity}
-                                        onChange={e => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                                        onChange={e => {
+                                            let val = parseFloat(e.target.value) || 0;
+                                            if (item.baseUnit?.toUpperCase() === 'UNIDAD') val = Math.floor(val);
+                                            updateItem(idx, 'quantity', val);
+                                        }}
                                         className="w-full h-9 text-center text-sm font-bold border border-slate-200 rounded-lg bg-white outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
                                     />
                                     <div className="flex items-center gap-1">

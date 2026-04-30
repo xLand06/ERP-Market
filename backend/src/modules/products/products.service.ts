@@ -78,9 +78,13 @@ export const getProductById = async (id: string): Promise<ProductDTO | null> => 
 export const createProduct = async (data: CreateProductInput): Promise<ProductDTO> => {
     const { presentations, barcodes, ...productData } = data;
 
+    // Normalizar subGroupId: si es string vacío, convertir a null
+    const subGroupId = productData.subGroupId === '' ? null : productData.subGroupId;
+
     const product = await prisma.product.create({
         data: {
             ...productData,
+            subGroupId,
             presentations: {
                 create: presentations ?? [],
             },
@@ -129,10 +133,14 @@ export const updateProduct = async (id: string, data: UpdateProductInput): Promi
         await prisma.productBarcode.deleteMany({ where: { productId: id } });
     }
 
+    // Normalizar subGroupId: si es string vacío, convertir a null
+    const subGroupId = productData.subGroupId === '' ? null : productData.subGroupId;
+
     const product = await prisma.product.update({
         where: { id },
         data: {
             ...productData,
+            subGroupId,
             ...(presentations !== undefined && {
                 presentations: {
                     create: presentations,

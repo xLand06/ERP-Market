@@ -11,7 +11,7 @@ interface InventoryItem {
         cost?: number;
         price?: number;
         baseUnit?: string;
-        subGroup?: string;
+        subGroup?: { id: string; name: string };
         presentations?: Array<{
             id?: string;
             name: string;
@@ -27,9 +27,10 @@ export function useInventory(branchId: string) {
     const queryKey = ['inventory', branchId];
 
     const queryFn = async () => {
-        const res = await api.get('/inventory', { 
-            params: { branchId: branchId || undefined } 
-        });
+        const url = branchId && branchId !== 'all' 
+            ? `/inventory/stock/branch/${branchId}`
+            : '/inventory/stock';
+        const res = await api.get(url);
         return res.data.data as InventoryItem[];
     };
 
@@ -49,7 +50,9 @@ export function useInventory(branchId: string) {
             stock: Number(item.stock || 0),
             minStock: Number(item.minStock || 0),
             baseUnit: item.product.baseUnit || 'UNIDAD',
-            category: item.product.subGroup || 'Varios',
+            category: typeof item.product.subGroup === 'object' 
+                ? (item.product.subGroup as any)?.name || 'Varios' 
+                : (item.product.subGroup || 'Varios'),
             presentations: item.product.presentations || [],
         }));
     }, [query.data]);
@@ -71,8 +74,10 @@ export function useUpdateStock() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ product, quantity, minStock }: { product: { id: string }; quantity: number; minStock: number }) => {
-            const res = await api.put(`/inventory/${product.id}`, {
+        mutationFn: async ({ product, quantity, minStock, branchId }: { product: { id: string }; quantity: number; minStock?: number; branchId: string }) => {
+            const res = await api.put('/inventory/stock', {
+                productId: product.id,
+                branchId,
                 stock: quantity,
                 minStock,
             });

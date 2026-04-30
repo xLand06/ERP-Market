@@ -130,7 +130,7 @@ export default function CashRegisterPage() {
             }
         },
         enabled: !!effectiveBranch && branches.length > 0,
-        staleTime: 0,
+        staleTime: 10_000,
     });
 
     const openMutation = useMutation({

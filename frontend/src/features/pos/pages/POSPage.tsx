@@ -107,7 +107,6 @@ function ProductCard({ product, onAdd, onShowPresentations }: {
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between mt-auto gap-2">
                     <div>
                         <p className="text-sm font-black text-slate-900 tabular-nums leading-none">{fmtCOP(product.price)}</p>
-                        <p className="text-[11px] font-medium text-slate-400 tabular-nums mt-0.5 sm:hidden lg:block">${usd.toFixed(2)} USD</p>
                     </div>
                     <div className="sm:opacity-80 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
                         {product.presentations.length > 0 && (
@@ -331,7 +330,7 @@ export default function POSPage() {
             }
         },
         enabled: !!effectiveBranch,
-        staleTime: 0,
+        staleTime: 10_000,
     });
 
     const usdRate = rates['USD'] || rates['COP'] || 3600;
@@ -376,7 +375,7 @@ export default function POSPage() {
                 name: item.product.name,
                 price: Number(item.product.price), // en COP
                 stock: Number(item.stock),
-                category: item.product.subGroup || 'Varios',
+                category: typeof item.product.subGroup === 'object' ? (item.product.subGroup?.name || 'Varios') : (item.product.subGroup || 'Varios'),
                 baseUnit: item.product.baseUnit || 'UNIDAD',
                 presentations: (item.product.presentations || []).map((p: any) => ({
                     id: p.id,

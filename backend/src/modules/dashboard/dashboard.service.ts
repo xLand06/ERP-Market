@@ -5,6 +5,7 @@
 
 import { prisma, getCloudPrisma } from '../../config/prisma';
 import type { KPIsDTO, SalesTrendDTO, TopProductDTO, SalesByBranchDTO } from '../../core/types/dto';
+import { parseDateRange } from '../../core/utils/helpers';
 
 /**
  * Selecciona el cliente Prisma adecuado:
@@ -330,12 +331,15 @@ export const getSalesByBranch = async (client: any, from?: string, to?: string):
             type: 'SALE',
             status: 'COMPLETED',
             ...(from || to
-                ? {
-                      createdAt: {
-                          ...(from && { gte: new Date(from) }),
-                          ...(to && { lte: new Date(to) }),
-                      },
-                  }
+                ? (() => {
+                      const { fromDate, toDate } = parseDateRange(from, to);
+                      return {
+                          createdAt: {
+                              ...(fromDate && { gte: fromDate }),
+                              ...(toDate && { lte: toDate }),
+                          },
+                      };
+                  })()
                 : {}),
         },
         _sum: { total: true },

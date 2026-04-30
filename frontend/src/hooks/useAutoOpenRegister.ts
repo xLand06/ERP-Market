@@ -1,61 +1,67 @@
-// =============================================================================
-// useAutoOpenRegister — Hook de apertura automática de caja por horario
-// Se ejecuta cada 60 segundos y abre la caja si la hora configurada coincide
-// =============================================================================
-
 import { useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import toast from 'react-hot-toast';
 
 interface UseAutoOpenRegisterOptions {
-    /** ID de la sede activa */
     branchId: string | null;
-    /** ¿Hay una caja ya abierta? Si es true, no hace nada */
     hasOpenRegister: boolean;
-    /** Callback para refrescar el query de caja abierta después de abrir */
     onOpened?: () => void;
 }
 
 export function useAutoOpenRegister({ branchId, hasOpenRegister, onOpened }: UseAutoOpenRegisterOptions) {
     const { autoOpenTime } = useConfigStore();
-
-    // Track whether we already opened today to avoid opening multiple times
     const openedTodayRef = useRef<string | null>(null);
+    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         if (!autoOpenTime || !branchId) return;
 
-        const check = async () => {
-            if (hasOpenRegister) return; // Ya hay caja abierta
+        const [targetH, targetM] = autoOpenTime.split(':').map(Number);
+
+        const scheduleNext = () => {
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
             const now = new Date();
-            const [hh, mm] = autoOpenTime.split(':').map(Number);
-            const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${hh}:${mm}`;
+            const next = new Date(now);
+            next.setHours(targetH, targetM, 0, 0);
 
-            // Ya la abrimos hoy a esta hora
-            if (openedTodayRef.current === todayKey) return;
+            if (next <= now) {
+                next.setDate(next.getDate() + 1);
+            }
 
-            const currentH = now.getHours();
-            const currentM = now.getMinutes();
+            const delay = next.getTime() - now.getTime();
+            timeoutRef.current = setTimeout(async () => {
+                if (hasOpenRegister) {
+                    scheduleNext();
+                    return;
+                }
 
-            // Coincide en la hora y dentro del minuto configurado
-            if (currentH === hh && currentM === mm) {
+                const now2 = new Date();
+                const todayKey = `${now2.getFullYear()}-${now2.getMonth()}-${now2.getDate()}-${targetH}:${targetM}`;
+
+                if (openedTodayRef.current === todayKey) {
+                    scheduleNext();
+                    return;
+                }
+
                 openedTodayRef.current = todayKey;
                 try {
                     await api.post('/cash-flow/open', { branchId, openingAmount: 0 });
-                    toast.success(`🕐 Caja abierta automáticamente a las ${autoOpenTime} hrs`);
+                    toast.success(`Caja abierta automáticamente a las ${autoOpenTime} hrs`);
                     onOpened?.();
                 } catch (err: any) {
-                    // Si ya hay una caja abierta (carrera), ignorar el error P2002/duplicate
                     console.warn('[AutoOpenRegister]', err?.response?.data?.error || err.message);
                 }
-            }
+
+                scheduleNext();
+            }, delay);
         };
 
-        // Ejecutar inmediatamente y luego cada 30 segundos
-        check();
-        const interval = setInterval(check, 30_000);
-        return () => clearInterval(interval);
+        scheduleNext();
+
+        return () => {
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        };
     }, [autoOpenTime, branchId, hasOpenRegister, onOpened]);
 }

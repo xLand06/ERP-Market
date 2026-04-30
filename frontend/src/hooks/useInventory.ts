@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
 
 interface Product {
@@ -77,7 +77,9 @@ export function useInventory(branchId: string) {
                         cost: Number(item.product.cost || 0),
                         baseUnit: item.product.baseUnit || 'UNIDAD',
                         presentations: item.product.presentations || [],
-                        subGroup: item.product.subGroup?.group?.name || 'Varios',
+                        subGroup: typeof item.product.subGroup === 'object' 
+                            ? (item.product.subGroup?.group?.name || item.product.subGroup?.name || 'Varios') 
+                            : (item.product.subGroup || 'Varios'),
                         subGroupId: item.product.subGroupId,
                         isActive: true,
                     },
@@ -243,13 +245,20 @@ export function useSyncService(branchId: string) {
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const queryClient = useQueryClient();
     const [lastSync, setLastSync] = useState<string | null>(null);
+    const syncPendingRef = useRef(false);
 
     useEffect(() => {
         if (!isElectron || !db) return;
 
         db.getLastSync().then(setLastSync);
 
-        const handleOnline = () => setIsOnline(true);
+        const handleOnline = () => {
+            setIsOnline(true);
+            if (!syncPendingRef.current) {
+                syncPendingRef.current = true;
+                triggerSync();
+            }
+        };
         const handleOffline = () => setIsOnline(false);
 
         window.addEventListener('online', handleOnline);
@@ -261,46 +270,42 @@ export function useSyncService(branchId: string) {
         };
     }, []);
 
-    useEffect(() => {
+    const triggerSync = async () => {
         if (!isElectron || !db || !isOnline) return;
+        syncPendingRef.current = false;
 
-        const SYNC_INTERVAL = 30 * 60 * 1000;
-        const interval = setInterval(async () => {
-            try {
-                const pending = await db.getPendingChanges();
-                
-                if (pending.length > 0) {
-                    for (const change of pending) {
-                        try {
-                            if (change.type === 'STOCK_UPDATE') {
-                                await api.put('/inventory/stock', change.data);
-                            }
-                        } catch (e) {
-                            console.error('Sync error:', e);
+        try {
+            const pending = await db.getPendingChanges();
+
+            if (pending.length > 0) {
+                for (const change of pending) {
+                    try {
+                        if (change.type === 'STOCK_UPDATE') {
+                            await api.put('/inventory/stock', change.data);
                         }
+                    } catch (e) {
+                        console.error('Sync error:', e);
                     }
-                    
-                    await db.markSynced(pending.map((p: any) => p.id));
                 }
 
-                const res = await api.get(`/inventory/stock/branch/${branchId}`);
-                const data = res.data.data;
-                
-                if (data.length > 0) {
-                    await db.saveStock(branchId, data);
-                }
-                
-                await db.setLastSync(new Date().toISOString());
-                await db.getLastSync().then(setLastSync);
-                
-                queryClient.invalidateQueries({ queryKey: ['inventory', branchId] });
-            } catch (error) {
-                console.error('Auto-sync error:', error);
+                await db.markSynced(pending.map((p: any) => p.id));
             }
-        }, SYNC_INTERVAL);
 
-        return () => clearInterval(interval);
-    }, [isOnline, branchId]);
+            const res = await api.get(`/inventory/stock/branch/${branchId}`);
+            const data = res.data.data;
 
-    return { isOnline, lastSync };
+            if (data.length > 0) {
+                await db.saveStock(branchId, data);
+            }
+
+            await db.setLastSync(new Date().toISOString());
+            await db.getLastSync().then(setLastSync);
+
+            queryClient.invalidateQueries({ queryKey: ['inventory', branchId] });
+        } catch (error) {
+            console.error('Sync error:', error);
+        }
+    };
+
+    return { isOnline, lastSync, triggerSync };
 }
