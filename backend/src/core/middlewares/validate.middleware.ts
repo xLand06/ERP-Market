@@ -80,6 +80,8 @@ export const validate = (schema: any, options: ValidateOptions = {}) => {
             (req as any).validatedParams = result.data;
         }
 
+        console.log(`[Validation Debug] Source: ${source}, Data:`, JSON.stringify(result.data));
+
         next();
     };
 };
@@ -94,5 +96,9 @@ export const validate = (schema: any, options: ValidateOptions = {}) => {
 export const validatedData = (req: AuthRequest, source: 'body' | 'query' | 'params' = 'body') => {
     const key = source === 'body' ? 'validatedBody' : 
                 source === 'query' ? 'validatedQuery' : 'validatedParams';
-    return (req as any)[key];
+    const data = (req as any)[key];
+    if (!data) {
+        console.error(`[ValidatedData Error] Key ${key} not found in request for route ${req.originalUrl || req.url}`);
+    }
+    return data;
 };

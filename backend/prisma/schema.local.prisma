@@ -89,11 +89,11 @@ model User {
   transactions  Transaction[]
   cashRegisters CashRegister[]
   auditLogs     AuditLog[]
-  mermas        Merma[]
+  mermas        Merma[] @relation("MermaCreatedBy")
 
   @@index([username])
-  @@index([cedula])
-  @@index([role])
+    @@index([cedula])
+    @@index([role])
   @@index([isActive])
   @@index([branchId])
   @@map("users")

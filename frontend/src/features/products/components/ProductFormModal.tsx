@@ -182,11 +182,12 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
 
         setSaving(true);
         try {
+            const isWeighable = baseUnit === 'KG' || baseUnit === 'GR';
             const data: any = {
                 name,
                 description: description || null,
                 baseUnit,
-                expectedSpoilagePercent: expectedSpoilagePercent ? Number(expectedSpoilagePercent) : null,
+                expectedSpoilagePercent: (isWeighable && expectedSpoilagePercent !== '') ? Number(expectedSpoilagePercent) : null,
                 cost: cost ? Number(cost) : null,
                 price: Number(price) || 0,
                 subGroupId: subGroupId || null,
@@ -268,25 +269,27 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                     <option value="M">METRO (M)</option>
                                 </select>
                             </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                                    % Merma Esperada
-                                </label>
-                                <div className="relative">
-                                    <input
-                                        type="number"
-                                        step="0.1"
-                                        min="0"
-                                        max="100"
-                                        value={expectedSpoilagePercent}
-                                        onChange={(e) => setExpectedSpoilagePercent(e.target.value === '' ? '' : Number(e.target.value))}
-                                        className="w-full px-4 py-2.5 pr-8 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm"
-                                        placeholder="0"
-                                    />
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
+                            {(baseUnit === 'KG' || baseUnit === 'GR') && (
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                                        % Merma Esperada
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            max="100"
+                                            value={expectedSpoilagePercent}
+                                            onChange={(e) => setExpectedSpoilagePercent(e.target.value === '' ? '' : Number(e.target.value))}
+                                            className="w-full px-4 py-2.5 pr-8 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm"
+                                            placeholder="0"
+                                        />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-1">Porcentaje esperado de merma/spoilage</p>
                                 </div>
-                                <p className="text-xs text-slate-400 mt-1">Porcentaje esperado de merma/spoilage</p>
-                            </div>
+                            )}
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Grupo</label>
                                 <select

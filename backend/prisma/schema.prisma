@@ -85,11 +85,11 @@ model User {
   branch   Branch? @relation(fields: [branchId], references: [id])
 
 transactions  Transaction[]
-  cashRegisters CashRegister[]
-  auditLogs     AuditLog[]
-  mermas        Merma[]
+cashRegisters CashRegister[]
+auditLogs     AuditLog[]
+mermas        Merma[] @relation("MermaCreatedBy")
 
-  @@index([username])
+@@index([username])
   @@index([cedula])
   @@index([role])
   @@index([isActive])

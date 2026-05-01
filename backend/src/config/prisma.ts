@@ -1,4 +1,5 @@
 import '../config/env';
+import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { PrismaClient as PrismaClientLocal } from '.prisma/client-local';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -87,7 +88,10 @@ let _prismaLocal: PrismaClient | null = null;
 
 export const getLocalPrisma = (): PrismaClient => {
     if (!_prismaLocal) {
-        const localUrl = process.env.LOCAL_DATABASE_URL || 'file:./erp-market.db';
+        // Usar la raíz del backend (donde suele estar el .db)
+        // __dirname es backend/src/config
+        const dbPath = path.resolve(__dirname, '../../erp-market.db');
+        const localUrl = process.env.LOCAL_DATABASE_URL || `file:${dbPath}`;
         _prismaLocal = new PrismaClientLocal({
             adapter: new PrismaLibSql({ url: localUrl }),
             log: ['error'],
