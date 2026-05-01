@@ -11,6 +11,8 @@ interface ConfigState {
     rates: Record<string, number>;
     iva: number;
     autoOpenTime: string | null; // 'HH:mm' o null para desactivado
+    purgeRetentionDays: number; // Días de retención para transacciones en purga automática
+    purgeLogRetentionDays: number; // Días de retención para logs en purga automática
     // Convenience getters
     vesRate: number;
     copRate: number;
@@ -20,6 +22,10 @@ interface ConfigState {
     updateRate: (code: string, rate: number) => Promise<void>;
     setIva: (iva: number) => void;
     setAutoOpenTime: (time: string | null) => void;
+    setPurgeRetention: (days: number) => void;
+    setPurgeLogRetention: (days: number) => void;
+    fetchSettings: () => Promise<void>;
+    updateSettings: (settings: Partial<ConfigState>) => Promise<void>;
 
     // Helpers de conversión (COP es la moneda base del sistema)
     /** Convierte desde cualquier moneda a COP */
@@ -46,6 +52,8 @@ export const useConfigStore = create<ConfigState>()(
             },
             iva: 0,
             autoOpenTime: null,
+            purgeRetentionDays: 30,
+            purgeLogRetentionDays: 90,
 
             get vesRate() { return get().rates['VES'] || 5.5; },
             get copRate() { return get().rates['USD'] || get().rates['COP'] || 3600; },
@@ -126,6 +134,36 @@ export const useConfigStore = create<ConfigState>()(
 
             setIva: (iva) => set({ iva }),
             setAutoOpenTime: (time) => set({ autoOpenTime: time }),
+            setPurgeRetention: (days) => set({ purgeRetentionDays: days }),
+            setPurgeLogRetention: (days) => set({ purgeLogRetentionDays: days }),
+
+            fetchSettings: async () => {
+                try {
+                    const res = await api.get('/settings');
+                    if (res.data.success) {
+                        set({
+                            iva: res.data.data.iva,
+                            autoOpenTime: res.data.data.autoOpenTime,
+                            purgeRetentionDays: res.data.data.purgeRetentionDays,
+                            purgeLogRetentionDays: res.data.data.purgeLogRetentionDays
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error fetching settings:', error);
+                }
+            },
+
+            updateSettings: async (settings) => {
+                try {
+                    const res = await api.post('/settings', settings);
+                    if (res.data.success) {
+                        set(settings);
+                    }
+                } catch (error) {
+                    console.error('Error updating settings:', error);
+                    throw error;
+                }
+            }
         }),
         {
             name: 'erp-config-storage',

@@ -20,6 +20,7 @@ const gunzip = promisify(zlib.gunzip);
 
 // Directorio donde se guardan los backups (relativo al proceso del backend)
 const BACKUP_DIR = path.resolve(process.cwd(), 'backups');
+const CONFIG_FILE = path.join(BACKUP_DIR, 'config.json');
 
 // ── Tablas purgables (datos transaccionales diarios) ─────────────────────────
 // Estas son las tablas que crecen diariamente y se pueden purgar de Supabase.
@@ -45,6 +46,7 @@ export interface BackupMeta {
 export interface CloudStats {
     table: string;
     count: number;
+    totalCount: number;
     oldestRecord: string | null;
 }
 
@@ -224,16 +226,23 @@ export async function getCloudStats(olderThanDays: number = 30): Promise<CloudSt
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
-    const [txCount, crCount, auditCount] = await Promise.all([
-        cloud.transaction.count({
-            where: { createdAt: { lt: cutoffDate } }
-        }),
-        cloud.cashRegister.count({
-            where: { openedAt: { lt: cutoffDate } }
-        }),
-        cloud.auditLog.count({
-            where: { createdAt: { lt: cutoffDate } }
-        }),
+    const [
+        txCount, txTotal,
+        itemsCount, itemsTotal,
+        crCount, crTotal,
+        auditCount, auditTotal
+    ] = await Promise.all([
+        cloud.transaction.count({ where: { createdAt: { lt: cutoffDate } } }),
+        cloud.transaction.count(),
+        
+        cloud.transactionItem.count({ where: { transaction: { createdAt: { lt: cutoffDate } } } }),
+        cloud.transactionItem.count(),
+
+        cloud.cashRegister.count({ where: { openedAt: { lt: cutoffDate } } }),
+        cloud.cashRegister.count(),
+
+        cloud.auditLog.count({ where: { createdAt: { lt: cutoffDate } } }),
+        cloud.auditLog.count(),
     ]);
 
     // Obtener el registro más antiguo de cada tabla
@@ -256,16 +265,25 @@ export async function getCloudStats(olderThanDays: number = 30): Promise<CloudSt
         {
             table: 'transactions',
             count: txCount,
+            totalCount: txTotal,
+            oldestRecord: oldestTx?.createdAt?.toISOString() ?? null,
+        },
+        {
+            table: 'transactionItems',
+            count: itemsCount,
+            totalCount: itemsTotal,
             oldestRecord: oldestTx?.createdAt?.toISOString() ?? null,
         },
         {
             table: 'cashRegisters',
             count: crCount,
+            totalCount: crTotal,
             oldestRecord: oldestCr?.openedAt?.toISOString() ?? null,
         },
         {
             table: 'auditLogs',
             count: auditCount,
+            totalCount: auditTotal,
             oldestRecord: oldestAudit?.createdAt?.toISOString() ?? null,
         },
     ];
@@ -298,6 +316,77 @@ export async function getSupabaseStorageSize(): Promise<CloudStorageStats> {
     } catch (error) {
         logger.error('[Backup] Error obteniendo tamaño de Supabase: ' + String(error));
         return { usedBytes: 0, totalBytes: 500 * 1024 * 1024, percentUsed: 0 };
+    }
+}
+
+/**
+ * Guarda la configuración de backup en un archivo local
+ */
+export async function saveBackupConfig(config: { purgeRetentionDays: number; purgeLogRetentionDays: number }) {
+    if (!fs.existsSync(BACKUP_DIR)) {
+        fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    }
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+    logger.info('[Backup] Configuración guardada en disco', config);
+}
+
+/**
+ * Lee la configuración de backup desde el disco
+ */
+export function loadBackupConfig() {
+    if (fs.existsSync(CONFIG_FILE)) {
+        try {
+            return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+        } catch (e) {
+            return { purgeRetentionDays: 30, purgeLogRetentionDays: 90 };
+        }
+    }
+    return { purgeRetentionDays: 30, purgeLogRetentionDays: 90 };
+}
+
+/**
+ * Verifica si el espacio en Supabase supera el 70% y gatilla una purga automática.
+ * Esta función puede ser llamada periódicamente o después de un ciclo de sync.
+ */
+export async function checkAndAutoPurge() {
+    try {
+        const stats = await getSupabaseStorageSize();
+        
+        if (stats.percentUsed >= 70) {
+            logger.warn(`[Backup] Supabase al ${stats.percentUsed}%. Iniciando respaldo preventivo y purga automática...`);
+            
+            // 1. Respaldo preventivo antes de purgar
+            try {
+                await exportLocalBackup();
+                logger.info('[Backup] Respaldo preventivo completado exitosamente.');
+            } catch (backupError) {
+                logger.error('[Backup] Error creando respaldo preventivo, procediendo con purga por espacio crítico: ' + String(backupError));
+            }
+
+            // 2. Cargamos la configuración persistente
+            const config = loadBackupConfig();
+            
+            // 3. Purgamos según la configuración (o defaults)
+            const results = await purgeCloudTransactional(
+                config.purgeRetentionDays || 15, 
+                config.purgeLogRetentionDays || 60
+            );
+            
+            const totalDeleted = results.reduce((sum, r) => sum + r.deletedCount, 0);
+            logger.info(`[Backup] Purga automática completada. ${totalDeleted} registros eliminados.`);
+            
+            return {
+                triggered: true,
+                percentUsed: stats.percentUsed,
+                totalDeleted,
+                results
+            };
+        }
+        
+        return { triggered: false, percentUsed: stats.percentUsed };
+    } catch (error) {
+        logger.error('[Backup] Error en purga automática: ' + String(error));
+        return { triggered: false, error: String(error) };
     }
 }
 

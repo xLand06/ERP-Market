@@ -1,3 +1,4 @@
+import React from 'react';
 import { useLocalStats, useClearPending, useForceSync, useSyncStatus, useClearSyncTokens } from '../hooks/useMaintenance';
 import { 
     Database, Package, Receipt, ShoppingCart, Archive, Wallet, 

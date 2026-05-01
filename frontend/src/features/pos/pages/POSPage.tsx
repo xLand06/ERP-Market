@@ -600,71 +600,90 @@ export default function POSPage() {
     // ── CAJA CERRADA — Pantalla de bloqueo ──────────────────────────────
     if (!registerLoading && !openRegister) {
         return (
-            <div className="flex items-center justify-center h-full pb-20">
-                <div className="flex flex-col items-center gap-5 max-w-sm w-full text-center">
-                    <div className="w-20 h-20 rounded-2xl bg-amber-50 border-2 border-amber-200 flex items-center justify-center">
-                        <Lock className="w-9 h-9 text-amber-500" />
-                    </div>
-                    <div>
-                        <h2 className="text-2xl font-black text-slate-800">Caja Cerrada</h2>
-                        <p className="text-slate-500 text-sm mt-1">No puedes realizar ventas sin un turno de caja activo.</p>
-                    </div>
+            <div className="flex flex-col items-center justify-center h-full max-w-md mx-auto text-center gap-4 pb-20">
+                <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex justify-center items-center">
+                    <Lock className="w-8 h-8" />
+                </div>
+                <h2 className="text-xl font-bold text-slate-800">Caja Cerrada</h2>
+                <p className="text-slate-500 text-sm">No puedes realizar ventas sin un turno de caja activo.</p>
+                
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm w-full mt-4">
                     <Button
                         size="lg"
-                        className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 font-bold text-base"
+                        className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 font-bold text-base shadow-sm"
                         onClick={() => setOpenCashOpen(true)}
                     >
-                        <Play className="w-5 h-5 mr-2" /> Abrir Caja Ahora
+                        <Play className="w-4 h-4 mr-2" /> Abrir Caja Ahora
                     </Button>
                 </div>
 
-                {/* Diálogo de apertura de caja con montos */}
+                {/* Diálogo de apertura de caja — Estilo alineado con Finanzas */}
                 <Dialog open={openCashOpen} onOpenChange={(o) => !o && setOpenCashOpen(false)}>
-                    <DialogContent className="max-w-sm">
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2">
-                                <Play className="w-5 h-5 text-emerald-600" /> Abrir Turno de Caja
-                            </DialogTitle>
-                            <DialogDescription>Ingresa el efectivo físico disponible al inicio del turno.</DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-3">
-                            {([
-                                { label: 'COP', symbol: '$', val: openCopVal, set: setOpenCopVal, step: '1' },
-                                { label: 'USD', symbol: '$', val: openUsdVal, set: setOpenUsdVal, step: '0.01' },
-                                { label: 'VES (Bs.)', symbol: 'Bs.', val: openVesVal, set: setOpenVesVal, step: '0.01' },
-                            ] as const).map((f) => (
-                                <div key={f.label} className="flex items-center gap-3">
-                                    <span className="w-20 font-bold text-slate-600 text-sm shrink-0">{f.label}</span>
-                                    <div className="relative flex-1">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">{f.symbol}</span>
-                                        <input
-                                            type="number"
-                                            step={f.step}
-                                            min="0"
-                                            value={f.val}
-                                            onChange={e => f.set(e.target.value)}
-                                            className="w-full text-right h-10 pl-10 pr-4 rounded-lg border border-slate-300 font-bold outline-none focus:ring-2 focus:ring-emerald-400"
-                                        />
+                    <DialogContent className="max-w-md p-0 overflow-hidden border-none shadow-2xl bg-slate-50/50">
+                        <div className="bg-white p-8 space-y-6">
+                            <div className="text-left">
+                                <DialogTitle className="text-xl font-bold text-slate-800">Abrir Turno de Caja</DialogTitle>
+                                <DialogDescription className="text-slate-500 text-sm mt-1">
+                                    Ingresa el monto de apertura (efectivo físico en caja) para iniciar.
+                                </DialogDescription>
+                            </div>
+
+                            <div className="space-y-3">
+                                {([
+                                    { id: 'cop', label: 'COP', symbol: '$', val: openCopVal, set: setOpenCopVal, step: '1' },
+                                    { id: 'usd', label: 'USD', symbol: '$', val: openUsdVal, set: setOpenUsdVal, step: '0.01' },
+                                    { id: 'ves', label: 'VES', symbol: 'Bs.', val: openVesVal, set: setOpenVesVal, step: '0.01' },
+                                ] as const).map((f) => (
+                                    <div key={f.id} className="flex items-center gap-3">
+                                        <span className="w-16 font-bold text-slate-600 text-sm shrink-0">{f.label}</span>
+                                        <div className="relative flex-1">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">{f.symbol}</span>
+                                            <input
+                                                type="number"
+                                                step={f.step}
+                                                min="0"
+                                                value={f.val}
+                                                onChange={e => f.set(e.target.value)}
+                                                className="w-full text-right h-11 pl-10 pr-4 rounded-lg border border-slate-200 bg-white font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm"
+                                            />
+                                        </div>
                                     </div>
+                                ))}
+                            </div>
+
+                            <div className="p-4 bg-slate-900 rounded-xl text-white">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Total Estimado (COP)</span>
+                                    <Badge variant="outline" className="text-[9px] border-slate-700 text-slate-500 uppercase">Base</Badge>
                                 </div>
-                            ))}
-                        </div>
-                        <div className="flex gap-3 pt-2">
-                            <Button variant="outline" className="flex-1" onClick={() => setOpenCashOpen(false)}>Cancelar</Button>
-                            <Button
-                                className="flex-[2] bg-emerald-600 hover:bg-emerald-700"
-                                disabled={openMutation.isPending}
-                                onClick={() => {
-                                    const cop = parseFloat(openCopVal) || 0;
-                                    const usd = parseFloat(openUsdVal) || 0;
-                                    const ves = parseFloat(openVesVal) || 0;
-                                    const total = cop + (usd * usdRate) + (ves * vesRate);
-                                    openMutation.mutate(total);
-                                }}
-                            >
-                                {openMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
-                                {openMutation.isPending ? 'Abriendo...' : 'Confirmar Apertura'}
-                            </Button>
+                                <p className="text-2xl font-black tabular-nums">
+                                    {fmtCOP((parseFloat(openCopVal) || 0) + ((parseFloat(openUsdVal) || 0) * usdRate) + ((parseFloat(openVesVal) || 0) * vesRate))}
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                                <Button 
+                                    variant="ghost" 
+                                    className="flex-1 h-11 rounded-lg font-bold text-slate-500" 
+                                    onClick={() => setOpenCashOpen(false)}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    className="flex-[2] h-11 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md shadow-emerald-100"
+                                    disabled={openMutation.isPending}
+                                    onClick={() => {
+                                        const cop = parseFloat(openCopVal) || 0;
+                                        const usd = parseFloat(openUsdVal) || 0;
+                                        const ves = parseFloat(openVesVal) || 0;
+                                        const total = cop + (usd * usdRate) + (ves * vesRate);
+                                        openMutation.mutate(total);
+                                    }}
+                                >
+                                    {openMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+                                    {openMutation.isPending ? 'Abriendo...' : 'Confirmar Apertura'}
+                                </Button>
+                            </div>
                         </div>
                     </DialogContent>
                 </Dialog>

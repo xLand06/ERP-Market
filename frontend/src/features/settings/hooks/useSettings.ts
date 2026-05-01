@@ -38,7 +38,7 @@ export function useCreateBranch() {
             toast.success('Sucursal creada correctamente');
         },
         onError: (error: unknown) => {
-            const err = error as { response?: { data?: { message?: string } };
+            const err = error as { response?: { data?: { message?: string } } };
             toast.error(err?.response?.data?.message || 'Error al crear sucursal');
         },
     });
@@ -57,7 +57,7 @@ export function useUpdateBranch() {
             toast.success('Sucursal actualizada correctamente');
         },
         onError: (error: unknown) => {
-            const err = error as { response?: { data?: { message?: string } };
+            const err = error as { response?: { data?: { message?: string } } };
             toast.error(err?.response?.data?.message || 'Error al actualizar sucursal');
         },
     });
@@ -76,7 +76,7 @@ export function useCreateGroup() {
             toast.success('Grupo creado correctamente');
         },
         onError: (error: unknown) => {
-            const err = error as { response?: { data?: { message?: string } };
+            const err = error as { response?: { data?: { message?: string } } };
             toast.error(err?.response?.data?.message || 'Error al crear grupo');
         },
     });

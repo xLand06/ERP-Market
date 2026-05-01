@@ -27,6 +27,8 @@ export function PurchaseHistoryPanel({ branchId: propBranch }: PurchaseHistoryPa
         : (selectedBranch !== 'all' ? selectedBranch : (user?.role === 'OWNER' ? null : selectedBranch));
 
     const [period, setPeriod] = useState<Period>('month');
+    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 15;
 
@@ -38,7 +40,7 @@ export function PurchaseHistoryPanel({ branchId: propBranch }: PurchaseHistoryPa
             return { from: d, to: d };
         }
         if (period === 'week') {
-            const dayOfWeek = now.getDay(); // 0=Sun
+            const dayOfWeek = now.getDay();
             const monday = new Date(now);
             monday.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
             const sun = new Date(monday);
@@ -49,14 +51,14 @@ export function PurchaseHistoryPanel({ branchId: propBranch }: PurchaseHistoryPa
             };
         }
         // month
-        const m = String(now.getMonth() + 1).padStart(2, '0');
-        const y = now.getFullYear();
-        const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+        const m = String(selectedMonth + 1).padStart(2, '0');
+        const y = selectedYear;
+        const lastDay = new Date(y, selectedMonth + 1, 0).getDate();
         return { from: `${y}-${m}-01`, to: `${y}-${m}-${String(lastDay).padStart(2, '0')}` };
-    }, [period]);
+    }, [period, selectedMonth, selectedYear]);
 
     const { data, isLoading, refetch } = useQuery({
-        queryKey: ['purchaseHistory', effectiveBranch, period, page],
+        queryKey: ['purchaseHistory', effectiveBranch, period, selectedMonth, selectedYear, page],
         queryFn: async () => {
             const params: any = {
                 type: 'INVENTORY_IN',
@@ -130,6 +132,28 @@ export function PurchaseHistoryPanel({ branchId: propBranch }: PurchaseHistoryPa
                     <p className="text-xs text-slate-400 mt-0.5">Entradas de mercancía registradas como egreso</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    {period === 'month' && (
+                        <div className="flex items-center gap-2 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                            <select
+                                value={selectedMonth}
+                                onChange={(e) => { setSelectedMonth(Number(e.target.value)); setPage(1); }}
+                                className="bg-transparent text-xs font-bold text-slate-600 px-2 py-1 outline-none cursor-pointer border-none"
+                            >
+                                {['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'].map((m, i) => (
+                                    <option key={m} value={i}>{m}</option>
+                                ))}
+                            </select>
+                            <select
+                                value={selectedYear}
+                                onChange={(e) => { setSelectedYear(Number(e.target.value)); setPage(1); }}
+                                className="bg-transparent text-xs font-bold text-slate-600 px-2 py-1 outline-none cursor-pointer border-none"
+                            >
+                                {[2024, 2025, 2026, 2027].map(y => (
+                                    <option key={y} value={y}>{y}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <div className="flex border border-slate-200 rounded-lg overflow-hidden bg-slate-100 p-0.5">
                         {(['day', 'week', 'month'] as Period[]).map(p => (
                             <button

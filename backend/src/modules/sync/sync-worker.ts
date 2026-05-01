@@ -65,6 +65,10 @@ export async function runSyncCycle() {
         if (pushResult.success) {
             lastSuccessfulSync = new Date();
             consecutiveFailures = 0;
+
+            // Verificar si se requiere purga automática (cada 15 min después del sync)
+            const { checkAndAutoPurge } = await import('../backup/backup.service');
+            await checkAndAutoPurge();
         }
 
         logger.info(

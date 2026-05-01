@@ -10,7 +10,7 @@
 // GET    /api/backup/cloud-stats     → Estadísticas de uso en Supabase
 // =============================================================================
 
-import express, { Router, Response } from 'express';
+import express, { Router, Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import { authMiddleware, AuthRequest } from '../../core/middlewares/auth.middleware';
@@ -24,6 +24,8 @@ import {
     purgeCloudTransactional,
     restoreLocalBackup,
     getSupabaseStorageSize,
+    checkAndAutoPurge,
+    saveBackupConfig,
 } from './backup.service';
 
 const router = Router();
@@ -55,12 +57,35 @@ router.get('/cloud-stats', async (req, res: Response) => {
     }
 });
 
+// ─── POST /api/backup/config ──────────────────────────────────────────────────
+// Guarda la configuración de retención para purgas automáticas
+router.post('/config', async (req: Request, res: Response) => {
+    try {
+        const { purgeRetentionDays, purgeLogRetentionDays } = req.body;
+        await saveBackupConfig({ purgeRetentionDays, purgeLogRetentionDays });
+        res.json({ success: true, message: 'Configuración guardada' });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // ─── GET /api/backup/cloud-storage ───────────────────────────────────────────
 // Obtiene el tamaño total utilizado en la base de datos de Supabase
 router.get('/cloud-storage', async (_req, res: Response) => {
     try {
         const storageStats = await getSupabaseStorageSize();
         res.json({ success: true, data: storageStats });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ─── POST /api/backup/auto-purge-check ────────────────────────────────────────
+// Verifica si se requiere purga automática (basada en el 70% de espacio)
+router.post('/auto-purge-check', async (_req, res: Response) => {
+    try {
+        const result = await checkAndAutoPurge();
+        res.json({ success: true, data: result });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });
     }

@@ -5,7 +5,7 @@ import { PlanGuard } from '../components/guards/PlanGuard';
 import RouteErrorBoundary from '../components/errors/RouteErrorBoundary';
 
 // Lazy-loaded feature pages
-import { lazy, Suspense } from 'react';
+import React, { lazy, Suspense } from 'react';
 
 const LoginPage              = lazy(() => import('../features/auth/pages/LoginPage'));
 const DashboardPage          = lazy(() => import('../features/dashboard/pages/DashboardPage'));

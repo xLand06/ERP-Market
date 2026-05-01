@@ -9,7 +9,16 @@ import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
 import './global.css';
 
+import { useEffect } from 'react';
+import { useConfigStore } from '@/hooks/useConfigStore';
+
 export default function App() {
+    const { fetchSettings } = useConfigStore();
+
+    useEffect(() => {
+        fetchSettings();
+    }, [fetchSettings]);
+
     return (
         <QueryClientProvider client={queryClient}>
             <RouterProvider router={router} />

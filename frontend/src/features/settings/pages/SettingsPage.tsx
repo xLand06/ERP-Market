@@ -31,7 +31,7 @@ export default function SettingsPage() {
     const tabs = [
         { id: 'branches' as Tab, label: 'Sucursales', icon: Building2, count: branches.length },
         { id: 'categories' as Tab, label: 'Grupos y Subgrupos', icon: Tag, count: groups.length },
-        { id: 'system' as Tab, label: 'Tasa de Cambios', icon: Settings2 },
+        { id: 'system' as Tab, label: 'Configuración Global', icon: Settings2 },
         { id: 'maintenance' as Tab, label: 'Mantenimiento', icon: AlertTriangle },
         { id: 'backup' as Tab, label: 'Backup & Nube', icon: HardDrive },
     ];

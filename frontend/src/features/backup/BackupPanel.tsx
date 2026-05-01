@@ -3,7 +3,7 @@
 // Escalable para Google Drive OAuth2 (ver comentarios TODO)
 // =============================================================================
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
     Download, Trash2, Cloud, CloudOff, AlertTriangle, CheckCircle2,
     HardDrive, RefreshCw, Shield, Info, Archive, ChevronDown, ChevronUp,
@@ -289,7 +289,7 @@ function BackupExportSection() {
 // ── Sección 2: Purgar Supabase ────────────────────────────────────────────────
 
 function CloudPurgeSection() {
-    const [olderThanDays, setOlderThanDays] = useState(30);
+    const [olderThanDays, setOlderThanDays] = useState('30');
     const [logRetentionDays] = useState(90);
     const [showStats, setShowStats] = useState(false);
     const [purgeResults, setPurgeResults] = useState<PurgeResult[] | null>(null);
@@ -307,7 +307,8 @@ function CloudPurgeSection() {
     const { data: stats, isLoading: loadingStats, refetch: refetchStats } = useQuery<CloudStat[]>({
         queryKey: ['cloud-stats', olderThanDays],
         queryFn: async () => {
-            const res = await api.get(`/backup/cloud-stats?days=${olderThanDays}`);
+            const days = parseInt(olderThanDays) || 0;
+            const res = await api.get(`/backup/cloud-stats?days=${days}`);
             return res.data.data;
         },
         enabled: showStats,
@@ -315,12 +316,13 @@ function CloudPurgeSection() {
     });
 
     console.log('stats', stats);
-    const totalToDelete = stats?.reduce((s, r) => s + r.count, 0) ?? 0;
+    const totalToDelete = stats?.reduce((s, r) => s + (r as any).count, 0) ?? 0;
+    const totalInCloud = stats?.reduce((s, r) => s + (r as any).totalCount, 0) ?? 0;
 
     const handlePurge = async () => {
         if (!window.confirm(
             `¿Confirmas la purga de registros con más de ${olderThanDays} días en Supabase?\n\n` +
-            `• Se eliminarán aproximadamente ${totalToDelete} registros de la NUBE.\n` +
+            `• Se eliminarán aproximadamente ${totalToDelete.toLocaleString()} registros de la NUBE.\n` +
             `• Los datos locales (SQLite) permanecerán INTACTOS.\n` +
             `• Solo se borran registros ya sincronizados (SYNCED).`
         )) return;
@@ -328,7 +330,8 @@ function CloudPurgeSection() {
         setPurging(true);
         const toastId = toast.loading('Purgando Supabase...');
         try {
-            const res = await api.post('/backup/purge-cloud', { olderThanDays, logRetentionDays });
+            const days = parseInt(olderThanDays) || 30;
+            const res = await api.post('/backup/purge-cloud', { olderThanDays: days, logRetentionDays });
             setPurgeResults(res.data.data.results);
             toast.success(res.data.data.message, { id: toastId, duration: 6000 });
             refetchStats();
@@ -391,13 +394,13 @@ function CloudPurgeSection() {
             <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-100 rounded-xl mb-5">
                 <Shield className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
                 <div className="text-xs text-amber-800 space-y-1">
-                    <p className="font-semibold">Purga segura de Supabase</p>
+                    <p className="font-semibold">Política de Purga Inteligente</p>
                     <ul className="space-y-0.5 list-disc list-inside text-amber-700">
                         <li>Solo se borran registros marcados como <strong>SYNCED</strong> (ya en la nube)</li>
-                        <li>Solo registros con más de los días configurados</li>
-                        <li>Las cajas abiertas nunca se borran</li>
-                        <li><strong>Los datos locales (SQLite) no se tocan</strong></li>
-                        <li>Los logs de auditoría tienen retención de {logRetentionDays} días</li>
+                        <li><strong>Purga Automática:</strong> Se activa al superar el <strong>70%</strong> de uso en Supabase.</li>
+                        <li><strong>Retención:</strong> Registros antiguos (&gt;15 días) y Logs (&gt;60 días) se eliminan al purgar.</li>
+                        <li>Las cajas abiertas nunca se borran.</li>
+                        <li><strong>Los datos locales (SQLite) permanecen intactos.</strong></li>
                     </ul>
                 </div>
             </div>
@@ -411,11 +414,15 @@ function CloudPurgeSection() {
                     <div className="flex items-center gap-3">
                         <input
                             id="input-purge-days"
-                            type="number"
-                            min={0}
-                            max={365}
+                            type="text"
+                            inputMode="numeric"
                             value={olderThanDays}
-                            onChange={e => setOlderThanDays(parseInt(e.target.value) || 30)}
+                            onChange={e => {
+                                const val = e.target.value;
+                                if (val === '' || /^\d+$/.test(val)) {
+                                    setOlderThanDays(val);
+                                }
+                            }}
                             className="w-24 px-3 py-2 border border-slate-200 rounded-xl text-sm font-bold text-center focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all"
                         />
                         <span className="text-sm font-semibold text-slate-600">días</span>
@@ -436,26 +443,39 @@ function CloudPurgeSection() {
                         onClick={() => setShowStats(v => !v)}
                         className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors"
                     >
-                        <span>Registros que se eliminarían de Supabase ({totalToDelete} total)</span>
+                        <span>
+                            Impacto de la Purga: {totalToDelete.toLocaleString()} registros a eliminar 
+                            <span className="text-slate-400 font-normal ml-2">(de {totalInCloud.toLocaleString()} totales en nube)</span>
+                        </span>
                         {showStats ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
                     {loadingStats ? (
                         <div className="p-4 text-center text-sm text-slate-400">Consultando Supabase...</div>
                     ) : (
-                        <table className="w-full text-sm">
+                        <>
+                            <table className="w-full text-sm">
                             <thead className="bg-slate-50 border-y border-slate-100">
                                 <tr>
                                     <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-500 uppercase">Tabla</th>
                                     <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">A eliminar</th>
-                                    <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Registro más antiguo</th>
+                                    <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Total en Nube</th>
+                                    <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Más antiguo</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {stats?.map(s => (
+                                {(stats as any[])?.map(s => (
                                     <tr key={s.table} className="hover:bg-slate-50">
-                                        <td className="px-4 py-2.5 font-mono text-slate-700">{s.table}</td>
+                                        <td className="px-4 py-2.5 font-mono text-slate-700">
+                                            {s.table === 'transactionItems' ? '📦 Detalle de Transacciones' :
+                                             s.table === 'transactions' ? '📝 Transacciones / Ventas' :
+                                             s.table === 'cashRegisters' ? '💰 Sesiones de Caja' :
+                                             s.table === 'auditLogs' ? '🔍 Logs de Auditoría' : s.table}
+                                        </td>
                                         <td className={`px-4 py-2.5 text-right font-bold ${s.count > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
                                             {s.count.toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-2.5 text-right font-semibold text-slate-500">
+                                            {s.totalCount?.toLocaleString() ?? '—'}
                                         </td>
                                         <td className="px-4 py-2.5 text-right text-slate-400 text-xs">
                                             {s.oldestRecord ? fmtDate(s.oldestRecord) : '—'}
@@ -464,9 +484,15 @@ function CloudPurgeSection() {
                                 ))}
                             </tbody>
                         </table>
-                    )}
-                </div>
-            )}
+                        {totalToDelete === 0 && (stats?.some(s => (s as any).totalCount > 0)) && (
+                            <div className="p-3 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500 text-center italic">
+                                Nota: Hay registros en la nube, pero ninguno supera los {olderThanDays} días de antigüedad seleccionados.
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        )}
 
             {/* Resultados de la última purga */}
             {purgeResults && (
