@@ -26,6 +26,7 @@ const PurchasesPage          = lazy(() => import('../features/purchases/pages/Pu
 const EmployeeDirectoryPage  = lazy(() => import('../features/users/pages/EmployeeDirectoryPage'));
 const AuditLogsPage          = lazy(() => import('../features/audit/pages/AuditLogsPage'));
 const SettingsPage           = lazy(() => import('../features/settings/pages/SettingsPage'));
+const MermaPage             = lazy(() => import('../features/merma/pages/MermaPage'));
 
 const wrap = (Component: React.ComponentType) => (
     <Suspense fallback={<PageSkeleton />}>
@@ -75,6 +76,7 @@ export const router = createRouter([
             { path: 'purchases',           element: wrap(PurchasesPage) },
             { path: 'audit',               element: wrap(AuditLogsPage) },
             { path: 'settings',          element: wrap(SettingsPage) },
+            { path: 'merma',              element: wrap(MermaPage) },
         ],
     },
     { path: '*', element: wrap(NotFoundPage) },

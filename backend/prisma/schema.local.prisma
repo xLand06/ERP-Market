@@ -56,6 +56,14 @@ enum CedulaType {
   E
 }
 
+enum MermaReason {
+  DAMAGED
+  EXPIRED
+  SOBRANTE
+  BAD_CONDITION
+  OTHER
+}
+
 // =============================================================================
 // USERS
 // =============================================================================
@@ -81,6 +89,7 @@ model User {
   transactions  Transaction[]
   cashRegisters CashRegister[]
   auditLogs     AuditLog[]
+  mermas        Merma[]
 
   @@index([username])
   @@index([cedula])
@@ -109,6 +118,7 @@ model Branch {
   transactions   Transaction[]
   cashRegisters  CashRegister[]
   purchaseOrders PurchaseOrder[]
+  mermas         Merma[]
 
   @@index([isActive])
   @@map("branches")
@@ -161,6 +171,7 @@ model Product {
   baseUnit    String   @default("UNIDAD")
   imageUrl    String?
   isActive    Boolean  @default(true)
+  expectedSpoilagePercent Float?  // % merma esperada
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -172,6 +183,7 @@ model Product {
   inventory          BranchInventory[]
   transactionItems   TransactionItem[]
   purchaseOrderItems PurchaseOrderItem[]
+  mermas            Merma[]
 
   @@index([name])
   @@index([subGroupId])
@@ -426,4 +438,32 @@ model ExchangeRate {
   updatedAt DateTime @updatedAt
 
   @@map("exchange_rates")
+}
+
+// =============================================================================
+// MERMA (SPOILAGE)
+// =============================================================================
+
+model Merma {
+  id            String      @id @default(cuid())
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime   @updatedAt
+  branchId      String
+  productId     String
+  quantity      Float
+  reason        MermaReason
+  description   String?
+  syncStatus    SyncStatus  @default(PENDING)
+
+  branch     Branch    @relation(fields: [branchId], references: [id])
+  product    Product   @relation(fields: [productId], references: [id])
+  createdBy  User      @relation("MermaCreatedBy", fields: [createdById], references: [id])
+
+  createdById String
+
+  @@index([branchId, createdAt])
+  @@index([productId])
+  @@index([reason])
+  @@index([syncStatus])
+  @@map("mermas")
 }

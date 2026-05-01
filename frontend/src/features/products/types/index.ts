@@ -34,6 +34,7 @@ export interface Product {
     imageUrl?: string;
     subGroupId?: string;
     isActive: boolean;
+    expectedSpoilagePercent?: number;
     barcodes: ProductBarcode[];
     presentations: ProductPresentation[];
 }

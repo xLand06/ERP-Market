@@ -26,6 +26,7 @@ import syncRouter from './modules/sync/sync.routes';
 import { startSyncWorker } from './modules/sync/sync-worker';
 import backupRouter from './modules/backup/backup.routes';
 import settingsRouter from './modules/settings/settings.routes';
+import mermaRouter from './modules/merma/merma.routes';
 
 const app = express();
 
@@ -174,6 +175,7 @@ app.use('/api/dashboard',  dashboardRouter);
 app.use('/api/sync',       syncRouter);
 app.use('/api/backup',     backupRouter);
 app.use('/api/settings',   settingsRouter);
+app.use('/api/merma',       mermaRouter);
 
 // ─── 404 HANDLER ───────────────────────────────────────────────────────────
 app.use(notFoundHandler);

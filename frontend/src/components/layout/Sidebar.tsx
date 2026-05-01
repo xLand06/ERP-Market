@@ -4,7 +4,7 @@ import { useAuthStore } from '@/features/auth/store/authStore';
 import {
     LayoutDashboard, Package, ShoppingCart,
     Coins, Users, Truck, BarChart2, ShieldCheck, Store, PanelLeftClose, PanelLeftOpen, X,
-    Settings, Tag
+    Settings, Tag, TrendingDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isPathAllowed } from '@/lib/planConfig';
@@ -28,6 +28,7 @@ const navItems: NavItem[] = [
     { name: 'Compras', path: '/purchases', icon: Truck },
     { name: 'Reportes', path: '/reports', icon: BarChart2 },
     { name: 'Proveedores', path: '/suppliers', icon: Users },
+    { name: 'Merma', path: '/merma', icon: TrendingDown },
 ];
 
 export interface SidebarProps {
