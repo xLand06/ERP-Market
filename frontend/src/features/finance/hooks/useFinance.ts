@@ -26,7 +26,7 @@ export function useCreateCashEntry() {
             toast.success('Entrada de efectivo registrada');
         },
         onError: (error: unknown) => {
-            const err = error as { response?: { data?: { message?: string } };
+            const err = error as { response?: { data?: { message?: string } } };
             toast.error(err?.response?.data?.message || 'Error al registrar entrada');
         },
     });
@@ -45,7 +45,7 @@ export function useCloseCashRegister() {
             toast.success('Cierre de caja registrado');
         },
         onError: (error: unknown) => {
-            const err = error as { response?: { data?: { message?: string } };
+            const err = error as { response?: { data?: { message?: string } } };
             toast.error(err?.response?.data?.message || 'Error al cerrar caja');
         },
     });

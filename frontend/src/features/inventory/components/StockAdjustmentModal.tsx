@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PackageOpen, X, Search, Check, Save } from 'lucide-react';
+import { PackageOpen, X, Search, Check, Save, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useQuery } from '@tanstack/react-query';
@@ -15,7 +15,7 @@ export interface ProductCatalog {
 interface StockAdjustmentModalProps {
     open: boolean;
     onClose: () => void;
-    onSave: (data: { product: ProductCatalog, quantity: number, minStock?: number }) => void;
+    onSave: (data: { product: ProductCatalog, quantity: number, minStock?: number, reason: string }) => void;
 }
 
 export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentModalProps) {
@@ -23,6 +23,7 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
     const [selectedProduct, setSelectedProduct] = useState<ProductCatalog | null>(null);
     const [stock, setStock] = useState<number | ''>('');
     const [minStock, setMinStock] = useState<number | ''>('');
+    const [reason, setReason] = useState('');
 
     // Reset when opened
     useEffect(() => {
@@ -31,6 +32,7 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
             setSelectedProduct(null);
             setStock('');
             setMinStock('');
+            setReason('');
         }
     }, [open]);
 
@@ -51,12 +53,13 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedProduct || stock === '') return;
+        if (!selectedProduct || stock === '' || reason.trim() === '') return;
         
         onSave({ 
             product: selectedProduct, 
             quantity: Number(stock), 
-            minStock: minStock !== '' ? Number(minStock) : undefined 
+            minStock: minStock !== '' ? Number(minStock) : undefined,
+            reason: reason.trim()
         });
         onClose();
     };
@@ -69,7 +72,7 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
                 <div className="p-6 pb-4 border-b border-slate-100 flex items-center justify-between shrink-0">
                     <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                         <PackageOpen className="w-5 h-5 text-indigo-600" />
-                        Registrar / Ajustar Stock
+                        Ajuste por Recuento de Stock
                     </h2>
                     <button 
                         onClick={onClose}
@@ -131,6 +134,11 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
                         </div>
                     ) : (
                         <form id="stockForm" onSubmit={handleSubmit} className="space-y-6">
+                            <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 flex gap-3 text-blue-800 text-sm items-start">
+                                <Info className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                                <p>Este formulario es para <strong>correcciones de recuento físico</strong>. No lo use para registrar mermas o egresos. Se guardará un registro de auditoría con su usuario.</p>
+                            </div>
+
                             <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 flex items-start justify-between">
                                 <div>
                                     <div className="text-xs font-semibold text-indigo-600 uppercase tracking-wider mb-1">Producto Seleccionado</div>
@@ -150,7 +158,7 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Cantidad Física *</label>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Cantidad Física Real *</label>
                                     <Input
                                         type="number"
                                         min="0"
@@ -174,6 +182,18 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
                                     />
                                 </div>
                             </div>
+                            
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Motivo del Ajuste *</label>
+                                <Input
+                                    type="text"
+                                    required
+                                    value={reason}
+                                    onChange={(e) => setReason(e.target.value)}
+                                    className="bg-slate-50 focus:bg-white"
+                                    placeholder="Ej: Conteo físico, error previo, etc."
+                                />
+                            </div>
                         </form>
                     )}
                 </div>
@@ -185,11 +205,11 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
                     <Button 
                         type="submit" 
                         form="stockForm"
-                        disabled={!selectedProduct || stock === ''}
+                        disabled={!selectedProduct || stock === '' || reason.trim() === ''}
                         className="flex-1 bg-indigo-600 hover:bg-indigo-700"
                     >
                         <Save className="w-4 h-4 mr-2" /> 
-                        Guardar Stock
+                        Guardar Recuento
                     </Button>
                 </div>
             </div>

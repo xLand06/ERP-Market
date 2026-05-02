@@ -13,6 +13,7 @@ export const setStockSchema = z.object({
     branchId: z.string(),
     stock: z.number().min(0, 'El stock no puede ser negativo'),
     minStock: z.number().min(0).optional().default(0),
+    reason: z.string().optional(),
 });
 
 /**

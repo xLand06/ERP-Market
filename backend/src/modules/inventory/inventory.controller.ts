@@ -58,7 +58,12 @@ export const setStock = async (req: AuthRequest, res: Response) => {
         await logAudit({
             action: 'STOCK_SET',
             module: 'inventory',
-            details: { productId: data.productId, branchId: data.branchId, stock: data.stock },
+            details: { 
+                productId: data.productId, 
+                branchId: data.branchId, 
+                stock: data.stock,
+                reason: data.reason || 'Ajuste manual de stock sin motivo'
+            },
             userId: req.user!.id,
             ipAddress: extractIp(req),
         });

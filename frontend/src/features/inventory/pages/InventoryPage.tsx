@@ -1,11 +1,12 @@
 import { useState, useId, useMemo, useEffect } from 'react';
-import { Search, Plus, Download, Pencil, Check, X, Package, Loader2 } from 'lucide-react';
+import { Search, Plus, Download, Pencil, Check, X, Package, Loader2, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import { ProductFormModal } from '../components/ProductFormModal';
+import { ProductFormModal } from '@/features/products/components/ProductFormModal';
+import { useGroups, useSubgroups } from '@/features/products/hooks';
 import { StockAdjustmentModal } from '../components/StockAdjustmentModal';
 import { StockEntryModal } from '../components/StockEntryModal';
 import { useAuthStore } from '@/features/auth/store/authStore';
@@ -46,6 +47,9 @@ export default function InventoryPage() {
     const { inventory, isLoading, refetch } = useInventory(effectiveBranch || '');
     const updatePriceMutation = useUpdatePrice();
     const updateStockMutation = useUpdateStock();
+
+    const { data: groups = [] } = useGroups();
+    const { data: subgroups = [] } = useSubgroups();
 
     useBarcodeScanner((barcode) => {
         setSearch(barcode);
@@ -126,10 +130,9 @@ export default function InventoryPage() {
         <ProductFormModal
             open={!!editTarget}
             onClose={() => setEditTarget(null)}
-            product={editTarget}
-            categories={inventory.map(c => ({ id: c.category, name: c.category })).filter((c, i, arr) => arr.findIndex(x => x.id === c.id) === i)}
-            initialStock={editTarget?.stock}
-            initialMinStock={editTarget?.minStock}
+            product={editTarget as any}
+            groups={groups}
+            subgroups={subgroups}
             onSuccess={() => {
                 refetch();
                 setEditTarget(null);
@@ -138,7 +141,7 @@ export default function InventoryPage() {
         <StockAdjustmentModal 
             open={adjustmentOpen}
             onClose={() => setAdjustmentOpen(false)}
-            onSave={({ product, quantity, minStock }) => {
+            onSave={({ product, quantity, minStock, reason }) => {
                 if (!effectiveBranch) {
                     toast.error('Seleccione una sede específica');
                     return;
@@ -147,7 +150,8 @@ export default function InventoryPage() {
                     product: { id: product.id }, 
                     quantity, 
                     minStock,
-                    branchId: effectiveBranch
+                    branchId: effectiveBranch,
+                    reason
                 }, {
                     onSuccess: () => {
                         toast.success('Inventario actualizado con éxito');
@@ -182,6 +186,14 @@ export default function InventoryPage() {
                 <div className="flex flex-col xs:flex-row gap-2.5 w-full sm:w-auto">
                     <Button variant="outline" size="lg" className="h-11 sm:h-10 text-slate-700 font-bold sm:px-4">
                         <Download className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Exportar Excel
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="lg"
+                        className="h-11 sm:h-10 text-indigo-700 font-bold sm:px-4 border-indigo-200 hover:bg-indigo-50"
+                        onClick={() => setAdjustmentOpen(true)}
+                    >
+                        <ClipboardList className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Recuento Stock
                     </Button>
                     <Button
                         size="lg"

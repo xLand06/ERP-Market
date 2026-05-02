@@ -74,12 +74,13 @@ export function useUpdateStock() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ product, quantity, minStock, branchId }: { product: { id: string }; quantity: number; minStock?: number; branchId: string }) => {
+        mutationFn: async ({ product, quantity, minStock, branchId, reason }: { product: { id: string }; quantity: number; minStock?: number; branchId: string; reason?: string }) => {
             const res = await api.put('/inventory/stock', {
                 productId: product.id,
                 branchId,
                 stock: quantity,
                 minStock,
+                reason,
             });
             return res.data;
         },
