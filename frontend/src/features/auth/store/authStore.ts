@@ -9,6 +9,7 @@ interface User {
     email?: string;
     telefono?: string;
     role: 'OWNER' | 'SELLER';
+    canManageInventory?: boolean;
     branchId?: string;
 }
 

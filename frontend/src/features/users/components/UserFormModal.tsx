@@ -15,6 +15,7 @@ export interface User {
     apellido?: string;
     email?: string;
     role: 'OWNER' | 'SELLER';
+    canManageInventory?: boolean;
     branchId?: string;
     isActive: boolean;
     cedula?: string;
@@ -38,6 +39,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
     const [apellido, setApellido] = useState('');
     const [email, setEmail] = useState('');
     const [role, setRole] = useState<'OWNER' | 'SELLER'>('SELLER');
+    const [canManageInventory, setCanManageInventory] = useState(false);
     const [branchId, setBranchId] = useState('');
     
     // Additional Fields for Backend
@@ -58,6 +60,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                 setApellido(user.apellido || '');
                 setEmail(user.email || '');
                 setRole(user.role || 'SELLER');
+                setCanManageInventory(user.canManageInventory || false);
                 setBranchId(user.branchId || '');
                 setTelefono(user.telefono || '');
                 
@@ -82,6 +85,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                 setApellido('');
                 setEmail('');
                 setRole('SELLER');
+                setCanManageInventory(false);
                 setBranchId('');
                 setCedulaType('V');
                 setCedulaNumber('');
@@ -117,7 +121,8 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                 nombre, 
                 apellido: apellido.trim() || null, 
                 email: email.trim() || null, 
-                role, 
+                role,
+                canManageInventory: role === 'SELLER' ? canManageInventory : false,
                 branchId: branchId || null,
                 cedula: fullCedula,
                 cedulaType,
@@ -320,6 +325,28 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                             </select>
                         </div>
                     </div>
+
+                    {role === 'SELLER' && (
+                        <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-start gap-3">
+                            <div className="flex items-center h-5">
+                                <input
+                                    id="canManageInventory"
+                                    type="checkbox"
+                                    checked={canManageInventory}
+                                    onChange={(e) => setCanManageInventory(e.target.checked)}
+                                    className="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500"
+                                />
+                            </div>
+                            <div className="flex flex-col">
+                                <label htmlFor="canManageInventory" className="text-sm font-bold text-indigo-900">
+                                    Permitir gestionar inventario
+                                </label>
+                                <p className="text-xs text-indigo-700 mt-0.5">
+                                    Si está activo, este vendedor podrá registrar entradas de mercancía y hacer ajustes de recuento.
+                                </p>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="flex gap-3 pt-6 mt-6 border-t border-slate-100">
                         <button 

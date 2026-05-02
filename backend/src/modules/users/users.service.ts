@@ -18,9 +18,9 @@ export const getAllUsers = () =>
             cedulaType: true,
             email: true, 
             telefono: true,
-            role: true, 
-            isActive: true, 
-            createdAt: true,
+            role: true,
+            canManageInventory: true,
+            isActive: true,            createdAt: true,
             branchId: true,
             branch: { select: { name: true } }
         },
@@ -39,9 +39,9 @@ export const getUserById = (id: string) =>
             cedulaType: true,
             email: true, 
             telefono: true,
-            role: true, 
-            isActive: true, 
-            branchId: true 
+            role: true,
+            canManageInventory: true,
+            isActive: true,            branchId: true 
         },
     });
 

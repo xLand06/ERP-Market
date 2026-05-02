@@ -52,6 +52,7 @@ export const registerSchema = z.object({
     telefono: z.string().regex(/^[0-9]{10,15}$/, 'Teléfono inválido').optional().or(z.literal('')),
     password: passwordStrengthSchema,
     role: z.enum(['OWNER', 'SELLER']).default('SELLER'),
+    canManageInventory: z.boolean().optional(),
     branchId: z.string().cuid('ID de sucursal inválido').optional(),
 });
 

@@ -11,6 +11,7 @@ export interface AuthUser {
     email?: string;
     telefono?: string;
     role: 'OWNER' | 'SELLER';
+    canManageInventory?: boolean;
     branchId?: string;
 }
 

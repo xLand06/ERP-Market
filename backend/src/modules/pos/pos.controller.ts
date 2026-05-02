@@ -15,7 +15,12 @@ import { validatedData } from '../../core/middlewares/validate.middleware';
 export const createTransaction = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const data = validatedData(req, 'body');
-        
+
+        if (data.type === 'INVENTORY_IN' && req.user!.role === 'SELLER' && !req.user!.canManageInventory) {
+            res.status(403).json({ success: false, error: 'No tienes permiso para ingresar inventario' });
+            return;
+        }
+
         const transaction = await posService.createTransaction({
             ...data,
             userId: req.user!.id,

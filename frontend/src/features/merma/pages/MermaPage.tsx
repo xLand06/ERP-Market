@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Plus, AlertTriangle, TrendingDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/features/auth/store/authStore';
-import { useMermas, useMermaSummary, useMermaReport } from './hooks';
-import { MermaCards } from './components/MermaCards';
-import { MermaTable } from './components/MermaTable';
-import { MermaForm } from './components/MermaForm';
+import { useMermas, useMermaSummary, useMermaReport } from '../hooks';
+import { MermaCards } from '../components/MermaCards';
+import { MermaTable } from '../components/MermaTable';
+import { MermaForm } from '../components/MermaForm';
 
 export default function MermaPage() {
     const [formOpen, setFormOpen] = useState(false);

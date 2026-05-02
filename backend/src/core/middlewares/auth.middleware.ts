@@ -14,6 +14,7 @@ export interface AuthUser {
     name?: string;
     email?: string;
     branchId?: string;
+    canManageInventory?: boolean;
 }
 
 export interface AuthRequest extends Request {
@@ -65,6 +66,7 @@ export const authMiddleware = (
             role: string;
             name?: string;
             email?: string;
+            canManageInventory?: boolean;
         };
 
         req.user = {
@@ -72,6 +74,7 @@ export const authMiddleware = (
             role: decoded.role as 'OWNER' | 'SELLER',
             name: decoded.name,
             email: decoded.email,
+            canManageInventory: decoded.canManageInventory,
         };
 
         logger.debug('User authenticated', {
@@ -98,9 +101,9 @@ export const authMiddleware = (
     }
 };
 
-export const generateToken = (user: { id: string; role: string; name?: string; email?: string }): string => {
+export const generateToken = (user: { id: string; role: string; name?: string; email?: string; canManageInventory?: boolean }): string => {
     return jwt.sign(
-        { id: user.id, role: user.role, name: user.name, email: user.email },
+        { id: user.id, role: user.role, name: user.name, email: user.email, canManageInventory: user.canManageInventory },
         env.JWT_SECRET,
         { expiresIn: '12h' }
     );

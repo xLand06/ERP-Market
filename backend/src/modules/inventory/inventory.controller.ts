@@ -53,6 +53,12 @@ export const getStockByProduct = async (req: Request, res: Response) => {
 export const setStock = async (req: AuthRequest, res: Response) => {
     try {
         const data = validatedData(req, 'body');
+
+        if (req.user!.role === 'SELLER' && !req.user!.canManageInventory) {
+            res.status(403).json({ success: false, error: 'No tienes permiso para ajustar el inventario' });
+            return;
+        }
+
         const result = await inventoryService.upsertStock(data);
         
         await logAudit({

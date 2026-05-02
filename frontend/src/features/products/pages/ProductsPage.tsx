@@ -8,6 +8,7 @@ import { ProductFormModal } from '../components/ProductFormModal';
 import type { Product } from '../types';
 import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
 import { useConfigStore } from '@/hooks/useConfigStore';
+import { useAuthStore } from '@/features/auth/store/authStore';
 import { useProducts, useGroups, useSubgroups, useToggleProductStatus } from '../hooks';
 
 export default function ProductsPage() {
@@ -21,6 +22,8 @@ export default function ProductsPage() {
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
     const { fmtCOP } = useConfigStore();
+    const user = useAuthStore(s => s.user);
+    const isOwner = user?.role === 'OWNER';
 
     useBarcodeScanner((barcode) => {
         setSearch(barcode);
@@ -88,9 +91,11 @@ export default function ProductsPage() {
                         <Button variant="outline" size="lg" className="h-10 font-bold text-slate-700">
                             <Download className="w-4.5 h-4.5 mr-2" /> Exportar
                         </Button>
-                        <Button onClick={handleOpenCreate} size="lg" className="h-10 font-bold shadow-sm shadow-indigo-500/20 bg-indigo-600 hover:bg-indigo-700 text-white">
-                            <Plus className="w-4.5 h-4.5 mr-2" /> Nuevo Producto
-                        </Button>
+                        {isOwner && (
+                            <Button onClick={handleOpenCreate} size="lg" className="h-10 font-bold shadow-sm shadow-indigo-500/20 bg-indigo-600 hover:bg-indigo-700 text-white">
+                                <Plus className="w-4.5 h-4.5 mr-2" /> Nuevo Producto
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -173,7 +178,7 @@ export default function ProductsPage() {
                                     <th className="text-right">Costo</th>
                                     <th className="text-right">Precio Venta</th>
                                     <th className="text-center">Estado</th>
-                                    <th className="w-24 text-right">Acciones</th>
+                                    {isOwner && <th className="w-24 text-right">Acciones</th>}
                                 </tr>
                             </thead>
                             <tbody>
@@ -240,32 +245,34 @@ export default function ProductsPage() {
                                                 {prod.isActive ? 'Activo' : 'Inactivo'}
                                             </Badge>
                                         </td>
-                                        <td className="text-right">
-                                            <div className="flex items-center justify-end gap-1">
-                                                <button
-                                                    onClick={() => handleOpenEdit(prod)}
-                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                                                    aria-label={`Editar producto ${prod.name}`}
-                                                >
-                                                    <Edit2 className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => toggleStatusMutation.mutate({ id: prod.id, isActive: !prod.isActive })}
-                                                    className={cn(
-                                                        'p-1.5 rounded-lg transition-colors',
-                                                        prod.isActive
-                                                            ? 'text-slate-400 hover:text-red-500 hover:bg-red-50'
-                                                            : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
-                                                    )}
-                                                    aria-label={prod.isActive ? `Inactivar ${prod.name}` : `Activar ${prod.name}`}
-                                                    disabled={toggleStatusMutation.isPending}
-                                                >
-                                                    {prod.isActive
-                                                        ? <PackageX className="w-4 h-4" />
-                                                        : <PackageCheck className="w-4 h-4" />}
-                                                </button>
-                                            </div>
-                                        </td>
+                                        {isOwner && (
+                                            <td className="text-right">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <button
+                                                        onClick={() => handleOpenEdit(prod)}
+                                                        className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                                        aria-label={`Editar producto ${prod.name}`}
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => toggleStatusMutation.mutate({ id: prod.id, isActive: !prod.isActive })}
+                                                        className={cn(
+                                                            'p-1.5 rounded-lg transition-colors',
+                                                            prod.isActive
+                                                                ? 'text-slate-400 hover:text-red-500 hover:bg-red-50'
+                                                                : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
+                                                        )}
+                                                        aria-label={prod.isActive ? `Inactivar ${prod.name}` : `Activar ${prod.name}`}
+                                                        disabled={toggleStatusMutation.isPending}
+                                                    >
+                                                        {prod.isActive
+                                                            ? <PackageX className="w-4 h-4" />
+                                                            : <PackageCheck className="w-4 h-4" />}
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        )}
                                     </tr>
                                 ))}
                                 {!isLoading && products.length === 0 && !isError && (

@@ -42,6 +42,7 @@ export default function InventoryPage() {
     const selectedBranch = useAuthStore(s => s.selectedBranch);
     const user = useAuthStore(s => s.user);
     const isOwner = user?.role === 'OWNER';
+    const canManage = isOwner || user?.canManageInventory;
     const effectiveBranch = selectedBranch === 'all' && isOwner ? null : selectedBranch;
 
     const { inventory, isLoading, refetch } = useInventory(effectiveBranch || '');
@@ -187,27 +188,31 @@ export default function InventoryPage() {
                     <Button variant="outline" size="lg" className="h-11 sm:h-10 text-slate-700 font-bold sm:px-4">
                         <Download className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Exportar Excel
                     </Button>
-                    <Button
-                        variant="outline"
-                        size="lg"
-                        className="h-11 sm:h-10 text-indigo-700 font-bold sm:px-4 border-indigo-200 hover:bg-indigo-50"
-                        onClick={() => setAdjustmentOpen(true)}
-                    >
-                        <ClipboardList className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Recuento Stock
-                    </Button>
-                    <Button
-                        size="lg"
-                        className="h-11 sm:h-10 font-bold shadow-lg shadow-indigo-500/20 sm:px-4 bg-indigo-600 hover:bg-indigo-700 text-white"
-                        onClick={() => {
-                            if (!effectiveBranch) {
-                                toast.error('Seleccione una sede específica para registrar la entrada');
-                                return;
-                            }
-                            setStockEntryOpen(true);
-                        }}
-                    >
-                        <Plus className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Entrada de Mercancía
-                    </Button>
+                    {canManage && (
+                        <>
+                            <Button
+                                variant="outline"
+                                size="lg"
+                                className="h-11 sm:h-10 text-indigo-700 font-bold sm:px-4 border-indigo-200 hover:bg-indigo-50"
+                                onClick={() => setAdjustmentOpen(true)}
+                            >
+                                <ClipboardList className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Recuento Stock
+                            </Button>
+                            <Button
+                                size="lg"
+                                className="h-11 sm:h-10 font-bold shadow-lg shadow-indigo-500/20 sm:px-4 bg-indigo-600 hover:bg-indigo-700 text-white"
+                                onClick={() => {
+                                    if (!effectiveBranch) {
+                                        toast.error('Seleccione una sede específica para registrar la entrada');
+                                        return;
+                                    }
+                                    setStockEntryOpen(true);
+                                }}
+                            >
+                                <Plus className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Entrada de Mercancía
+                            </Button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -273,9 +278,9 @@ export default function InventoryPage() {
                                 <th scope="col" className="text-center">Stock</th>
                                 <th scope="col" className="text-center">Mín.</th>
                                 <th scope="col">Estado</th>
-                                <th scope="col" className="w-20">Acciones</th>
-                            </tr>
-                        </thead>
+                                {isOwner && <th scope="col" className="w-20">Acciones</th>}
+                                </tr>
+                                </thead>
                         <tbody>
                             {!isLoading && paginated.map(p => {
                                 const level = stockLevel(p.stock, p.minStock);
