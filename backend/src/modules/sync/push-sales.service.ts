@@ -81,6 +81,7 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                         imageUrl: prod.imageUrl ?? null,
                         isActive: prod.isActive,
                         subGroupId: prod.subGroupId ?? null,
+                        expectedSpoilagePercent: prod.expectedSpoilagePercent != null ? Number(prod.expectedSpoilagePercent) : null,
                     },
                     create: {
                         id: prod.id,
@@ -93,6 +94,7 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                         imageUrl: prod.imageUrl ?? null,
                         isActive: prod.isActive,
                         subGroupId: prod.subGroupId ?? null,
+                        expectedSpoilagePercent: prod.expectedSpoilagePercent != null ? Number(prod.expectedSpoilagePercent) : null,
                     },
                 });
                 pushedCount++;
@@ -184,6 +186,7 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                         role: user.role as $Enums.Role,
                         branchId: user.branchId || null,
                         isActive: user.isActive,
+                        canManageInventory: user.canManageInventory,
                     },
                     create: {
                         id: user.id,
@@ -198,6 +201,7 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                         role: user.role as $Enums.Role,
                         branchId: user.branchId || null,
                         isActive: user.isActive,
+                        canManageInventory: user.canManageInventory,
                     },
                 });
                 pushedCount++;

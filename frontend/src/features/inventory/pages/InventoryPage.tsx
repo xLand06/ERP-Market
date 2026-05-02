@@ -13,6 +13,7 @@ import { useAuthStore } from '@/features/auth/store/authStore';
 import { useInventory, useUpdatePrice, useUpdateStock } from '../hooks';
 import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
 import type { InventoryProduct } from '../types';
+import { api } from '@/lib/api';
 
 const stockLevel = (stock: number, min: number): 'normal' | 'warning' | 'critical' =>
     stock <= min * 0.15 ? 'critical' : stock <= min * 0.6 ? 'warning' : 'normal';
@@ -21,6 +22,27 @@ const getBadgeVariant = (level: 'normal' | 'warning' | 'critical') =>
     level === 'critical' ? 'destructive' : level === 'warning' ? 'warning' : 'success';
 
 const STATUS_LABELS: Record<string, string> = { normal:'Normal', warning:'Alerta', critical:'Crítico' };
+
+const handleExport = async (branchId: string | null, branchName?: string) => {
+    try {
+        toast.loading('Generando Excel...', { id: 'export-inventory' });
+        const params = new URLSearchParams();
+        if (branchId && branchId !== 'all') params.append('branchId', branchId);
+        if (branchName) params.append('branchName', branchName);
+        const url = `/inventory/export?${params.toString()}`;
+        const response = await api.get(url, { responseType: 'blob' });
+        const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.download = `Inventario_${new Date().toISOString().split('T')[0]}.xlsx`;
+        link.click();
+        window.URL.revokeObjectURL(link.href);
+        toast.success('Excel descargado correctamente', { id: 'export-inventory' });
+    } catch (err: any) {
+        toast.error('Error al exportar inventario', { id: 'export-inventory' });
+        console.error('[ExportInventory] Error:', err);
+    }
+};
 
 export default function InventoryPage() {
     const [search, setSearch]       = useState('');
@@ -185,7 +207,7 @@ export default function InventoryPage() {
                     </p>
                 </div>
                 <div className="flex flex-col xs:flex-row gap-2.5 w-full sm:w-auto">
-                    <Button variant="outline" size="lg" className="h-11 sm:h-10 text-slate-700 font-bold sm:px-4">
+                    <Button variant="outline" size="lg" className="h-11 sm:h-10 text-slate-700 font-bold sm:px-4" onClick={() => handleExport(effectiveBranch, selectedBranch === 'all' ? undefined : selectedBranch)}>
                         <Download className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Exportar Excel
                     </Button>
                     {canManage && (

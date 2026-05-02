@@ -92,3 +92,25 @@ export const getLowStock = async (req: Request, res: Response) => {
         res.status(500).json({ success: false, error: error.message });
     }
 };
+
+/**
+ * Exportar inventario a Excel
+ */
+export const exportInventoryExcel = async (req: Request, res: Response) => {
+    try {
+        const { branchId, branchName } = req.query;
+        const { generateInventoryExcel } = await import('./inventory.export.service');
+
+        const buffer = await generateInventoryExcel({
+            branchId: branchId as string | undefined,
+            branchName: branchName as string | undefined,
+        });
+
+        res.setHeader('Content-Disposition', `attachment; filename="Inventario_${new Date().toISOString().split('T')[0]}.xlsx"`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.send(buffer);
+    } catch (error: any) {
+        console.error('[InventoryController.exportInventoryExcel] Error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};

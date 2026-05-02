@@ -69,6 +69,7 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
                         imageUrl: prod.imageUrl ?? undefined,
                         isActive: prod.isActive,
                         subGroupId: prod.subGroupId ?? undefined,
+                        expectedSpoilagePercent: prod.expectedSpoilagePercent != null ? Number(prod.expectedSpoilagePercent) : undefined,
                     },
                     create: {
                         id: prod.id,
@@ -81,6 +82,7 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
                         imageUrl: prod.imageUrl ?? undefined,
                         isActive: prod.isActive,
                         subGroupId: prod.subGroupId ?? undefined,
+                        expectedSpoilagePercent: prod.expectedSpoilagePercent != null ? Number(prod.expectedSpoilagePercent) : undefined,
                     },
                 });
                 pulledCount++;
@@ -168,9 +170,14 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
                             nombre: user.nombre,
                             apellido: user.apellido ?? undefined,
                             email: user.email ?? undefined,
+                            cedula: user.cedula,
+                            cedulaType: user.cedulaType as any,
+                            password: user.password,
+                            telefono: user.telefono ?? undefined,
                             role: user.role as any,
                             isActive: user.isActive,
                             branchId: user.branchId ?? undefined,
+                            canManageInventory: user.canManageInventory,
                         },
                     });
                 } else {
@@ -188,6 +195,7 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
                             role: user.role as any,
                             isActive: user.isActive,
                             branchId: user.branchId ?? undefined,
+                            canManageInventory: user.canManageInventory,
                         },
                     });
                 }
