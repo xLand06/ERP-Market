@@ -5,13 +5,13 @@ import toast from 'react-hot-toast';
 
 export function SystemSettings() {
     const { 
-        rates, iva, autoOpenTime, purgeRetentionDays, purgeLogRetentionDays,
+        rates, iva, autoOpenTime, autoCloseTime, purgeRetentionDays, purgeLogRetentionDays,
         updateRate, updateSettings, fetchSettings
     } = useConfigStore();
     const [localVes, setLocalVes] = useState(rates['VES']?.toString() || '5.5');
     const [localUsd, setLocalUsd] = useState((rates['USD'] || rates['COP'] || 3600).toString());
     const [localIva, setLocalIva] = useState((iva * 100).toString());
-    const [localOpenTime, setLocalOpenTime] = useState(autoOpenTime || '');
+    const [localCloseTime, setLocalCloseTime] = useState(autoCloseTime || '');
     const [localPurgeDays, setLocalPurgeDays] = useState(purgeRetentionDays.toString());
     const [localLogDays, setLocalLogDays] = useState(purgeLogRetentionDays.toString());
     const [saving, setSaving] = useState(false);
@@ -30,7 +30,7 @@ export function SystemSettings() {
             // 2. Configuración general (JSON backend + Store)
             await updateSettings({
                 iva: (parseFloat(localIva) || 0) / 100,
-                autoOpenTime: localOpenTime.trim() || null,
+                autoCloseTime: localCloseTime.trim() || null,
                 purgeRetentionDays: parseInt(localPurgeDays) || 30,
                 purgeLogRetentionDays: parseInt(localLogDays) || 90
             });
@@ -128,17 +128,17 @@ export function SystemSettings() {
 
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <label className="text-sm font-semibold text-slate-700">Apertura Automática de Caja</label>
+                                <label className="text-sm font-semibold text-slate-700">Cierre Automático de Seguridad</label>
                                 <div className="relative">
                                     <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                     <input
                                         type="time"
-                                        value={localOpenTime}
-                                        onChange={(e) => setLocalOpenTime(e.target.value)}
+                                        value={localCloseTime}
+                                        onChange={(e) => setLocalCloseTime(e.target.value)}
                                         className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all font-mono"
                                     />
                                 </div>
-                                <p className="text-xs text-slate-400 px-1">La caja se abrirá con $0 a la hora indicada.</p>
+                                <p className="text-xs text-slate-400 px-1">Si una caja queda abierta, se cerrará automáticamente a esta hora con el saldo del sistema.</p>
                             </div>
 
                             <div className="space-y-2">

@@ -30,6 +30,7 @@ export const getOne = async (req: Request, res: Response): Promise<void> => {
 export const create = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const data = validatedData(req, 'body');
+        console.log('[Users Controller] Creating user with data:', JSON.stringify(data, null, 2));
         const user = await usersService.createUser(data);
         
         await logAudit({

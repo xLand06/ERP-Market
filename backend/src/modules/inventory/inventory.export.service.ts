@@ -28,6 +28,7 @@ async function getExportData(branchId?: string) {
                 include: {
                     subGroup: { include: { group: { select: { name: true } } } },
                     presentations: true,
+                    barcodes: { take: 1 }, // Obtener al menos un código de barras
                 },
             },
             branch: { select: { id: true, name: true } },
@@ -70,38 +71,47 @@ export async function generateInventoryExcel(options: ExportOptions = {}): Promi
     const LIGHT_GRAY = 'F8FAFC';    // Slate-50
     const MEDIUM_GRAY = 'E2E8F0';  // Slate-200
 
-    // ─── HOJA 1: DASHBOARD ────────────────────────────────────────────
+// ─── HOJA 1: DASHBOARD ────────────────────────────────────────────
     const dashboardSheet = workbook.addWorksheet('Dashboard', {
         pageSetup: { paperSize: 9, orientation: 'landscape', margins: { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 } }
     });
 
+    // Establecer anchos de columnas para el dashboard
+    dashboardSheet.columns = [
+        { key: 'a', width: 5 },
+        { key: 'b', width: 25 },
+        { key: 'c', width: 18 },
+        { key: 'd', width: 5 },
+        { key: 'e', width: 25 },
+        { key: 'f', width: 18 },
+        { key: 'g', width: 5 },
+        { key: 'h', width: 25 },
+        { key: 'i', width: 18 },
+    ];
+
     // Título del dashboard
-    dashboardSheet.mergeCells('A1:H1');
-    const titleCell = dashboardSheet.getCell('A1');
+    dashboardSheet.mergeCells('B1:I1');
+    const titleCell = dashboardSheet.getCell('B1');
     titleCell.value = 'DASHBOARD DE INVENTARIO';
-    titleCell.font = { bold: true, size: 18, color: { argb: 'FFFFFFFF' } };
+    titleCell.font = { bold: true, size: 20, color: { argb: 'FFFFFFFF' } };
     titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
     titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    titleCell.border = {
-        top: { style: 'thin', color: { argb: 'FF4F46E5' } },
-        left: { style: 'thin', color: { argb: 'FF4F46E5' } },
-        bottom: { style: 'thin', color: { argb: 'FF4F46E5' } },
-        right: { style: 'thin', color: { argb: 'FF4F46E5' } }
-    };
     dashboardSheet.getRow(1).height = 35;
 
     // Fecha de generación
-    dashboardSheet.mergeCells('A2:H2');
-    const dateCell = dashboardSheet.getCell('A2');
+    dashboardSheet.mergeCells('B2:I2');
+    const dateCell = dashboardSheet.getCell('B2');
     dateCell.value = `Generado el: ${new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}`;
     dateCell.font = { italic: true, size: 10, color: { argb: 'FF64748B' } };
     dateCell.alignment = { horizontal: 'center' };
     dateCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    dashboardSheet.getRow(2).height = 18;
 
     // Sede info
+    const dataStartRow = branchName ? 3 : 2;
     if (branchName) {
-        dashboardSheet.mergeCells('A3:H3');
-        const branchCell = dashboardSheet.getCell('A3');
+        dashboardSheet.mergeCells('B3:I3');
+        const branchCell = dashboardSheet.getCell('B3');
         branchCell.value = `Sede: ${branchName}`;
         branchCell.font = { bold: true, size: 12, color: { argb: 'FF334155' } };
         branchCell.alignment = { horizontal: 'center' };
@@ -111,143 +121,185 @@ export async function generateInventoryExcel(options: ExportOptions = {}): Promi
 
     // Calcular estadísticas
     const totalProducts = data.length;
-    const totalStock = data.reduce((sum, item) => sum + Number(item.stock), 0);
-    const totalValue = data.reduce((sum, item) => sum + (Number(item.stock) * Number(item.product.cost || 0)), 0);
-    const totalSaleValue = data.reduce((sum, item) => sum + (Number(item.stock) * Number(item.product.price || 0)), 0);
+    const totalStock = data.reduce((sum, item) => sum + (item.stock ? Number(item.stock) : 0), 0);
+    const totalValue = data.reduce((sum, item) => sum + ((item.stock ? Number(item.stock) : 0) * (item.product.cost ? Number(item.product.cost) : 0)), 0);
+    const totalSaleValue = data.reduce((sum, item) => sum + ((item.stock ? Number(item.stock) : 0) * (item.product.price ? Number(item.product.price) : 0)), 0);
 
-    const criticalItems = data.filter(item => getStockLevel(Number(item.stock), Number(item.minStock)) === 'critical');
-    const warningItems = data.filter(item => getStockLevel(Number(item.stock), Number(item.minStock)) === 'warning');
-    const normalItems = data.filter(item => getStockLevel(Number(item.stock), Number(item.minStock)) === 'normal');
+    const criticalItems = data.filter(item => getStockLevel(item.stock ? Number(item.stock) : 0, item.minStock ? Number(item.minStock) : 0) === 'critical');
+    const warningItems = data.filter(item => getStockLevel(item.stock ? Number(item.stock) : 0, item.minStock ? Number(item.minStock) : 0) === 'warning');
+    const normalItems = data.filter(item => getStockLevel(item.stock ? Number(item.stock) : 0, item.minStock ? Number(item.minStock) : 0) === 'normal');
 
     const totalCategories = new Set(data.map(item => item.product.subGroup?.group?.name || 'Sin categoría')).size;
-    const totalBranches = new Set(data.map(item => item.branchId)).size;
 
-    // Métricas principales
-    const metricsStartRow = branchName ? 5 : 4;
-    const metrics = [
-        { label: 'Total Productos', value: totalProducts, color: PRIMARY_COLOR },
-        { label: 'Stock Total', value: totalStock, color: '2563EB' },
-        { label: 'Valor Inventario (Costo)', value: `$${totalValue.toLocaleString('es-ES', { minimumFractionDigits: 2 })}`, color: SUCCESS_COLOR },
-        { label: 'Valor Inventario (Venta)', value: `$${totalSaleValue.toLocaleString('es-ES', { minimumFractionDigits: 2 })}`, color: '7C3AED' },
-        { label: 'Alertas Críticas', value: criticalItems.length, color: DANGER_COLOR },
-        { label: 'Alertas Medias', value: warningItems.length, color: WARNING_COLOR },
-        { label: 'Categorías', value: totalCategories, color: '0891B2' },
-        { label: 'Sedes', value: totalBranches, color: 'B45309' },
+    // ─── SECCIÓN: MÉTRICAS PRINCIPALES ──────────────────────────────────
+    const metricsHeaderRow = dataStartRow + 1;
+    dashboardSheet.mergeCells(`B${metricsHeaderRow}:I${metricsHeaderRow}`);
+    const metricsHeader = dashboardSheet.getCell(`B${metricsHeaderRow}`);
+    metricsHeader.value = 'MÉTRICAS PRINCIPALES';
+    metricsHeader.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+    metricsHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    metricsHeader.alignment = { horizontal: 'center', vertical: 'middle' };
+    dashboardSheet.getRow(metricsHeaderRow).height = 25;
+
+    // Primera fila de métricas (4 métricas)
+    const m1Row = metricsHeaderRow + 1;
+    const metricConfigs = [
+        { label: 'Total Productos', value: totalProducts, fmt: '#,##0' },
+        { label: 'Stock Total', value: totalStock, fmt: '#,##0.00' },
+        { label: 'Valor Inventario (Costo)', value: totalValue, fmt: '$#,##0.00' },
+        { label: 'Valor Inventario (Venta)', value: totalSaleValue, fmt: '$#,##0.00' },
+        { label: 'Alertas Críticas', value: criticalItems.length, fmt: '#,##0' },
+        { label: 'Alertas Medias', value: warningItems.length, fmt: '#,##0' },
+        { label: 'Categorías', value: totalCategories, fmt: '#,##0' },
+        { label: 'Productos OK', value: normalItems.length, fmt: '#,##0' },
     ];
 
-    // Headers métricas
-    const headerRow = dashboardSheet.getRow(metricsStartRow);
-    headerRow.values = ['Métrica', 'Valor', '', 'Métrica', 'Valor', '', 'Métrica', 'Valor'];
-    headerRow.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
-    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
-    headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
-    headerRow.height = 20;
+    // Primera fila (columnas B-C, E-F, H-I)
+    const firstRowMetrics = [0, 1, 2, 3];
+    firstRowMetrics.forEach((idx) => {
+        const config = metricConfigs[idx];
+        const col = idx < 2 ? 'B' : idx < 4 ? 'E' : 'H';
+        const labelCell = dashboardSheet.getCell(`${col}${m1Row}`);
+        labelCell.value = config.label;
+        labelCell.font = { bold: true, size: 11, color: { argb: 'FF334155' } };
+        labelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+        labelCell.alignment = { horizontal: 'left' };
+        labelCell.border = { right: { style: 'thin', color: { argb: 'FFE2E8F0' } } };
 
-    // Datos métricas (3 columnas de 2 métricas cada una)
-    for (let i = 0; i < 8; i++) {
-        const row = dashboardSheet.getRow(metricsStartRow + 1 + Math.floor(i / 3));
-        const col = (i % 3) * 3 + 1;
-        row.getCell(col).value = metrics[i].label;
-        row.getCell(col).font = { bold: true, size: 10, color: { argb: 'FF334155' } };
-        row.getCell(col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
-        row.getCell(col).border = { top: { style: 'thin', color: { argb: 'FFE2E8F0' } }, left: { style: 'thin', color: { argb: 'FFE2E8F0' } }, bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } }, right: { style: 'thin', color: { argb: 'FFE2E8F0' } } };
-
-        const valueCell = row.getCell(col + 1);
-        valueCell.value = metrics[i].value;
-        valueCell.font = { bold: true, size: 12, color: { argb: `FF${metrics[i].color}` } };
-        valueCell.alignment = { horizontal: 'right' };
-        valueCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
-        valueCell.border = { top: { style: 'thin', color: { argb: 'FFE2E8F0' } }, left: { style: 'thin', color: { argb: 'FFE2E8F0' } }, bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } }, right: { style: 'thin', color: { argb: 'FFE2E8F0' } } };
-
-        // Merge label + value with empty cell
-        dashboardSheet.mergeCells(row.number, col, row.number, col + 1);
-        if (col + 2 <= 8) {
-            dashboardSheet.mergeCells(row.number, col + 2, row.number, col + 2);
-        }
-    }
-
-    // Anchos de columna para dashboard
-    dashboardSheet.columns = [
-        { key: 'a', width: 20 },
-        { key: 'b', width: 20 },
-        { key: 'c', width: 2 },
-        { key: 'd', width: 20 },
-        { key: 'e', width: 20 },
-        { key: 'f', width: 2 },
-        { key: 'g', width: 20 },
-        { key: 'h', width: 20 },
-    ];
-
-    // Gráfico de estado (tabla resumen)
-    const chartRow = metricsStartRow + 4;
-    dashboardSheet.mergeCells(`A${chartRow}:H${chartRow}`);
-    const chartTitle = dashboardSheet.getCell(`A${chartRow}`);
-    chartTitle.value = 'RESUMEN POR ESTADO DE STOCK';
-    chartTitle.font = { bold: true, size: 14, color: { argb: 'FF1E293B' } };
-    chartTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
-    chartTitle.alignment = { horizontal: 'center', vertical: 'middle' };
-    chartTitle.border = { top: { style: 'medium', color: { argb: 'FF94A3B8' } }, left: { style: 'medium', color: { argb: 'FF94A3B8' } }, bottom: { style: 'medium', color: { argb: 'FF94A3B8' } }, right: { style: 'medium', color: { argb: 'FF94A3B8' } } };
-    dashboardSheet.getRow(chartRow).height = 25;
-
-    // Tabla de estados
-    const statusHeaders = ['Estado', 'Cantidad', '% del Total', 'Valor Costo', 'Valor Venta'];
-    const statusRow = dashboardSheet.getRow(chartRow + 1);
-    statusHeaders.forEach((h, i) => {
-        const cell = statusRow.getCell(i + 1);
-        cell.value = h;
-        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
-        cell.alignment = { horizontal: 'center' };
-        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        const valCol = String.fromCharCode(col.charCodeAt(0) + 1);
+        const valCell = dashboardSheet.getCell(`${valCol}${m1Row}`);
+        valCell.value = config.value;
+        valCell.font = { bold: true, size: 14, color: { argb: idx < 2 ? 'FF4F46E5' : idx < 4 ? 'FF059669' : 'FF7C3AED' } };
+        valCell.numFmt = config.fmt;
+        valCell.alignment = { horizontal: 'right' };
+        valCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
     });
 
+    // Segunda fila de métricas
+    const m2Row = m1Row + 1;
+    const secondRowMetrics = [4, 5, 6, 7];
+    secondRowMetrics.forEach((idx) => {
+        const config = metricConfigs[idx];
+        const col = idx < 6 ? 'B' : idx < 8 ? 'E' : 'H';
+        const labelCell = dashboardSheet.getCell(`${col}${m2Row}`);
+        labelCell.value = config.label;
+        labelCell.font = { bold: true, size: 11, color: { argb: 'FF334155' } };
+        labelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+        labelCell.alignment = { horizontal: 'left' };
+        labelCell.border = { right: { style: 'thin', color: { argb: 'FFE2E8F0' } } };
+
+        const valCol = String.fromCharCode(col.charCodeAt(0) + 1);
+        const valCell = dashboardSheet.getCell(`${valCol}${m2Row}`);
+        valCell.value = config.value;
+        valCell.font = { bold: true, size: 14, color: { argb: idx === 4 ? 'FFDC2626' : idx === 5 ? 'FFD97706' : 'FF0891B2' } };
+        valCell.numFmt = config.fmt;
+        valCell.alignment = { horizontal: 'right' };
+        valCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+    });
+
+    dashboardSheet.getRow(m1Row).height = 22;
+    dashboardSheet.getRow(m2Row).height = 22;
+
+    // ─── SECCIÓN: RESUMEN POR ESTADO ──────────────────────────────────
+    const statusHeaderRow = m2Row + 2;
+    dashboardSheet.mergeCells(`B${statusHeaderRow}:I${statusHeaderRow}`);
+    const statusHeader = dashboardSheet.getCell(`B${statusHeaderRow}`);
+    statusHeader.value = 'RESUMEN POR ESTADO DE STOCK';
+    statusHeader.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+    statusHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    statusHeader.alignment = { horizontal: 'center', vertical: 'middle' };
+    dashboardSheet.getRow(statusHeaderRow).height = 25;
+
+    // Tabla de estados
+    const statusRow = statusHeaderRow + 1;
+    const statusHeaders = ['Estado', 'Cantidad', '% del Total', 'Valor Costo', 'Valor Venta'];
+
+    // Headers de estado
+    const h1 = dashboardSheet.getCell('B' + String(statusRow));
+    h1.value = statusHeaders[0];
+    h1.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    h1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
+    h1.alignment = { horizontal: 'center' };
+
+    const h2 = dashboardSheet.getCell('C' + String(statusRow));
+    h2.value = statusHeaders[1];
+    h2.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    h2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
+    h2.alignment = { horizontal: 'center' };
+
+    const h3 = dashboardSheet.getCell('D' + String(statusRow));
+    h3.value = statusHeaders[2];
+    h3.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    h3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
+    h3.alignment = { horizontal: 'center' };
+
+    const h4 = dashboardSheet.getCell('E' + String(statusRow));
+    h4.value = statusHeaders[3];
+    h4.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    h4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
+    h4.alignment = { horizontal: 'center' };
+
+    const h5 = dashboardSheet.getCell('F' + String(statusRow));
+    h5.value = statusHeaders[4];
+    h5.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    h5.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
+    h5.alignment = { horizontal: 'center' };
+
+    dashboardSheet.getRow(statusRow).height = 20;
+
     const statusData = [
-        { estado: 'Normal', cantidad: normalItems.length, color: SUCCESS_COLOR },
-        { estado: 'Alerta', cantidad: warningItems.length, color: WARNING_COLOR },
-        { estado: 'Crítico', cantidad: criticalItems.length, color: DANGER_COLOR },
+        { estado: 'Normal', items: normalItems, color: SUCCESS_COLOR },
+        { estado: 'Alerta', items: warningItems, color: WARNING_COLOR },
+        { estado: 'Crítico', items: criticalItems, color: DANGER_COLOR },
     ];
 
     statusData.forEach((item, idx) => {
-        const row = dashboardSheet.getRow(chartRow + 2 + idx);
-        row.getCell(1).value = item.estado;
-        row.getCell(1).font = { bold: true, color: { argb: `FF${item.color}` } };
-        row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } };
+        const rowNum = statusRow + 1 + idx;
+        const cantidad = item.items.length;
+        const pct = totalProducts > 0 ? cantidad / totalProducts : 0;
+        const costo = item.items.reduce((s, i) => s + ((i.stock ? Number(i.stock) : 0) * (i.product.cost ? Number(i.product.cost) : 0)), 0);
+        const venta = item.items.reduce((s, i) => s + ((i.stock ? Number(i.stock) : 0) * (i.product.price ? Number(i.product.price) : 0)), 0);
 
-        row.getCell(2).value = item.cantidad;
-        row.getCell(2).alignment = { horizontal: 'center' };
-        row.getCell(2).numFmt = '#,##0';
+        // Fila: Estado
+        const c1 = dashboardSheet.getCell('B' + String(rowNum));
+        c1.value = item.estado;
+        c1.font = { bold: true, color: { argb: 'FF' + item.color } };
+        c1.alignment = { horizontal: 'left' };
+        c1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
 
-        row.getCell(3).value = totalProducts > 0 ? (item.cantidad / totalProducts) : 0;
-        row.getCell(3).numFmt = '0.00%';
+        // Fila: Cantidad
+        const c2 = dashboardSheet.getCell('C' + String(rowNum));
+        c2.value = cantidad;
+        c2.numFmt = '#,##0';
+        c2.font = { color: { argb: 'FF' + item.color } };
+        c2.alignment = { horizontal: 'right' };
+        c2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
 
-        const costo = item.estado === 'Normal'
-            ? normalItems.reduce((s, i) => s + Number(i.stock) * Number(i.product.cost || 0), 0)
-            : item.estado === 'Alerta'
-                ? warningItems.reduce((s, i) => s + Number(i.stock) * Number(i.product.cost || 0), 0)
-                : criticalItems.reduce((s, i) => s + Number(i.stock) * Number(i.product.cost || 0), 0);
-        row.getCell(4).value = costo;
-        row.getCell(4).numFmt = '$#,##0.00';
+        // Fila: %
+        const c3 = dashboardSheet.getCell('D' + String(rowNum));
+        c3.value = pct;
+        c3.numFmt = '0.00%';
+        c3.font = { color: { argb: 'FF' + item.color } };
+        c3.alignment = { horizontal: 'right' };
+        c3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
 
-        const venta = item.estado === 'Normal'
-            ? normalItems.reduce((s, i) => s + Number(i.stock) * Number(i.product.price || 0), 0)
-            : item.estado === 'Alerta'
-                ? warningItems.reduce((s, i) => s + Number(i.stock) * Number(i.product.price || 0), 0)
-                : criticalItems.reduce((s, i) => s + Number(i.stock) * Number(i.product.price || 0), 0);
-        row.getCell(5).value = venta;
-        row.getCell(5).numFmt = '$#,##0.00';
+        // Fila: Valor Costo
+        const c4 = dashboardSheet.getCell('E' + String(rowNum));
+        c4.value = costo;
+        c4.numFmt = '$#,##0.00';
+        c4.font = { color: { argb: 'FF' + item.color } };
+        c4.alignment = { horizontal: 'right' };
+        c4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
 
-        // Apply borders
-        [1, 2, 3, 4, 5].forEach(col => {
-            const cell = row.getCell(col);
-            cell.border = {
-                top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-                left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-                bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-                right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
-            };
-        });
+        // Fila: Valor Venta
+        const c5 = dashboardSheet.getCell('F' + String(rowNum));
+        c5.value = venta;
+        c5.numFmt = '$#,##0.00';
+        c5.font = { color: { argb: 'FF' + item.color } };
+        c5.alignment = { horizontal: 'right' };
+        c5.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
 
-        row.height = 18;
+        dashboardSheet.getRow(rowNum).height = 18;
     });
 
     // ─── HOJA 2: INVENTARIO COMPLETO ──────────────────────────────────
@@ -281,15 +333,18 @@ export async function generateInventoryExcel(options: ExportOptions = {}): Promi
     // Datos
     data.forEach((item, idx) => {
         const row = inventorySheet.getRow(idx + 2);
-        const stock = Number(item.stock);
-        const minStock = Number(item.minStock);
-        const cost = Number(item.product.cost || 0);
-        const price = Number(item.product.price || 0);
+        const stock = item.stock ? Number(item.stock) : 0;
+        const minStock = item.minStock ? Number(item.minStock) : 0;
+        const cost = item.product.cost ? Number(item.product.cost) : 0;
+        const price = item.product.price ? Number(item.product.price) : 0;
         const level = getStockLevel(stock, minStock);
         const isEven = idx % 2 === 0;
 
+        // Obtener código de barras (nuevo sistema: barcodes relation, fallback: campo viejo)
+        const barcode = item.product.barcodes?.[0]?.code || item.product.barcode || 'Sin código';
+
         const rowData = [
-            item.product.barcode || 'N/A',
+            barcode,
             item.product.name,
             item.product.subGroup?.group?.name || 'Sin categoría',
             item.product.subGroup?.name || 'Sin grupo',
@@ -349,17 +404,23 @@ export async function generateInventoryExcel(options: ExportOptions = {}): Promi
         row.height = 16;
     });
 
-    // Auto-fit columns
+    // Auto-fit columns with appropriate minimum widths
+    const minWidths = [12, 35, 18, 18, 14, 14, 12, 12, 10, 12, 18, 16, 16]; // anchos mínimos por columna
     inventorySheet.columns.forEach((column, index) => {
         if (!column || !column.eachCell) return;
-        let maxLength = invHeaders[index]?.length || 10;
+        const headerLength = invHeaders[index]?.length || 10;
+        let maxLength = headerLength;
         column.eachCell?.({ includeEmpty: false }, (cell) => {
             if (cell.value) {
-                const length = String(cell.value).length;
+                // Para monedas, sumar el ancho del símbolo y separadores
+                const cellValue = typeof cell.value === 'number' ? `$${cell.value.toLocaleString('en-US')}` : String(cell.value);
+                const length = cellValue.length;
                 if (length > maxLength) maxLength = length;
             }
         });
-        column.width = Math.min(Math.max(maxLength + 2, 10), 30);
+        const calculatedWidth = maxLength + 2;
+        const minWidth = minWidths[index] || 10;
+        column.width = Math.min(Math.max(calculatedWidth, minWidth), 50);
     });
 
     // ─── HOJA 3: ALERTAS DE STOCK ────────────────────────────────────
@@ -398,16 +459,19 @@ export async function generateInventoryExcel(options: ExportOptions = {}): Promi
     // Datos de alertas
     alertData.forEach((item, idx) => {
         const row = alertsSheet.getRow(idx + 2);
-        const stock = Number(item.stock);
-        const minStock = Number(item.minStock);
-        const cost = Number(item.product.cost || 0);
-        const price = Number(item.product.price || 0);
+        const stock = item.stock ? Number(item.stock) : 0;
+        const minStock = item.minStock ? Number(item.minStock) : 0;
+        const cost = item.product.cost ? Number(item.product.cost) : 0;
+        const price = item.product.price ? Number(item.product.price) : 0;
         const level = getStockLevel(stock, minStock);
         const diff = stock - minStock;
         const isEven = idx % 2 === 0;
 
+        // Obtener código de barras
+        const barcode = item.product.barcodes?.[0]?.code || item.product.barcode || 'Sin código';
+
         const rowData = [
-            item.product.barcode || 'N/A',
+            barcode,
             item.product.name,
             item.product.subGroup?.group?.name || 'Sin categoría',
             stock,
@@ -453,17 +517,22 @@ export async function generateInventoryExcel(options: ExportOptions = {}): Promi
         row.height = 16;
     });
 
-    // Auto-fit columns for alerts
+    // Auto-fit columns for alerts with appropriate minimum widths
+    const alertMinWidths = [12, 35, 18, 12, 12, 12, 14, 14, 12, 18, 16]; // anchos mínimos por columna
     alertsSheet.columns.forEach((column, index) => {
         if (!column || !column.eachCell) return;
-        let maxLength = alertHeaders[index]?.length || 10;
+        const headerLength = alertHeaders[index]?.length || 10;
+        let maxLength = headerLength;
         column.eachCell?.({ includeEmpty: false }, (cell) => {
             if (cell.value) {
-                const length = String(cell.value).length;
+                const cellValue = typeof cell.value === 'number' ? `$${cell.value.toLocaleString('en-US')}` : String(cell.value);
+                const length = cellValue.length;
                 if (length > maxLength) maxLength = length;
             }
         });
-        column.width = Math.min(Math.max(maxLength + 2, 10), 30);
+        const calculatedWidth = maxLength + 2;
+        const minWidth = alertMinWidths[index] || 10;
+        column.width = Math.min(Math.max(calculatedWidth, minWidth), 50);
     });
 
     // Agregar resumen al final de alertas

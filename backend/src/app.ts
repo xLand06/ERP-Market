@@ -24,6 +24,7 @@ import auditRouter from './modules/audit/audit.routes';
 import dashboardRouter from './modules/dashboard/dashboard.routes';
 import syncRouter from './modules/sync/sync.routes';
 import { startSyncWorker } from './modules/sync/sync-worker';
+import { startCashRegisterAutomation } from './modules/cashFlow/cashFlow-automation';
 import backupRouter from './modules/backup/backup.routes';
 import settingsRouter from './modules/settings/settings.routes';
 import mermaRouter from './modules/merma/merma.routes';
@@ -40,10 +41,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     next();
 });
 
-// ─── BACKGROUND SYNC (Sistema Híbrido) ─────────────────────────────────────────
-// Sync worker para sistema híbrido SQLite + Supabase
-// Intervalo: 15 minutos (900000ms)
+// ─── BACKGROUND WORKERS ────────────────────────────────────────────────────────
+// Sync worker para sistema híbrido SQLite + Supabase (15 min)
 startSyncWorker(900000);
+
+// Automation worker para apertura/cierre de cajas (60 seg)
+startCashRegisterAutomation(60000);
 
 // ─── MIDDLEWARES GLOBALES ───────────────────────────────────────────────────
 app.use(cors({

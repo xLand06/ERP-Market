@@ -66,6 +66,7 @@ export const authMiddleware = (
             role: string;
             name?: string;
             email?: string;
+            branchId?: string;
             canManageInventory?: boolean;
         };
 
@@ -74,6 +75,7 @@ export const authMiddleware = (
             role: decoded.role as 'OWNER' | 'SELLER',
             name: decoded.name,
             email: decoded.email,
+            branchId: decoded.branchId,
             canManageInventory: decoded.canManageInventory,
         };
 
@@ -101,9 +103,9 @@ export const authMiddleware = (
     }
 };
 
-export const generateToken = (user: { id: string; role: string; name?: string; email?: string; canManageInventory?: boolean }): string => {
+export const generateToken = (user: { id: string; role: string; name?: string; email?: string; branchId?: string; canManageInventory?: boolean }): string => {
     return jwt.sign(
-        { id: user.id, role: user.role, name: user.name, email: user.email, canManageInventory: user.canManageInventory },
+        { id: user.id, role: user.role, name: user.name, email: user.email, branchId: user.branchId, canManageInventory: user.canManageInventory },
         env.JWT_SECRET,
         { expiresIn: '12h' }
     );

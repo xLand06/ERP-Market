@@ -53,7 +53,7 @@ export const registerSchema = z.object({
     password: passwordStrengthSchema,
     role: z.enum(['OWNER', 'SELLER']).default('SELLER'),
     canManageInventory: z.boolean().optional(),
-    branchId: z.string().cuid('ID de sucursal inválido').optional(),
+    branchId: z.preprocess((val) => (val === '' ? null : val), z.any().optional()),
 });
 
 /**

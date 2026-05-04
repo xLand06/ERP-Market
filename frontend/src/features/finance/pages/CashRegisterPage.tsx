@@ -16,7 +16,6 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
 import { useConfigStore } from '@/hooks/useConfigStore';
-import { useAutoOpenRegister } from '@/hooks/useAutoOpenRegister';
 
 function StatCard({ icon: Icon, label, value, color, bg }: {
     icon: React.ElementType; label: string; value: string; color: string; bg: string;
@@ -165,13 +164,6 @@ export default function CashRegisterPage() {
             await api.post(`/cash-flow/${openRegister.id}/movement`, { branchId: effectiveBranch, subType, amount, notes });
         },
         onSuccess: () => { setEntryOpen(false); refetch(); }
-    });
-
-    // Auto-apertura por horario configurado en Settings
-    useAutoOpenRegister({
-        branchId: effectiveBranch || null,
-        hasOpenRegister: !!openRegister,
-        onOpened: refetch,
     });
 
     const historyBranchId = selectedBranch === 'all' ? undefined : effectiveBranch;

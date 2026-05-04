@@ -100,11 +100,17 @@ api.interceptors.response.use(
 
         // Toast de error — silenciar para endpoints del dashboard y reportes
         const url = originalRequest.url || '';
+        const data = error.response?.data as any;
+
         if (!isSilent(url)) {
-            const message = error.response?.data
-                ? (error.response.data as { error?: string }).error || error.message
-                : error.message;
-            toast.error(message, { duration: 4000 });
+            // Si hay detalles de validación, dejamos que el componente los maneje
+            // para evitar doble toast (global + local)
+            if (data?.details) {
+                console.log('[API] Validation details found, skipping global toast');
+            } else {
+                const message = data?.error || error.message;
+                toast.error(message, { duration: 4000 });
+            }
         }
 
         console.error('[API Error]', error.response?.status, originalRequest.url);

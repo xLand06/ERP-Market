@@ -11,6 +11,7 @@ interface ConfigState {
     rates: Record<string, number>;
     iva: number;
     autoOpenTime: string | null; // 'HH:mm' o null para desactivado
+    autoCloseTime: string | null; // 'HH:mm' o null para desactivado
     purgeRetentionDays: number; // Días de retención para transacciones en purga automática
     purgeLogRetentionDays: number; // Días de retención para logs en purga automática
     // Convenience getters
@@ -22,6 +23,7 @@ interface ConfigState {
     updateRate: (code: string, rate: number) => Promise<void>;
     setIva: (iva: number) => void;
     setAutoOpenTime: (time: string | null) => void;
+    setAutoCloseTime: (time: string | null) => void;
     setPurgeRetention: (days: number) => void;
     setPurgeLogRetention: (days: number) => void;
     fetchSettings: () => Promise<void>;
@@ -52,6 +54,7 @@ export const useConfigStore = create<ConfigState>()(
             },
             iva: 0,
             autoOpenTime: null,
+            autoCloseTime: null,
             purgeRetentionDays: 30,
             purgeLogRetentionDays: 90,
 
@@ -134,6 +137,7 @@ export const useConfigStore = create<ConfigState>()(
 
             setIva: (iva) => set({ iva }),
             setAutoOpenTime: (time) => set({ autoOpenTime: time }),
+            setAutoCloseTime: (time) => set({ autoCloseTime: time }),
             setPurgeRetention: (days) => set({ purgeRetentionDays: days }),
             setPurgeLogRetention: (days) => set({ purgeLogRetentionDays: days }),
 
@@ -144,6 +148,7 @@ export const useConfigStore = create<ConfigState>()(
                         set({
                             iva: res.data.data.iva,
                             autoOpenTime: res.data.data.autoOpenTime,
+                            autoCloseTime: res.data.data.autoCloseTime,
                             purgeRetentionDays: res.data.data.purgeRetentionDays,
                             purgeLogRetentionDays: res.data.data.purgeLogRetentionDays
                         });

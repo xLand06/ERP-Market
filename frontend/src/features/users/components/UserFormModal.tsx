@@ -48,11 +48,13 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
     const [telefono, setTelefono] = useState('');
     
     const [saving, setSaving] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string[]>>({});
     const initialFocusRef = useRef<HTMLInputElement>(null);
 
     // Auto-fill form when user changes or reset on open
     useEffect(() => {
         if (open) {
+            setErrors({});
             if (user) {
                 setUsername(user.username || '');
                 setPassword(''); // No pre-fill password
@@ -113,6 +115,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
+        setErrors({});
         try {
             // Build full cedula "V-12345678"
             const fullCedula = `${cedulaType}-${cedulaNumber.trim()}`;
@@ -154,10 +157,30 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
         } catch (error: any) {
             console.error('Error saving user:', error);
             const backendMsg = error?.response?.data?.error;
-            toast.error(backendMsg || 'Error al guardar el usuario. Verifica los campos.');
+            const details = error?.response?.data?.details;
+
+            if (details) {
+                setErrors(details);
+                toast.error('Verifica los errores de validación');
+            } else {
+                toast.error(backendMsg || 'Error al guardar el usuario. Verifica los campos.');
+            }
         } finally {
             setSaving(false);
         }
+    };
+
+    const renderError = (field: string) => {
+        if (!errors[field]) return null;
+        return (
+            <div className="mt-1 flex flex-col gap-0.5">
+                {errors[field].map((err, i) => (
+                    <p key={i} className="text-[10px] leading-tight text-red-500 font-bold animate-in fade-in slide-in-from-top-1 duration-200">
+                        {err}
+                    </p>
+                ))}
+            </div>
+        );
     };
 
     return (
@@ -180,6 +203,12 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                         <X className="w-5 h-5" />
                     </button>
                 </div>
+
+                {errors['_'] && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
+                        {renderError('_')}
+                    </div>
+                )}
                 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -196,6 +225,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                 aria-required="true"
                                 placeholder="Ej: María"
                             />
+                            {renderError('nombre')}
                         </div>
                         <div>
                             <label htmlFor="apellido" className="block text-sm font-semibold text-slate-700 mb-1.5">Apellido</label>
@@ -207,6 +237,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
                                 placeholder="Ej: González"
                             />
+                            {renderError('apellido')}
                         </div>
                     </div>
 
@@ -233,6 +264,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                     placeholder="12345678"
                                 />
                             </div>
+                            {renderError('cedula')}
                         </div>
                         <div>
                             <label htmlFor="telefono" className="block text-sm font-semibold text-slate-700 mb-1.5">Teléfono</label>
@@ -244,6 +276,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
                                 placeholder="04121234567"
                             />
+                            {renderError('telefono')}
                         </div>
                     </div>
 
@@ -261,6 +294,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                 placeholder="Ej: mgonzalez"
                                 autoComplete="off"
                             />
+                            {renderError('username')}
                             <p className="text-xs text-slate-500 mt-1">Este identificador será usado para iniciar sesión.</p>
                         </div>
                     )}
@@ -275,6 +309,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                             className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
                             placeholder="correo@ejemplo.com"
                         />
+                        {renderError('email')}
                     </div>
 
                     <div>
@@ -292,6 +327,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                             placeholder={user ? 'Dejar en blanco para no cambiar' : '••••••••'}
                             autoComplete="new-password"
                         />
+                        {renderError('password')}
                         {!user && <p className="text-[10px] text-slate-400 mt-1">Mín. 8 caracteres, 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial.</p>}
                     </div>
 
@@ -309,6 +345,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                 <option value="SELLER">Vendedor</option>
                                 <option value="OWNER">Administrador</option>
                             </select>
+                            {renderError('role')}
                         </div>
                         <div>
                             <label htmlFor="branchId" className="block text-sm font-semibold text-slate-700 mb-1.5">Sucursal</label>
@@ -323,6 +360,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                     <option key={b.id} value={b.id}>{b.name}</option>
                                 ))}
                             </select>
+                            {renderError('branchId')}
                         </div>
                     </div>
 

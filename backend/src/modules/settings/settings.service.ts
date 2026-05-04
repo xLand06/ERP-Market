@@ -8,6 +8,7 @@ const SETTINGS_FILE = path.join(CONFIG_DIR, 'system-settings.json');
 export interface SystemSettings {
     iva: number;
     autoOpenTime: string | null;
+    autoCloseTime: string | null;
     purgeRetentionDays: number;
     purgeLogRetentionDays: number;
 }
@@ -15,6 +16,7 @@ export interface SystemSettings {
 const DEFAULT_SETTINGS: SystemSettings = {
     iva: 0,
     autoOpenTime: null,
+    autoCloseTime: null,
     purgeRetentionDays: 30,
     purgeLogRetentionDays: 90
 };
