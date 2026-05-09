@@ -29,7 +29,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             '/finance/cash-register',
             '/audit',
             '/users',
-            '/settings'
+            '/settings',
+            '/merma'
         ]
     },
     FULL: {
@@ -49,7 +50,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             '/purchases',
             '/directory',
             '/audit',
-            '/sales'
+            '/sales',
+            '/merma'
         ]
     }
 };
@@ -68,7 +70,8 @@ export const ROLE_CONFIG: Record<RoleType, RoleConfig> = {
             '/finance/cash-register',
             '/audit',
             '/users',
-            '/settings'
+            '/settings',
+            '/merma'
         ]
     },
     SELLER: {
@@ -79,7 +82,8 @@ export const ROLE_CONFIG: Record<RoleType, RoleConfig> = {
             '/products',
             '/sales',
             '/finance/cash-register',
-            '/directory'
+            '/directory',
+            '/merma'
         ]
     }
 };

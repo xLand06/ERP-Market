@@ -15,7 +15,7 @@ const router = Router();
 router.use(authMiddleware);
 
 /** POST /api/cash-flow/open — Abrir caja */
-router.post('/open', validate(openCashRegisterSchema), ctrl.openRegister);
+router.post('/open', roleGuard('SELLER'), validate(openCashRegisterSchema), ctrl.openRegister);
 
 /** PATCH /api/cash-flow/:id/close — Cerrar arqueo (solo OWNER) */
 router.patch('/:id/close', 

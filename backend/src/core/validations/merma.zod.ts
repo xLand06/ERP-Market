@@ -8,6 +8,7 @@ export const mermaReasonSchema = z.enum(['DAMAGED', 'EXPIRED', 'SOBRANTE', 'BAD_
 
 export const createMermaSchema = z.object({
     productId: z.string().min(1, 'El producto es requerido'),
+    branchId: z.string().optional(),
     quantity: z.number().positive('La cantidad debe ser mayor a 0'),
     reason: mermaReasonSchema,
     description: z.string().optional(),

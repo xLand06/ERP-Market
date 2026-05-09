@@ -17,7 +17,7 @@ router.use(authMiddleware);
 /**
  * POST /api/pos/transactions — Crear venta o entrada
  */
-router.post('/transactions', validate(createTransactionSchema), ctrl.createTransaction);
+router.post('/transactions', roleGuard('SELLER'), validate(createTransactionSchema), ctrl.createTransaction);
 
 /**
  * GET /api/pos/transactions — Historial con filtros

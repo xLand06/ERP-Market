@@ -12,7 +12,7 @@ import { logAudit, extractIp } from '../../core/middlewares/audit.middleware';
 export const createMerma = async (req: AuthRequest, res: Response) => {
     try {
         const data = validatedData(req, 'body');
-        const branchId = req.user!.branchId;
+        const branchId = req.user!.branchId || data.branchId;
         if (!branchId) {
             return res.status(400).json({ success: false, error: 'El usuario no tiene una sucursal asignada' });
         }

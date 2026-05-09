@@ -67,7 +67,8 @@ export interface MermaReportItem {
 
 export interface CreateMermaInput {
     productId: string;
-    quantity: number;
+    branchId?: string;
+    quantity: number | string;
     reason: MermaReason;
     description?: string;
 }

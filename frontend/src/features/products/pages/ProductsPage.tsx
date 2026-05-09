@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit2, PackageX, PackageCheck, AlertCircle, Download, PackageSearch } from 'lucide-react';
+import { Plus, Search, Edit2, PackageX, PackageCheck, AlertCircle, Download, PackageSearch, Percent } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -177,6 +177,7 @@ export default function ProductsPage() {
                                     <th>C. Barras</th>
                                     <th className="text-right">Costo</th>
                                     <th className="text-right">Precio Venta</th>
+                                    <th className="text-center">Merma</th>
                                     <th className="text-center">Estado</th>
                                     {isOwner && <th className="w-24 text-right">Acciones</th>}
                                 </tr>
@@ -184,7 +185,7 @@ export default function ProductsPage() {
                             <tbody>
                                 {isLoading ? (
                                     <tr>
-                                        <td colSpan={8} className="text-center py-10 text-sm text-slate-400">
+                                        <td colSpan={9} className="text-center py-10 text-sm text-slate-400">
                                             Cargando productos...
                                         </td>
                                     </tr>
@@ -241,6 +242,16 @@ export default function ProductsPage() {
                                             </span>
                                         </td>
                                         <td className="text-center">
+                                            {prod.expectedSpoilagePercent ? (
+                                                <span className="inline-flex items-center gap-1 text-xs font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md">
+                                                    <Percent className="w-3 h-3" />
+                                                    {prod.expectedSpoilagePercent}%
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-slate-300">—</span>
+                                            )}
+                                        </td>
+                                        <td className="text-center">
                                             <Badge variant={prod.isActive ? 'success' : 'default'} className="px-2 font-semibold">
                                                 {prod.isActive ? 'Activo' : 'Inactivo'}
                                             </Badge>
@@ -277,7 +288,7 @@ export default function ProductsPage() {
                                 ))}
                                 {!isLoading && products.length === 0 && !isError && (
                                     <tr>
-                                        <td colSpan={8} className="text-center py-12">
+                                        <td colSpan={9} className="text-center py-12">
                                             <PackageX className="w-10 h-10 text-slate-300 mx-auto mb-3" />
                                             <p className="text-base font-semibold text-slate-700">No se encontraron productos</p>
                                             <p className="text-sm text-slate-500 mt-1">Ajusta los filtros o crea un nuevo registro.</p>

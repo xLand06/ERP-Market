@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
-    Search, Barcode, Package, DollarSign, Smartphone, X, Check, Loader2, ShoppingCart, PackagePlus, Lock, Play
+    Search, Barcode, Package, DollarSign, Smartphone, X, Check, Loader2, ShoppingCart, PackagePlus, Lock, Play, Store
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -93,27 +93,25 @@ function ProductCard({ product, onAdd, onShowPresentations }: {
             onClick={handle}
             disabled={product.stock === 0}
             className={cn(
-                'flex flex-row sm:flex-col gap-3 p-3.5 rounded-xl border text-left transition-all duration-200 group relative',
-                'hover:border-emerald-400 hover:shadow-lg sm:hover:-translate-y-1 active:scale-[0.97]',
+                'flex flex-col gap-2 p-3 rounded-xl border text-left transition-all duration-200 group relative h-full min-h-[150px] w-full',
+                'hover:border-emerald-400 hover:shadow-md hover:-translate-y-1 active:scale-[0.98]',
                 flash ? 'border-emerald-500 bg-emerald-50 shadow-inner' : 'border-slate-200 bg-white',
-                product.stock === 0 && 'opacity-40 cursor-not-allowed hover:border-slate-200 hover:shadow-none sm:hover:translate-y-0'
+                product.stock === 0 && 'opacity-40 cursor-not-allowed hover:border-slate-200 hover:shadow-none hover:translate-y-0'
             )}
         >
-            <div className="w-12 h-12 sm:w-auto sm:h-auto rounded-lg bg-slate-50 sm:bg-transparent flex items-center justify-center shrink-0 group-hover:bg-white transition-colors">
-                <Package className="w-6 h-6 text-slate-400 group-hover:text-emerald-500 transition-all group-hover:scale-110" />
+            <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center shrink-0 group-hover:bg-white transition-colors">
+                <Package className="w-5 h-5 text-slate-400 group-hover:text-emerald-500 transition-all group-hover:scale-110" />
             </div>
-            <div className="flex flex-col flex-1 min-w-0 justify-center sm:justify-start">
-                <p className="text-[13px] sm:text-xs font-bold text-slate-800 line-clamp-2 leading-snug mb-1">{product.name}</p>
-                <div className="flex flex-col sm:flex-row sm:items-end justify-between mt-auto gap-2">
-                    <div>
-                        <p className="text-sm font-black text-slate-900 tabular-nums leading-none">{fmtCOP(product.price)}</p>
-                    </div>
-                    <div className="sm:opacity-80 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
-                        {product.presentations.length > 0 && (
-                            <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-bold whitespace-nowrap">
+            <div className="flex flex-col flex-1 min-w-0 w-full">
+                <p className="text-[12px] font-bold text-slate-800 line-clamp-2 leading-tight mb-2 h-8">{product.name}</p>
+                <div className="mt-auto pt-2 border-t border-slate-50 space-y-2">
+                    <p className="text-sm font-black text-slate-900 tabular-nums leading-none">{fmtCOP(product.price)}</p>
+                    <div className="flex items-center justify-between gap-1.5">
+                        {product.presentations.length > 0 ? (
+                            <span className="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-bold whitespace-nowrap">
                                 {product.presentations.length} pres.
                             </span>
-                        )}
+                        ) : <div/>}
                         <StockBadge stock={product.stock} unit={product.baseUnit} />
                     </div>
                 </div>
@@ -375,7 +373,7 @@ export default function POSPage() {
                 name: item.product.name,
                 price: Number(item.product.price), // en COP
                 stock: Number(item.stock),
-                category: typeof item.product.subGroup === 'object' ? (item.product.subGroup?.name || 'Varios') : (item.product.subGroup || 'Varios'),
+                category: typeof item.product.subGroup === 'object' ? ((item.product.subGroup as any)?.name || 'Varios') : (item.product.subGroup || 'Varios'),
                 baseUnit: item.product.baseUnit || 'UNIDAD',
                 presentations: (item.product.presentations || []).map((p: any) => ({
                     id: p.id,
@@ -593,8 +591,35 @@ export default function POSPage() {
     const subtotal = cart.reduce((s, i) => s + i.currentPrice * i.qty, 0);
     const total = subtotal + (subtotal * iva);
 
-    if (!selectedBranch) {
-        return <div className="h-full flex items-center justify-center text-slate-500 pb-20">Por favor, seleccione una sede en la configuración.</div>;
+    if (!selectedBranch || selectedBranch === 'all') {
+        return (
+            <div className="flex flex-col items-center justify-center h-full max-w-2xl mx-auto text-center gap-6 pb-20">
+                <div className="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-full flex justify-center items-center mb-2">
+                    <Store className="w-8 h-8" />
+                </div>
+                <h2 className="text-2xl font-black text-slate-800">Selecciona una Sucursal</h2>
+                <p className="text-slate-500 max-w-md">
+                    Para acceder al Punto de Venta, necesitas seleccionar en qué sucursal vas a operar.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full mt-4">
+                    {branches.map((b: any) => (
+                        <button
+                            key={b.id}
+                            onClick={() => useAuthStore.getState().setSelectedBranch(b.id)}
+                            className="p-5 rounded-2xl border border-slate-200 bg-white hover:border-indigo-500 hover:shadow-md transition-all flex items-center gap-4 text-left group"
+                        >
+                            <div className="w-12 h-12 rounded-xl bg-slate-50 group-hover:bg-indigo-50 flex items-center justify-center shrink-0 transition-colors">
+                                <Store className="w-6 h-6 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">{b.name}</h3>
+                                <p className="text-xs text-slate-500 mt-1">Operar en esta sucursal</p>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        );
     }
 
     // ── CAJA CERRADA — Pantalla de bloqueo ──────────────────────────────
@@ -740,7 +765,7 @@ export default function POSPage() {
                     ))}
                 </div>
 
-                <div className="flex-1 overflow-y-auto grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-4 content-start">
+                <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 content-start">
                     {isLoading ? (
                         <div className="col-span-full h-32 flex items-center justify-center">
                             <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import {
     TrendingUp, TrendingDown, DollarSign, ArrowUpCircle,
-    Plus, Lock, Circle, Play, History, ChevronLeft, ChevronRight, Calendar, Copy, Eye, ShoppingBag, PackageMinus
+    Plus, Lock, Circle, Play, History, ChevronLeft, ChevronRight, Calendar, Copy, Eye, ShoppingBag, PackageMinus, Store
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -247,7 +247,34 @@ export default function CashRegisterPage() {
         }
 
         if (!effectiveBranch) {
-            return <div className="h-full flex items-center justify-center text-slate-500 pb-20">Por favor, seleccione una sede en la configuración.</div>;
+            return (
+                <div className="flex flex-col items-center justify-center h-full max-w-2xl mx-auto text-center gap-6 pb-20">
+                    <div className="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-full flex justify-center items-center mb-2">
+                        <Store className="w-8 h-8" />
+                    </div>
+                    <h2 className="text-2xl font-black text-slate-800">Selecciona una Sucursal</h2>
+                    <p className="text-slate-500 max-w-md">
+                        Para acceder al flujo de caja, necesitas seleccionar en qué sucursal vas a operar.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full mt-4">
+                        {branches.map((b: any) => (
+                            <button
+                                key={b.id}
+                                onClick={() => setSelectedBranch(b.id)}
+                                className="p-5 rounded-2xl border border-slate-200 bg-white hover:border-indigo-500 hover:shadow-md transition-all flex items-center gap-4 text-left group"
+                            >
+                                <div className="w-12 h-12 rounded-xl bg-slate-50 group-hover:bg-indigo-50 flex items-center justify-center shrink-0 transition-colors">
+                                    <Store className="w-6 h-6 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">{b.name}</h3>
+                                    <p className="text-xs text-slate-500 mt-1">Operar en esta sucursal</p>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            );
         }
 
         if (isLoading) {
