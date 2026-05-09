@@ -1,7 +1,7 @@
 import '../config/env';
 import path from 'path';
 import { PrismaClient } from '@prisma/client';
-import { PrismaClient as PrismaClientLocal } from '.prisma/client-local';
+import { PrismaClient as PrismaClientLocal } from '../../node_modules/.prisma/client-local';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
 import { Pool } from 'pg';
