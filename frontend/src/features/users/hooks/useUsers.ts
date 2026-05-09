@@ -3,11 +3,11 @@ import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
 import type { User, Employee } from '../types';
 
-export function useUsers() {
+export function useUsers(filters: { search?: string; role?: string; isActive?: string } = {}) {
     return useQuery({
-        queryKey: ['users'],
+        queryKey: ['users', filters],
         queryFn: async () => {
-            const res = await api.get('/users');
+            const res = await api.get('/users', { params: filters });
             return res.data.data as User[];
         },
         retry: false,

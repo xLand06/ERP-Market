@@ -4,9 +4,10 @@ import { AuthRequest } from '../../core/middlewares/auth.middleware';
 import { logAudit, extractIp } from '../../core/middlewares/audit.middleware';
 import { validatedData } from '../../core/middlewares/validate.middleware';
 
-export const getAll = async (_req: Request, res: Response): Promise<void> => {
+export const getAll = async (req: Request, res: Response): Promise<void> => {
     try {
-        const users = await usersService.getAllUsers();
+        const filters = req.query;
+        const users = await usersService.getAllUsers(filters as any);
         res.json({ success: true, data: users });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

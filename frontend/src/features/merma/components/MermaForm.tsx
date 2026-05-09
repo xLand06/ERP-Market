@@ -146,7 +146,7 @@ export function MermaForm({ open, onOpenChange }: MermaFormProps) {
 
             await createMerma.mutateAsync(submitData);
             toast({ 
-                title: '✅ Merma registrada', 
+                title: 'Merma registrada', 
                 description: 'El registro se ha guardado en el historial de auditoría' 
             });
             onOpenChange(false);

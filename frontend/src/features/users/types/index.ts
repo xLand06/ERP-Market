@@ -8,6 +8,7 @@ export interface User {
     role: 'OWNER' | 'SELLER';
     canManageInventory?: boolean;
     branchId?: string;
+    branch?: { name: string };
     isActive: boolean;
     createdAt: string;
 }

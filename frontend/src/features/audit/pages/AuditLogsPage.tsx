@@ -19,6 +19,7 @@ import toast from 'react-hot-toast';
 import { getAuditLogs, AuditLog, AuditFilters } from '../services/auditService';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useUsers } from '@/features/users/hooks';
 
 const MODULE_ICONS: Record<string, React.ReactNode> = {
     'AUTH': <Shield className="w-4 h-4" />,
@@ -238,6 +239,7 @@ const AuditLogsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [filters, setFilters] = useState<AuditFilters>({ page: 1, limit: 20 });
     const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+    const { data: users = [] } = useUsers();
 
     const fetchLogs = async () => {
         setLoading(true);
@@ -287,8 +289,8 @@ const AuditLogsPage: React.FC = () => {
                     </div>
                 </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+ 
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input 
@@ -312,6 +314,22 @@ const AuditLogsPage: React.FC = () => {
                         <option value="INVENTORY">Inventario</option>
                         <option value="FINANCE">Finanzas</option>
                         <option value="USERS">Usuarios</option>
+                    </select>
+                </div>
+                <div className="relative">
+                    <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <select 
+                        name="userId"
+                        className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none appearance-none"
+                        onChange={handleFilterChange}
+                        value={filters.userId || ''}
+                    >
+                        <option value="">Todos los usuarios</option>
+                        {users.map(u => (
+                            <option key={u.id} value={u.id}>
+                                {`${u.nombre} ${u.apellido || ''}`.trim() || u.username}
+                            </option>
+                        ))}
                     </select>
                 </div>
                 <div>

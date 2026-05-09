@@ -7,8 +7,25 @@ import { prisma } from '../../config/prisma';
 import bcrypt from 'bcryptjs';
 import { RegisterInput, UpdateUserInput } from '../../core/validations/auth.zod';
 
-export const getAllUsers = () =>
-    prisma.user.findMany({
+export const getAllUsers = (filters: { 
+    search?: string; 
+    role?: string; 
+    isActive?: string;
+} = {}) => {
+    const { search, role, isActive } = filters;
+    
+    return prisma.user.findMany({
+        where: {
+            ...(role && { role }),
+            ...(isActive !== undefined && { isActive: isActive === 'true' }),
+            ...(search && {
+                OR: [
+                    { nombre: { contains: search, mode: 'insensitive' } },
+                    { username: { contains: search, mode: 'insensitive' } },
+                    { email: { contains: search, mode: 'insensitive' } },
+                ]
+            })
+        },
         select: { 
             id: true, 
             username: true, 
@@ -26,6 +43,7 @@ export const getAllUsers = () =>
         },
         orderBy: { createdAt: 'desc' },
     });
+};
 
 export const getUserById = (id: string) =>
     prisma.user.findUnique({
