@@ -48,7 +48,13 @@ export type AuditActionType =
     | 'SYSTEM_PURGE'
     | 'LOGIN'
     | 'LOGIN_FAILED'
-    | 'MERMA_CREATE';
+    | 'MERMA_CREATE'
+    | 'BATCH_CREATE'
+    | 'BATCH_UPDATE'
+    | 'BATCH_DELETE'
+    | 'STOCKCOUNT_CREATE'
+    | 'STOCKCOUNT_STATUS_UPDATE'
+    | 'STOCKCOUNT_APPLY';
 
 /**
  * Extrae la IP real del cliente, considerando proxies y load balancers.

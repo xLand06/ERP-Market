@@ -7,6 +7,9 @@ export interface TransactionItemInput {
     presentationId?: string;
     quantity: number;
     unitPrice: number;
+    // Lote / Vencimiento (opcional — solo para INVENTORY_IN)
+    batchCode?: string;
+    expiryDate?: string; // ISO date string: 'YYYY-MM-DD'
 }
 
 export interface PaymentMethodInput {
@@ -135,7 +138,7 @@ export const createTransaction = async (input: CreateTransactionInput) => {
                 exchangeRate: exchangeRate ?? null,
                 invoiceNumber: invoiceNumber || null,
                 // Campo multi-pago
-                paymentMethods: paymentMethodsData,
+                paymentMethods: paymentMethodsData as any,
                 items: {
                     create: processedItems.map((item) => ({
                         productId: item.productId,
@@ -169,6 +172,33 @@ export const createTransaction = async (input: CreateTransactionInput) => {
                     where: { id: item.productId },
                     data: { cost: item.unitPrice }, // unitPrice ya está en COP
                 });
+
+                // Si el ítem trae datos de lote, crear o actualizar el ProductBatch
+                const rawItem = items.find(i => i.productId === item.productId);
+                if (rawItem?.batchCode && rawItem?.expiryDate) {
+                    await (tx as any).productBatch.upsert({
+                        where: {
+                            batchCode_productId_branchId: {
+                                batchCode: rawItem.batchCode,
+                                productId: item.productId,
+                                branchId,
+                            },
+                        },
+                        update: {
+                            quantity: { increment: item.totalUnitsToDeduct },
+                            costPrice: item.unitPrice,
+                            expiryDate: new Date(rawItem.expiryDate),
+                        },
+                        create: {
+                            batchCode: rawItem.batchCode,
+                            productId: item.productId,
+                            branchId,
+                            expiryDate: new Date(rawItem.expiryDate),
+                            quantity: item.totalUnitsToDeduct,
+                            costPrice: item.unitPrice,
+                        },
+                    });
+                }
             }
         }
 

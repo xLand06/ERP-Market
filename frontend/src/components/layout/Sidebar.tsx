@@ -4,7 +4,7 @@ import { useAuthStore } from '@/features/auth/store/authStore';
 import {
     LayoutDashboard, Package, ShoppingCart,
     Coins, Users, Truck, BarChart2, ShieldCheck, Store, PanelLeftClose, PanelLeftOpen, X,
-    Settings, Tag, TrendingDown, History
+    Settings, Tag, TrendingDown, History, CalendarClock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isPathAllowed } from '@/lib/planConfig';
@@ -22,6 +22,7 @@ const navItems: NavItem[] = [
     { name: 'Flujo de Caja', path: '/finance/cash-register', icon: Coins },
     { name: 'Productos', path: '/products', icon: Tag },
     { name: 'Inventario', path: '/inventory', icon: Package },
+    { name: 'Lotes y Vencimientos', path: '/inventory/batches', icon: CalendarClock },
     { name: 'Merma', path: '/merma', icon: TrendingDown },
     { name: 'Compras', path: '/purchases', icon: Truck },
     { name: 'Proveedores', path: '/suppliers', icon: Users },
@@ -50,7 +51,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                     </div>
                     {!collapsed && (
                         <span className="font-bold text-white text-base lg:text-lg tracking-tight whitespace-nowrap animate-in fade-in duration-300 delay-150">
-                            ABASTOS SOFIMAR
+                            ALLMARKET
                         </span>
                     )}
                 </div>

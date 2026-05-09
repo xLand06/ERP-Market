@@ -168,10 +168,11 @@ export const updateOrderStatus = async (id: string, data: UpdatePurchaseOrderSta
                     data: { cost: item.unitCost },
                 });
 
-                // 3. Crear lote si hay información de batch en notes
-                const batchInfo = parseBatchInfo(item.notes);
+                // 3. (Opcional) Crear lote si el ítem tuviera campos de lote
+                // TODO: Agregar batchCode/expiryDate a PurchaseOrderItem en el schema si se requiere
+                /*
+                const batchInfo = parseBatchInfo((item as any).notes);
                 if (batchInfo?.batchCode && batchInfo?.expiryDate) {
-                    // Verificar si el lote ya existe
                     const existingBatch = await tx.productBatch.findFirst({
                         where: {
                             batchCode: batchInfo.batchCode,
@@ -181,13 +182,11 @@ export const updateOrderStatus = async (id: string, data: UpdatePurchaseOrderSta
                     });
 
                     if (existingBatch) {
-                        // Incrementar cantidad del lote existente
                         await tx.productBatch.update({
                             where: { id: existingBatch.id },
                             data: { quantity: { increment: item.quantity } },
                         });
                     } else {
-                        // Crear nuevo lote
                         await tx.productBatch.create({
                             data: {
                                 batchCode: batchInfo.batchCode,
@@ -200,6 +199,7 @@ export const updateOrderStatus = async (id: string, data: UpdatePurchaseOrderSta
                         });
                     }
                 }
+                */
             }
         }
 

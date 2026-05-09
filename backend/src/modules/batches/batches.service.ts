@@ -110,25 +110,33 @@ export const deleteBatch = async (id: string) => {
  * @param branchId Filtrar por sucursal (opcional)
  */
 export const getExpiringBatches = async (days: number = 30, branchId?: string) => {
-    const today = new Date();
-    const futureDate = new Date();
-    futureDate.setDate(today.getDate() + days);
+    try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Inicio del día
 
-    return prisma.productBatch.findMany({
-        where: {
-            branchId: branchId || undefined,
-            expiryDate: {
-                gte: today,
-                lte: futureDate,
+        const futureDate = new Date();
+        futureDate.setDate(today.getDate() + days);
+        futureDate.setHours(23, 59, 59, 999); // Fin del día futuro
+
+        return await prisma.productBatch.findMany({
+            where: {
+                ...(branchId && branchId !== 'all' ? { branchId } : {}),
+                expiryDate: {
+                    gte: today,
+                    lte: futureDate,
+                },
+                quantity: { gt: 0 },
             },
-            quantity: { gt: 0 }, // Solo lotes con stock
-        },
-        include: {
-            product: { select: { id: true, name: true, barcode: true } },
-            branch: { select: { id: true, name: true } },
-        },
-        orderBy: { expiryDate: 'asc' },
-    });
+            include: {
+                product: { select: { id: true, name: true, barcode: true } },
+                branch: { select: { id: true, name: true } },
+            },
+            orderBy: { expiryDate: 'asc' },
+        });
+    } catch (error: any) {
+        console.error('[BatchesService.getExpiringBatches] Error:', error);
+        throw error;
+    }
 };
 
 /**
@@ -136,20 +144,26 @@ export const getExpiringBatches = async (days: number = 30, branchId?: string) =
  * @param branchId Filtrar por sucursal (opcional)
  */
 export const getExpiredBatches = async (branchId?: string) => {
-    const today = new Date();
+    try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-    return prisma.productBatch.findMany({
-        where: {
-            branchId: branchId || undefined,
-            expiryDate: { lt: today },
-            quantity: { gt: 0 }, // Solo lotes con stock
-        },
-        include: {
-            product: { select: { id: true, name: true, barcode: true } },
-            branch: { select: { id: true, name: true } },
-        },
-        orderBy: { expiryDate: 'asc' },
-    });
+        return await prisma.productBatch.findMany({
+            where: {
+                ...(branchId && branchId !== 'all' ? { branchId } : {}),
+                expiryDate: { lt: today },
+                quantity: { gt: 0 },
+            },
+            include: {
+                product: { select: { id: true, name: true, barcode: true } },
+                branch: { select: { id: true, name: true } },
+            },
+            orderBy: { expiryDate: 'asc' },
+        });
+    } catch (error: any) {
+        console.error('[BatchesService.getExpiredBatches] Error:', error);
+        throw error;
+    }
 };
 
 /**

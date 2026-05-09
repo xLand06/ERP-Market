@@ -147,11 +147,11 @@ function createTray(): void {
     const iconPath = join(__dirname, is.dev ? '../../resources/icon.png' : '../resources/icon.png');
     const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
     tray = new Tray(icon);
-    tray.setToolTip('ERP-Market — Abastos Sofimar');
+    tray.setToolTip('ALLMARKET -- AbastosSofimar');
 
     const contextMenu = Menu.buildFromTemplate([
         {
-            label: 'Abrir ERP-Market',
+            label: 'Abrir ALLMARKET',
             click: () => {
                 if (mainWindow) {
                     mainWindow.show();
@@ -262,7 +262,7 @@ function createMenu(): void {
             label: 'Ayuda',
             submenu: [
                 {
-                    label: 'Acerca de ERP-Market',
+                    label: 'Acerca de ALLMARKET',
                     click: () => {
                         if (mainWindow) {
                             mainWindow.webContents.send('open-about');
@@ -309,7 +309,7 @@ function createWindow(): void {
         height: windowState.height,
         minWidth: 1024,
         minHeight: 600,
-        title: 'ERP-Market — Abastos Sofimar',
+        title: 'ALLMARKET -- AbastosSofimar',
         icon: join(__dirname, is.dev ? '../../resources/icon.png' : '../resources/icon.png'),
         show: false,
         autoHideMenuBar: false, // Menú nativo visible en producción

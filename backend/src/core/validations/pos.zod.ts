@@ -30,6 +30,9 @@ export const transactionItemSchema = z.object({
     presentationId: z.string().optional(),
     quantity: z.preprocess((val) => Number(val), z.number().positive('La cantidad debe ser mayor a 0')),
     unitPrice: z.preprocess((val) => Number(val), z.number().positive('El precio unitario debe ser mayor a 0').max(99999999.99, 'Precio excede el límite')),
+    // Lote / Vencimiento — solo aplica a INVENTORY_IN, ignorado en SALE
+    batchCode: z.string().max(100).optional(),
+    expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha debe ser YYYY-MM-DD').optional(),
 });
 
 /**

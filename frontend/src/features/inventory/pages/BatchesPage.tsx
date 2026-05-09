@@ -3,7 +3,7 @@
 // =============================================================================
 
 import { useState, useMemo } from 'react';
-import { Package, Plus, Search, Loader2, Edit2, Trash2, AlertTriangle, Clock } from 'lucide-react';
+import { Package, Search, Loader2, Edit2, Trash2, AlertTriangle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -29,9 +29,9 @@ export default function BatchesPage() {
     const [search, setSearch] = useState('');
     const [productFilter] = useState('');
     const [expiryFilter, setExpiryFilter] = useState<'all' | 'expiring' | 'expired'>('all');
-    const [modalOpen, setModalOpen] = useState(false);
     const [editBatch, setEditBatch] = useState<Batch | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+    const [modalOpen, setModalOpen] = useState(false);
 
     const isOwner = useAuthStore(s => s.user?.role === 'OWNER');
     const selectedBranch = useAuthStore(s => s.selectedBranch);
@@ -103,10 +103,6 @@ export default function BatchesPage() {
         setModalOpen(true);
     };
 
-    const handleNew = () => {
-        setEditBatch(null);
-        setModalOpen(true);
-    };
 
     const formatDate = (d: string) => new Date(d).toLocaleDateString('es-VE');
     const formatCurrency = (v: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v);
@@ -122,7 +118,7 @@ export default function BatchesPage() {
                             ¿Estás seguro de eliminar este lote? Esta acción no se puede deshacer.
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogFooter gap-2>
+                    <DialogFooter className="gap-2">
                         <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancelar</Button>
                         <Button variant="destructive" onClick={() => deleteConfirm && handleDelete(deleteConfirm)}>
                             Eliminar
@@ -149,18 +145,9 @@ export default function BatchesPage() {
                             Lotes de Inventario
                         </h1>
                         <p className="text-xs text-slate-400 mt-1 font-medium">
-                            {batches.length} lotes registrados
+                            {batches.length} lotes registrados — Los lotes se crean automáticamente al registrar una entrada de mercancía con lote.
                         </p>
                     </div>
-                    {isOwner && (
-                        <Button
-                            size="lg"
-                            className="h-10 font-bold shadow-sm shadow-emerald-500/20 bg-emerald-600 hover:bg-emerald-700 text-white"
-                            onClick={handleNew}
-                        >
-                            <Plus className="w-4 h-4 mr-2" /> Nuevo Lote
-                        </Button>
-                    )}
                 </div>
 
                 {/* Expiry Alerts Strip */}
@@ -284,11 +271,9 @@ export default function BatchesPage() {
                                                 <div className="flex flex-col items-center gap-3 text-slate-400">
                                                     <Package className="w-10 h-10" />
                                                     <p className="text-sm font-medium">No hay lotes registrados</p>
-                                                    {isOwner && (
-                                                        <Button variant="outline" size="sm" onClick={handleNew}>
-                                                            Crear el primero
-                                                        </Button>
-                                                    )}
+                                                    <p className="text-xs text-slate-400 text-center max-w-xs">
+                                                        Los lotes se crean al registrar una <strong>Entrada de Mercancía</strong> con el botón 🏷 Lote activo en cada producto.
+                                                    </p>
                                                 </div>
                                             </td>
                                         </tr>
