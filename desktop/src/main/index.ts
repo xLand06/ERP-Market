@@ -144,29 +144,8 @@ function saveWindowState(): void {
 let tray: Tray | null = null;
 
 function createTray(): void {
-    // Crear un icono de 16x16 simple (pixel buffer RGBA)
-    const size = 16;
-    const buffer = Buffer.alloc(size * size * 4);
-    // Fondo azul con borde blanco (ícono genérico)
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            const idx = (y * size + x) * 4;
-            const isEdge = x === 0 || x === size - 1 || y === 0 || y === size - 1;
-            if (isEdge) {
-                buffer[idx] = 255;     // R
-                buffer[idx + 1] = 255; // G
-                buffer[idx + 2] = 255; // B
-                buffer[idx + 3] = 255; // A
-            } else {
-                buffer[idx] = 41;      // R (color azul #2965f1)
-                buffer[idx + 1] = 101; // G
-                buffer[idx + 2] = 241; // B
-                buffer[idx + 3] = 255; // A
-            }
-        }
-    }
-
-    const icon = nativeImage.createFromBuffer(buffer, { width: size, height: size });
+    const iconPath = join(__dirname, is.dev ? '../../resources/icon.png' : '../resources/icon.png');
+    const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
     tray = new Tray(icon);
     tray.setToolTip('ERP-Market — Abastos Sofimar');
 
@@ -331,6 +310,7 @@ function createWindow(): void {
         minWidth: 1024,
         minHeight: 600,
         title: 'ERP-Market — Abastos Sofimar',
+        icon: join(__dirname, is.dev ? '../../resources/icon.png' : '../resources/icon.png'),
         show: false,
         autoHideMenuBar: false, // Menú nativo visible en producción
         webPreferences: {
