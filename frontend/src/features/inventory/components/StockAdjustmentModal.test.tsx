@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { StockAdjustmentModal } from '../StockAdjustmentModal';
-import type { ProductCatalog } from '../StockAdjustmentModal';
+import { StockAdjustmentModal } from '@/features/inventory/components/StockAdjustmentModal';
+import type { ProductCatalog } from '@/features/inventory/components/StockAdjustmentModal';
 
 // Mock api
 vi.mock('@/lib/api', () => ({

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { PaymentDialog } from '../PaymentDialog';
+import { PaymentDialog } from '@/features/pos/components/PaymentDialog';
 
 // Mock usePayment hook
 vi.mock('@/features/pos/hooks/usePayment', () => ({

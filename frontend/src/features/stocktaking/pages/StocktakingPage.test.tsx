@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import StocktakingPage from '../StocktakingPage';
+import StocktakingPage from '@/features/stocktaking/pages/StocktakingPage';
 
 // Mock useStockCounts hook
 vi.mock('@/features/stocktaking/hooks/useStocktaking', () => ({

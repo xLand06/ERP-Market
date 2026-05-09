@@ -1,54 +1,31 @@
-/**
- * TEST HELPERS — JWT generation for test tokens
- */
+// =============================================================================
+// TEST HELPERS — Auth tokens, request builders
+// =============================================================================
 
 import jwt from 'jsonwebtoken';
 
-// ── JWT Secret for tests (matches env.ts default) ────────────────────────────
-const TEST_JWT_SECRET = 'changeme';
+const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
-/**
- * Create a test JWT token for a user.
- */
-export const createTestToken = (userId: string, role: 'OWNER' | 'SELLER', extra: Record<string, any> = {}): string => {
+export function createTestToken(userId: string, role: string, branchId?: string) {
     return jwt.sign(
-        {
-            id: userId,
-            role,
-            name: 'Test User',
-            email: 'test@test.com',
-            branchId: 'branch-test-a',
-            canManageInventory: false,
-            ...extra,
-        },
-        TEST_JWT_SECRET,
-        { expiresIn: '12h' }
+        { id: userId, role, branchId: branchId || null },
+        JWT_SECRET,
+        { expiresIn: '1h' }
     );
-};
+}
 
-/**
- * Get auth headers for an OWNER user.
- */
-export const loginAsOwner = (): Record<string, string> => {
+export function authHeaders(userId: string, role: string, branchId?: string) {
+    const token = createTestToken(userId, role, branchId);
     return {
-        Authorization: `Bearer ${createTestToken('user-owner-test', 'OWNER')}`,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
     };
-};
+}
 
-/**
- * Get auth headers for a SELLER user.
- */
-export const loginAsSeller = (): Record<string, string> => {
-    return {
-        Authorization: `Bearer ${createTestToken('user-seller-test', 'SELLER')}`,
-    };
-};
+export function ownerHeaders(userId: string, branchId?: string) {
+    return authHeaders(userId, 'OWNER', branchId);
+}
 
-/**
- * Get auth headers for an inactive user.
- */
-export const loginAsInactive = (): Record<string, string> => {
-    return {
-        Authorization: `Bearer ${createTestToken('user-inactive', 'SELLER')}`,
-    };
-};
+export function sellerHeaders(userId: string, branchId?: string) {
+    return authHeaders(userId, 'SELLER', branchId);
+}

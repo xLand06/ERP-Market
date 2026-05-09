@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { CartPanel } from '../CartPanel';
-import { mockCartItem, mockCartItem2, mockProduct, mockProduct2, mockTotals } from '../../__tests__/mocks';
-import type { CartItem, Product } from '../../types';
+import { CartPanel } from '@/features/pos/components/CartPanel';
+import { mockCartItem, mockCartItem2, mockProduct, mockProduct2, mockTotals } from '@/__tests__/mocks';
+import type { CartItem, Product } from '@/features/pos/types';
 
 function setup(props: {
     items?: CartItem[];

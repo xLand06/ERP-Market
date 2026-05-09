@@ -1,13 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ProductSearch } from '../ProductSearch';
-import { mockProduct, mockProduct2, mockProduct3 } from '../../__tests__/mocks';
-import type { InventoryItem } from '../../types';
+import { ProductSearch } from '@/features/pos/components/ProductSearch';
+import { mockProduct, mockProduct2, mockProduct3 } from '@/__tests__/mocks';
+import type { InventoryItem } from '@/features/pos/types';
 
-vi.mock('@/features/pos/hooks/useProductSearch');
+// Mock the hook at module level
+const mockSetCategory = vi.fn();
+const mockSetSearch = vi.fn();
 
-const { useProductSearch } = await import('@/features/pos/hooks/useProductSearch');
+vi.mock('@/features/pos/hooks/useProductSearch', () => ({
+    useProductSearch: vi.fn(),
+}));
+
+import { useProductSearch } from '@/features/pos/hooks/useProductSearch';
 
 function buildInventory(...products: typeof mockProduct[]): InventoryItem[] {
     return products.map(p => ({ product: p, stock: p.stock }));
@@ -17,133 +23,110 @@ function mockHook({
     filteredProducts = [],
     categories = ['Todos'],
     category = 'Todos',
+    isSearching = false,
 } = {}) {
-    const mockValue = {
+    (useProductSearch as ReturnType<typeof vi.fn>).mockReturnValue({
         search: '',
-        setSearch: vi.fn(),
+        setSearch: mockSetSearch,
         category,
-        setCategory: vi.fn(),
+        setCategory: mockSetCategory,
         categories,
         filteredProducts,
-        isSearching: false,
-    };
-    (useProductSearch as ReturnType<typeof vi.fn>).mockReturnValue(mockValue);
-    return mockValue;
+        isSearching,
+    });
 }
 
 describe('ProductSearch', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockSetCategory.mockClear();
+        mockSetSearch.mockClear();
     });
 
     it('muestra "No se encontraron productos" cuando filteredProducts está vacío', () => {
         mockHook({ filteredProducts: [] });
-        const onAddToCart = vi.fn();
-        const onShowPresentations = vi.fn();
-
         render(
             <ProductSearch
                 inventory={[]}
                 isSaleMode={true}
-                onAddToCart={onAddToCart}
-                onShowPresentations={onShowPresentations}
+                onAddToCart={vi.fn()}
+                onShowPresentations={vi.fn()}
             />
         );
-
-        expect(screen.getByText('No se encontraron productos')).toBeInTheDocument();
+        expect(screen.getByText('No se encontraron productos.')).toBeInTheDocument();
     });
 
     it('renderiza productos cuando se pasan como props', () => {
         mockHook({ filteredProducts: [mockProduct, mockProduct2] });
-        const onAddToCart = vi.fn();
-        const onShowPresentations = vi.fn();
-
         render(
             <ProductSearch
                 inventory={buildInventory(mockProduct, mockProduct2)}
                 isSaleMode={true}
-                onAddToCart={onAddToCart}
-                onShowPresentations={onShowPresentations}
+                onAddToCart={vi.fn()}
+                onShowPresentations={vi.fn()}
             />
         );
-
         expect(screen.getByText('Cerveza Andina')).toBeInTheDocument();
         expect(screen.getByText('Papas Lay')).toBeInTheDocument();
     });
 
     it('filtra por categoría al hacer click en chip', async () => {
         const user = userEvent.setup();
-        const mockValue = mockHook({
+        mockHook({
             filteredProducts: [mockProduct, mockProduct2],
             categories: ['Todos', 'Bebidas', 'Snacks'],
         });
-        const onAddToCart = vi.fn();
-        const onShowPresentations = vi.fn();
-
         render(
             <ProductSearch
                 inventory={buildInventory(mockProduct, mockProduct2)}
                 isSaleMode={true}
-                onAddToCart={onAddToCart}
-                onShowPresentations={onShowPresentations}
+                onAddToCart={vi.fn()}
+                onShowPresentations={vi.fn()}
             />
         );
 
         const bebidasChip = screen.getByText('Bebidas');
         await user.click(bebidasChip);
 
-        expect(mockValue.setCategory).toHaveBeenCalledWith('Bebidas');
+        expect(mockSetCategory).toHaveBeenCalledWith('Bebidas');
     });
 
     it('renderiza badge de stock en producto', () => {
         mockHook({ filteredProducts: [mockProduct] });
-        const onAddToCart = vi.fn();
-        const onShowPresentations = vi.fn();
-
         render(
             <ProductSearch
                 inventory={buildInventory(mockProduct)}
                 isSaleMode={true}
-                onAddToCart={onAddToCart}
-                onShowPresentations={onShowPresentations}
+                onAddToCart={vi.fn()}
+                onShowPresentations={vi.fn()}
             />
         );
-
-        // Stock badge shows "48 UNIDAD"
         expect(screen.getByText(/48 UNIDAD/)).toBeInTheDocument();
     });
 
     it('muestra indicador de presentaciones cuando hay más de una', () => {
         mockHook({ filteredProducts: [mockProduct] });
-        const onAddToCart = vi.fn();
-        const onShowPresentations = vi.fn();
-
         render(
             <ProductSearch
                 inventory={buildInventory(mockProduct)}
                 isSaleMode={true}
-                onAddToCart={onAddToCart}
-                onShowPresentations={onShowPresentations}
+                onAddToCart={vi.fn()}
+                onShowPresentations={vi.fn()}
             />
         );
-
         expect(screen.getByText(/1 pres\./)).toBeInTheDocument();
     });
 
     it('no muestra indicador de presentaciones cuando no hay ninguna', () => {
         mockHook({ filteredProducts: [mockProduct2] });
-        const onAddToCart = vi.fn();
-        const onShowPresentations = vi.fn();
-
         render(
             <ProductSearch
                 inventory={buildInventory(mockProduct2)}
                 isSaleMode={true}
-                onAddToCart={onAddToCart}
-                onShowPresentations={onShowPresentations}
+                onAddToCart={vi.fn()}
+                onShowPresentations={vi.fn()}
             />
         );
-
         expect(screen.queryByText(/pres\./)).not.toBeInTheDocument();
     });
 });
