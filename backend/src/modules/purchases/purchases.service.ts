@@ -86,6 +86,35 @@ export const createOrder = async (data: CreatePurchaseOrderInput) => {
 };
 
 /**
+ * Parse batch info from notes field
+ * Expected format in notes: { batchCode: "...", expiryDate: "YYYY-MM-DD" }
+ * Or can be passed via item-level notes: "batch:CODE|expiry:YYYY-MM-DD"
+ */
+const parseBatchInfo = (notes: string | null | undefined): { batchCode?: string; expiryDate?: string } | null => {
+    if (!notes) return null;
+    try {
+        // Try JSON format first
+        if (notes.startsWith('{')) {
+            const parsed = JSON.parse(notes);
+            if (parsed.batchCode && parsed.expiryDate) {
+                return { batchCode: parsed.batchCode, expiryDate: parsed.expiryDate };
+            }
+        }
+        // Try legacy format: batch:CODE|expiry:YYYY-MM-DD
+        if (notes.includes('batch:') && notes.includes('expiry:')) {
+            const batchMatch = notes.match(/batch:([^|]+)/);
+            const expiryMatch = notes.match(/expiry:(\d{4}-\d{2}-\d{2})/);
+            if (batchMatch && expiryMatch) {
+                return { batchCode: batchMatch[1], expiryDate: expiryMatch[1] };
+            }
+        }
+    } catch {
+        return null;
+    }
+    return null;
+};
+
+/**
  * Actualizar estado de la orden (Gestión de Stock al RECIBIR)
  */
 export const updateOrderStatus = async (id: string, data: UpdatePurchaseOrderStatusInput) => {
@@ -138,6 +167,39 @@ export const updateOrderStatus = async (id: string, data: UpdatePurchaseOrderSta
                     where: { id: item.productId },
                     data: { cost: item.unitCost },
                 });
+
+                // 3. Crear lote si hay información de batch en notes
+                const batchInfo = parseBatchInfo(item.notes);
+                if (batchInfo?.batchCode && batchInfo?.expiryDate) {
+                    // Verificar si el lote ya existe
+                    const existingBatch = await tx.productBatch.findFirst({
+                        where: {
+                            batchCode: batchInfo.batchCode,
+                            productId: item.productId,
+                            branchId: currentOrder.branchId,
+                        },
+                    });
+
+                    if (existingBatch) {
+                        // Incrementar cantidad del lote existente
+                        await tx.productBatch.update({
+                            where: { id: existingBatch.id },
+                            data: { quantity: { increment: item.quantity } },
+                        });
+                    } else {
+                        // Crear nuevo lote
+                        await tx.productBatch.create({
+                            data: {
+                                batchCode: batchInfo.batchCode,
+                                productId: item.productId,
+                                branchId: currentOrder.branchId,
+                                expiryDate: new Date(batchInfo.expiryDate),
+                                quantity: item.quantity,
+                                costPrice: item.unitCost,
+                            },
+                        });
+                    }
+                }
             }
         }
 

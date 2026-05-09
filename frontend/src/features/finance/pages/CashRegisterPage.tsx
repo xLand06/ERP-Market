@@ -11,7 +11,7 @@ import { ExpenseEntryModal } from '../components/ExpenseEntryModal';
 import { PurchaseHistoryPanel } from '../components/PurchaseHistoryPanel';
 import { CashClosureModal } from '../components/CashClosureModal';
 import { CashRegisterDetailModal } from '../components/CashRegisterDetailModal';
-import { SaleDetailModal, Sale } from '../../sales/components/SaleDetailModal';
+import { SaleDetailModal, Sale } from '../components/SaleDetailModal';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';

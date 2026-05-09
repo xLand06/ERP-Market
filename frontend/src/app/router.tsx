@@ -12,7 +12,7 @@ const DashboardPage          = lazy(() => import('../features/dashboard/pages/Da
 const InventoryPage          = lazy(() => import('../features/inventory/pages/InventoryPage'));
 const BatchesPage            = lazy(() => import('../features/inventory/pages/BatchesPage'));
 const POSPage                = lazy(() => import('../features/pos/pages/POSPage'));
-const SalesHistoryPage       = lazy(() => import('../features/sales/pages/SalesHistoryPage'));
+
 const FinancePage            = lazy(() => import('../features/finance/pages/FinancePage'));
 const CashRegisterPage       = lazy(() => import('../features/finance/pages/CashRegisterPage'));
 const ProductsPage           = lazy(() => import('../features/products/pages/ProductsPage'));
@@ -27,6 +27,8 @@ const EmployeeDirectoryPage  = lazy(() => import('../features/users/pages/Employ
 const AuditLogsPage          = lazy(() => import('../features/audit/pages/AuditLogsPage'));
 const SettingsPage           = lazy(() => import('../features/settings/pages/SettingsPage'));
 const MermaPage             = lazy(() => import('../features/merma/pages/MermaPage'));
+const StocktakingPage        = lazy(() => import('../features/stocktaking/pages/StocktakingPage'));
+const StockCountView        = lazy(() => import('../features/stocktaking/pages/StockCountView'));
 
 const wrap = (Component: React.ComponentType) => (
     <Suspense fallback={<PageSkeleton />}>
@@ -64,7 +66,7 @@ export const router = createRouter([
             { path: 'inventory',           element: wrap(InventoryPage) },
             { path: 'inventory/batches',   element: wrap(BatchesPage) },
             { path: 'pos',                 element: wrap(POSPage) },
-            { path: 'sales',               element: wrap(SalesHistoryPage) },
+
             { path: 'finance',             element: wrap(FinancePage) },
             { path: 'finance/cash-register', element: wrap(CashRegisterPage) },
             { path: 'products',            element: wrap(ProductsPage) },
@@ -74,6 +76,8 @@ export const router = createRouter([
             { path: 'reports',             element: wrap(ReportsPage) },
             // ─── Plan Medio ───────────────────────────────────────────────
             { path: 'purchases',           element: wrap(PurchasesPage) },
+            { path: 'inventory/stocktaking', element: wrap(StocktakingPage) },
+            { path: 'inventory/stocktaking/:id', element: wrap(StockCountView) },
             { path: 'audit',               element: wrap(AuditLogsPage) },
             { path: 'settings',          element: wrap(SettingsPage) },
             { path: 'merma',              element: wrap(MermaPage) },

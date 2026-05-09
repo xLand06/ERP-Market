@@ -35,8 +35,17 @@ extraFiles:
 
 win:
   target:
-    - target: dir
+    - target: nsis
       arch:
         - x64
 
-publish: null
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+publish:
+  provider: github
+  owner: xLand06
+  repo: ERP-Market

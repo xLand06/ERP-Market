@@ -28,6 +28,8 @@ import { startCashRegisterAutomation } from './modules/cashFlow/cashFlow-automat
 import backupRouter from './modules/backup/backup.routes';
 import settingsRouter from './modules/settings/settings.routes';
 import mermaRouter from './modules/merma/merma.routes';
+import stocktakingRouter from './modules/stocktaking/stocktaking.routes';
+import batchesRouter from './modules/batches/batches.routes';
 
 const app = express();
 
@@ -179,6 +181,8 @@ app.use('/api/sync',       syncRouter);
 app.use('/api/backup',     backupRouter);
 app.use('/api/settings',   settingsRouter);
 app.use('/api/merma',       mermaRouter);
+app.use('/api/stocktaking', stocktakingRouter);
+app.use('/api/batches',     batchesRouter);
 
 // ─── 404 HANDLER ───────────────────────────────────────────────────────────
 app.use(notFoundHandler);

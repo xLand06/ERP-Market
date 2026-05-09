@@ -1,4 +1,4 @@
-import { prisma } from '../../config/prisma';
+import { prisma, prismaCloud, getCloudPrisma } from '../../config/prisma';
 import { TransactionType, TransactionStatus } from '@prisma/client';
 import { parseDateRange } from '../../core/utils/helpers';
 
@@ -7,6 +7,13 @@ export interface TransactionItemInput {
     presentationId?: string;
     quantity: number;
     unitPrice: number;
+}
+
+export interface PaymentMethodInput {
+    type: 'cash' | 'transfer' | 'card' | 'usd' | 'other';
+    amount: number;
+    currency: 'COP' | 'USD' | 'VES';
+    exchangeRate?: number;
 }
 
 export interface CreateTransactionInput {
@@ -21,18 +28,47 @@ export interface CreateTransactionInput {
     currency?: string;       // 'COP' | 'USD' | 'VES'
     exchangeRate?: number | null; // tasa COP por unidad de currency
     invoiceNumber?: string;  // nº factura para INVENTORY_IN
+    // Multi-pago
+    paymentMethods?: PaymentMethodInput[];
 }
 
 export const createTransaction = async (input: CreateTransactionInput) => {
     const {
         type, branchId, userId, items, cashRegisterId, notes, ipAddress,
-        currency = 'COP', exchangeRate, invoiceNumber
+        currency = 'COP', exchangeRate, invoiceNumber, paymentMethods
     } = input;
 
     // El total siempre se calcula en COP (moneda principal)
     const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
-    return await prisma.$transaction(async (tx) => {
+    // Validación multi-pago: si se envía paymentMethods, la suma debe ser igual al total
+    if (paymentMethods && paymentMethods.length > 0) {
+        const sumaMetodos = paymentMethods.reduce((sum, pm) => {
+            // Si el método no es COP, convertir a COP usando el exchangeRate
+            const amountInCOP = pm.currency === 'COP'
+                ? pm.amount
+                : pm.amount * (pm.exchangeRate || 1);
+            return sum + amountInCOP;
+        }, 0);
+        // Tolerancia de 1 centavo por errores de punto flotante
+        if (Math.abs(sumaMetodos - total) > 0.01) {
+            throw new Error(
+                `La suma de los métodos de pago (${sumaMetodos.toFixed(2)} COP) no coincide con el total de la transacción (${total.toFixed(2)} COP)`
+            );
+        }
+    }
+
+    // Determinar si usamos el cliente cloud para el storage
+    // Sistema híbrido:cloud es null en modo offline, por lo que siempre cae a SQLite
+    const useCloud = !!getCloudPrisma();
+    const dbInstance = useCloud ? prismaCloud : prisma;
+
+    // Serializar paymentMethods: JSON directo en PostgreSQL, string en SQLite
+    const paymentMethodsData = paymentMethods
+        ? (useCloud ? paymentMethods : JSON.stringify(paymentMethods))
+        : null;
+
+    return await dbInstance.$transaction(async (tx) => {
         let assignedCashRegisterId = cashRegisterId;
         const processedItems = [];
 
@@ -98,6 +134,8 @@ export const createTransaction = async (input: CreateTransactionInput) => {
                 currency: currency || 'COP',
                 exchangeRate: exchangeRate ?? null,
                 invoiceNumber: invoiceNumber || null,
+                // Campo multi-pago
+                paymentMethods: paymentMethodsData,
                 items: {
                     create: processedItems.map((item) => ({
                         productId: item.productId,
@@ -146,8 +184,9 @@ export const getTransactions = (filters: {
     to?: string;
     page?: number;
     limit?: number;
+    search?: string;
 }) => {
-    const { type, branchId, userId, from, to, page = 1, limit = 50 } = filters;
+    const { type, branchId, userId, from, to, page = 1, limit = 50, search } = filters;
     return prisma.transaction.findMany({
         where: {
             ...(type && { type: { equals: type } }),
@@ -164,6 +203,12 @@ export const getTransactions = (filters: {
                       };
                   })()
                 : {}),
+            ...(search ? {
+                OR: [
+                    { id: { contains: search, mode: 'insensitive' } },
+                    { invoiceNumber: { contains: search, mode: 'insensitive' } }
+                ]
+            } : {}),
         },
         include: {
             items: { include: { product: { select: { id: true, name: true, barcode: true, baseUnit: true } }, presentation: true } },

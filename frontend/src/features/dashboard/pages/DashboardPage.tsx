@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { useKPIs, useSalesTrend, useTopProducts, useSalesByBranch, formatCurrency, formatNumber } from '../api/useDashboard';
-import { 
+import { useExpiringBatches } from '../../inventory/hooks/useBatches';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/features/auth/store/authStore';
+import {
     TrendingUp, TrendingDown, AlertTriangle, ShoppingCart,
-    DollarSign, Package, PackageOpen, Users, Percent
+    DollarSign, Package, PackageOpen, Users, Percent, Clock
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,8 +15,7 @@ import {
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
 } from 'recharts';
-import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/features/auth/store/authStore';
+
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
@@ -336,6 +338,7 @@ function SalesByBranchChart({ data, loading }: { data: any[]; loading: boolean }
 }
 
 function LowStockPanel({ count }: { count: number }) {
+    const navigate = useNavigate();
     return (
         <Card className="h-full">
             <CardHeader className="flex-row items-center justify-between pb-3 border-b border-slate-100">
@@ -351,8 +354,40 @@ function LowStockPanel({ count }: { count: number }) {
                     <p className="text-slate-600 font-medium">{count} productos con stock bajo</p>
                     <p className="text-xs text-slate-400 mt-1">Revisa el módulo de inventario</p>
                 </div>
-                <Button variant="outline" size="sm" className="w-full mt-4">
+                <Button variant="outline" size="sm" className="w-full mt-4" onClick={() => navigate('/inventory')}>
                     Ver Inventario
+                </Button>
+            </CardContent>
+        </Card>
+    );
+}
+
+function ExpiringBatchesPanel() {
+    const navigate = useNavigate();
+    const { data: expiringData } = useExpiringBatches(30);
+    const total = (expiringData?.expiring?.length || 0) + (expiringData?.expired?.length || 0);
+
+    if (total === 0) return null;
+
+    return (
+        <Card className="h-full">
+            <CardHeader className="flex-row items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    <h3 className="text-sm font-semibold text-slate-900">Lotes por Vencer</h3>
+                </div>
+                <Badge variant="warning">{total} alerta{total !== 1 ? 's' : ''}</Badge>
+            </CardHeader>
+            <CardContent className="pt-4">
+                <div className="text-center py-6">
+                    <Clock className="w-10 h-10 text-amber-500 mx-auto mb-3" />
+                    <p className="text-slate-600 font-medium">
+                        {expiringData?.expired?.length || 0} vencidos, {expiringData?.expiring?.length || 0} próximos
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">Revisa el módulo de lotes</p>
+                </div>
+                <Button variant="outline" size="sm" className="w-full mt-3" onClick={() => navigate('/inventory/batches')}>
+                    Ver Lotes
                 </Button>
             </CardContent>
         </Card>
@@ -483,7 +518,10 @@ export default function DashboardPage() {
                 <div className="lg:col-span-2">
                     <SalesByBranchChart data={salesByBranch || []} loading={branchLoading} />
                 </div>
-                <LowStockPanel count={kpis?.inventory.lowStockAlerts || 0} />
+                <div className="flex flex-col gap-5">
+                    <LowStockPanel count={kpis?.inventory.lowStockAlerts || 0} />
+                    <ExpiringBatchesPanel />
+                </div>
             </div>
         </div>
     );

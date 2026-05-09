@@ -33,4 +33,18 @@ contextBridge.exposeInMainWorld('erpApi', {
     // ── Rutas de la app ────────────────────────────────────────
     getAppPath: (): Promise<string> => ipcRenderer.invoke('get-app-path'),
     getUserDataPath: (): Promise<string> => ipcRenderer.invoke('get-user-data-path'),
+
+    // ── Auto-update events ─────────────────────────────────────
+    onUpdateAvailable: (callback: (info: any) => void): void => {
+        ipcRenderer.on('update-available', (_event, info) => callback(info));
+    },
+    onUpdateDownloaded: (callback: () => void): void => {
+        ipcRenderer.on('update-downloaded', () => callback());
+    },
+    onUpdateError: (callback: (error: string) => void): void => {
+        ipcRenderer.on('update-error', (_event, error) => callback(error));
+    },
+    quitAndInstall: (): void => {
+        ipcRenderer.send('quit-and-install');
+    },
 });

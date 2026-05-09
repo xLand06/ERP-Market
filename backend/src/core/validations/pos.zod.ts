@@ -7,6 +7,22 @@ import { z } from 'zod';
 import { paginationSchema } from './common.zod';
 
 /**
+ * Métodos de pago para transacciones multi-pago
+ */
+export const paymentMethodSchema = z.object({
+    type: z.enum(['cash', 'transfer', 'card', 'usd', 'other']),
+    amount: z.preprocess((val) => Number(val), z.number().positive('El monto debe ser mayor a 0')),
+    currency: z.enum(['COP', 'USD', 'VES']),
+    exchangeRate: z.preprocess(
+        (val) => (val === '' || val === null || val === undefined) ? undefined : Number(val),
+        z.number().positive().optional()
+    ),
+}).refine(
+    (data) => data.currency === 'COP' || (data.exchangeRate !== undefined && data.exchangeRate > 0),
+    { message: 'exchangeRate es requerido cuando currency no es COP', path: ['exchangeRate'] }
+);
+
+/**
  * Esquema para un ítem de transacción
  */
 export const transactionItemSchema = z.object({
@@ -36,6 +52,9 @@ export const createTransactionSchema = z.object({
     ),
     // Número de factura (requerido para INVENTORY_IN, opcional para SALE)
     invoiceNumber: z.string().max(100).optional().or(z.literal('')),
+
+    // Multi-pago: métodos de pago utilizados (opcional, backward compatible)
+    paymentMethods: z.array(paymentMethodSchema).optional(),
 });
 
 /**
@@ -48,6 +67,7 @@ export const transactionFiltersSchema = paginationSchema.extend({
     userId: z.string().optional(),
     from: z.string().datetime().optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
     to: z.string().datetime().optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
+    search: z.string().optional(),
 });
 
 /**
@@ -64,3 +84,4 @@ export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
 export type TransactionItemInput = z.infer<typeof transactionItemSchema>;
 export type TransactionFiltersInput = z.infer<typeof transactionFiltersSchema>;
 export type CancelTransactionInput = z.infer<typeof cancelTransactionSchema>;
+export type PaymentMethodInput = z.infer<typeof paymentMethodSchema>;

@@ -64,6 +64,13 @@ enum MermaReason {
   OTHER
 }
 
+enum StockCountStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
 // =============================================================================
 // USERS
 // =============================================================================
@@ -91,6 +98,7 @@ model User {
   cashRegisters CashRegister[]
   auditLogs     AuditLog[]
   mermas        Merma[] @relation("MermaCreatedBy")
+  stockCounts   StockCount[]
 
   @@index([username])
     @@index([cedula])
@@ -120,6 +128,8 @@ model Branch {
   cashRegisters  CashRegister[]
   purchaseOrders PurchaseOrder[]
   mermas         Merma[]
+  stockCounts    StockCount[]
+  productBatches ProductBatch[]
 
   @@index([isActive])
   @@map("branches")
@@ -184,7 +194,9 @@ model Product {
   inventory          BranchInventory[]
   transactionItems   TransactionItem[]
   purchaseOrderItems PurchaseOrderItem[]
-  mermas            Merma[]
+  mermas             Merma[]
+  stockCountItems    StockCountItem[]
+  productBatches     ProductBatch[]
 
   @@index([name])
   @@index([subGroupId])
@@ -266,6 +278,9 @@ model Transaction {
   currency      String?  // 'COP' | 'USD' | 'VES'
   exchangeRate  Float?   // tasa COP/currency usada al momento
   invoiceNumber String?  // Nº factura para INVENTORY_IN
+
+  // Multi-pago (espejo del schema cloud)
+  paymentMethods String? // JSON: [{ type: "cash", amount: 5000, currency: "COP" }, ...]
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
@@ -467,4 +482,72 @@ model Merma {
   @@index([reason])
   @@index([syncStatus])
   @@map("mermas")
+}
+
+// =============================================================================
+// STOCK COUNT (Physical Inventory)
+// =============================================================================
+
+model StockCount {
+  id          String           @id @default(cuid())
+  status      StockCountStatus @default(DRAFT)
+  notes       String?
+  createdAt   DateTime         @default(now())
+  completedAt DateTime?
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  syncStatus SyncStatus @default(PENDING)
+
+  items StockCountItem[]
+
+  @@index([branchId])
+  @@index([status])
+  @@index([createdById])
+  @@index([syncStatus])
+  @@map("stock_counts")
+}
+
+model StockCountItem {
+  id            String @id @default(cuid())
+  expectedStock Float
+  countedStock  Float
+  difference    Float  // countedStock - expectedStock
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  stockCountId String
+  stockCount   StockCount @relation(fields: [stockCountId], references: [id], onDelete: Cascade)
+
+  @@unique([stockCountId, productId])
+  @@index([productId])
+  @@map("stock_count_items")
+}
+
+// =============================================================================
+// PRODUCT BATCHES (Lots & Expiry)
+// =============================================================================
+
+model ProductBatch {
+  id         String   @id @default(cuid())
+  batchCode  String
+  expiryDate DateTime
+  quantity   Float    @default(0)
+  costPrice  Float?
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  @@unique([batchCode, productId, branchId])
+  @@index([productId, branchId])
+  @@index([expiryDate])
+  @@map("product_batches")
 }

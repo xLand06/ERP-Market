@@ -16,7 +16,7 @@ export const getAllUsers = (filters: {
     
     return prisma.user.findMany({
         where: {
-            ...(role && { role }),
+            ...(role && { role: role as any }),
             ...(isActive !== undefined && { isActive: isActive === 'true' }),
             ...(search && {
                 OR: [

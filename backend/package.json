@@ -18,7 +18,9 @@
         "db:setup": "prisma generate && prisma generate --schema=prisma/schema.local.prisma && prisma db push && prisma db push --schema=prisma/schema.local.prisma",
         "db:seed": "ts-node prisma/seed.ts",
         "db:seed:local": "ts-node prisma/seed.local.ts",
-        "db:reset": "prisma migrate reset --force && ts-node prisma/seed.ts"
+        "db:reset": "prisma migrate reset --force && ts-node prisma/seed.ts",
+        "test": "vitest run",
+        "test:watch": "vitest"
     },
     "prisma": {
         "seed": "ts-node prisma/seed.ts"
@@ -49,9 +51,12 @@
         "@types/express": "^4.17.21",
         "@types/jsonwebtoken": "^9.0.6",
         "@types/node": "^22.0.0",
+        "@types/supertest": "^6.0.2",
         "nodemon": "^3.1.4",
         "prisma": "^7.7.0",
+        "supertest": "^7.0.0",
         "ts-node": "^10.9.2",
-        "typescript": "^5.5.4"
+        "typescript": "^5.5.4",
+        "vitest": "^2.1.0"
     }
 }
