@@ -11,9 +11,9 @@ export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<Tab>('branches');
 
     const { data: branches = [] } = useQuery({
-        queryKey: ['branches'],
+        queryKey: ['branches', 'all'],
         queryFn: async () => {
-            const res = await api.get('/branches');
+            const res = await api.get('/branches?includeInactive=true');
             return res.data.data;
         },
         retry: false

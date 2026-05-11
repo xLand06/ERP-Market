@@ -7,6 +7,9 @@ export const openCashRegister = async (data: {
     openingAmount: number;
     notes?: string;
 }) => {
+    const branch = await prisma.branch.findUnique({ where: { id: data.branchId }, select: { isActive: true } });
+    if (!branch?.isActive) throw new Error('No se puede abrir caja en una sucursal desactivada.');
+
     const existing = await prisma.cashRegister.findFirst({
         where: { branchId: data.branchId, status: 'OPEN' },
     });

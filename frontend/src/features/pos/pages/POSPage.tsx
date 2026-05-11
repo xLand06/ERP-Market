@@ -298,12 +298,12 @@ export default function POSPage() {
                 <Dialog open={openCashOpen} onOpenChange={(o) => !o && setOpenCashOpen(false)}>
                     <DialogContent className="max-w-md p-0 overflow-hidden border-none shadow-2xl bg-slate-50/50">
                         <div className="bg-white p-8 space-y-6">
-                            <div className="text-left">
+                            <DialogHeader className="text-left">
                                 <DialogTitle className="text-xl font-bold text-slate-800">Abrir Turno de Caja</DialogTitle>
                                 <DialogDescription className="text-slate-500 text-sm mt-1">
                                     Ingresa el monto de apertura (efectivo físico en caja) para iniciar.
                                 </DialogDescription>
-                            </div>
+                            </DialogHeader>
                             <div className="space-y-3">
                                 {([
                                     { id: 'cop', label: 'COP', symbol: '$', val: openCopVal, set: setOpenCopVal, step: '1' },
@@ -382,15 +382,6 @@ export default function POSPage() {
 
             {/* RIGHT: Cart */}
             <div className="flex-[4] flex flex-col bg-white rounded-xl border shadow-sm overflow-hidden">
-                <div className="px-5 py-5 border-b flex justify-between items-center">
-                    <p className="font-bold">Ticket de {isSaleMode ? 'Venta' : 'Entrada'}</p>
-                    {cart.length > 0 && (
-                        <button onClick={clearCart} className="text-xs text-red-500 hover:text-red-700">
-                            Limpiar
-                        </button>
-                    )}
-                </div>
-
                 <CartPanel
                     items={cart}
                     totals={totals}

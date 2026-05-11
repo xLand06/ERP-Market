@@ -83,7 +83,8 @@ api.interceptors.response.use(
         // 401 → cierra sesión inmediatamente
         if (error.response?.status === 401) {
             useAuthStore.getState().logout();
-            window.location.href = '/login';
+            const isElectron = window.location.protocol === 'file:' || (window as any).erpApi?.isElectron;
+            window.location.href = isElectron ? '#/login' : '/login';
             return Promise.reject(error);
         }
 

@@ -32,6 +32,7 @@ generate_skill.py
 SKILL.md
 
 .agent
+temp-backend/   
 
 ##Electron
 out/

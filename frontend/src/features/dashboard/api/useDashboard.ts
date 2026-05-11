@@ -14,26 +14,26 @@ const DASHBOARD_QUERY_OPTIONS = {
     gcTime: 5 * 60_000,     // mantiene en caché 5 minutos
 } as const;
 
-export const useKPIs = (branchId?: string) => {
+export const useKPIs = (branchId?: string, range: string = 'today') => {
     return useQuery({
-        queryKey: ['dashboard', 'kpis', branchId],
-        queryFn: () => dashboardApi.getKPIs(branchId ? { branchId } : undefined),
+        queryKey: ['dashboard', 'kpis', branchId, range],
+        queryFn: () => dashboardApi.getKPIs({ branchId, range }),
         ...DASHBOARD_QUERY_OPTIONS,
     });
 };
 
-export const useSalesTrend = (days = 30, branchId?: string) => {
+export const useSalesTrend = (range: string = 'month', branchId?: string) => {
     return useQuery({
-        queryKey: ['dashboard', 'salesTrend', days, branchId],
-        queryFn: () => dashboardApi.getSalesTrend(days, branchId),
+        queryKey: ['dashboard', 'salesTrend', range, branchId],
+        queryFn: () => dashboardApi.getSalesTrend({ range, branchId }),
         ...DASHBOARD_QUERY_OPTIONS,
     });
 };
 
-export const useTopProducts = (limit = 10, branchId?: string) => {
+export const useTopProducts = (limit = 10, branchId?: string, range: string = 'month') => {
     return useQuery({
-        queryKey: ['dashboard', 'topProducts', limit, branchId],
-        queryFn: () => dashboardApi.getTopProducts(limit, branchId),
+        queryKey: ['dashboard', 'topProducts', limit, branchId, range],
+        queryFn: () => dashboardApi.getTopProducts({ limit, branchId, range }),
         ...DASHBOARD_QUERY_OPTIONS,
     });
 };

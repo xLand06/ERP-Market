@@ -171,11 +171,11 @@ export const updateStockCountStatus = async (id: string, data: UpdateStockCountS
             },
         });
 
-        // Actualizar diferencias si se completa
+        // Actualizar diferencias si se completa (en paralelo)
         if (status === 'COMPLETED' && itemsUpdate) {
-            for (const update of itemsUpdate) {
-                await tx.stockCountItem.update(update);
-            }
+            await Promise.all(itemsUpdate.map((update: any) =>
+                tx.stockCountItem.update(update)
+            ));
         }
 
         return updated;

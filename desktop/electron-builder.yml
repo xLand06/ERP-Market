@@ -17,11 +17,13 @@ files:
 extraFiles:
   - from: "../backend/.env"
     to: "resources/backend/.env"
+  - from: "../backend/erp-market.db"
+    to: "resources/seed/erp-market.db"
   - from: "../backend/dist"
     to: "resources/backend"
     filter:
       - "**/*"
-  - from: "../backend/node_modules"
+  - from: "../temp-backend/node_modules"
     to: "resources/backend/node_modules"
     filter:
       - "**/*"

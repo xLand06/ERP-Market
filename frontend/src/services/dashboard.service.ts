@@ -58,21 +58,21 @@ export interface SalesByBranch {
 }
 
 export const dashboardApi = {
-    getKPIs: async (params?: ListParams): Promise<KPIsData> => {
+    getKPIs: async (params?: { branchId?: string; range?: string }): Promise<KPIsData> => {
         const { data } = await api.get<ApiResponse<KPIsData>>('/dashboard/kpis', { params });
         return data.data;
     },
 
-    getSalesTrend: async (days = 30, branchId?: string): Promise<SalesTrendItem[]> => {
+    getSalesTrend: async (params: { range?: string; branchId?: string }): Promise<SalesTrendItem[]> => {
         const { data } = await api.get<ApiResponse<SalesTrendItem[]>>('/dashboard/sales-trend', {
-            params: { days, branchId },
+            params,
         });
         return data.data;
     },
 
-    getTopProducts: async (limit = 10, branchId?: string): Promise<TopProduct[]> => {
+    getTopProducts: async (params: { limit?: number; branchId?: string; range?: string }): Promise<TopProduct[]> => {
         const { data } = await api.get<ApiResponse<TopProduct[]>>('/dashboard/top-products', {
-            params: { limit, branchId },
+            params,
         });
         return data.data;
     },

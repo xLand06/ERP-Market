@@ -10,14 +10,13 @@ import { z } from 'zod';
  */
 export const dashboardFiltersSchema = z.object({
     branchId: z.string().optional().or(z.literal('all')).or(z.literal('')),
+    range: z.enum(['today', 'month', 'year', 'all']).optional(),
 });
 
 /**
  * Filtros para tendencia de ventas
  */
-export const salesTrendSchema = dashboardFiltersSchema.extend({
-    days: z.preprocess((val) => Number(val) || 30, z.number().min(1).max(365)).default(30),
-});
+export const salesTrendSchema = dashboardFiltersSchema;
 
 /**
  * Filtros para top productos

@@ -143,39 +143,39 @@ export const updateOrderStatus = async (id: string, data: UpdatePurchaseOrderSta
             include: { supplier: true, items: true },
         });
 
-        // Si se recibe la mercancía, afectar stock y actualizar costos
+        // Si se recibe la mercancía, afectar stock y actualizar costos (en paralelo)
         if (status === 'RECEIVED') {
-            for (const item of currentOrder.items) {
-                // 1. Incrementar stock en la sede específica
-                await tx.branchInventory.upsert({
-                    where: {
-                        productId_branchId: {
+            await Promise.all(currentOrder.items.map(async (item) => {
+                await Promise.all([
+                    tx.branchInventory.upsert({
+                        where: {
+                            productId_branchId: {
+                                productId: item.productId,
+                                branchId: currentOrder.branchId,
+                            },
+                        },
+                        update: { stock: { increment: item.quantity } },
+                        create: {
                             productId: item.productId,
                             branchId: currentOrder.branchId,
+                            stock: item.quantity,
                         },
-                    },
-                    update: { stock: { increment: item.quantity } },
-                    create: {
-                        productId: item.productId,
-                        branchId: currentOrder.branchId,
-                        stock: item.quantity,
-                    },
-                });
-
-                // 2. Actualizar precio de costo en catálogo maestro
-                await tx.product.update({
-                    where: { id: item.productId },
-                    data: { cost: item.unitCost },
-                });
+                    }),
+                    tx.product.update({
+                        where: { id: item.productId },
+                        data: { cost: item.unitCost },
+                    }),
+                ]);
 
                 // 3. (Opcional) Crear lote si el ítem tuviera campos de lote
-                // TODO: Agregar batchCode/expiryDate a PurchaseOrderItem en el schema si se requiere
-                /*
-                const batchInfo = parseBatchInfo((item as any).notes);
-                if (batchInfo?.batchCode && batchInfo?.expiryDate) {
+                const rawItem = currentOrder.items.find(i => i.id === item.id) as any;
+                const batchCode = rawItem?.notes ? parseBatchInfo(rawItem.notes)?.batchCode : undefined;
+                const expiryDate = rawItem?.notes ? parseBatchInfo(rawItem.notes)?.expiryDate : undefined;
+
+                if (batchCode && expiryDate) {
                     const existingBatch = await tx.productBatch.findFirst({
                         where: {
-                            batchCode: batchInfo.batchCode,
+                            batchCode,
                             productId: item.productId,
                             branchId: currentOrder.branchId,
                         },
@@ -189,18 +189,17 @@ export const updateOrderStatus = async (id: string, data: UpdatePurchaseOrderSta
                     } else {
                         await tx.productBatch.create({
                             data: {
-                                batchCode: batchInfo.batchCode,
+                                batchCode,
                                 productId: item.productId,
                                 branchId: currentOrder.branchId,
-                                expiryDate: new Date(batchInfo.expiryDate),
+                                expiryDate: new Date(expiryDate),
                                 quantity: item.quantity,
                                 costPrice: item.unitCost,
                             },
                         });
                     }
                 }
-                */
-            }
+            }));
         }
 
         return updatedOrder;

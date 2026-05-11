@@ -425,12 +425,21 @@ function QuickActions() {
 
 export default function DashboardPage() {
     const selectedBranch = useAuthStore(s => s.selectedBranch);
+    const [timeRange, setTimeRange] = useState<'today' | 'month' | 'year' | 'all'>('today');
+    
     const effectiveBranch = (selectedBranch === 'all' || !selectedBranch) ? undefined : selectedBranch;
 
-    const { data: kpis, isLoading: kpisLoading } = useKPIs(effectiveBranch);
-    const { data: salesTrend, isLoading: trendLoading } = useSalesTrend(30, effectiveBranch);
-    const { data: topProducts, isLoading: topLoading } = useTopProducts(10, effectiveBranch);
+    const { data: kpis, isLoading: kpisLoading } = useKPIs(effectiveBranch, timeRange);
+    const { data: salesTrend, isLoading: trendLoading } = useSalesTrend(timeRange === 'today' ? 'month' : timeRange, effectiveBranch);
+    const { data: topProducts, isLoading: topLoading } = useTopProducts(10, effectiveBranch, timeRange);
     const { data: salesByBranch, isLoading: branchLoading } = useSalesByBranch();
+
+    const rangeLabels = {
+        today: 'Hoy',
+        month: 'Este Mes',
+        year: 'Este Año',
+        all: 'Todo el Tiempo'
+    };
 
     const loading = kpisLoading || trendLoading || topLoading || branchLoading;
     const today = new Date().toLocaleDateString('es-VE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -443,9 +452,29 @@ export default function DashboardPage() {
                     <h1 className="text-xl sm:text-2xl font-black text-slate-900">Dashboard Gerencial</h1>
                     <p className="text-xs text-slate-500 mt-1 capitalize">{today}</p>
                 </div>
-                <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 w-fit">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span className="text-xs font-bold text-emerald-700 uppercase">Sistema Activo</span>
+                
+                <div className="flex items-center gap-2">
+                    <div className="flex p-1 bg-slate-100 rounded-lg border border-slate-200">
+                        {(['today', 'month', 'year', 'all'] as const).map((r) => (
+                            <button
+                                key={r}
+                                onClick={() => setTimeRange(r)}
+                                className={cn(
+                                    "px-3 py-1.5 text-xs font-bold rounded-md transition-all",
+                                    timeRange === r 
+                                        ? "bg-white text-slate-900 shadow-sm" 
+                                        : "text-slate-500 hover:text-slate-700"
+                                )}
+                            >
+                                {rangeLabels[r]}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="text-xs font-bold text-emerald-700 uppercase">Sistema Activo</span>
+                    </div>
                 </div>
             </div>
 
@@ -464,7 +493,7 @@ export default function DashboardPage() {
                 ) : (
                     <>
                         <KPICard
-                            title="Ventas del Día"
+                            title={`Ventas ${rangeLabels[timeRange]}`}
                             value={formatCurrency(kpis?.sales.today.total || 0)}
                             subvalue={`${kpis?.sales.today.count || 0} transacciones`}
                             change={kpis?.sales.today.change || 0}
@@ -473,9 +502,9 @@ export default function DashboardPage() {
                             color="#10B981"
                         />
                         <KPICard
-                            title="Ventas del Mes"
+                            title="Ingresos Estimados"
                             value={formatCurrency(kpis?.sales.thisMonth.total || 0)}
-                            subvalue={`${kpis?.sales.thisMonth.count || 0} transacciones`}
+                            subvalue="Bruto facturado"
                             change={kpis?.sales.thisMonth.change || 0}
                             icon={ShoppingCart}
                             iconBg="bg-blue-50"

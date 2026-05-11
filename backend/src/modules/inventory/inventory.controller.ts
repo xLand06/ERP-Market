@@ -12,10 +12,12 @@ import { validatedData } from '../../core/middlewares/validate.middleware';
 /**
  * Obtener stock consolidado de todas las sedes (Solo OWNER)
  */
-export const getAllStock = async (_req: Request, res: Response) => {
+export const getAllStock = async (req: Request, res: Response) => {
     try {
-        const stock = await inventoryService.getAllStock();
-        res.json({ success: true, data: stock });
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 100;
+        const stock = await inventoryService.getAllStock(page, limit);
+        res.json({ success: true, ...stock });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });
     }

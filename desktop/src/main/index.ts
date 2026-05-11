@@ -1,12 +1,14 @@
 process.env.ELECTRON = 'true';
 
 import { app, BrowserWindow, shell, Menu, Tray, nativeImage, Notification } from 'electron';
+
+// Deshabilitar DNS over HTTPS para evitar errores de SSL handshake en redes con filtros (dns.google, cloudflare-dns)
+app.commandLine.appendSwitch('disable-features', 'DnsOverHttps');
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { is } from '@electron-toolkit/utils';
 import { startExpressServer } from './express-bridge';
 import Store from 'electron-store';
-import { autoUpdater } from 'electron-updater';
 
 // =============================================================================
 // ELECTRON STORE — Persistencia ligera para token JWT y configuración
@@ -14,6 +16,7 @@ import { autoUpdater } from 'electron-updater';
 const store = new Store<{
     token: string | null;
     branchId: string | null;
+    schemaVersion: string | undefined;
     windowState: {
         x: number;
         y: number;
@@ -22,7 +25,7 @@ const store = new Store<{
         isMaximized: boolean;
     } | null;
 }>({
-    defaults: { token: null, branchId: null, windowState: null },
+    defaults: { token: null, branchId: null, schemaVersion: undefined, windowState: null },
 });
 
 (global as Record<string, unknown>).erpStore = store;
@@ -36,51 +39,6 @@ ipcMain.handle('store-delete', (_event, key: string) => store.delete(key));
 ipcMain.handle('get-app-path', () => app.getAppPath());
 ipcMain.handle('get-user-data-path', () => app.getPath('userData'));
 
-// ── Auto-update IPCs ──────────────────────────────────────────────────────────
-ipcMain.on('quit-and-install', () => {
-    autoUpdater.quitAndInstall();
-});
-
-// =============================================================================
-// AUTO-UPDATER — electron-updater
-// =============================================================================
-function setupAutoUpdater(): void {
-    if (is.dev) return; // Solo en producción
-
-    // Logger personalizado para ver output en consola
-    autoUpdater.logger = {
-        info: (message: any) => console.log('[AutoUpdater]', message),
-        warn: (message: any) => console.warn('[AutoUpdater]', message),
-        error: (message: any) => console.error('[AutoUpdater]', message),
-        debug: (message: any) => console.debug('[AutoUpdater]', message),
-    };
-
-    autoUpdater.on('update-available', (info) => {
-        console.log('[AutoUpdater] Update available:', info.version);
-        if (mainWindow) {
-            mainWindow.webContents.send('update-available', info);
-        }
-    });
-
-    autoUpdater.on('update-downloaded', () => {
-        console.log('[AutoUpdater] Update downloaded. Will install on restart.');
-        if (mainWindow) {
-            mainWindow.webContents.send('update-downloaded');
-        }
-    });
-
-    autoUpdater.on('error', (err) => {
-        console.error('[AutoUpdater] Error:', err);
-        if (mainWindow) {
-            mainWindow.webContents.send('update-error', err.message);
-        }
-    });
-
-    // Check de actualización al iniciar (en segundo plano)
-    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
-        console.warn('[AutoUpdater] Check failed:', err.message);
-    });
-}
 
 // =============================================================================
 // WINDOW STATE PERSISTENCE
@@ -277,15 +235,7 @@ function createMenu(): void {
                         }
                     },
                 },
-                { type: 'separator' },
-                {
-                    label: 'Buscar actualizaciones',
-                    click: () => {
-                        if (!is.dev) {
-                            autoUpdater.checkForUpdatesAndNotify();
-                        }
-                    },
-                },
+
             ],
         },
     ];
@@ -373,6 +323,41 @@ app.whenReady().then(async () => {
     // Configurar la URL de la base de datos local (SQLite vía Prisma en el backend)
     const dbFileName = 'erp-market.db';
     const fullDbPath = join(userDataPath, dbFileName).replace(/\\/g, '/');
+
+    // ── Gestión del schema local ──────────────────────────────────────────────
+    // La DB empaquetada solo tiene el schema (tablas vacías).
+    // Los datos iniciales se descargan desde Supabase en el primer inicio.
+    const SCHEMA_VERSION = '3';
+    const storedSchemaVersion = store.get('schemaVersion') as string | undefined;
+
+    const bundledDbPath = is.dev
+        ? join(app.getAppPath(), '../backend', dbFileName)
+        : join(process.resourcesPath, 'seed', dbFileName);
+
+    const needsSchemaRestore = (): boolean => {
+        if (!existsSync(fullDbPath)) return true;
+
+        const dbSize = require('fs').statSync(fullDbPath).size;
+        if (dbSize < 8192) return true;
+        if (storedSchemaVersion && storedSchemaVersion !== SCHEMA_VERSION) return true;
+
+        return false;
+    };
+
+    if (needsSchemaRestore()) {
+        if (existsSync(bundledDbPath)) {
+            const fs = require('fs');
+            if (existsSync(fullDbPath)) fs.unlinkSync(fullDbPath);
+            fs.copyFileSync(bundledDbPath, fullDbPath);
+            store.set('schemaVersion', SCHEMA_VERSION);
+            console.log(`[Electron] Schema copiado a ${fullDbPath}`);
+        } else {
+            console.warn(`[Electron] Schema DB no encontrada en ${bundledDbPath}`);
+        }
+    } else {
+        console.log(`[Electron] DB local encontrada en ${fullDbPath}`);
+    }
+
     process.env.LOCAL_DATABASE_URL = `file:${fullDbPath}`;
 
     console.log(`[Electron] SQLite DB: ${fullDbPath}`);
@@ -385,7 +370,6 @@ app.whenReady().then(async () => {
     createWindow();
     createMenu();
     createTray();
-    setupAutoUpdater();
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();

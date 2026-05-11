@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { runSyncCycle } from './sync-worker';
+import { runSyncCycle, getLastSuccessfulSync } from './sync-worker';
 import { prisma, getLocalPrisma, getCloudPrisma } from '../../config/prisma';
 import { checkCloudConnection } from './connectivity.service';
 import { getSyncStatus } from './status.service';
@@ -8,6 +8,64 @@ import { roleGuard } from '../../core/middlewares/roleGuard';
 import { logAudit, extractIp } from '../../core/middlewares/audit.middleware';
 
 const router = Router();
+
+// ─── Rutas PÚBLICAS (sin autenticación) ──────────────────────────────────────
+// /initial-status debe ser pública porque se llama ANTES de que existan
+// usuarios en la DB local (primer inicio sin seed).
+
+// Endpoint para detectar primer inicio y estado del sync inicial
+router.get('/initial-status', async (_req, res) => {
+    try {
+        const localPrisma = getLocalPrisma();
+        const lastSync = getLastSuccessfulSync();
+        const isOnline = await checkCloudConnection();
+
+        // Detectar si ya se hizo sync desde la nube:
+        // El seed tiene exactamente: 2 sucursales, 2 usuarios, 3 grupos, 7 productos
+        // Si hay MAS que esos valores, cloud sync ya se hizo
+        const [branchCount, userCount, groupCount, productCount] = await Promise.all([
+            localPrisma.branch.count(),
+            localPrisma.user.count(),
+            localPrisma.product.count(),
+            localPrisma.group.count(),
+        ]);
+
+        const SEED_THRESHOLDS = {
+            branches: 2,  // Sede A + Sede B
+            users: 2,     // admin + vendedor
+            groups: 3,    // Bebidas, Alimentos, Limpieza
+            products: 7,  // 7 productos demo
+        };
+
+        const hasCloudData = (
+            branchCount > SEED_THRESHOLDS.branches ||
+            userCount > SEED_THRESHOLDS.users ||
+            groupCount > SEED_THRESHOLDS.groups ||
+            productCount > SEED_THRESHOLDS.products
+        );
+
+        // Primer inicio: seed data + nunca sync → needsSync
+        const needsInitialSync = !hasCloudData && lastSync === null;
+
+        res.json({
+            success: true,
+            data: {
+                needsInitialSync,
+                hasCloudData,
+                isOnline,
+                lastSyncAt: lastSync?.toISOString() ?? null,
+                isSyncing: false,
+                stage: needsInitialSync
+                    ? (isOnline ? 'connecting' : 'offline')
+                    : 'ready',
+            },
+        });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ─── Rutas PROTEGIDAS (requieren autenticación) ──────────────────────────────
 router.use(authMiddleware);
 
 // Endpoint status de sync

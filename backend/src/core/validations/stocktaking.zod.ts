@@ -16,11 +16,11 @@ export const stockCountStatusSchema = z.enum(['DRAFT', 'IN_PROGRESS', 'COMPLETED
  * products: string[] = IDs específicos de productos
  */
 export const createStockCountSchema = z.object({
-    branchId: z.string().cuid('ID de sede inválido'),
+    branchId: z.string().min(1, 'ID de sede es requerido'),
     notes: z.string().max(500).optional().or(z.literal('')),
     products: z.union([
         z.literal('all'),
-        z.array(z.string().cuid('ID de producto inválido')).min(1, 'Debe seleccionar al menos un producto'),
+        z.array(z.string().min(1, 'ID de producto inválido')).min(1, 'Debe seleccionar al menos un producto'),
     ]).default('all'),
 });
 
@@ -50,7 +50,7 @@ export const applyStockCountSchema = z.object({
  * Filtros para listar conteos
  */
 export const stockCountFiltersSchema = z.object({
-    branchId: z.string().cuid().optional(),
+    branchId: z.string().optional(),
     status: stockCountStatusSchema.optional(),
     from: z.string().datetime().optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
     to: z.string().datetime().optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),

@@ -56,7 +56,7 @@ export function SaleDetailModal({ sale, open, onClose }: SaleDetailModalProps) {
                         <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
                             <ShoppingBag className="w-4 h-4 text-emerald-600" />
                         </div>
-                        Ticket #{sale.ticketNo}
+                        Detalle de Venta #{sale.ticketNo}
                     </DialogTitle>
                     <DialogDescription>
                         Detalle de la venta del {new Date(sale.date).toLocaleDateString('es-VE', {

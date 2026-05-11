@@ -113,9 +113,9 @@ export const CartPanel = React.memo(function CartPanel({
     const { fmtCOP, fromCOP } = useConfigStore();
 
     return (
-        <div className="flex flex-col bg-white rounded-xl border shadow-sm overflow-hidden">
+        <>
             <div className="px-5 py-5 border-b flex justify-between items-center">
-                <p className="font-bold">Ticket de Venta</p>
+                <p className="font-bold">Ticket de {isSaleMode ? 'Venta' : 'Entrada'}</p>
                 {items.length > 0 && (
                     <button onClick={onClearCart} className="text-xs text-red-500">
                         Limpiar
@@ -190,6 +190,6 @@ export const CartPanel = React.memo(function CartPanel({
                     )}
                 </Button>
             </div>
-        </div>
+        </>
     );
 });

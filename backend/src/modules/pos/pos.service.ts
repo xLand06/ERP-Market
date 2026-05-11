@@ -1,4 +1,4 @@
-import { prisma, prismaCloud, getCloudPrisma } from '../../config/prisma';
+import { prisma } from '../../config/prisma';
 import { TransactionType, TransactionStatus } from '@prisma/client';
 import { parseDateRange } from '../../core/utils/helpers';
 
@@ -41,6 +41,17 @@ export const createTransaction = async (input: CreateTransactionInput) => {
         currency = 'COP', exchangeRate, invoiceNumber, paymentMethods
     } = input;
 
+    // 1. Validar que la sede existe y está activa para nuevas operaciones
+    const branch = await prisma.branch.findUnique({
+        where: { id: branchId },
+        select: { isActive: true, name: true }
+    });
+
+    if (!branch) throw new Error('La sucursal no existe.');
+    if (!branch.isActive) {
+        throw new Error(`La sucursal "${branch.name}" está desactivada y no puede procesar nuevas transacciones.`);
+    }
+
     // El total siempre se calcula en COP (moneda principal)
     const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
@@ -61,14 +72,13 @@ export const createTransaction = async (input: CreateTransactionInput) => {
         }
     }
 
-    // Determinar si usamos el cliente cloud para el storage
-    // Sistema híbrido:cloud es null en modo offline, por lo que siempre cae a SQLite
-    const useCloud = !!getCloudPrisma();
-    const dbInstance = useCloud ? prismaCloud : prisma;
+    // Sistema offline-first: SIEMPRE escribir en SQLite local.
+    // La sincronización se encarga de subir a Supabase después.
+    const dbInstance = prisma;
 
-    // Serializar paymentMethods: JSON directo en PostgreSQL, string en SQLite
+    // SQLite requiere serializar JSON como string
     const paymentMethodsData = paymentMethods
-        ? (useCloud ? paymentMethods : JSON.stringify(paymentMethods))
+        ? JSON.stringify(paymentMethods)
         : null;
 
     return await dbInstance.$transaction(async (tx) => {
@@ -83,31 +93,43 @@ export const createTransaction = async (input: CreateTransactionInput) => {
             assignedCashRegisterId = openReg.id;
         }
 
+        // ── Batch pre-fetch: reducir N+1 ──────────────────────────────
+        // Traer presentaciones, inventarios y productos en 3 queries totales
+        const presentationIds = items.filter(i => i.presentationId).map(i => i.presentationId!);
+        const presentations = presentationIds.length > 0
+            ? await tx.productPresentation.findMany({
+                where: { id: { in: presentationIds } }
+              })
+            : [];
+        const presMap = new Map(presentations.map(p => [p.id, Number(p.multiplier)]));
+
+        const productIds = items.map(i => i.productId);
+        const products = type === TransactionType.SALE
+            ? await tx.product.findMany({
+                where: { id: { in: productIds } },
+                select: { id: true, name: true, baseUnit: true },
+              })
+            : [];
+        const productMap = new Map(products.map(p => [p.id, p]));
+
+        const inventoryItems = type === TransactionType.SALE
+            ? await tx.branchInventory.findMany({
+                where: { productId: { in: productIds }, branchId }
+              })
+            : [];
+        const invMap = new Map(inventoryItems.map(i => [i.productId, Number(i.stock)]));
+
+        // ── Procesar items con datos precargados ──────────────────────
         for (const item of items) {
-            let multiplier = 1;
-
-            if (item.presentationId) {
-                const presentation = await tx.productPresentation.findUnique({
-                    where: { id: item.presentationId }
-                });
-                if (!presentation) throw new Error(`Presentación ${item.presentationId} no válida`);
-                multiplier = Number(presentation.multiplier);
-            }
-
+            const multiplier = item.presentationId ? (presMap.get(item.presentationId) ?? 1) : 1;
             const totalUnitsToDeduct = item.quantity * multiplier;
 
             if (type === TransactionType.SALE) {
-                const inv = await tx.branchInventory.findUnique({
-                    where: { productId_branchId: { productId: item.productId, branchId } },
-                });
-
-                if (!inv || Number(inv.stock) < totalUnitsToDeduct) {
-                    const product = await tx.product.findUnique({
-                        where: { id: item.productId },
-                        select: { name: true, baseUnit: true },
-                    });
+                const availableStock = invMap.get(item.productId) ?? 0;
+                if (availableStock < totalUnitsToDeduct) {
+                    const prod = productMap.get(item.productId);
                     throw new Error(
-                        `Stock insuficiente para "${product?.name || item.productId}". Requerido: ${totalUnitsToDeduct} ${product?.baseUnit}. Disponible: ${inv?.stock ?? 0}`
+                        `Stock insuficiente para "${prod?.name || item.productId}". Requerido: ${totalUnitsToDeduct} ${prod?.baseUnit || 'UNIDAD'}. Disponible: ${availableStock}`
                     );
                 }
             }
@@ -220,7 +242,7 @@ export const getTransactions = (filters: {
     return prisma.transaction.findMany({
         where: {
             ...(type && { type: { equals: type } }),
-            ...(branchId && { branchId }),
+            ...(branchId && branchId !== 'all' && { branchId }),
             ...(userId && { userId }),
             ...(from || to
                 ? (() => {
@@ -277,14 +299,15 @@ export const cancelTransaction = async (id: string) => {
             data: { status: TransactionStatus.CANCELLED },
         });
 
-        for (const item of tx.items) {
+        // Ejecutar updates de stock en paralelo
+        await Promise.all(tx.items.map(item => {
             const realQuantity = Number(item.quantity) * Number(item.multiplierUsed);
             const delta = tx.type === TransactionType.SALE ? realQuantity : -realQuantity;
-            await txClient.branchInventory.updateMany({
+            return txClient.branchInventory.updateMany({
                 where: { productId: item.productId, branchId: tx.branchId },
                 data: { stock: { increment: delta } },
             });
-        }
+        }));
 
         return txClient.transaction.findUnique({ where: { id } });
     });

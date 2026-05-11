@@ -12,9 +12,10 @@ import { validatedData } from '../../core/middlewares/validate.middleware';
 /**
  * Listar todas las sedes activas
  */
-export const getAll = async (_req: Request, res: Response): Promise<void> => {
+export const getAll = async (req: Request, res: Response): Promise<void> => {
     try {
-        const branches = await branchesService.getAllBranches();
+        const includeInactive = req.query.includeInactive === 'true';
+        const branches = await branchesService.getAllBranches(includeInactive);
         res.json({ success: true, data: branches });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });

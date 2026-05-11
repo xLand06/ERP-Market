@@ -36,11 +36,14 @@ const authOptionalPaths = [
     '/api/groups',
 ];
 
-export const authMiddleware = (
+import { prisma } from '../../config/prisma';
+import { asyncHandler } from './errorHandler';
+
+export const authMiddleware = asyncHandler(async (
     req: AuthRequest,
     res: Response,
     next: NextFunction
-): void => {
+): Promise<void> => {
     const path = req.originalUrl;
 
     if (publicPaths.some(p => path.startsWith(p))) {
@@ -69,6 +72,18 @@ export const authMiddleware = (
             branchId?: string;
             canManageInventory?: boolean;
         };
+
+        // Verificar contra la MISMA base de datos donde se escriben los datos (SQLite local)
+        const userExists = await prisma.user.findUnique({
+            where: { id: decoded.id },
+            select: { id: true, isActive: true }
+        });
+
+        if (!userExists || !userExists.isActive) {
+            logger.warn('Token rejected: user not in local DB', { userId: decoded.id });
+            next(new UnauthorizedError('El usuario ya no existe o está inactivo. Inicie sesión nuevamente.'));
+            return;
+        }
 
         req.user = {
             id: decoded.id,
@@ -101,7 +116,7 @@ export const authMiddleware = (
 
         next(new UnauthorizedError('Token inválido o expirado'));
     }
-};
+});
 
 export const generateToken = (user: { id: string; role: string; name?: string; email?: string; branchId?: string; canManageInventory?: boolean }): string => {
     return jwt.sign(

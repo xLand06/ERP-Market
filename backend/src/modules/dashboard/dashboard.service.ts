@@ -31,48 +31,78 @@ const calculateChange = (current: number, previous: number): number => {
 };
 
 /** KPIs principales del dashboard */
-export const getDashboardKPIs = async (client: any, branchId?: string): Promise<KPIsDTO> => {
+export const getDashboardKPIs = async (client: any, branchId?: string, range: 'today' | 'month' | 'year' | 'all' = 'today'): Promise<KPIsDTO> => {
     const now = new Date();
-    const startOfToday = new Date(now);
-    startOfToday.setHours(0, 0, 0, 0);
+    
+    // Calcular rangos para el filtro principal
+    let startDate: Date;
+    let compareStartDate: Date;
+    let compareEndDate: Date;
 
-    const startOfYesterday = new Date(now);
-    startOfYesterday.setDate(now.getDate() - 1);
-    startOfYesterday.setHours(0, 0, 0, 0);
+    if (range === 'today') {
+        startDate = new Date(now);
+        startDate.setHours(0, 0, 0, 0);
+        compareStartDate = new Date(startDate);
+        compareStartDate.setDate(startDate.getDate() - 1);
+        compareEndDate = new Date(startDate);
+    } else if (range === 'month') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        compareStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        compareEndDate = new Date(startDate);
+    } else if (range === 'year') {
+        startDate = new Date(now.getFullYear(), 0, 1);
+        compareStartDate = new Date(now.getFullYear() - 1, 0, 1);
+        compareEndDate = new Date(startDate);
+    } else {
+        startDate = new Date(0);
+        compareStartDate = new Date(0);
+        compareEndDate = new Date(0);
+    }
 
+    // Rangos fijos para métricas secundarias
+    const startOfToday = new Date(now); startOfToday.setHours(0,0,0,0);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - 7);
 
     const isSQLite = (client as any)._activeProvider === 'sqlite' || process.env.ELECTRON === 'true';
 
     const [
-        salesToday,
-        salesThisMonth,
-        salesThisWeek,
+        salesCurrent,
+        salesPrevious,
+        salesMonth,
+        salesLastMonth,
         totalProducts,
         lowStockCount,
         openRegister,
-        transactionsToday,
-        monthlyTransactions,
-        salesYesterday,
-        salesLastMonth,
-        transactionsYesterday,
+        transactionsCurrent,
+        transactionsPrevious,
+        currentTransactionsList,
         productsYesterday,
     ] = await Promise.all([
+        // 1. Rango actual seleccionado (para la tarjeta principal)
         client.transaction.aggregate({
             where: {
                 type: 'SALE',
                 status: 'COMPLETED',
-                createdAt: { gte: startOfToday },
+                createdAt: { gte: startDate },
                 ...(branchId && { branchId }),
             },
             _sum: { total: true },
             _count: true,
         }),
 
+        // 2. Rango anterior (para el % de cambio de la tarjeta principal)
+        range !== 'all' ? client.transaction.aggregate({
+            where: {
+                type: 'SALE',
+                status: 'COMPLETED',
+                createdAt: { gte: compareStartDate, lt: compareEndDate },
+                ...(branchId && { branchId }),
+            },
+            _sum: { total: true },
+        }) : Promise.resolve({ _sum: { total: 0 } }),
+
+        // 3. Ventas Mes Actual (fijo)
         client.transaction.aggregate({
             where: {
                 type: 'SALE',
@@ -84,15 +114,15 @@ export const getDashboardKPIs = async (client: any, branchId?: string): Promise<
             _count: true,
         }),
 
+        // 4. Ventas Mes Pasado (fijo para el % del mes)
         client.transaction.aggregate({
             where: {
                 type: 'SALE',
                 status: 'COMPLETED',
-                createdAt: { gte: startOfWeek },
+                createdAt: { gte: startOfLastMonth, lt: startOfMonth },
                 ...(branchId && { branchId }),
             },
             _sum: { total: true },
-            _count: true,
         }),
 
         client.product.count({ where: { isActive: true } }),
@@ -108,16 +138,23 @@ export const getDashboardKPIs = async (client: any, branchId?: string): Promise<
 
         client.transaction.count({
             where: {
-                createdAt: { gte: startOfToday },
+                createdAt: { gte: startDate },
                 ...(branchId && { branchId }),
             },
         }),
+
+        range !== 'all' ? client.transaction.count({
+            where: {
+                createdAt: { gte: compareStartDate, lt: compareEndDate },
+                ...(branchId && { branchId }),
+            },
+        }) : Promise.resolve(0),
 
         client.transaction.findMany({
             where: {
                 type: 'SALE',
                 status: 'COMPLETED',
-                createdAt: { gte: startOfMonth },
+                createdAt: { gte: startDate },
                 ...(branchId && { branchId }),
             },
             select: {
@@ -127,78 +164,33 @@ export const getDashboardKPIs = async (client: any, branchId?: string): Promise<
                 items: {
                     select: {
                         quantity: true,
-                        product: {
-                            select: { cost: true }
-                        }
+                        product: { select: { cost: true } }
                     }
                 }
-            }
-        }),
-
-        // salesYesterday
-        client.transaction.aggregate({
-            where: {
-                type: 'SALE',
-                status: 'COMPLETED',
-                createdAt: { gte: startOfYesterday, lt: startOfToday },
-                ...(branchId && { branchId }),
             },
-            _sum: { total: true },
+            take: 1500,
         }),
 
-        // salesLastMonth
-        client.transaction.aggregate({
-            where: {
-                type: 'SALE',
-                status: 'COMPLETED',
-                createdAt: { gte: startOfLastMonth, lt: startOfMonth },
-                ...(branchId && { branchId }),
-            },
-            _sum: { total: true },
-        }),
-
-        // transactionsYesterday
-        client.transaction.count({
-            where: {
-                createdAt: { gte: startOfYesterday, lt: startOfToday },
-                ...(branchId && { branchId }),
-            },
-        }),
-
-        // productsYesterday
         client.product.count({
-            where: {
-                isActive: true,
-                createdAt: { lt: startOfToday }
-            }
+            where: { isActive: true, createdAt: { lt: startOfToday } }
         }),
     ]);
 
-    // Calcular totales y ganancias por moneda en memoria
+    // Ganancias
     const currencyMap: Record<string, { totalSales: number; totalProfit: number; count: number }> = {};
-
-    for (const tx of monthlyTransactions) {
+    for (const tx of currentTransactionsList) {
         const curr = tx.currency || 'COP';
         const rate = tx.exchangeRate ? Number(tx.exchangeRate) : 1;
         const totalCOP = Number(tx.total);
-        
         let costCOP = 0;
         for (const item of tx.items) {
-            const qty = Number(item.quantity);
-            const cost = Number(item.product?.cost || 0);
-            costCOP += qty * cost;
+            costCOP += Number(item.quantity) * Number(item.product?.cost || 0);
         }
-
         const profitCOP = totalCOP - costCOP;
-
-        // Convertir a la moneda original
         const totalOrig = (curr === 'COP' || rate <= 1) ? totalCOP : totalCOP / rate;
         const profitOrig = (curr === 'COP' || rate <= 1) ? profitCOP : profitCOP / rate;
 
-        if (!currencyMap[curr]) {
-            currencyMap[curr] = { totalSales: 0, totalProfit: 0, count: 0 };
-        }
-
+        if (!currencyMap[curr]) currencyMap[curr] = { totalSales: 0, totalProfit: 0, count: 0 };
         currencyMap[curr].totalSales += totalOrig;
         currencyMap[curr].totalProfit += profitOrig;
         currencyMap[curr].count += 1;
@@ -211,24 +203,24 @@ export const getDashboardKPIs = async (client: any, branchId?: string): Promise<
         count: data.count,
     }));
 
-    const totalSalesToday = salesToday._sum.total ? Number(salesToday._sum.total) : 0;
-    const totalSalesYesterday = salesYesterday._sum.total ? Number(salesYesterday._sum.total) : 0;
-    const totalSalesThisMonth = salesThisMonth._sum.total ? Number(salesThisMonth._sum.total) : 0;
+    const totalSalesCurrent = salesCurrent._sum.total ? Number(salesCurrent._sum.total) : 0;
+    const totalSalesPrevious = (salesPrevious as any)._sum.total ? Number((salesPrevious as any)._sum.total) : 0;
+    const totalSalesMonth = salesMonth._sum.total ? Number(salesMonth._sum.total) : 0;
     const totalSalesLastMonth = salesLastMonth._sum.total ? Number(salesLastMonth._sum.total) : 0;
 
     return {
         sales: {
             today: {
-                total: totalSalesToday,
-                count: salesToday._count,
-                change: calculateChange(totalSalesToday, totalSalesYesterday),
+                total: totalSalesCurrent,
+                count: salesCurrent._count,
+                change: calculateChange(totalSalesCurrent, totalSalesPrevious),
             },
             thisMonth: {
-                total: totalSalesThisMonth,
-                count: salesThisMonth._count,
-                change: calculateChange(totalSalesThisMonth, totalSalesLastMonth),
+                total: totalSalesMonth,
+                count: salesMonth._count,
+                change: calculateChange(totalSalesMonth, totalSalesLastMonth),
             },
-            weekSales: salesThisWeek._sum.total ? Number(salesThisWeek._sum.total) : 0,
+            weekSales: totalSalesCurrent, 
         },
         inventory: {
             totalProducts,
@@ -236,16 +228,21 @@ export const getDashboardKPIs = async (client: any, branchId?: string): Promise<
             change: calculateChange(totalProducts, productsYesterday),
         },
         cashRegister: openRegister as KPIsDTO['cashRegister'],
-        transactionsToday,
-        transactionsTodayChange: calculateChange(transactionsToday, transactionsYesterday),
+        transactionsToday: transactionsCurrent,
+        transactionsTodayChange: calculateChange(transactionsCurrent, transactionsPrevious as number),
         salesByCurrency,
     };
 };
 
 /** Ventas por día de los últimos N días (para gráfica de líneas) */
-export const getSalesTrend = async (client: any, branchId?: string, days = 30): Promise<SalesTrendDTO[]> => {
-    const since = new Date();
-    since.setDate(since.getDate() - days);
+export const getSalesTrend = async (client: any, branchId?: string, range: 'today' | 'month' | 'year' | 'all' = 'month'): Promise<SalesTrendDTO[]> => {
+    const now = new Date();
+    let since = new Date();
+
+    if (range === 'today') since.setHours(0,0,0,0);
+    else if (range === 'month') since.setDate(since.getDate() - 30);
+    else if (range === 'year') since.setFullYear(since.getFullYear() - 1);
+    else since = new Date(0);
 
     const transactions = await client.transaction.findMany({
         where: {
@@ -293,13 +290,21 @@ export const getSalesTrend = async (client: any, branchId?: string, days = 30): 
 };
 
 /** Top 10 productos más vendidos (por unidades) */
-export const getTopProducts = async (client: any, branchId?: string, limit = 10): Promise<TopProductDTO[]> => {
+export const getTopProducts = async (client: any, branchId?: string, limit = 10, range: 'today' | 'month' | 'year' | 'all' = 'month'): Promise<TopProductDTO[]> => {
+    const now = new Date();
+    let startDate: Date;
+    if (range === 'today') { startDate = new Date(now); startDate.setHours(0,0,0,0); }
+    else if (range === 'month') { startDate = new Date(now.getFullYear(), now.getMonth(), 1); }
+    else if (range === 'year') { startDate = new Date(now.getFullYear(), 0, 1); }
+    else { startDate = new Date(0); }
+
     const data = await client.transactionItem.groupBy({
         by: ['productId'],
         where: {
             transaction: {
                 type: 'SALE',
                 status: 'COMPLETED',
+                createdAt: { gte: startDate },
                 ...(branchId && { branchId }),
             },
         },
@@ -315,9 +320,10 @@ export const getTopProducts = async (client: any, branchId?: string, limit = 10)
         where: { id: { in: productIds } },
         select: { id: true, name: true, barcode: true, price: true },
     });
+    const productMap = new Map(products.map((p: any) => [p.id, p]));
 
     return data.map((d: any) => ({
-        product: products.find((p: any) => p.id === d.productId),
+        product: productMap.get(d.productId),
         totalQuantity: d._sum.quantity ?? 0,
         totalRevenue: d._sum.subtotal ? Number(d._sum.subtotal) : 0,
     }));
@@ -351,9 +357,10 @@ export const getSalesByBranch = async (client: any, from?: string, to?: string):
         where: { id: { in: branchIds } },
         select: { id: true, name: true },
     });
+    const branchMap = new Map(branches.map((b: any) => [b.id, b]));
 
     return data.map((d: any) => ({
-        branch: branches.find((b: any) => b.id === d.branchId),
+        branch: branchMap.get(d.branchId),
         totalSales: d._sum.total ? Number(d._sum.total) : 0,
         transactionCount: d._count,
     }));
