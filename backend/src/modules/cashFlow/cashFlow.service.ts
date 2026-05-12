@@ -29,7 +29,10 @@ export const openCashRegister = async (data: {
 export const closeCashRegister = async (
     cashRegisterId: string,
     closingAmount: number,
-    notes?: string
+    notes?: string,
+    /** Si se pasa, se usa este valor como expectedAmount en lugar de calcularlo internamente.
+     *  Útil para cierres automáticos donde no hay conteo físico y el expected ES el closing. */
+    expectedOverride?: number
 ) => {
     const cashRegister = await prisma.cashRegister.findUnique({
         where: { id: cashRegisterId },
@@ -48,7 +51,7 @@ export const closeCashRegister = async (
         (sum: number, tx) => sum + Number(tx.total),
         0
     );
-    const expectedAmount = Number(cashRegister.openingAmount) + salesTotal;
+    const expectedAmount = expectedOverride ?? (Number(cashRegister.openingAmount) + salesTotal);
     const difference = closingAmount - expectedAmount;
 
     return prisma.cashRegister.update({

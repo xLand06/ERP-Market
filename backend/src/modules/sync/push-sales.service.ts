@@ -35,16 +35,19 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
     try {
         logger.info('[Sync] Iniciando Push completo hacia cloud...');
 
-        // ─── STEP 1: BRANCHES ──────────────────────────────────────────────────
+        // ─── STEP 1: BRANCHES (batch por code) ──────────────────────────────────
         logger.info('[Sync] Step 1: Pushing Branches...');
         const localBranches = await localPrisma.branch.findMany({ where: { isActive: true } });
+        const branchCodes = localBranches.map(b => b.code || `SEDE-${b.id.slice(-6).toUpperCase()}`);
+        const cloudBranchesByCode = new Map(
+            branchCodes.length > 0
+                ? (await cloud.branch.findMany({ where: { code: { in: branchCodes } } })).map(b => [b.code, b])
+                : []
+        );
         for (const branch of localBranches) {
             try {
                 const branchCode = branch.code || `SEDE-${branch.id.slice(-6).toUpperCase()}`;
-                // Reconciliar por code (unique en cloud)
-                const existingByCode = branchCode
-                    ? await cloud.branch.findFirst({ where: { code: branchCode } })
-                    : null;
+                const existingByCode = cloudBranchesByCode.get(branchCode) || null;
 
                 if (existingByCode) {
                     await cloud.branch.update({
@@ -75,13 +78,17 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
             }
         }
 
-        // ─── STEP 2: GROUPS ────────────────────────────────────────────────────
+        // ─── STEP 2: GROUPS (batch por name) ────────────────────────────────────
         logger.info('[Sync] Step 2: Pushing Groups...');
         const localGroups = await localPrisma.group.findMany();
+        const cloudGroupsByName = new Map(
+            localGroups.length > 0
+                ? (await cloud.group.findMany({ where: { name: { in: localGroups.map(g => g.name) } } })).map(g => [g.name, g])
+                : []
+        );
         for (const group of localGroups) {
             try {
-                // Reconciliar por name (unique)
-                const existingByName = await cloud.group.findFirst({ where: { name: group.name } });
+                const existingByName = cloudGroupsByName.get(group.name) || null;
                 if (existingByName) {
                     await cloud.group.update({
                         where: { id: existingByName.id },
@@ -98,25 +105,31 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
             }
         }
 
-        // ─── STEP 3: SUBGROUPS ─────────────────────────────────────────────────
+        // ─── STEP 3: SUBGROUPS (batch por compound key name+groupId) ────────────
         logger.info('[Sync] Step 3: Pushing SubGroups...');
         const localSubGroups = await localPrisma.subGroup.findMany();
+        // Batch fetch: necesitamos traer todos los subgrupos que coincidan (name, groupId)
+        const cloudSubGroupsByKey = new Map<string, any>();
+        if (localSubGroups.length > 0) {
+            // Traer todos los subgrupos del grupo y filtrar en memoria por name
+            const groupIds = [...new Set(localSubGroups.map(sg => sg.groupId))];
+            const allCloudSgs = await cloud.subGroup.findMany({ where: { groupId: { in: groupIds } } });
+            for (const csg of allCloudSgs) {
+                cloudSubGroupsByKey.set(`${csg.name}::${csg.groupId}`, csg);
+            }
+        }
         for (const sg of localSubGroups) {
             try {
-                // Reconciliar por compound unique [name, groupId]
-                const existingBySg = await cloud.subGroup.findFirst({
-                    where: { name: sg.name, groupId: sg.groupId },
-                });
+                const key = `${sg.name}::${sg.groupId}`;
+                const existingBySg = cloudSubGroupsByKey.get(key) || null;
                 if (existingBySg) {
                     await cloud.subGroup.update({
                         where: { id: existingBySg.id },
                         data: { name: sg.name, groupId: sg.groupId },
                     });
                 } else {
-                    // Verificar que el grupo existe en cloud antes de crear
-                    const groupExists = await cloud.group.findUnique({
-                        where: { id: sg.groupId }, select: { id: true },
-                    });
+                    const groupExists = cloudGroupsByName.get(sg.groupId) // ya batch-eamos groups
+                        ?? await cloud.group.findUnique({ where: { id: sg.groupId }, select: { id: true } });
                     if (!groupExists) continue;
 
                     await cloud.subGroup.create({
@@ -129,17 +142,65 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
             }
         }
 
-        // ─── STEP 4: PRODUCTS ──────────────────────────────────────────────────
+        // ─── STEP 4: PRODUCTS (batch por barcode + id) ─────────────────────────
         logger.info('[Sync] Step 4: Pushing Products...');
         const localProducts = await localPrisma.product.findMany({
             include: { presentations: true, barcodes: true },
         });
+
+        // Batch 1: reconciliar productos con barcode
+        const prodByBarcode = new Map<string, any>();
+        const prodById = new Map<string, any>();
+        const barcodes = localProducts.map(p => p.barcode).filter(Boolean) as string[];
+        if (barcodes.length > 0) {
+            const cloudProds = await cloud.product.findMany({ where: { barcode: { in: barcodes } } });
+            for (const cp of cloudProds) {
+                if (cp.barcode) prodByBarcode.set(cp.barcode, cp);
+            }
+        }
+        // Batch 2: productos restantes (sin barcode o no encontrados) por id
+        const idsToFetch = localProducts
+            .filter(p => !p.barcode || !prodByBarcode.has(p.barcode))
+            .map(p => p.id);
+        if (idsToFetch.length > 0) {
+            const cloudProds = await cloud.product.findMany({ where: { id: { in: idsToFetch } } });
+            for (const cp of cloudProds) prodById.set(cp.id, cp);
+        }
+
+        // Batch: presentations y barcodes de cloud para lookup rápido
+        let cloudPresByBarcode = new Map<string, any>();
+        let cloudPresById = new Map<string, any>();
+        const allPresBarcodes = localProducts.flatMap(p => p.presentations.map(pr => pr.barcode).filter(Boolean)) as string[];
+        if (allPresBarcodes.length > 0) {
+            const cloudPres = await cloud.productPresentation.findMany({ where: { barcode: { in: allPresBarcodes } } });
+            for (const cp of cloudPres) {
+                if (cp.barcode) cloudPresByBarcode.set(cp.barcode, cp);
+                cloudPresById.set(cp.id, cp);
+            }
+        }
+        // Si quedan presentations sin barcode, traerlas por id
+        const presIdsToFetch = localProducts
+            .flatMap(p => p.presentations)
+            .filter(pr => !pr.barcode && !cloudPresById.has(pr.id))
+            .map(pr => pr.id);
+        if (presIdsToFetch.length > 0) {
+            const cloudPres = await cloud.productPresentation.findMany({ where: { id: { in: presIdsToFetch } } });
+            for (const cp of cloudPres) cloudPresById.set(cp.id, cp);
+            // Reemplazar el map combinado para lookup eficiente
+        }
+
+        const cloudBcByCode = new Map<string, any>();
+        const allBcCodes = localProducts.flatMap(p => p.barcodes.map(b => b.code));
+        if (allBcCodes.length > 0) {
+            const cloudBcs = await cloud.productBarcode.findMany({ where: { code: { in: allBcCodes } } });
+            for (const cb of cloudBcs) cloudBcByCode.set(cb.code, cb);
+        }
+
         for (const prod of localProducts) {
             try {
-                // Producto: reconciliar por barcode si existe, sino por id
-                let existingProd = prod.barcode
-                    ? await cloud.product.findFirst({ where: { barcode: prod.barcode } })
-                    : await cloud.product.findUnique({ where: { id: prod.id } });
+                const existingProd = prod.barcode
+                    ? (prodByBarcode.get(prod.barcode) ?? null)
+                    : (prodById.get(prod.id) ?? null);
 
                 const prodData = {
                     name: prod.name,
@@ -168,16 +229,15 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                 pushedCount++;
             } catch (err: any) {
                 logger.warn(`[Sync] Product ${prod.name} skip: ${err.message?.slice(0, 100)}`);
-                continue; // Si falla el producto, no procesar sus presentaciones
+                continue;
             }
 
-            // ── Step 5: Presentations ──────────────────────────────────────────
+            // ── Step 5: Presentations (batch lookup) ──────────────────────────
             for (const pres of prod.presentations) {
                 try {
-                    // Reconciliar por barcode si tiene, sino por id
-                    let existingPres = pres.barcode
-                        ? await cloud.productPresentation.findFirst({ where: { barcode: pres.barcode } })
-                        : await cloud.productPresentation.findUnique({ where: { id: pres.id } });
+                    const existingPres = pres.barcode
+                        ? (cloudPresByBarcode.get(pres.barcode) ?? cloudPresById.get(pres.id) ?? null)
+                        : (cloudPresById.get(pres.id) ?? null);
 
                     if (existingPres) {
                         await cloud.productPresentation.update({
@@ -206,11 +266,10 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                 }
             }
 
-            // ── Step 6: Barcodes ───────────────────────────────────────────────
+            // ── Step 6: Barcodes (batch lookup) ───────────────────────────────
             for (const bc of prod.barcodes) {
                 try {
-                    // Reconciliar por code (unique)
-                    const existingBc = await cloud.productBarcode.findFirst({ where: { code: bc.code } });
+                    const existingBc = cloudBcByCode.get(bc.code) ?? null;
                     if (existingBc) {
                         await cloud.productBarcode.update({
                             where: { id: existingBc.id },
@@ -227,13 +286,17 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
             }
         }
 
-        // ─── STEP 7: USERS ────────────────────────────────────────────────────
+        // ─── STEP 7: USERS (batch por username) ────────────────────────────────
         logger.info('[Sync] Step 7: Pushing Users...');
         const localUsers = await localPrisma.user.findMany({ where: { isActive: true } });
+        const cloudUsersByUsername = new Map(
+            localUsers.length > 0
+                ? (await cloud.user.findMany({ where: { username: { in: localUsers.map(u => u.username) } } })).map(u => [u.username, u])
+                : []
+        );
         for (const user of localUsers) {
             try {
-                // Reconciliar por username (unique)
-                const existingUser = await cloud.user.findFirst({ where: { username: user.username } });
+                const existingUser = cloudUsersByUsername.get(user.username) ?? null;
                 const userData = {
                     username: user.username,
                     cedula: user.cedula,
@@ -265,13 +328,17 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
             }
         }
 
-        // ─── STEP 8: EXCHANGE RATES ────────────────────────────────────────────
+        // ─── STEP 8: EXCHANGE RATES (batch por code) ────────────────────────────
         logger.info('[Sync] Step 8: Pushing ExchangeRates...');
         const localRates = await localPrisma.exchangeRate.findMany();
+        const cloudRatesByCode = new Map(
+            localRates.length > 0
+                ? (await cloud.exchangeRate.findMany({ where: { code: { in: localRates.map(r => r.code) } } })).map(r => [r.code, r])
+                : []
+        );
         for (const rate of localRates) {
             try {
-                // Reconciliar por code (unique)
-                const existingRate = await cloud.exchangeRate.findFirst({ where: { code: rate.code } });
+                const existingRate = cloudRatesByCode.get(rate.code) ?? null;
                 if (existingRate) {
                     await cloud.exchangeRate.update({
                         where: { id: existingRate.id },
@@ -418,6 +485,7 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                         currency: (tx as any).currency ?? 'COP',
                         exchangeRate: (tx as any).exchangeRate != null ? Number((tx as any).exchangeRate) : null,
                         invoiceNumber: (tx as any).invoiceNumber ?? null,
+                        paymentMethods: (tx as any).paymentMethods ?? null,
                         createdAt: tx.createdAt,
                         userId: tx.userId,
                         branchId: tx.branchId,
@@ -435,6 +503,7 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                         currency: (tx as any).currency ?? 'COP',
                         exchangeRate: (tx as any).exchangeRate != null ? Number((tx as any).exchangeRate) : null,
                         invoiceNumber: (tx as any).invoiceNumber ?? null,
+                        paymentMethods: (tx as any).paymentMethods ?? null,
                         createdAt: tx.createdAt,
                         userId: tx.userId,
                         branchId: tx.branchId,

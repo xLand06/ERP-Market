@@ -92,10 +92,10 @@ export function PaymentDialog({
                     </div>
                     <div className="flex justify-end gap-3 mt-1">
                         <p className="text-[11px] text-slate-400 tabular-nums">
-                            ${fromCOP(total, 'USD').toFixed(2)} USD
+                            ${fromCOP(total, 'USD').toFixed(4)} USD
                         </p>
                         <p className="text-[11px] text-slate-400 tabular-nums">
-                            Bs. {fromCOP(total, 'VES').toFixed(2)} VES
+                            Bs. {fromCOP(total, 'VES').toFixed(4)} VES
                         </p>
                     </div>
                 </div>
@@ -127,11 +127,10 @@ export function PaymentDialog({
                             <div key={row.key} className="flex gap-2 items-center">
                                 <select
                                     value={`${row.type}-${row.currency}`}
-                                    onChange={e => {
-                                        const [type, curr] = e.target.value.split('-') as [PaymentMethodType, Currency];
-                                        updateRow(row.key, 'type', type);
-                                        // currency will auto-adjust in updateRow
-                                    }}
+                                        onChange={e => {
+                                            const [type, currency] = e.target.value.split('-') as [PaymentMethodType, Currency];
+                                            updateRow(row.key, { type, currency });
+                                        }}
                                     className="flex-1 h-11 rounded-lg border border-slate-200 px-3 text-sm bg-white"
                                 >
                                     {PAYMENT_OPTIONS.map(m => (
@@ -146,8 +145,9 @@ export function PaymentDialog({
                                     </span>
                                     <Input
                                         type="number"
+                                        step="0.0001"
                                         value={row.amount}
-                                        onChange={e => updateRow(row.key, 'amount', parseFloat(e.target.value) || 0)}
+                                        onChange={e => updateRow(row.key, { amount: parseFloat(e.target.value) || 0 })}
                                         className="w-32 pl-8 font-semibold"
                                     />
                                 </div>

@@ -262,7 +262,7 @@ export const getSalesTrend = async (client: any, branchId?: string, range: 'toda
     const dayMap: Record<string, { total: number; count: number; [currency: string]: any }> = {};
 
     for (const tx of transactions) {
-        const dateStr = tx.createdAt.toISOString().split('T')[0];
+        const dateStr = tx.createdAt.toLocaleDateString('en-CA'); // YYYY-MM-DD local time
         const curr = tx.currency || 'COP';
         const rate = tx.exchangeRate ? Number(tx.exchangeRate) : 1;
         const totalCOP = Number(tx.total);

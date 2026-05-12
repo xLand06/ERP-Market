@@ -1,16 +1,19 @@
 import { resolve, join } from 'path';
 import { is } from '@electron-toolkit/utils';
 import type { Application } from 'express';
+import type { Server } from 'http';
 
 // =============================================================================
 // EXPRESS BRIDGE
 // Importa el app de Express del backend y lo levanta en 127.0.0.1:3001.
+// Expone stopExpressServer() para graceful shutdown desde Electron.
 // Solo se llama desde Electron Main Process (después de setear ELECTRON=true).
 // =============================================================================
 
 const ELECTRON_PORT = 3001;
 
 let serverStarted = false;
+let httpServer: Server | null = null;
 
 export async function startExpressServer(): Promise<void> {
     if (serverStarted) return;
@@ -35,22 +38,38 @@ export async function startExpressServer(): Promise<void> {
         expressApp = require(backendPath).default;
     }
 
-    return new Promise((resolve, reject) => {
-        const server = expressApp.listen(ELECTRON_PORT, '127.0.0.1', () => {
+    return new Promise((resolvePromise, reject) => {
+        httpServer = expressApp.listen(ELECTRON_PORT, '127.0.0.1', () => {
             serverStarted = true;
             console.log(`[ERP-Market] Express local API → http://127.0.0.1:${ELECTRON_PORT}/api`);
-            resolve();
+            resolvePromise();
         });
 
-        server.once('error', (err: NodeJS.ErrnoException) => {
+        httpServer.once('error', (err: NodeJS.ErrnoException) => {
             if (err.code === 'EADDRINUSE') {
                 // Puerto ya en uso — probablemente ya está corriendo (hot-reload)
                 console.warn(`[ERP-Market] Puerto ${ELECTRON_PORT} en uso, reutilizando...`);
                 serverStarted = true;
-                resolve();
+                resolvePromise();
             } else {
                 reject(err);
             }
+        });
+    });
+}
+
+/**
+ * Detiene el servidor Express de forma graceful.
+ * Se llama desde Electron antes de salir (app.on('before-quit')).
+ */
+export async function stopExpressServer(): Promise<void> {
+    if (!httpServer) return;
+    return new Promise((resolvePromise) => {
+        httpServer!.close(() => {
+            serverStarted = false;
+            httpServer = null;
+            console.log('[ERP-Market] Express server closed');
+            resolvePromise();
         });
     });
 }

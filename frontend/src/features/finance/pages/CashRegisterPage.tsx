@@ -355,7 +355,6 @@ export default function CashRegisterPage() {
             <>
                 <ExpenseEntryModal open={entryOpen} onClose={() => setEntryOpen(false)} onSave={(data) => addMovementMutation.mutate(data)} />
                 <CashClosureModal open={closureOpen} onClose={() => setClosureOpen(false)} openingBalance={openingAmount} expectedBalance={expectedBalance} onConfirm={(d) => { closeMutation.mutate(d); setClosureOpen(false); }} />
-                <SaleDetailModal sale={selectedSaleDetails || null} open={!!selectedSaleId} onClose={() => setSelectedSaleId(null)} />
                 <div className="flex flex-col gap-6 max-w-350 mx-auto pb-8">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
@@ -656,6 +655,7 @@ export default function CashRegisterPage() {
                     onClose={() => setSelectedHistoryId(null)} 
                     onSaleClick={(saleId) => setSelectedSaleId(saleId)}
                 />
+                <SaleDetailModal sale={selectedSaleDetails || null} open={!!selectedSaleId} onClose={() => setSelectedSaleId(null)} />
                 {activeTab === 'current' ? renderCurrentTab() : activeTab === 'history' ? renderHistoryTab() : <PurchaseHistoryPanel branchId={effectiveBranch} />}
             </div>
         </div>

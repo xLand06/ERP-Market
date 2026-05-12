@@ -78,7 +78,6 @@ router.get('/status', async (_req, res) => {
             data: {
                 ...status,
                 isOnline,
-                lastSyncAt: new Date().toISOString(),
             }
         });
     } catch (error: any) {

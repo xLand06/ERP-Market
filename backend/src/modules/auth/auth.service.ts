@@ -8,7 +8,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
 import { logger } from '../../core/utils/logger';
-import { generateToken } from '../../core/middlewares/auth.middleware';
+import { generateToken, generateRefreshToken } from '../../core/middlewares/auth.middleware';
 
 export const login = async (username: string, password: string, ip?: string) => {
     // Buscar por username O cédula (V-12345678 o E-12345678)
@@ -49,6 +49,8 @@ export const login = async (username: string, password: string, ip?: string) => 
         branchId: user.branchId || undefined,
         canManageInventory: user.canManageInventory
     });
+
+    const refreshToken = generateRefreshToken({ id: user.id });
     
     logger.info('Login exitoso', {
         module: 'auth',
@@ -60,6 +62,7 @@ export const login = async (username: string, password: string, ip?: string) => 
     
     return {
         token,
+        refreshToken,
         user: { 
             id: user.id, 
             username: user.username,

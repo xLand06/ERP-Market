@@ -79,7 +79,7 @@ export const createTransaction = async (input: CreateTransactionInput) => {
     // SQLite requiere serializar JSON como string
     const paymentMethodsData = paymentMethods
         ? JSON.stringify(paymentMethods)
-        : null;
+        : undefined;
 
     return await dbInstance.$transaction(async (tx) => {
         let assignedCashRegisterId = cashRegisterId;
@@ -159,7 +159,7 @@ export const createTransaction = async (input: CreateTransactionInput) => {
                 currency: currency || 'COP',
                 exchangeRate: exchangeRate ?? null,
                 invoiceNumber: invoiceNumber || null,
-                // Campo multi-pago
+                // Campo multi-pago (serializado como string para SQLite)
                 paymentMethods: paymentMethodsData as any,
                 items: {
                     create: processedItems.map((item) => ({
@@ -300,13 +300,27 @@ export const cancelTransaction = async (id: string) => {
         });
 
         // Ejecutar updates de stock en paralelo
-        await Promise.all(tx.items.map(item => {
+        await Promise.all(tx.items.map(async (item) => {
             const realQuantity = Number(item.quantity) * Number(item.multiplierUsed);
             const delta = tx.type === TransactionType.SALE ? realQuantity : -realQuantity;
-            return txClient.branchInventory.updateMany({
+            await txClient.branchInventory.updateMany({
                 where: { productId: item.productId, branchId: tx.branchId },
                 data: { stock: { increment: delta } },
             });
+
+            // Si es una venta cancelada, restaurar también en el batch más reciente (FIFO)
+            if (tx.type === TransactionType.SALE) {
+                const latestBatch = await txClient.productBatch.findFirst({
+                    where: { productId: item.productId, branchId: tx.branchId },
+                    orderBy: { expiryDate: 'desc' },
+                });
+                if (latestBatch) {
+                    await txClient.productBatch.update({
+                        where: { id: latestBatch.id },
+                        data: { quantity: { increment: realQuantity } },
+                    });
+                }
+            }
         }));
 
         return txClient.transaction.findUnique({ where: { id } });

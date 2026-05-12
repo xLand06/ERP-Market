@@ -28,6 +28,7 @@ export interface AuthRequest extends Request {
 const publicPaths = [
     '/api/auth/login',
     '/api/auth/register',
+    '/api/auth/refresh',
     '/api/health',
 ];
 

@@ -426,10 +426,11 @@ export async function purgeCloudTransactional(
 
     const results: PurgeResult[] = [];
 
-    // 1. Obtener IDs de transactions a borrar
+    // 1. Obtener IDs de transactions a borrar (SOLO las que ya están sincronizadas)
     const txsToPurge = await cloud.transaction.findMany({
         where: {
             createdAt: { lt: txCutoff },
+            syncStatus: 'SYNCED',
         },
         select: { id: true },
     });

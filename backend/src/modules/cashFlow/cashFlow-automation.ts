@@ -57,7 +57,8 @@ export async function runAutomationCycle() {
                         await cashFlowService.closeCashRegister(
                             openRegister.id,
                             expectedAmount,
-                            'Cierre automático programado por el sistema'
+                            'Cierre automático programado por el sistema',
+                            expectedAmount // expectedOverride: en auto-cierre el closing = expected
                         );
                         logger.info(`[Automation] ✅ Caja cerrada exitosamente para sede: ${branch.name}`);
                     } catch (closeErr: any) {

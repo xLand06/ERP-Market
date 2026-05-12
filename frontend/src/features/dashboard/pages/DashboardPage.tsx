@@ -502,9 +502,9 @@ export default function DashboardPage() {
                             color="#10B981"
                         />
                         <KPICard
-                            title="Ingresos Estimados"
+                            title="Ingresos del Mes"
                             value={formatCurrency(kpis?.sales.thisMonth.total || 0)}
-                            subvalue="Bruto facturado"
+                            subvalue={`${kpis?.sales.thisMonth.count || 0} transacciones`}
                             change={kpis?.sales.thisMonth.change || 0}
                             icon={ShoppingCart}
                             iconBg="bg-blue-50"
@@ -520,7 +520,7 @@ export default function DashboardPage() {
                             color="#8B5CF6"
                         />
                         <KPICard
-                            title="Transacciones Hoy"
+                            title={`Transacciones ${rangeLabels[timeRange]}`}
                             value={formatNumber(kpis?.transactionsToday || 0)}
                             change={kpis?.transactionsTodayChange || 0}
                             icon={Users}

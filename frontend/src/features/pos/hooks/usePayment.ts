@@ -22,7 +22,7 @@ interface UsePaymentReturn {
     isChangeOver: boolean;
     canConfirm: boolean;
     addRow: () => void;
-    updateRow: (key: string, field: 'type' | 'currency' | 'amount', value: string | number) => void;
+    updateRow: (key: string, updates: Partial<Omit<PaymentMethodRow, 'key'>>) => void;
     removeRow: (key: string) => void;
     reset: (totalCOP: number) => void;
     getPayload: () => Array<{ type: PaymentMethodType; amount: number; currency: Currency; exchangeRate?: number }>;
@@ -99,8 +99,7 @@ export function usePayment(
 
     const updateRow = useCallback((
         key: string,
-        field: 'type' | 'currency' | 'amount',
-        value: string | number
+        updates: Partial<Omit<PaymentMethodRow, 'key'>>
     ) => {
         setRows(prev => {
             const idx = prev.findIndex(r => r.key === key);
@@ -116,31 +115,23 @@ export function usePayment(
             return prev.map((r, i) => {
                 if (i !== idx) return r;
 
-                if (field === 'type') {
-                    const newType = value as PaymentMethodType;
-                    const opt = DEFAULT_PAYMENT_OPTIONS.find(o => o.type === newType);
-                    const newCurrency = opt?.currency || 'COP';
+                const next = { ...r, ...updates };
+
+                // Si cambió el tipo pero no la moneda, auto-ajustamos moneda si es necesario
+                if (updates.type && !updates.currency) {
+                    const opt = DEFAULT_PAYMENT_OPTIONS.find(o => o.type === updates.type);
+                    next.currency = opt?.currency || 'COP';
+                }
+
+                // Si cambió tipo o moneda, recalculamos monto sugerido si el monto actual es 0 o igual al anterior restante
+                if (updates.type || updates.currency) {
                     let newAmount = remainingCOP;
-                    if (newCurrency === 'USD') newAmount = remainingCOP / usdRate;
-                    if (newCurrency === 'VES') newAmount = remainingCOP / vesRate;
-
-                    return { ...r, type: newType, currency: newCurrency, amount: Number(newAmount.toFixed(2)) };
+                    if (next.currency === 'USD') newAmount = remainingCOP / usdRate;
+                    if (next.currency === 'VES') newAmount = remainingCOP / vesRate;
+                    next.amount = Number(newAmount.toFixed(4));
                 }
 
-                if (field === 'currency') {
-                    const newCurrency = value as Currency;
-                    let newAmount = remainingCOP;
-                    if (newCurrency === 'USD') newAmount = remainingCOP / usdRate;
-                    if (newCurrency === 'VES') newAmount = remainingCOP / vesRate;
-
-                    return { ...r, currency: newCurrency, amount: Number(newAmount.toFixed(2)) };
-                }
-
-                if (field === 'amount') {
-                    return { ...r, amount: typeof value === 'number' ? value : parseFloat(value) || 0 };
-                }
-
-                return r;
+                return next;
             });
         });
     }, [totalInCOP, toCOP, usdRate, vesRate]);

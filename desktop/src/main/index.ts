@@ -7,7 +7,7 @@ app.commandLine.appendSwitch('disable-features', 'DnsOverHttps');
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { is } from '@electron-toolkit/utils';
-import { startExpressServer } from './express-bridge';
+import { startExpressServer, stopExpressServer } from './express-bridge';
 import Store from 'electron-store';
 
 // =============================================================================
@@ -377,11 +377,14 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
+    if (process.platform !== 'darwin') {
+        app.quit();
+    }
 });
 
 // Flag para distinguir close intencional de hide
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
     (app as any).isQuitting = true;
     saveWindowState();
+    await stopExpressServer();
 });

@@ -1,7 +1,7 @@
 {
   "iva": 0,
   "autoOpenTime": "19:32",
+  "autoCloseTime": "01:00",
   "purgeRetentionDays": 30,
-  "purgeLogRetentionDays": 90,
-  "autoCloseTime": "01:00"
+  "purgeLogRetentionDays": 90
 }
