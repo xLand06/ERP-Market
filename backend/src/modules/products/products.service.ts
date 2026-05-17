@@ -19,11 +19,11 @@ export const getAllProducts = async (filters: ProductListParams): Promise<ApiLis
         ...(isActive !== undefined && { isActive }),
         ...(search && {
             OR: [
-                { name: { contains: search, mode: 'insensitive' as const } },
-                { barcode: { contains: search, mode: 'insensitive' as const } },
-                { presentations: { some: { barcode: { contains: search, mode: 'insensitive' as const } } } },
+                { name: { contains: search } },
+                { barcode: { contains: search } },
+                { presentations: { some: { barcode: { contains: search } } } },
                 // Buscar también en los barcodes del modelo ProductBarcode
-                { barcodes: { some: { code: { contains: search, mode: 'insensitive' as const } } } },
+                { barcodes: { some: { code: { contains: search } } } },
             ],
         }),
     };

@@ -20,9 +20,9 @@ export const getAllUsers = (filters: {
             ...(isActive !== undefined && { isActive: isActive === 'true' }),
             ...(search && {
                 OR: [
-                    { nombre: { contains: search, mode: 'insensitive' } },
-                    { username: { contains: search, mode: 'insensitive' } },
-                    { email: { contains: search, mode: 'insensitive' } },
+                    { nombre: { contains: search } },
+                    { username: { contains: search } },
+                    { email: { contains: search } },
                 ]
             })
         },

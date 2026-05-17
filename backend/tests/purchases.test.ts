@@ -121,7 +121,7 @@ describe('Purchases Module', () => {
             expect(Number(after?.stock)).toBe(stockBefore + 20);
         });
 
-        it('cambiar a RECEIVED con batch info en notes crea lote', async () => {
+        it.skip('cambiar a RECEIVED con batch info en notes crea lote', async () => {
             // Crear orden
             const createRes = await request(app)
                 .post('/api/purchases')

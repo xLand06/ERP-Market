@@ -257,8 +257,8 @@ export const getTransactions = (filters: {
                 : {}),
             ...(search ? {
                 OR: [
-                    { id: { contains: search, mode: 'insensitive' } },
-                    { invoiceNumber: { contains: search, mode: 'insensitive' } }
+                    { id: { contains: search } },
+                    { invoiceNumber: { contains: search } }
                 ]
             } : {}),
         },

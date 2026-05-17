@@ -40,7 +40,7 @@ describe('Auth Module', () => {
                 data: {
                     id: 'user-e-cedula',
                     username: 'e_cedula_user',
-                    cedula: '87654321',
+                    cedula: 'E-87654321',
                     cedulaType: 'E',
                     nombre: 'E Cedula',
                     password: await import('bcryptjs').then(m => m.default.hash('test123', 10)),

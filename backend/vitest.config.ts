@@ -10,6 +10,7 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './src'),
+            '.prisma/client-local': path.resolve(__dirname, 'node_modules/.prisma/client-local'),
         },
     },
 });

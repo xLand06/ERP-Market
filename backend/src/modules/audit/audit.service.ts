@@ -21,7 +21,7 @@ export const getAuditLogs = (filters: {
     return (prisma as any).auditLog.findMany({
         where: {
             ...(userId && { userId }),
-            ...(action && { action: { contains: action, mode: 'insensitive' } }),
+            ...(action && { action: { contains: action } }),
             ...(module && { module }),
             ...(from || to
                 ? (() => {

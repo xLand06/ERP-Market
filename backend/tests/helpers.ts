@@ -3,6 +3,7 @@
 // =============================================================================
 
 import jwt from 'jsonwebtoken';
+import { SEED } from './setup';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
@@ -28,4 +29,14 @@ export function ownerHeaders(userId: string, branchId?: string) {
 
 export function sellerHeaders(userId: string, branchId?: string) {
     return authHeaders(userId, 'SELLER', branchId);
+}
+
+// ── Helpers que usan SEED (requiere que beforeAll haya corrido) ──────────────
+
+export function loginAsOwner() {
+    return authHeaders(SEED.ownerId, 'OWNER', SEED.branchId);
+}
+
+export function loginAsSeller() {
+    return authHeaders(SEED.sellerId, 'SELLER', SEED.branchId);
 }

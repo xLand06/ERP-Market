@@ -26,8 +26,8 @@ export const getAllSuppliers = async (filters?: { isActive?: boolean; search?: s
     }
     if (filters?.search) {
         where.OR = [
-            { name: { contains: filters.search, mode: 'insensitive' } },
-            { email: { contains: filters.search, mode: 'insensitive' } },
+            { name: { contains: filters.search } },
+            { email: { contains: filters.search } },
             { rut: { contains: filters.search } },
         ];
     }
