@@ -8,7 +8,7 @@
         "build": "electron-vite build",
         "preview": "electron-vite preview",
         "build:schema": "cd ..\\backend && pnpm run db:build:schema",
-        "build:installer": "pnpm run build && pnpm run build:schema && electron-builder --config electron-builder.yml"
+        "build:installer": "node scripts/prepare-backend.mjs && pnpm run build && pnpm run build:schema && electron-builder --config electron-builder.yml"
     },
     "dependencies": {
         "@electron-toolkit/utils": "^3.0.0",

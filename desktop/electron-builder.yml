@@ -27,17 +27,13 @@ extraFiles:
     to: "resources/backend/node_modules"
     filter:
       - "**/*"
-      - "!@prisma/**"
-      - ".prisma/**/*"
-      - "!prisma/**"
-  - from: "../node_modules/@prisma"
-    to: "resources/backend/node_modules/@prisma"
-    filter:
-      - "**/*"
 
 win:
   target:
     - target: nsis
+      arch:
+        - x64
+    - target: portable
       arch:
         - x64
 
