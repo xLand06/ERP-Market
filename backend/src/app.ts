@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import crypto from 'crypto';
+import path from 'path';
 import { errorHandler, notFoundHandler } from './core/middlewares/errorHandler';
 import logger from './core/utils/logger';
 
@@ -80,8 +81,10 @@ app.use(helmet({
         directives: {
             defaultSrc: ["'self'"],
             scriptSrc: ["'self'", "'unsafe-inline'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "https:"],
+            connectSrc: ["'self'", "http://127.0.0.1:3000", "http://127.0.0.1:3001", "http://localhost:3000", "http://localhost:3001"],
         },
     },
     crossOriginEmbedderPolicy: false,
@@ -183,6 +186,19 @@ app.use('/api/settings',   settingsRouter);
 app.use('/api/merma',       mermaRouter);
 app.use('/api/stocktaking', stocktakingRouter);
 app.use('/api/batches',     batchesRouter);
+
+// ─── FRONTEND ESTÁTICO (modo standalone sin Electron) ─────────────────────
+// Sirve el frontend compilado desde backend/public/
+// Solo en producción: en desarrollo Vite se usa el dev server con proxy
+const frontendDist = path.join(__dirname, '../public');
+app.use(express.static(frontendDist));
+
+// SPA fallback: cualquier ruta que no sea /api/* devuelve index.html
+// para que React Router maneje la navegación del lado del cliente
+app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(frontendDist, 'index.html'));
+});
 
 // ─── 404 HANDLER ───────────────────────────────────────────────────────────
 app.use(notFoundHandler);

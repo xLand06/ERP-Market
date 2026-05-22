@@ -1,11 +1,18 @@
 // =============================================================================
 // INITIAL SYNC SCREEN — Pantalla de carga en el primer inicio de la app
-// Muestra progreso de la sincronización inicial con Supabase.
-// En inicios posteriores (o si no hay internet), pasa directo al login.
+// 
+// CRÍTICO: La DB local NO tiene seed data. Todos los datos (usuarios,
+// productos, sucursales, etc.) se descargan desde Supabase en el primer sync.
+// 
+// Si no hay internet en el primer inicio → BLOQUEA la app con botón reintentar.
+// No permite pasar al login hasta que tenga datos reales de la nube.
+// 
+// En inicios posteriores (datos ya descargados), si no hay internet pasa
+// directo al login y opera offline hasta que la conexión se restablezca.
 // =============================================================================
 
-import { useEffect, useState, useRef } from 'react';
-import { Loader2, CloudOff, CheckCircle2, Database, Cloud, ArrowRight } from 'lucide-react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { Loader2, CloudOff, CheckCircle2, Database, Cloud, ArrowRight, RefreshCw } from 'lucide-react';
 import api from '@/lib/api';
 
 type SyncStage = 'checking' | 'connecting' | 'syncing' | 'offline' | 'done' | 'error';
@@ -27,7 +34,6 @@ export default function InitialSyncScreen({ onComplete }: Props) {
     const [stage, setStage] = useState<SyncStage>('checking');
     const [statusText, setStatusText] = useState('Verificando conexión...');
     const [progress, setProgress] = useState(0);
-    const [pulledItems, setPulledItems] = useState(0);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const mountedRef = useRef(true);
 
@@ -36,128 +42,116 @@ export default function InitialSyncScreen({ onComplete }: Props) {
         return () => { mountedRef.current = false; };
     }, []);
 
-    useEffect(() => {
-        let attempts = 0;
-        const MAX_ATTEMPTS = 30; // 30s timeout total
+    const cleanup = useCallback(() => {
+        if (pollRef.current) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+        }
+    }, []);
 
-        async function checkAndSync() {
+    const markDone = useCallback(async () => {
+        if ((window as any).erpApi?.store) {
+            try {
+                await (window as any).erpApi.store.set('initialSyncDone', true);
+            } catch { /* Electron store no disponible en dev */ }
+        }
+    }, []);
+
+    const checkAndSync = useCallback(async () => {
+        if (!mountedRef.current) return;
+        cleanup();
+        setStage('checking');
+        setProgress(0);
+        setStatusText('Verificando conexión...');
+
+        let attempts = 0;
+        const MAX_ATTEMPTS = 30;
+
+        try {
+            // 1. Verificar estado inicial
+            const { data: statusData } = await api.get<{ success: boolean; data: InitialStatus }>('/sync/initial-status');
+            const status = statusData.data;
+
             if (!mountedRef.current) return;
 
-            try {
-                // 1. Verificar estado inicial
-                const { data: statusData } = await api.get<{ success: boolean; data: InitialStatus }>('/sync/initial-status');
-                const status = statusData.data;
+            // ✅ Ya tiene datos de cloud (inicio posterior) → pasar directo
+            if (status.hasCloudData || !status.needsInitialSync) {
+                setStage('done');
+                setProgress(100);
+                setStatusText('Datos sincronizados');
+                await markDone();
+                setTimeout(() => { if (mountedRef.current) onComplete(); }, 500);
+                return;
+            }
 
-                if (!mountedRef.current) return;
+            // 🚫 Sin conexión + necesita datos de cloud → BLOQUEAR
+            if (!status.isOnline) {
+                setStage('offline');
+                setProgress(0);
+                setStatusText('Se requiere conexión a internet');
+                return;
+            }
 
-                // Si ya tiene datos de cloud o no necesita sync → listo
-                if (status.hasCloudData || !status.needsInitialSync) {
-                    setStage('done');
-                    setStatusText('Datos sincronizados');
+            // 2. Hay conexión y necesita sync → disparar ciclo
+            setStage('connecting');
+            setStatusText('Conectando con Supabase...');
+            setProgress(15);
 
-                    // Si la app es Electron, marcar en store que ya se hizo el sync inicial
-                    if ((window as any).erpApi?.store) {
-                        try {
-                            await (window as any).erpApi.store.set('initialSyncDone', true);
-                        } catch { /* Electron store no disponible en dev */ }
-                    }
+            await api.post('/sync/trigger');
 
-                    setTimeout(() => {
-                        if (mountedRef.current) onComplete();
-                    }, 1500);
-                    return;
-                }
+            setStage('syncing');
+            setStatusText('Descargando datos desde la nube...');
+            setProgress(30);
 
-                // 2. Sin conexión → modo offline directo
-                if (!status.isOnline) {
-                    setStage('offline');
-                    setStatusText('Sin conexión a internet');
-                    setProgress(100);
-                    setTimeout(() => {
-                        if (mountedRef.current) onComplete();
-                    }, 2000);
-                    return;
-                }
+            // 3. Polling hasta que el sync termine
+            pollRef.current = setInterval(async () => {
+                if (!mountedRef.current) { cleanup(); return; }
 
-                // 3. Necesita sync → disparar ciclo
-                setStage('connecting');
-                setStatusText('Conectando con Supabase...');
-                setProgress(20);
+                attempts++;
+                try {
+                    const { data: pollData } = await api.get<{ success: boolean; data: InitialStatus }>('/sync/initial-status');
+                    const pollStatus = pollData.data;
 
-                await api.post('/sync/trigger');
-
-                setStage('syncing');
-                setStatusText('Descargando datos desde la nube...');
-                setProgress(40);
-
-                // 4. Polling hasta que el sync termine
-                pollRef.current = setInterval(async () => {
-                    if (!mountedRef.current) {
-                        if (pollRef.current) clearInterval(pollRef.current);
+                    // ✅ Sync completado
+                    if (pollStatus.hasCloudData) {
+                        cleanup();
+                        setStage('done');
+                        setProgress(100);
+                        setStatusText('¡Sincronización completada!');
+                        await markDone();
+                        setTimeout(() => { if (mountedRef.current) onComplete(); }, 500);
                         return;
                     }
 
-                    attempts++;
-                    try {
-                        const { data: pollData } = await api.get<{ success: boolean; data: InitialStatus }>('/sync/initial-status');
-                        const pollStatus = pollData.data;
+                    // Progreso estimado mientras espera
+                    const elapsedProgress = Math.min(30 + (attempts * 2), 90);
+                    setProgress(elapsedProgress);
 
-                        // Si ya cloud data, el sync funcionó
-                        if (pollStatus.hasCloudData) {
-                            if (pollRef.current) clearInterval(pollRef.current);
-                            setStage('done');
-                            setProgress(100);
-                            setStatusText('¡Sincronización completada!');
+                } catch { /* Error en poll, reintentar */ }
 
-                            if ((window as any).erpApi?.store) {
-                                try {
-                                    await (window as any).erpApi.store.set('initialSyncDone', true);
-                                } catch { /* ignorar */ }
-                            }
+                // ⏱ Timeout: no llegaron datos después de 30s → bloquear
+                if (attempts >= MAX_ATTEMPTS) {
+                    cleanup();
+                    setStage('offline');
+                    setProgress(0);
+                    setStatusText('Tiempo de espera agotado — verifica tu conexión');
+                }
+            }, 1000);
 
-                            setTimeout(() => {
-                                if (mountedRef.current) onComplete();
-                            }, 1500);
-                            return;
-                        }
-
-                        // Progreso estimado mientras espera
-                        const elapsedProgress = Math.min(40 + (attempts * 2), 90);
-                        setProgress(elapsedProgress);
-                        setStatusText(`Sincronizando... (${Math.round(elapsedProgress)}%)`);
-
-                    } catch { /* Error en poll, reintentar */ }
-
-                    // Timeout: si lleva más de 30s, pasar a offline
-                    if (attempts >= MAX_ATTEMPTS) {
-                        if (pollRef.current) clearInterval(pollRef.current);
-                        setStage('offline');
-                        setProgress(100);
-                        setStatusText('Tiempo de espera agotado — modo offline');
-                        setTimeout(() => {
-                            if (mountedRef.current) onComplete();
-                        }, 2000);
-                    }
-                }, 1000);
-
-            } catch (err: any) {
-                if (!mountedRef.current) return;
-                // Error de conexión con el backend → probablemente offline
-                setStage('offline');
-                setProgress(100);
-                setStatusText('Servidor local disponible — modo offline');
-                setTimeout(() => {
-                    if (mountedRef.current) onComplete();
-                }, 1500);
-            }
+        } catch (err: any) {
+            if (!mountedRef.current) return;
+            // Error de conexión con el backend local
+            setStage('offline');
+            setProgress(0);
+            setStatusText('Error de conexión con el servidor local');
         }
+    }, [onComplete, cleanup, markDone]);
 
+    // Efecto principal: arrancar sync al montar
+    useEffect(() => {
         checkAndSync();
-
-        return () => {
-            if (pollRef.current) clearInterval(pollRef.current);
-        };
-    }, [onComplete]);
+        return cleanup;
+    }, [checkAndSync, cleanup]);
 
     return (
         <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center z-50">
@@ -187,7 +181,7 @@ export default function InitialSyncScreen({ onComplete }: Props) {
                     </div>
                 )}
                 {stage === 'offline' && (
-                    <CloudOff className="w-16 h-16 text-amber-400" />
+                    <CloudOff className="w-16 h-16 text-red-400" />
                 )}
                 {stage === 'done' && (
                     <CheckCircle2 className="w-16 h-16 text-emerald-400" />
@@ -199,31 +193,42 @@ export default function InitialSyncScreen({ onComplete }: Props) {
 
             {/* Texto de estado */}
             <p className="text-slate-300 text-lg font-medium mb-2">{statusText}</p>
-            <p className="text-slate-500 text-sm mb-6">
+            <p className="text-slate-500 text-sm mb-8 text-center max-w-xs">
                 {stage === 'checking' && 'Preparando el sistema...'}
                 {stage === 'connecting' && 'Estableciendo conexión segura...'}
                 {stage === 'syncing' && 'Los datos de todas las sucursales se están descargando'}
-                {stage === 'offline' && 'Podés usar la app sin conexión'}
+                {(stage === 'offline') && 'La app necesita descargar los datos de Supabase para funcionar. Verificá que el cable de red esté conectado o que el Wi-Fi esté activo.'}
                 {stage === 'done' && 'Redirigiendo al inicio de sesión...'}
             </p>
 
-            {/* Barra de progreso */}
-            <div className="w-72 h-2 bg-slate-700 rounded-full overflow-hidden">
-                <div
-                    className={`h-full rounded-full transition-all duration-500 ease-out ${
-                        stage === 'done'
-                            ? 'bg-emerald-400'
-                            : stage === 'offline'
-                            ? 'bg-amber-400'
-                            : 'bg-gradient-to-r from-blue-400 to-emerald-400'
-                    }`}
-                    style={{ width: `${progress}%` }}
-                />
-            </div>
+            {/* Barra de progreso (solo cuando hay progreso real) */}
+            {stage !== 'offline' && stage !== 'error' && (
+                <div className="w-72 h-2 bg-slate-700 rounded-full overflow-hidden mb-8">
+                    <div
+                        className={`h-full rounded-full transition-all duration-500 ease-out ${
+                            stage === 'done'
+                                ? 'bg-emerald-400'
+                                : 'bg-gradient-to-r from-blue-400 to-emerald-400'
+                        }`}
+                        style={{ width: `${progress}%` }}
+                    />
+                </div>
+            )}
+
+            {/* Botón reintentar (solo en offline/error) */}
+            {(stage === 'offline' || stage === 'error') && (
+                <button
+                    onClick={checkAndSync}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-emerald-900/30 active:scale-95"
+                >
+                    <RefreshCw className="w-4 h-4" />
+                    Reintentar conexión
+                </button>
+            )}
 
             {/* Footer */}
             <p className="text-slate-600 text-xs mt-12">
-                ERP-Market v1.0.0 — Sistema Híbrido Offline-First
+                ERP-Market v2.0 — Sistema Híbrido Offline-First
             </p>
         </div>
     );

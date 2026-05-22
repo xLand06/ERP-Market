@@ -4,9 +4,10 @@ import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const rootPath = path.resolve(__dirname, '..');
-const backendPath = path.join(rootPath, 'backend');
-const tempBackendPath = path.join(rootPath, 'temp-backend');
+// El script está en desktop/scripts/ — el backend está en la raíz del workspace
+const workspaceRoot = path.resolve(__dirname, '..', '..');
+const backendPath = path.join(workspaceRoot, 'backend');
+const tempBackendPath = path.join(workspaceRoot, 'temp-backend');
 
 console.log('🔄 Sincronizando temp-backend para empaquetado seguro...');
 

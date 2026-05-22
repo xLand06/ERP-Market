@@ -1,7 +1,12 @@
 // =============================================================================
 // APP — Componente principal con Providers
+// 
 // En Electron: muestra pantalla de carga inicial la primera vez que se inicia
 // para sincronizar datos desde Supabase. En inicios posteriores va directo.
+// 
+// SEGURIDAD: aunque `initialSyncDone` esté marcado, verifica que realmente
+// haya datos en la DB local. Si no hay (DB corrupta/reemplazada), fuerza un
+// nuevo sync. Sin esto, el usuario quedaría atrapado en login sin usuarios.
 // =============================================================================
 
 import { useState, useEffect } from 'react';
@@ -14,6 +19,7 @@ import './global.css';
 
 import { useConfigStore } from '@/hooks/useConfigStore';
 import InitialSyncScreen from '@/components/loading/InitialSyncScreen';
+import api from '@/lib/api';
 
 export default function App() {
     const { fetchSettings } = useConfigStore();
@@ -37,9 +43,26 @@ export default function App() {
 
             try {
                 const stored = await (window as any).erpApi.store.get('initialSyncDone');
+
                 if (stored === true) {
-                    // Ya se hizo sync en una sesión anterior
-                    setInitialSyncDone(true);
+                    // Ya se hizo sync antes → verificar que los datos SIGAN ahí
+                    // (seguro contra DB corrupta o reemplazada)
+                    try {
+                        const { data: statusData } = await api.get('/sync/initial-status');
+                        const hasData = statusData?.data?.hasCloudData === true
+                            || statusData?.data?.needsInitialSync === false;
+
+                        if (hasData) {
+                            setInitialSyncDone(true);
+                        } else {
+                            // La DB está vacía aunque el flag diga que ya sincronizó
+                            console.warn('[App] initialSyncDone=true pero DB vacía — forzando re-sync');
+                            setInitialSyncDone(false);
+                        }
+                    } catch {
+                        // Backend no disponible aún (arrancando) — asumir que está bien
+                        setInitialSyncDone(true);
+                    }
                 } else {
                     // Primera vez o nunca se completó → mostrar loading
                     setInitialSyncDone(false);

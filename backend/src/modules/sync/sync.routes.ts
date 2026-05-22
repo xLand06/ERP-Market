@@ -21,8 +21,9 @@ router.get('/initial-status', async (_req, res) => {
         const isOnline = await checkCloudConnection();
 
         // Detectar si ya se hizo sync desde la nube:
-        // El seed tiene exactamente: 2 sucursales, 2 usuarios, 3 grupos, 7 productos
-        // Si hay MAS que esos valores, cloud sync ya se hizo
+        // La DB inicia VACÍA (solo schema, sin seed). Si hay algún dato,
+        // es porque ya se descargó de la nube en un sync anterior.
+        // Los thresholds son una red de seguridad por si lastSync se pierde.
         const [branchCount, userCount, groupCount, productCount] = await Promise.all([
             localPrisma.branch.count(),
             localPrisma.user.count(),
@@ -60,6 +61,17 @@ router.get('/initial-status', async (_req, res) => {
                     : 'ready',
             },
         });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Endpoint público para disparar sync manual (desde login, sin token)
+// runSyncCycle tiene su propio mutex (isSyncing), múltiples llamadas son seguras
+router.post('/trigger', async (_req, res) => {
+    try {
+        runSyncCycle();
+        res.json({ success: true, message: 'Sync cycle triggered' });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });
     }
@@ -144,16 +156,6 @@ router.get('/debug-connection', async (_req, res) => {
         debugInfo.isOnline = isOnline;
 
         res.json({ success: true, data: debugInfo });
-    } catch (error: any) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Endpoint for manual sync trigger
-router.post('/trigger', async (_req, res) => {
-    try {
-        runSyncCycle();
-        res.json({ success: true, message: 'Sync cycle triggered' });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });
     }

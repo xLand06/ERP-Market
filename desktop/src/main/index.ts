@@ -339,7 +339,9 @@ app.whenReady().then(async () => {
 
         const dbSize = require('fs').statSync(fullDbPath).size;
         if (dbSize < 8192) return true;
-        if (storedSchemaVersion && storedSchemaVersion !== SCHEMA_VERSION) return true;
+        // Si no hay schemaVersion guardado (primera vez/actualización)
+        // O es una versión distinta → restaurar schema fresco
+        if (!storedSchemaVersion || storedSchemaVersion !== SCHEMA_VERSION) return true;
 
         return false;
     };
