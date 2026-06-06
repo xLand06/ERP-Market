@@ -15,6 +15,11 @@ export interface InventoryProduct {
         multiplier: number;
         barcode?: string;
     }>;
+    barcodes?: Array<{
+        id?: string;
+        code: string;
+        label?: string | null;
+    }>;
 }
 
 export interface StockEntry {

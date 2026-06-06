@@ -212,24 +212,32 @@ export default function ProductsPage() {
                                             </span>
                                         </td>
                                         <td>
-                                            <div className="flex flex-col gap-1">
-                                                {prod.barcodes && prod.barcodes.length > 0 ? (
-                                                    <>
-                                                        <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded w-fit">
-                                                            {prod.barcodes[0].code}
+                                            {(() => {
+                                                const codes = Array.from(new Set([
+                                                    ...(prod.barcode ? [prod.barcode] : []),
+                                                    ...(prod.barcodes ? prod.barcodes.map(b => b.code) : []),
+                                                    ...(prod.presentations ? prod.presentations.map(pr => pr.barcode).filter(Boolean) as string[] : [])
+                                                ]));
+                                                if (codes.length === 0) {
+                                                    return (
+                                                        <span className="text-xs font-mono bg-slate-50 text-slate-400 px-2 py-1 rounded w-fit border border-dashed border-slate-200">
+                                                            —
                                                         </span>
-                                                        {prod.barcodes.length > 1 && (
+                                                    );
+                                                }
+                                                return (
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded w-fit">
+                                                            {codes[0]}
+                                                        </span>
+                                                        {codes.length > 1 && (
                                                             <span className="text-[10px] text-slate-400 font-medium">
-                                                                +{prod.barcodes.length - 1} código{prod.barcodes.length - 1 > 1 ? 's' : ''} más
+                                                                +{codes.length - 1} código{codes.length - 1 > 1 ? 's' : ''} más
                                                             </span>
                                                         )}
-                                                    </>
-                                                ) : (
-                                                    <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded w-fit">
-                                                        {prod.barcode || '—'}
-                                                    </span>
-                                                )}
-                                            </div>
+                                                    </div>
+                                                );
+                                            })()}
                                         </td>
                                         <td className="text-right">
                                             <span className="text-sm font-medium text-slate-500">

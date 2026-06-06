@@ -18,6 +18,11 @@ interface InventoryItem {
             multiplier: number;
             barcode?: string;
         }>;
+        barcodes?: Array<{
+            id: string;
+            code: string;
+            label?: string | null;
+        }>;
     };
     stock: number;
     minStock: number;
@@ -54,6 +59,7 @@ export function useInventory(branchId: string) {
                 ? (item.product.subGroup as any)?.name || 'Varios' 
                 : (item.product.subGroup || 'Varios'),
             presentations: item.product.presentations || [],
+            barcodes: item.product.barcodes || [],
         }));
     }, [query.data]);
 

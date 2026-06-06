@@ -85,10 +85,24 @@ export default function InventoryPage() {
     }, [inventory.length]);
 
     const filtered = useMemo(() => {
-        return inventory.filter(p =>
-            (category === 'Todos' || p.category === category) &&
-            (p.name.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase()))
-        );
+        const queryStr = search.toLowerCase().trim();
+        return inventory.filter(p => {
+            const matchesCategory = category === 'Todos' || p.category === category;
+            if (!matchesCategory) return false;
+
+            const nameMatches = p.name.toLowerCase().includes(queryStr);
+            const codeMatches = p.code.toLowerCase().includes(queryStr);
+            
+            const barcodesMatches = p.barcodes?.some(b => 
+                b.code.toLowerCase().includes(queryStr)
+            );
+            
+            const presentationBarcodesMatches = p.presentations?.some(pr => 
+                pr.barcode?.toLowerCase().includes(queryStr)
+            );
+
+            return nameMatches || codeMatches || barcodesMatches || presentationBarcodesMatches;
+        });
     }, [inventory, category, search]);
 
     const paginated = useMemo(() => {
@@ -323,7 +337,34 @@ export default function InventoryPage() {
                                                 <Package className="w-4.5 h-4.5" />
                                             </div>
                                         </td>
-                                        <td><span className="text-xs font-mono text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded">{p.code}</span></td>
+                                        <td>
+                                            {(() => {
+                                                const codes = Array.from(new Set([
+                                                    ...(p.code ? [p.code] : []),
+                                                    ...(p.barcodes ? p.barcodes.map(b => b.code) : []),
+                                                    ...(p.presentations ? p.presentations.map(pr => pr.barcode).filter(Boolean) as string[] : [])
+                                                ]));
+                                                if (codes.length === 0) {
+                                                    return (
+                                                        <span className="text-xs font-mono bg-slate-50 text-slate-400 px-2 py-0.5 rounded border border-dashed border-slate-200">
+                                                            —
+                                                        </span>
+                                                    );
+                                                }
+                                                return (
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-xs font-mono bg-slate-50 border border-slate-200 text-slate-600 px-2 py-0.5 rounded w-fit">
+                                                            {codes[0]}
+                                                        </span>
+                                                        {codes.length > 1 && (
+                                                            <span className="text-[10px] text-slate-400 font-medium">
+                                                                +{codes.length - 1} código{codes.length - 1 > 1 ? 's' : ''} más
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </td>
                                         <td><p className="text-sm font-semibold text-slate-800">{p.name}</p></td>
                                         <td><span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{p.category}</span></td>
                                         <td className="text-right tabular-nums text-sm text-slate-600">${p.cost.toFixed(2)}</td>
