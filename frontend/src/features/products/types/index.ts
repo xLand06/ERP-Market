@@ -61,6 +61,8 @@ export interface CreateProductPayload {
         price: number;
         barcode?: string | null;
     }>;
+    minStock?: number;
+    branchId?: string | null;
 }
 
 export interface UpdateProductPayload extends CreateProductPayload {

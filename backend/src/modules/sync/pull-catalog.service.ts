@@ -705,6 +705,26 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
             }
         }
 
+        // ─── STEP 13: SYSTEM SETTINGS (Pull de configuraciones globales) ──────
+        logger.info('[Sync] Pull Step 13: System Settings...');
+        try {
+            const cloudSettings = await cloud.systemSetting.findMany();
+            for (const setting of cloudSettings) {
+                try {
+                    await localPrisma.systemSetting.upsert({
+                        where: { key: setting.key },
+                        update: { value: setting.value },
+                        create: { id: setting.id, key: setting.key, value: setting.value },
+                    });
+                    pulledCount++;
+                } catch (err: any) {
+                    logger.warn(`[Sync] Pull Setting ${setting.key} skip: ${err.message?.slice(0, 100)}`);
+                }
+            }
+        } catch (err: any) {
+            logger.error(`[Sync] Error general al descargar System Settings: ${err.message}`);
+        }
+
         if (skippedFks > 0) {
             logger.warn(`[Sync] ${skippedFks} transacciones omitidas por FKs faltantes`);
         }

@@ -178,6 +178,18 @@ export const getLocalPrisma = (): PrismaClient => {
             adapter: new PrismaLibSql({ url: localUrl }),
             log: ['error'],
         }) as unknown as PrismaClient;
+
+        // Optimizar SQLite (WAL mode, synchronous = NORMAL, cache_size = 2000)
+        Promise.all([
+            _prismaLocal.$executeRawUnsafe('PRAGMA journal_mode = WAL;'),
+            _prismaLocal.$executeRawUnsafe('PRAGMA synchronous = NORMAL;'),
+            _prismaLocal.$executeRawUnsafe('PRAGMA cache_size = -2000;')
+        ]).then(() => {
+            logger.info('[DB] Optimizaciones de SQLite aplicadas (WAL, synchronous=NORMAL, cache=2MB)');
+        }).catch(err => {
+            logger.error('[DB] Error al aplicar optimizaciones de SQLite:', err);
+        });
+
         logger.info('[DB] Cliente local SQLite inicializado', { url: localUrl, absolutePath: dbPath });
     }
     return _prismaLocal;

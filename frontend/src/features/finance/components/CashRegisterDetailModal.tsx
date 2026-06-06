@@ -53,28 +53,52 @@ export function CashRegisterDetailModal({ id, open, onClose, onSaleClick }: Prop
         if (t.type === 'SALE' && t.status === 'COMPLETED') {
             totalIncome += amt;
 
-            const notes = t.notes || '';
-            const regex = /(Efectivo COP|Efectivo USD|Pago Móvil VES) \((?:\$|Bs\.)(\d+(\.\d+)?)/g;
-            let match;
-            let foundAny = false;
+            // Intentar usar paymentMethods si existe
+            const pms = (() => {
+                if (!t.paymentMethods) return [];
+                if (Array.isArray(t.paymentMethods)) return t.paymentMethods;
+                if (typeof t.paymentMethods === 'string') {
+                    try {
+                        return JSON.parse(t.paymentMethods);
+                    } catch {
+                        return [];
+                    }
+                }
+                return [];
+            })();
 
-            while ((match = regex.exec(notes)) !== null) {
-                foundAny = true;
-                const type = match[1];
-                const amount = parseFloat(match[2]);
+            if (pms.length > 0) {
+                pms.forEach((pm: any) => {
+                    const cur = pm.currency || 'COP';
+                    const amount = Number(pm.amount) || 0;
+                    if (cur === 'COP') breakdown.COP += amount;
+                    if (cur === 'USD') breakdown.USD += amount;
+                    if (cur === 'VES') breakdown.VES += amount;
+                });
+            } else {
+                const notes = t.notes || '';
+                const regex = /(Efectivo COP|Efectivo USD|Pago Móvil VES) \((?:\$|Bs\.)(\d+(\.\d+)?)/g;
+                let match;
+                let foundAny = false;
 
-                if (type.includes('COP')) breakdown.COP += amount;
-                if (type.includes('USD')) breakdown.USD += amount;
-                if (type.includes('VES')) breakdown.VES += amount;
-            }
+                while ((match = regex.exec(notes)) !== null) {
+                    foundAny = true;
+                    const type = match[1];
+                    const amount = parseFloat(match[2]);
 
-            if (!foundAny) {
-                const currency = t.currency || 'COP';
-                const rate = Number(t.exchangeRate) || 1;
+                    if (type.includes('COP')) breakdown.COP += amount;
+                    if (type.includes('USD')) breakdown.USD += amount;
+                    if (type.includes('VES')) breakdown.VES += amount;
+                }
 
-                if (currency === 'COP') breakdown.COP += amt;
-                if (currency === 'USD') breakdown.USD += amt / rate;
-                if (currency === 'VES') breakdown.VES += amt / rate;
+                if (!foundAny) {
+                    const currency = t.currency || 'COP';
+                    const rate = Number(t.exchangeRate) || 1;
+
+                    if (currency === 'COP') breakdown.COP += amt;
+                    if (currency === 'USD') breakdown.USD += amt / rate;
+                    if (currency === 'VES') breakdown.VES += amt / rate;
+                }
             }
         } else if (t.type === 'ADJUSTMENT' && t.status === 'COMPLETED') {
             if (amt > 0) totalIncome += amt;

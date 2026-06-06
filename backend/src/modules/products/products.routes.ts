@@ -24,6 +24,13 @@ router.use(authMiddleware);
 router.get('/', validate(productFiltersSchema, { source: 'query' }), ctrl.getProducts);
 
 /**
+ * GET /api/products/check-barcode?code=xxx&excludeId=yyy
+ * Verificar si un código de barras ya existe (cross-product)
+ * DEBE ir antes de /:id para que Express no lo confunda
+ */
+router.get('/check-barcode', ctrl.checkBarcode);
+
+/**
  * GET /api/products/:id
  * Obtener un producto por ID
  */

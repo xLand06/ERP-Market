@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Check, Loader2, X } from 'lucide-react';
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -7,11 +7,13 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { usePayment } from '../hooks/usePayment';
-import type { PaymentMethodType, Currency } from '../types';
+import type { PaymentMethodType, Currency, CartItem } from '../types';
 
 interface PaymentDialogProps {
     open: boolean;
     total: number; // siempre en COP
+    cartItems: CartItem[];
+    onUpdateQty: (productId: string, presentationId: string | undefined, newQty: number) => void;
     onClose: () => void;
     onConfirm: (paymentMethods: Array<{
         type: PaymentMethodType;
@@ -40,9 +42,60 @@ const CURRENCY_SYMBOL: Record<Currency, string> = {
     VES: 'Bs.',
 };
 
+function WeightItemRow({
+    item,
+    onUpdateQty,
+    fmtCOP,
+}: {
+    item: CartItem;
+    onUpdateQty: (productId: string, presentationId: string | undefined, newQty: number) => void;
+    fmtCOP: (n: number) => string;
+}) {
+    const [inputValue, setInputValue] = useState<string>(item.qty.toString());
+    const [isFocused, setIsFocused] = useState(false);
+
+    useEffect(() => {
+        if (!isFocused) {
+            setInputValue(item.qty.toString());
+        }
+    }, [item.qty, isFocused]);
+
+    const handleChange = (valStr: string) => {
+        setInputValue(valStr);
+        const val = parseFloat(valStr);
+        if (!isNaN(val) && val > 0) {
+            onUpdateQty(item.id, item.presentationId, val);
+        }
+    };
+
+    return (
+        <div className="flex items-center justify-between gap-3 text-xs bg-white p-2 rounded-lg border border-indigo-100/50 shadow-sm">
+            <div className="flex flex-col flex-1 min-w-0">
+                <span className="font-semibold text-slate-700 truncate">{item.name}</span>
+                <span className="text-[10px] text-slate-400">Precio: {fmtCOP(item.currentPrice)} / {item.baseUnit}</span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+                <Input
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    value={inputValue}
+                    onFocus={() => setIsFocused(true)}
+                    onBlur={() => setIsFocused(false)}
+                    onChange={e => handleChange(e.target.value)}
+                    className="w-20 h-8 text-right font-bold text-xs p-2 focus-visible:ring-indigo-500 border-slate-200"
+                />
+                <span className="font-bold text-slate-500 text-[10px] uppercase">{item.baseUnit}</span>
+            </div>
+        </div>
+    );
+}
+
 export function PaymentDialog({
     open,
     total,
+    cartItems,
+    onUpdateQty,
     onClose,
     onConfirm,
     isSubmitting,
@@ -61,15 +114,31 @@ export function PaymentDialog({
         updateRow,
         removeRow,
         reset,
+        updateTotal,
         getPayload,
     } = usePayment(rates, fmtCOP);
 
-    // Reset when dialog opens with new total
+    const [prevOpen, setPrevOpen] = useState(open);
+
+    // Reset only when the dialog is opened (transitions from closed to open)
     useEffect(() => {
         if (open) {
-            reset(total);
+            if (!prevOpen) {
+                reset(total);
+            } else {
+                updateTotal(total);
+            }
         }
-    }, [open, total, reset]);
+        setPrevOpen(open);
+    }, [open, prevOpen, total, reset, updateTotal]);
+
+    // Filtrar productos que se venden por peso (KG o gramos)
+    const weightItems = useMemo(() => {
+        return cartItems.filter(item => {
+            const unit = (item.baseUnit || '').toLowerCase().trim();
+            return unit.includes('kg') || unit.includes('gram') || unit === 'g';
+        });
+    }, [cartItems]);
 
     const handleConfirm = () => {
         const payload = getPayload();
@@ -78,11 +147,30 @@ export function PaymentDialog({
 
     return (
         <Dialog open={open} onOpenChange={o => !o && onClose()}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md max-h-[95vh] overflow-y-auto custom-scrollbar">
                 <DialogHeader>
                     <DialogTitle>Cobrar Venta</DialogTitle>
                     <DialogDescription>Selecciona los métodos de pago</DialogDescription>
                 </DialogHeader>
+
+                {/* Ajustar Peso de Productos */}
+                {weightItems.length > 0 && (
+                    <div className="px-6 py-3 bg-indigo-50/30 border-y border-slate-100 flex flex-col gap-2.5">
+                        <p className="text-xs font-bold text-indigo-600 uppercase tracking-wide">
+                            Ajustar Peso de Productos ({weightItems.length})
+                        </p>
+                        <div className="flex flex-col gap-2 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
+                            {weightItems.map(item => (
+                                <WeightItemRow
+                                    key={`${item.id}-${item.presentationId}`}
+                                    item={item}
+                                    onUpdateQty={onUpdateQty}
+                                    fmtCOP={fmtCOP}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Total a cobrar */}
                 <div className="px-6 py-3 bg-slate-50 border-y border-slate-100">

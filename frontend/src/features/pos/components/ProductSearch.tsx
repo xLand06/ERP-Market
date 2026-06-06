@@ -11,7 +11,7 @@ import type { Product, ProductPresentation, InventoryItem } from '../types';
 interface ProductSearchProps {
     inventory: InventoryItem[];
     isSaleMode: boolean;
-    onAddToCart: (product: Product, presentation?: ProductPresentation) => void;
+    onAddToCart: (product: Product, presentation?: ProductPresentation) => boolean;
     onShowPresentations: (product: Product) => void;
     onProductNotFound?: (barcode: string) => void;
 }
@@ -25,7 +25,7 @@ function StockBadge({ stock, unit }: { stock: number; unit: string }) {
 interface ProductCardProps {
     product: Product;
     isSaleMode: boolean;
-    onAdd: (product: Product, presentation?: ProductPresentation) => void;
+    onAdd: (product: Product, presentation?: ProductPresentation) => boolean;
     onShowPresentations: (product: Product) => void;
 }
 
@@ -43,9 +43,10 @@ const ProductCard = React.memo(function ProductCard({
         if (product.presentations && product.presentations.length > 0) {
             onShowPresentations(product);
         } else {
-            onAdd(product);
-            setFlash(true);
-            setTimeout(() => setFlash(false), 250);
+            if (onAdd(product)) {
+                setFlash(true);
+                setTimeout(() => setFlash(false), 250);
+            }
         }
     }, [product, onAdd, onShowPresentations]);
 
@@ -123,11 +124,13 @@ export function ProductSearch({
                     return;
                 }
                 if (found.presentation) {
-                    onAddToCart(found.product, found.presentation);
-                    toast.success(`✓ ${found.product.name} (${found.presentation.name}) añadido`);
+                    if (onAddToCart(found.product, found.presentation)) {
+                        toast.success(`✓ ${found.product.name} (${found.presentation.name}) añadido`);
+                    }
                 } else {
-                    onAddToCart(found.product);
-                    toast.success(`✓ ${found.product.name} añadido`);
+                    if (onAddToCart(found.product)) {
+                        toast.success(`✓ ${found.product.name} añadido`);
+                    }
                 }
                 setSearch('');
                 return;
@@ -143,8 +146,9 @@ export function ProductSearch({
                 if (prod.presentations.length > 0) {
                     onShowPresentations(prod);
                 } else {
-                    onAddToCart(prod);
-                    toast.success(`✓ ${prod.name} añadido`);
+                    if (onAddToCart(prod)) {
+                        toast.success(`✓ ${prod.name} añadido`);
+                    }
                 }
                 setSearch('');
                 return;

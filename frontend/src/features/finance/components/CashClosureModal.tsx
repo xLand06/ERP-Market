@@ -179,7 +179,7 @@ export function CashClosureModal({
                             <AlertTriangle className="w-4 h-4 shrink-0" />
                             <p className="text-sm font-semibold">
                                 {isShort
-                                    ? `Faltante de ${fmtCOP(Math.abs(difference))} en caja.`
+                                    ? `Faltante de  ${fmtCOP(Math.abs(difference))} COP en caja.`
                                     : isOver
                                         ? `Sobrante de +${fmtCOP(difference)} en caja.`
                                         : 'Caja cuadrada correctamente.'}

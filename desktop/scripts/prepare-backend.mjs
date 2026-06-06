@@ -44,4 +44,22 @@ execSync('npx prisma generate --schema=prisma/schema.local.prisma', { cwd: tempB
 console.log('🧹 Limpiando dependencias de desarrollo para reducir el tamaño del EXE...');
 execSync('npm prune --omit=dev', { cwd: tempBackendPath, stdio: 'inherit' });
 
+// 7. Eliminar motores de Prisma innecesarios para achicar el peso (schema-engine pesa ~40MB y solo sirve en dev)
+console.log('🗑️ Eliminando motores de desarrollo de Prisma innecesarios (schema-engine)...');
+const enginesDir = path.join(tempBackendPath, 'node_modules', '@prisma', 'engines');
+if (fs.existsSync(enginesDir)) {
+    try {
+        const files = fs.readdirSync(enginesDir);
+        for (const file of files) {
+            if (file.startsWith('schema-engine')) {
+                const filePath = path.join(enginesDir, file);
+                console.log(`  - Borrando: ${file}`);
+                fs.rmSync(filePath, { force: true });
+            }
+        }
+    } catch (err) {
+        console.warn('⚠️ No se pudieron limpiar algunos motores de Prisma (no crítico):', err.message);
+    }
+}
+
 console.log('✅ temp-backend actualizado y listo para empaquetar.');

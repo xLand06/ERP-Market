@@ -1,9 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import { prisma } from '../../config/prisma';
 import { logger } from '../../core/utils/logger';
-
-const CONFIG_DIR = path.resolve(process.cwd(), 'config');
-const SETTINGS_FILE = path.join(CONFIG_DIR, 'system-settings.json');
 
 export interface SystemSettings {
     iva: number;
@@ -21,26 +17,51 @@ const DEFAULT_SETTINGS: SystemSettings = {
     purgeLogRetentionDays: 90
 };
 
-export function getSettings(): SystemSettings {
-    if (!fs.existsSync(SETTINGS_FILE)) {
-        return DEFAULT_SETTINGS;
-    }
+export async function getSettings(): Promise<SystemSettings> {
     try {
-        const data = fs.readFileSync(SETTINGS_FILE, 'utf-8');
-        return { ...DEFAULT_SETTINGS, ...JSON.parse(data) };
+        const dbSettings = await prisma.systemSetting.findMany();
+        if (dbSettings.length === 0) {
+            return DEFAULT_SETTINGS;
+        }
+
+        const config: any = { ...DEFAULT_SETTINGS };
+        for (const s of dbSettings) {
+            if (s.key === 'iva') {
+                config.iva = Number(s.value);
+            } else if (s.key === 'purgeRetentionDays') {
+                config.purgeRetentionDays = Number(s.value);
+            } else if (s.key === 'purgeLogRetentionDays') {
+                config.purgeLogRetentionDays = Number(s.value);
+            } else {
+                config[s.key] = s.value === 'null' ? null : s.value;
+            }
+        }
+        return config as SystemSettings;
     } catch (error: any) {
-        logger.error('[Settings] Error leyendo configuración:', { error: error.message || error });
+        logger.error('[Settings] Error leyendo configuración desde BD:', { error: error.message || error });
         return DEFAULT_SETTINGS;
     }
 }
 
-export function saveSettings(settings: Partial<SystemSettings>): SystemSettings {
-    if (!fs.existsSync(CONFIG_DIR)) {
-        fs.mkdirSync(CONFIG_DIR, { recursive: true });
+export async function saveSettings(settings: Partial<SystemSettings>): Promise<SystemSettings> {
+    try {
+        const current = await getSettings();
+        const updated = { ...current, ...settings };
+
+        // Guardar cada clave en la base de datos de manera atómica/upsert
+        for (const [key, val] of Object.entries(updated)) {
+            const strVal = val === null ? 'null' : String(val);
+            await prisma.systemSetting.upsert({
+                where: { key },
+                update: { value: strVal },
+                create: { key, value: strVal },
+            });
+        }
+
+        logger.info('[Settings] Configuración guardada en BD', { settings: updated });
+        return updated;
+    } catch (error: any) {
+        logger.error('[Settings] Error guardando configuración en BD:', { error: error.message || error });
+        throw error;
     }
-    const current = getSettings();
-    const updated = { ...current, ...settings };
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(updated, null, 2));
-    logger.info('[Settings] Configuración guardada', { settings: updated });
-    return updated;
 }

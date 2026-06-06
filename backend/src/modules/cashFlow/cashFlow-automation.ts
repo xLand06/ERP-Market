@@ -19,7 +19,7 @@ export async function runAutomationCycle() {
     if (lastProcessedMinute === currentHHmm) return;
     lastProcessedMinute = currentHHmm;
 
-    const settings = getSettings();
+    const settings = await getSettings();
     const { autoCloseTime } = settings;
 
     // Si no hay cierre configurado, no hacemos nada

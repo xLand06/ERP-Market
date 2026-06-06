@@ -219,7 +219,12 @@ export function BatchFormModal({ open, onClose, onSave, mode, initialData, isSav
                                 step="0.001"
                                 placeholder="0"
                                 value={form.quantity}
-                                onChange={e => setForm(prev => ({ ...prev, quantity: e.target.value }))}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    if (val === '' || parseFloat(val) >= 0) {
+                                        setForm(prev => ({ ...prev, quantity: val }));
+                                    }
+                                }}
                                 className={cn(errors.quantity && 'border-red-400')}
                             />
                             {errors.quantity && <p className="text-xs text-red-500">{errors.quantity}</p>}
@@ -236,7 +241,12 @@ export function BatchFormModal({ open, onClose, onSave, mode, initialData, isSav
                                 min="0"
                                 placeholder="0.00"
                                 value={form.costPrice}
-                                onChange={e => setForm(prev => ({ ...prev, costPrice: e.target.value }))}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    if (val === '' || parseFloat(val) >= 0) {
+                                        setForm(prev => ({ ...prev, costPrice: val }));
+                                    }
+                                }}
                             />
                         </div>
                     </div>

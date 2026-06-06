@@ -778,6 +778,26 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
             }
         }
 
+        // ─── STEP 15: SYSTEM SETTINGS (Push de configuraciones) ───────────────
+        logger.info('[Sync] Step 15: Pushing System Settings...');
+        try {
+            const localSettings = await localPrisma.systemSetting.findMany();
+            for (const setting of localSettings) {
+                try {
+                    await cloud.systemSetting.upsert({
+                        where: { key: setting.key },
+                        update: { value: setting.value },
+                        create: { id: setting.id, key: setting.key, value: setting.value },
+                    });
+                    pushedCount++;
+                } catch (err: any) {
+                    logger.warn(`[Sync] Setting ${setting.key} skip: ${err.message?.slice(0, 100)}`);
+                }
+            }
+        } catch (err: any) {
+            logger.error(`[Sync] Error general al subir System Settings: ${err.message}`);
+        }
+
         logger.info(`[Sync] Push completado — ${pushedCount} registros subidos`);
         return { success: true, pushedItems: pushedCount };
 

@@ -339,7 +339,13 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                                             step={item.baseUnit?.toUpperCase() === 'UNIDAD' ? '1' : '0.01'}
                                             value={item.quantity}
                                             onChange={e => {
-                                                let val = parseFloat(e.target.value) || 0;
+                                                const rawVal = e.target.value;
+                                                if (rawVal === '') {
+                                                    updateItem(idx, { quantity: 0 });
+                                                    return;
+                                                }
+                                                let val = parseFloat(rawVal) || 0;
+                                                val = Math.max(0, val);
                                                 if (item.baseUnit?.toUpperCase() === 'UNIDAD') val = Math.floor(val);
                                                 updateItem(idx, { quantity: val });
                                             }}
@@ -350,7 +356,10 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                                             <input
                                                 type="number" min="0" step="0.01"
                                                 value={item.unitCost}
-                                                onChange={e => updateItem(idx, { unitCost: parseFloat(e.target.value) || 0 })}
+                                                onChange={e => {
+                                                    const val = parseFloat(e.target.value) || 0;
+                                                    updateItem(idx, { unitCost: Math.max(0, val) });
+                                                }}
                                                 className="w-full h-9 text-right text-sm font-bold border border-slate-200 rounded-lg bg-white outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 pr-2 font-mono"
                                             />
                                         </div>

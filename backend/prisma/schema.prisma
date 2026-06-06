@@ -460,6 +460,16 @@ model ExchangeRate {
   @@map("exchange_rates")
 }
 
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+
+  @@map("system_settings")
+}
+
 // =============================================================================
 // MERMA (SPOILAGE)
 // =============================================================================

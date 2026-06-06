@@ -159,17 +159,24 @@ export default function POSPage() {
     // ── Barcode Scanner ──────────────────────────────────────────────
     useBarcodeScanner((barcode) => {
         const p = products.find(x => x.code === barcode);
-        if (p) { addToCart(p); toast.success(`✓ ${p.name} añadido`); return; }
+        if (p) {
+            if (addToCart(p)) toast.success(`✓ ${p.name} añadido`);
+            return;
+        }
 
         for (const prod of products) {
             if (prod.barcodes.some(b => b.code === barcode)) {
-                addToCart(prod); toast.success(`✓ ${prod.name} añadido`); return;
+                if (addToCart(prod)) toast.success(`✓ ${prod.name} añadido`);
+                return;
             }
         }
 
         for (const prod of products) {
             const pres = prod.presentations.find(pr => pr.barcode === barcode);
-            if (pres) { addToCart(prod, pres); toast.success(`✓ ${prod.name} (${pres.name}) añadido`); return; }
+            if (pres) {
+                if (addToCart(prod, pres)) toast.success(`✓ ${prod.name} (${pres.name}) añadido`);
+                return;
+            }
         }
 
         toast.error(`⚠️ Código ${barcode} no encontrado`);
@@ -397,6 +404,8 @@ export default function POSPage() {
                 <PaymentDialog
                     open={payOpen}
                     total={totals.total}
+                    cartItems={cart}
+                    onUpdateQty={updateCartItemQty}
                     onClose={() => setPayOpen(false)}
                     onConfirm={handlePayment}
                     isSubmitting={isSubmitting}
@@ -432,7 +441,11 @@ export default function POSPage() {
                     </DialogHeader>
                     <div className="grid gap-3 py-4">
                         {activeProductForPres && (
-                            <button onClick={() => { addToCart(activeProductForPres); setActiveProductForPres(null); toast.success(`✓ ${activeProductForPres.name} añadido`); }}
+                            <button onClick={() => {
+                                const added = addToCart(activeProductForPres);
+                                setActiveProductForPres(null);
+                                if (added) toast.success(`✓ ${activeProductForPres.name} añadido`);
+                            }}
                                 className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all hover:scale-[1.02] font-bold text-slate-800">
                                 <span>Base ({activeProductForPres.baseUnit})</span>
                                 <span className="font-black">{fmtCOP(isSaleMode ? activeProductForPres.price : activeProductForPres.cost)}</span>
@@ -440,7 +453,11 @@ export default function POSPage() {
                         )}
                         {activeProductForPres?.presentations.map(pres => (
                             <button key={pres.id}
-                                onClick={() => { addToCart(activeProductForPres, pres); setActiveProductForPres(null); toast.success(`✓ ${activeProductForPres.name} (${pres.name}) añadido`); }}
+                                onClick={() => {
+                                    const added = addToCart(activeProductForPres, pres);
+                                    setActiveProductForPres(null);
+                                    if (added) toast.success(`✓ ${activeProductForPres.name} (${pres.name}) añadido`);
+                                }}
                                 className="flex items-center justify-between p-4 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 hover:border-indigo-200 rounded-xl transition-all hover:scale-[1.02] font-bold text-indigo-900">
                                 <div className="flex flex-col text-left">
                                     <span>{pres.name}</span>

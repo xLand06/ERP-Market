@@ -164,7 +164,12 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
                                         min="0"
                                         required
                                         value={stock}
-                                        onChange={(e) => setStock(e.target.value === '' ? '' : Number(e.target.value))}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === '' || parseFloat(val) >= 0) {
+                                                setStock(val === '' ? '' : Math.max(0, Number(val)));
+                                            }
+                                        }}
                                         className="text-lg font-semibold bg-slate-50 focus:bg-white"
                                         placeholder="0"
                                         autoFocus
@@ -176,7 +181,12 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
                                         type="number"
                                         min="0"
                                         value={minStock}
-                                        onChange={(e) => setMinStock(e.target.value === '' ? '' : Number(e.target.value))}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === '' || parseFloat(val) >= 0) {
+                                                setMinStock(val === '' ? '' : Math.max(0, Number(val)));
+                                            }
+                                        }}
                                         className="text-lg bg-slate-50 focus:bg-white"
                                         placeholder="0"
                                     />

@@ -20,6 +20,16 @@ export function SystemSettings() {
         fetchSettings();
     }, []);
 
+    // Sincronizar el estado local cuando los datos terminen de cargar desde la API/Store
+    useEffect(() => {
+        setLocalVes(rates['VES']?.toString() || '5.5');
+        setLocalUsd((rates['USD'] || rates['COP'] || 3600).toString());
+        setLocalIva((iva * 100).toString());
+        setLocalCloseTime(autoCloseTime || '');
+        setLocalPurgeDays(purgeRetentionDays.toString());
+        setLocalLogDays(purgeLogRetentionDays.toString());
+    }, [rates, iva, autoCloseTime, purgeRetentionDays, purgeLogRetentionDays]);
+
     const handleSave = async () => {
         setSaving(true);
         try {

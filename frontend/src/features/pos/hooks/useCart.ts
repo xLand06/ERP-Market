@@ -9,7 +9,7 @@ interface UseCartOptions {
 
 interface UseCartReturn {
     items: CartItem[];
-    addItem: (product: Product, presentation?: ProductPresentation) => void;
+    addItem: (product: Product, presentation?: ProductPresentation) => boolean;
     updateQty: (id: string, presentationId: string | undefined, newQty: number) => void;
     updatePresentation: (productId: string, oldPresId: string | undefined, newPresId: string | 'base') => void;
     removeItem: (productId: string, presentationId: string | undefined) => void;
@@ -41,43 +41,31 @@ export function useCart(
     const getProduct = useCallback((id: string) => products.find(p => p.id === id), [products]);
 
     const addItem = useCallback((product: Product, presentation?: ProductPresentation) => {
+        const multiplier = presentation ? presentation.multiplier : 1;
+        const totalUnitsInCart = items
+            .filter(i => i.id === product.id)
+            .reduce((acc, i) => acc + (i.qty * i.multiplier), 0);
+
+        if (isSaleMode && totalUnitsInCart + multiplier > product.stock) {
+            showError(`Stock insuficiente para añadir ${product.name}`);
+            return false;
+        }
+
         setItems(prev => {
-            // Buscar item existente por id (que incluye presentationId)
             const exIdx = prev.findIndex(i =>
                 i.id === product.id && i.presentationId === presentation?.id
             );
 
-            const multiplier = presentation ? presentation.multiplier : 1;
             const salePrice = presentation ? presentation.price : product.price;
             const costPrice = presentation ? (product.cost * presentation.multiplier) : product.cost;
             const price = isSaleMode ? salePrice : costPrice;
 
             if (exIdx > -1) {
-                // Ya existe: incrementar qty
                 const ex = prev[exIdx];
-                const totalUnitsInCart = prev
-                    .filter(i => i.id === product.id)
-                    .reduce((acc, i) => acc + (i.qty * i.multiplier), 0);
-
-                if (isSaleMode && totalUnitsInCart + multiplier > product.stock) {
-                    showError(`Stock insuficiente para añadir más ${product.name}`);
-                    return prev;
-                }
-
                 const newCart = [...prev];
                 newCart[exIdx] = { ...ex, qty: ex.qty + 1 };
                 return newCart;
             } else {
-                // Nuevo item
-                const totalUnitsInCart = prev
-                    .filter(i => i.id === product.id)
-                    .reduce((acc, i) => acc + (i.qty * i.multiplier), 0);
-
-                if (isSaleMode && totalUnitsInCart + multiplier > product.stock) {
-                    showError(`Stock insuficiente para ${product.name}`);
-                    return prev;
-                }
-
                 return [...prev, {
                     id: product.id,
                     name: product.name,
@@ -92,7 +80,8 @@ export function useCart(
                 }];
             }
         });
-    }, [isSaleMode, showError]);
+        return true;
+    }, [isSaleMode, showError, items]);
 
     const updateQty = useCallback((
         productId: string,

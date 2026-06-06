@@ -25,6 +25,7 @@ interface UsePaymentReturn {
     updateRow: (key: string, updates: Partial<Omit<PaymentMethodRow, 'key'>>) => void;
     removeRow: (key: string) => void;
     reset: (totalCOP: number) => void;
+    updateTotal: (newTotalCOP: number) => void;
     getPayload: () => Array<{ type: PaymentMethodType; amount: number; currency: Currency; exchangeRate?: number }>;
     lastChangeRow: PaymentMethodRow | null;
 }
@@ -53,6 +54,24 @@ export function usePayment(
             amount: totalCOP,
         }]);
     }, []);
+
+    // Actualiza el total cuando cambia durante la edición de cantidades
+    const updateTotal = useCallback((newTotalCOP: number) => {
+        setTotalInCOP(newTotalCOP);
+        setRows(prev => {
+            if (prev.length === 1) {
+                const firstRow = prev[0];
+                let newAmount = newTotalCOP;
+                if (firstRow.currency === 'USD') newAmount = newTotalCOP / usdRate;
+                if (firstRow.currency === 'VES') newAmount = newTotalCOP / vesRate;
+                return [{
+                    ...firstRow,
+                    amount: Number(newAmount.toFixed(4))
+                }];
+            }
+            return prev;
+        });
+    }, [usdRate, vesRate]);
 
     // Convertir una fila a COP
     const toCOP = useCallback((row: PaymentMethodRow): number => {
@@ -167,6 +186,7 @@ export function usePayment(
         updateRow,
         removeRow,
         reset,
+        updateTotal,
         getPayload,
         lastChangeRow,
     };
