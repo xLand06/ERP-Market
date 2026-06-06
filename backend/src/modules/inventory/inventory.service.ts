@@ -20,7 +20,8 @@ export const getAllStock = async (page = 1, limit = 100) => {
                     product: {
                         include: { 
                             subGroup: { include: { group: { select: { name: true } } } },
-                            presentations: true
+                            presentations: true,
+                            barcodes: true
                         },
                     },
                     branch: { select: { id: true, name: true } },
@@ -49,7 +50,8 @@ export const getStockByBranch = async (branchId: string) => {
                 product: {
                     include: { 
                         subGroup: { include: { group: { select: { name: true } } } },
-                        presentations: true
+                        presentations: true,
+                        barcodes: true
                     },
                 },
             },

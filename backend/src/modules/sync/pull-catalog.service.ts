@@ -413,6 +413,48 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
             }
         }
 
+        // ─── STEP 8.5: BRANCH INVENTORY (Pull de inventario) ───────────────────
+        logger.info('[Sync] Pull Step 8.5: Branch Inventory...');
+        const cloudInventory = await cloud.branchInventory.findMany();
+        for (const inv of cloudInventory) {
+            try {
+                // Traducir ID de sucursal de cloud a local
+                const localBranchId = mapBranchId(inv.branchId);
+
+                // Verificar que el producto exista localmente
+                const productExists = await localPrisma.product.findUnique({
+                    where: { id: inv.productId },
+                    select: { id: true }
+                });
+                if (!productExists) continue;
+
+                // Verificar que la sucursal exista localmente
+                const branchExists = await localPrisma.branch.findUnique({
+                    where: { id: localBranchId },
+                    select: { id: true }
+                });
+                if (!branchExists) continue;
+
+                await localPrisma.branchInventory.upsert({
+                    where: { productId_branchId: { productId: inv.productId, branchId: localBranchId } },
+                    update: {
+                        stock: Number(inv.stock),
+                        minStock: Number(inv.minStock),
+                    },
+                    create: {
+                        id: inv.id,
+                        productId: inv.productId,
+                        branchId: localBranchId,
+                        stock: Number(inv.stock),
+                        minStock: Number(inv.minStock),
+                    },
+                });
+                pulledCount++;
+            } catch (err: any) {
+                logger.warn(`[Sync] Pull Inventory ${inv.productId}@${inv.branchId} skip: ${err.message?.slice(0, 100)}`);
+            }
+        }
+
         // ─── STEP 9: CASH REGISTERS ───────────────────────────────────────────
         logger.info('[Sync] Pull Step 9: CashRegisters...');
         const cloudCashRegisters = await cloud.cashRegister.findMany();
@@ -423,7 +465,7 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
                 const localUserId = mapUserId(cr.userId);
                 const localBranchId = mapBranchId(cr.branchId);
 
-                // Verificar FKs locales con IDs traducidos
+                // Verificar FK locales con IDs traducidos
                 const [userExists, branchExists] = await Promise.all([
                     localPrisma.user.findUnique({ where: { id: localUserId }, select: { id: true } }),
                     localPrisma.branch.findUnique({ where: { id: localBranchId }, select: { id: true } }),
@@ -474,10 +516,21 @@ export async function pullCatalog(): Promise<{ success: boolean; pulledItems?: n
             logger.warn(`[Sync] ${skippedCashRegs} CashRegisters omitidos por FKs faltantes`);
         }
 
-        // ─── STEP 10: TRANSACTIONS (solo SYNCED → para vista del dueño) ──────
+        // ─── STEP 10: TRANSACTIONS (solo SYNCED y pertenecientes a sucursales locales) ──────
         logger.info('[Sync] Pull Step 10: Transactions...');
+        
+        // Construir conjunto de todos los branchId de nube que corresponden a sucursales locales
+        const activeLocalBranches = await localPrisma.branch.findMany({ select: { id: true } });
+        const localToCloudBranchIds = activeLocalBranches.map(lb => {
+            const mappedCloudId = [...branchIdMap.entries()].find(([_, val]) => val === lb.id)?.[0];
+            return mappedCloudId || lb.id;
+        });
+
         const cloudTxs = await cloud.transaction.findMany({
-            where: { syncStatus: 'SYNCED' },
+            where: { 
+                syncStatus: 'SYNCED',
+                branchId: { in: localToCloudBranchIds }
+            },
             include: { items: true },
             orderBy: { createdAt: 'desc' },
             take: 500,

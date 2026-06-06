@@ -20,7 +20,13 @@ export const createGroupSchema = z.object({
 /**
  * Esquema para actualizar un grupo
  */
-export const updateGroupSchema = createGroupSchema.partial();
+export const updateGroupSchema = createGroupSchema.partial().extend({
+    isActive: z.boolean().optional(),
+});
+
+export const toggleGroupStatusSchema = z.object({
+    isActive: z.boolean(),
+});
 
 export type CreateGroupInput = z.infer<typeof createGroupSchema>;
 export type UpdateGroupInput = z.infer<typeof updateGroupSchema>;
@@ -44,6 +50,11 @@ export const createSubGroupSchema = z.object({
 export const updateSubGroupSchema = z.object({
     name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100).optional(),
     description: z.string().max(500).optional().or(z.literal('')),
+    isActive: z.boolean().optional(),
+});
+
+export const toggleSubGroupStatusSchema = z.object({
+    isActive: z.boolean(),
 });
 
 export type CreateSubGroupInput = z.infer<typeof createSubGroupSchema>;

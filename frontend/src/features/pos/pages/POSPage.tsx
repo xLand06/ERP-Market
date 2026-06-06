@@ -209,11 +209,7 @@ export default function POSPage() {
                 paymentMethods,
             };
 
-            if (isOnline) {
-                await api.post('/pos/transactions', payload);
-            } else {
-                throw new Error('Sin conexión. Verifica la red.');
-            }
+            await api.post('/pos/transactions', payload);
 
             setSummary({
                 visible: true,

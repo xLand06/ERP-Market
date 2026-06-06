@@ -191,7 +191,15 @@ app.use('/api/batches',     batchesRouter);
 // Sirve el frontend compilado desde backend/public/
 // Solo en producción: en desarrollo Vite se usa el dev server con proxy
 const frontendDist = path.join(__dirname, '../public');
-app.use(express.static(frontendDist));
+app.use(express.static(frontendDist, {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.css')) {
+            res.setHeader('Content-Type', 'text/css');
+        } else if (filePath.endsWith('.js') || filePath.endsWith('.mjs')) {
+            res.setHeader('Content-Type', 'application/javascript');
+        }
+    }
+}));
 
 // SPA fallback: cualquier ruta que no sea /api/* devuelve index.html
 // para que React Router maneje la navegación del lado del cliente

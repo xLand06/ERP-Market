@@ -141,11 +141,13 @@ model Group {
   id          String   @id @default(cuid())
   name        String   @unique
   description String?
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now()) @db.Timestamptz
   updatedAt   DateTime @updatedAt @db.Timestamptz
 
   subGroups SubGroup[]
 
+  @@index([isActive])
   @@map("groups")
 }
 
@@ -153,6 +155,7 @@ model SubGroup {
   id          String   @id @default(cuid())
   name        String
   description String?
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now()) @db.Timestamptz
   updatedAt   DateTime @updatedAt @db.Timestamptz
 
@@ -163,6 +166,7 @@ model SubGroup {
 
   @@unique([name, groupId])
   @@index([groupId])
+  @@index([isActive])
   @@map("sub_groups")
 }
 

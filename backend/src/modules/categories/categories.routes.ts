@@ -7,7 +7,7 @@ import { Router } from 'express';
 import { authMiddleware } from '../../core/middlewares/auth.middleware';
 import { roleGuard } from '../../core/middlewares/roleGuard';
 import { validate } from '../../core/middlewares/validate.middleware';
-import { createGroupSchema, updateGroupSchema, createSubGroupSchema, updateSubGroupSchema } from '../../core/validations/groups.zod';
+import { createGroupSchema, updateGroupSchema, toggleGroupStatusSchema, createSubGroupSchema, updateSubGroupSchema, toggleSubGroupStatusSchema } from '../../core/validations/groups.zod';
 import { idParamSchema } from '../../core/validations/common.zod';
 import * as ctrl from './categories.controller';
 
@@ -31,8 +31,11 @@ router.post('/', roleGuard('OWNER'), validate(createGroupSchema), ctrl.createGro
 /** PUT  /api/groups/:id — Actualizar grupo (solo OWNER) */
 router.put('/:id', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), validate(updateGroupSchema), ctrl.updateGroup);
 
-/** DELETE /api/groups/:id — Eliminar grupo (solo OWNER) */
+/** DELETE /api/groups/:id — Desactivar grupo (borrado lógico, solo OWNER) */
 router.delete('/:id', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), ctrl.deleteGroup);
+
+/** PATCH /api/groups/:id/status — Cambiar estado activo/inactivo (solo OWNER) */
+router.patch('/:id/status', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), validate(toggleGroupStatusSchema), ctrl.toggleGroupStatus);
 
 // =============================================================================
 // SUBGROUPS
@@ -50,7 +53,10 @@ router.post('/subgroups', roleGuard('OWNER'), validate(createSubGroupSchema), ct
 /** PUT  /api/groups/subgroups/:id — Actualizar subgrupo (solo OWNER) */
 router.put('/subgroups/:id', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), validate(updateSubGroupSchema), ctrl.updateSubGroup);
 
-/** DELETE /api/groups/subgroups/:id — Eliminar subgrupo (solo OWNER) */
+/** DELETE /api/groups/subgroups/:id — Desactivar subgrupo (borrado lógico, solo OWNER) */
 router.delete('/subgroups/:id', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), ctrl.deleteSubGroup);
+
+/** PATCH /api/groups/subgroups/:id/status — Cambiar estado activo/inactivo (solo OWNER) */
+router.patch('/subgroups/:id/status', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), validate(toggleSubGroupStatusSchema), ctrl.toggleSubGroupStatus);
 
 export default router;

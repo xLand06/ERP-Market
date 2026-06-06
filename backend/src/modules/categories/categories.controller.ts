@@ -16,9 +16,10 @@ import { logAudit, extractIp } from '../../core/middlewares/audit.middleware';
 /**
  * Listar grupos
  */
-export const getAllGroups = async (_req: Request, res: Response) => {
+export const getAllGroups = async (req: Request, res: Response) => {
     try {
-        const groups = await groupsService.getAllGroups();
+        const includeInactive = req.query.includeInactive === 'true';
+        const groups = await groupsService.getAllGroups(includeInactive);
         res.json({ success: true, data: groups });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });
@@ -94,7 +95,7 @@ export const updateGroup = async (req: AuthRequest, res: Response) => {
 };
 
 /**
- * Eliminar grupo (Auditado)
+ * Eliminar grupo (borrado lógico) (Auditado)
  */
 export const deleteGroup = async (req: AuthRequest, res: Response) => {
     try {
@@ -104,18 +105,38 @@ export const deleteGroup = async (req: AuthRequest, res: Response) => {
         await logAudit({
             action: 'GROUP_DELETE',
             module: 'groups',
-            details: { id },
+            details: { id, isActive: false },
             userId: req.user!.id,
             ipAddress: extractIp(req),
         });
         
-        res.status(200).json({ success: true, message: 'Grupo eliminado' });
+        res.status(200).json({ success: true, message: 'Grupo desactivado' });
     } catch (error: any) {
-        if (error.code === 'P2003') {
-            res.status(400).json({ success: false, error: 'No se puede eliminar un grupo con subgrupos asociados' });
-        } else {
-            res.status(500).json({ success: false, error: error.message });
-        }
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Cambiar estado de un grupo (activar/desactivar) (Auditado)
+ */
+export const toggleGroupStatus = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = validatedData(req, 'params');
+        const { isActive } = validatedData(req, 'body');
+        
+        const group = await groupsService.toggleGroupStatus(id, isActive);
+        
+        await logAudit({
+            action: isActive ? 'GROUP_ACTIVATE' : 'GROUP_DEACTIVATE',
+            module: 'groups',
+            details: { id, isActive },
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
+        });
+        
+        res.json({ success: true, data: group });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
     }
 };
 
@@ -128,8 +149,11 @@ export const deleteGroup = async (req: AuthRequest, res: Response) => {
  */
 export const getAllSubGroups = async (req: Request, res: Response) => {
     try {
-        const { groupId } = req.query;
-        const subGroups = await groupsService.getAllSubGroups(groupId as string | undefined);
+        const { groupId, includeInactive } = req.query;
+        const subGroups = await groupsService.getAllSubGroups(
+            groupId as string | undefined,
+            includeInactive === 'true'
+        );
         res.json({ success: true, data: subGroups });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });
@@ -205,7 +229,7 @@ export const updateSubGroup = async (req: AuthRequest, res: Response) => {
 };
 
 /**
- * Eliminar subgrupo (Auditado)
+ * Eliminar subgrupo (borrado lógico) (Auditado)
  */
 export const deleteSubGroup = async (req: AuthRequest, res: Response) => {
     try {
@@ -215,17 +239,37 @@ export const deleteSubGroup = async (req: AuthRequest, res: Response) => {
         await logAudit({
             action: 'SUBGROUP_DELETE',
             module: 'groups',
-            details: { id },
+            details: { id, isActive: false },
             userId: req.user!.id,
             ipAddress: extractIp(req),
         });
         
-        res.status(200).json({ success: true, message: 'Subgrupo eliminado' });
+        res.status(200).json({ success: true, message: 'Subgrupo desactivado' });
     } catch (error: any) {
-        if (error.code === 'P2003') {
-            res.status(400).json({ success: false, error: 'No se puede eliminar un subgrupo con productos asociados' });
-        } else {
-            res.status(500).json({ success: false, error: error.message });
-        }
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Cambiar estado de un subgrupo (activar/desactivar) (Auditado)
+ */
+export const toggleSubGroupStatus = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = validatedData(req, 'params');
+        const { isActive } = validatedData(req, 'body');
+        
+        const subGroup = await groupsService.toggleSubGroupStatus(id, isActive);
+        
+        await logAudit({
+            action: isActive ? 'SUBGROUP_ACTIVATE' : 'SUBGROUP_DEACTIVATE',
+            module: 'groups',
+            details: { id, isActive },
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
+        });
+        
+        res.json({ success: true, data: subGroup });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
     }
 };

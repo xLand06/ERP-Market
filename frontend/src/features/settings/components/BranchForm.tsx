@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
 import type { Branch } from '../types';
@@ -12,11 +12,19 @@ interface BranchFormProps {
 }
 
 export function BranchForm({ branch, open, onClose }: BranchFormProps) {
-    const [name, setName] = useState(branch?.name || '');
-    const [address, setAddress] = useState(branch?.address || '');
-    const [phone, setPhone] = useState(branch?.phone || '');
+    const [name, setName] = useState('');
+    const [address, setAddress] = useState('');
+    const [phone, setPhone] = useState('');
     const [saving, setSaving] = useState(false);
     const queryClient = useQueryClient();
+
+    useEffect(() => {
+        if (open) {
+            setName(branch?.name || '');
+            setAddress(branch?.address || '');
+            setPhone(branch?.phone || '');
+        }
+    }, [open, branch]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

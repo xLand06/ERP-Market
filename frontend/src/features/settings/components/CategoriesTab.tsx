@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Tag, Plus, Edit2, Trash2, Search, X, Save, Layers } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Tag, Plus, Edit2, Trash2, Search, RefreshCw, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import toast from 'react-hot-toast';
@@ -21,9 +22,9 @@ export function CategoriesTab() {
     const queryClient = useQueryClient();
 
     const { data: groups = [] } = useQuery<Group[]>({
-        queryKey: ['groups'],
+        queryKey: ['groups', 'all'],
         queryFn: async () => {
-            const res = await api.get('/groups');
+            const res = await api.get('/groups?includeInactive=true');
             return res.data.data;
         },
         retry: false
@@ -32,35 +33,35 @@ export function CategoriesTab() {
     const { data: subGroups = [] } = useQuery<SubGroup[]>({
         queryKey: ['groups', 'subgroups'],
         queryFn: async () => {
-            const res = await api.get('/groups/subgroups/all');
+            const res = await api.get('/groups/subgroups/all?includeInactive=true');
             return res.data.data;
         },
         retry: false
     });
 
-    const deleteGroupMutation = useMutation({
-        mutationFn: async (id: string) => {
-            await api.delete(`/groups/${id}`);
+    const toggleGroupMutation = useMutation({
+        mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+            await api.patch(`/groups/${id}/status`, { isActive });
         },
-        onSuccess: () => {
+        onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['groups'] });
-            toast.success('Grupo eliminado');
+            toast.success(variables.isActive ? 'Grupo activado' : 'Grupo desactivado');
         },
         onError: (error: any) => {
-            toast.error(error.response?.data?.error || 'No se puede eliminar el grupo');
+            toast.error(error.response?.data?.error || 'Error al cambiar estado del grupo');
         }
     });
 
-    const deleteSubGroupMutation = useMutation({
-        mutationFn: async (id: string) => {
-            await api.delete(`/groups/subgroups/${id}`);
+    const toggleSubGroupMutation = useMutation({
+        mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+            await api.patch(`/groups/subgroups/${id}/status`, { isActive });
         },
-        onSuccess: () => {
+        onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['groups'] });
-            toast.success('Subgrupo eliminado');
+            toast.success(variables.isActive ? 'Subgrupo activado' : 'Subgrupo desactivado');
         },
         onError: (error: any) => {
-            toast.error(error.response?.data?.error || 'No se puede eliminar el subgrupo');
+            toast.error(error.response?.data?.error || 'Error al cambiar estado del subgrupo');
         }
     });
 
@@ -97,6 +98,7 @@ export function CategoriesTab() {
                                 <th>Grupo</th>
                                 <th>Descripción</th>
                                 <th>Subgrupos</th>
+                                <th className="text-center">Estado</th>
                                 <th className="w-32">Acciones</th>
                             </tr>
                         </thead>
@@ -104,20 +106,28 @@ export function CategoriesTab() {
                             {filtered.map(group => {
                                 const groupSubGroups = subGroups.filter(sg => sg.groupId === group.id);
                                 return (
-                                    <tr key={group.id} className="group/row">
+                                    <tr key={group.id} className={cn("group/row", !group.isActive && "opacity-60 bg-slate-50/50")}>
                                         <td>
                                             <div className="flex items-center gap-2">
                                                 <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
                                                     <Tag className="w-4 h-4" />
                                                 </div>
-                                                <span className="font-bold text-slate-900">{group.name}</span>
+                                                <span className="font-bold text-slate-900">
+                                                    {group.name}
+                                                    {!group.isActive && <span className="ml-2 text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded uppercase">Inactivo</span>}
+                                                </span>
                                             </div>
                                         </td>
                                         <td className="text-slate-500 text-sm">{group.description || '—'}</td>
                                         <td>
                                             <div className="flex flex-wrap gap-1.5">
                                                 {groupSubGroups.map(sg => (
-                                                    <div key={sg.id} className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium border border-slate-200 group/sg">
+                                                    <div key={sg.id} className={cn(
+                                                        "flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border group/sg",
+                                                        sg.isActive
+                                                            ? "bg-slate-100 text-slate-700 border-slate-200"
+                                                            : "bg-slate-50 text-slate-400 border-slate-100"
+                                                    )}>
                                                         <span>{sg.name}</span>
                                                         <button 
                                                             onClick={() => openSubGroupForm(group.id, sg)}
@@ -126,20 +136,38 @@ export function CategoriesTab() {
                                                             <Edit2 className="w-3 h-3" />
                                                         </button>
                                                         <button 
-                                                            onClick={() => deleteSubGroupMutation.mutate(sg.id)}
-                                                            className="p-0.5 hover:text-red-500 opacity-0 group-hover/sg:opacity-100 transition-opacity"
+                                                            onClick={() => {
+                                                                const action = sg.isActive ? 'desactivar' : 'activar';
+                                                                if (confirm(`¿Estás seguro de que deseas ${action} este subgrupo?`)) {
+                                                                    toggleSubGroupMutation.mutate({ id: sg.id, isActive: !sg.isActive });
+                                                                }
+                                                            }}
+                                                            className={cn(
+                                                                "p-0.5 transition-opacity opacity-0 group-hover/sg:opacity-100",
+                                                                sg.isActive ? "hover:text-red-500" : "hover:text-emerald-600"
+                                                            )}
                                                         >
-                                                            <Trash2 className="w-3 h-3" />
+                                                            {sg.isActive ? <Trash2 className="w-3 h-3" /> : <RefreshCw className="w-3 h-3" />}
                                                         </button>
                                                     </div>
                                                 ))}
-                                                <button 
-                                                    onClick={() => openSubGroupForm(group.id)}
-                                                    className="flex items-center gap-1 px-2.5 py-1 text-indigo-600 hover:bg-indigo-50 rounded-lg text-xs font-bold transition-colors"
-                                                >
-                                                    <Plus className="w-3 h-3" /> Añadir
-                                                </button>
+                                                {group.isActive && (
+                                                    <button 
+                                                        onClick={() => openSubGroupForm(group.id)}
+                                                        className="flex items-center gap-1 px-2.5 py-1 text-indigo-600 hover:bg-indigo-50 rounded-lg text-xs font-bold transition-colors"
+                                                    >
+                                                        <Plus className="w-3 h-3" /> Añadir
+                                                    </button>
+                                                )}
                                             </div>
+                                        </td>
+                                        <td className="text-center">
+                                            <span className={cn(
+                                                "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                                                group.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                                            )}>
+                                                {group.isActive ? 'Activo' : 'Inactivo'}
+                                            </span>
                                         </td>
                                         <td>
                                             <div className="flex gap-1 justify-end">
@@ -152,14 +180,20 @@ export function CategoriesTab() {
                                                 </button>
                                                 <button 
                                                     onClick={() => {
-                                                        if (confirm('¿Estás seguro de eliminar este grupo y todos sus subgrupos?')) {
-                                                            deleteGroupMutation.mutate(group.id);
+                                                        const action = group.isActive ? 'desactivar' : 'activar';
+                                                        if (confirm(`¿Estás seguro de que deseas ${action} este grupo?`)) {
+                                                            toggleGroupMutation.mutate({ id: group.id, isActive: !group.isActive });
                                                         }
                                                     }} 
-                                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                    title="Eliminar Grupo"
+                                                    className={cn(
+                                                        "p-2 rounded-lg transition-colors",
+                                                        group.isActive
+                                                            ? "text-slate-400 hover:text-red-500 hover:bg-red-50"
+                                                            : "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
+                                                    )}
+                                                    title={group.isActive ? "Desactivar Grupo" : "Activar Grupo"}
                                                 >
-                                                    <Trash2 className="w-4.5 h-4.5" />
+                                                    {group.isActive ? <Trash2 className="w-4.5 h-4.5" /> : <RefreshCw className="w-4.5 h-4.5" />}
                                                 </button>
                                             </div>
                                         </td>
@@ -167,7 +201,7 @@ export function CategoriesTab() {
                                 );
                             })}
                             {filtered.length === 0 && (
-                                <tr><td colSpan={4} className="text-center py-20">
+                                <tr><td colSpan={5} className="text-center py-20">
                                     <div className="flex flex-col items-center gap-2 text-slate-400">
                                         <Layers className="w-10 h-10 opacity-20" />
                                         <p className="font-medium">No se encontraron grupos registrados</p>

@@ -1,10 +1,11 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Search, Barcode, Package, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useConfigStore } from '@/hooks/useConfigStore';
-import { useProductSearch } from '../hooks/useProductSearch';
+import { useProductSearch, findProductByBarcode } from '../hooks/useProductSearch';
+import toast from 'react-hot-toast';
 import type { Product, ProductPresentation, InventoryItem } from '../types';
 
 interface ProductSearchProps {
@@ -48,7 +49,6 @@ const ProductCard = React.memo(function ProductCard({
         }
     }, [product, onAdd, onShowPresentations]);
 
-    const usd = fromCOP(product.price, 'USD');
     return (
         <button
             onClick={handle}
@@ -102,13 +102,55 @@ export function ProductSearch({
         isSearching,
     } = useProductSearch(inventory, isSaleMode);
 
-    // Exponer el input ref para hotkey F2
+    // Manejar hotkey F2 y Enter para escanear código de barras estando enfocado en el input
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'F2') {
             e.preventDefault();
             searchRef.current?.focus();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const term = search.trim();
+            if (!term) return;
+
+            // 1. Intentar buscar por coincidencia exacta de código de barras
+            const allProducts = inventory.map(item => item.product).filter(Boolean) as unknown as Product[];
+            const found = findProductByBarcode(filteredProducts, term) 
+                || findProductByBarcode(allProducts, term); // fallback a todo el inventario
+
+            if (found) {
+                if (found.product.stock === 0 && isSaleMode) {
+                    toast.error(`⚠️ ${found.product.name} no tiene stock disponible`);
+                    return;
+                }
+                if (found.presentation) {
+                    onAddToCart(found.product, found.presentation);
+                    toast.success(`✓ ${found.product.name} (${found.presentation.name}) añadido`);
+                } else {
+                    onAddToCart(found.product);
+                    toast.success(`✓ ${found.product.name} añadido`);
+                }
+                setSearch('');
+                return;
+            }
+
+            // 2. Si no hay coincidencia exacta de código pero queda un solo producto filtrado
+            if (filteredProducts.length === 1) {
+                const prod = filteredProducts[0];
+                if (prod.stock === 0 && isSaleMode) {
+                    toast.error(`⚠️ ${prod.name} no tiene stock disponible`);
+                    return;
+                }
+                if (prod.presentations.length > 0) {
+                    onShowPresentations(prod);
+                } else {
+                    onAddToCart(prod);
+                    toast.success(`✓ ${prod.name} añadido`);
+                }
+                setSearch('');
+                return;
+            }
         }
-    }, []);
+    }, [search, filteredProducts, inventory, onAddToCart, onShowPresentations, setSearch, isSaleMode]);
 
     return (
         <div className="flex flex-col gap-4 h-full">

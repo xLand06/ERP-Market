@@ -35,6 +35,23 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
     try {
         logger.info('[Sync] Iniciando Push completo hacia cloud...');
 
+        // ─── MAPAS DE TRADUCCIÓN DE IDs (localId -> cloudId) ───────────────────
+        const cloudUsers = await cloud.user.findMany({ select: { id: true, username: true } });
+        const localUsersForMap = await localPrisma.user.findMany({ select: { id: true, username: true } });
+        const userMap = new Map<string, string>(); // localUserId -> cloudUserId
+        for (const lu of localUsersForMap) {
+            const cu = cloudUsers.find(u => u.username === lu.username);
+            if (cu) userMap.set(lu.id, cu.id);
+        }
+
+        const cloudBranches = await cloud.branch.findMany({ select: { id: true, code: true, name: true } });
+        const localBranchesForMap = await localPrisma.branch.findMany({ select: { id: true, code: true, name: true } });
+        const branchMap = new Map<string, string>(); // localBranchId -> cloudBranchId
+        for (const lb of localBranchesForMap) {
+            const cb = cloudBranches.find(b => b.code === lb.code || b.name === lb.name);
+            if (cb) branchMap.set(lb.id, cb.id);
+        }
+
         // ─── STEP 1: BRANCHES (batch por code) ──────────────────────────────────
         logger.info('[Sync] Step 1: Pushing Branches...');
         const localBranches = await localPrisma.branch.findMany({ where: { isActive: true } });
@@ -290,7 +307,7 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
         logger.info('[Sync] Step 7: Pushing Users...');
         const localUsers = await localPrisma.user.findMany({ where: { isActive: true } });
         const cloudUsersByUsername = new Map(
-            localUsers.length > 0
+            cloudUsers.length > 0
                 ? (await cloud.user.findMany({ where: { username: { in: localUsers.map(u => u.username) } } })).map(u => [u.username, u])
                 : []
         );
@@ -307,7 +324,7 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                     password: user.password,
                     telefono: user.telefono || '',
                     role: user.role as $Enums.Role,
-                    branchId: user.branchId || null,
+                    branchId: user.branchId ? branchMap.get(user.branchId) : null,
                     isActive: user.isActive,
                     canManageInventory: user.canManageInventory,
                 };
@@ -360,8 +377,11 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
         const localInventory = await localPrisma.branchInventory.findMany();
         for (const inv of localInventory) {
             try {
+                const cloudBranchId = branchMap.get(inv.branchId);
+                if (!cloudBranchId) continue;
+
                 await cloud.branchInventory.upsert({
-                    where: { productId_branchId: { productId: inv.productId, branchId: inv.branchId } },
+                    where: { productId_branchId: { productId: inv.productId, branchId: cloudBranchId } },
                     update: {
                         stock: Number(inv.stock),
                         minStock: Number(inv.minStock),
@@ -369,7 +389,7 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                     create: {
                         id: inv.id,
                         productId: inv.productId,
-                        branchId: inv.branchId,
+                        branchId: cloudBranchId,
                         stock: Number(inv.stock),
                         minStock: Number(inv.minStock),
                     },
@@ -392,10 +412,18 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
 
         for (const reg of pendingRegisters) {
             try {
+                // Traducir IDs de local a cloud
+                const cloudUserId = userMap.get(reg.userId);
+                const cloudBranchId = branchMap.get(reg.branchId);
+                if (!cloudUserId || !cloudBranchId) {
+                    logger.warn(`[Sync] CashRegister ${reg.id} skip: FK translation failed (user=${!!cloudUserId}, branch=${!!cloudBranchId})`);
+                    continue;
+                }
+
                 // Verificar FKs en cloud antes de push
                 const [userInCloud, branchInCloud] = await Promise.all([
-                    cloud.user.findFirst({ where: { id: reg.userId }, select: { id: true } }),
-                    cloud.branch.findFirst({ where: { id: reg.branchId }, select: { id: true } }),
+                    cloud.user.findFirst({ where: { id: cloudUserId }, select: { id: true } }),
+                    cloud.branch.findFirst({ where: { id: cloudBranchId }, select: { id: true } }),
                 ]);
                 if (!userInCloud || !branchInCloud) {
                     logger.warn(`[Sync] CashRegister ${reg.id} skip: FK faltante en cloud (user=${!!userInCloud}, branch=${!!branchInCloud})`);
@@ -413,8 +441,8 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                         notes: reg.notes ?? null,
                         openedAt: reg.openedAt,
                         closedAt: reg.closedAt ?? null,
-                        userId: reg.userId,
-                        branchId: reg.branchId,
+                        userId: cloudUserId,
+                        branchId: cloudBranchId,
                         syncStatus: 'SYNCED',
                     },
                     create: {
@@ -427,8 +455,8 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                         notes: reg.notes ?? null,
                         openedAt: reg.openedAt,
                         closedAt: reg.closedAt ?? null,
-                        userId: reg.userId,
-                        branchId: reg.branchId,
+                        userId: cloudUserId,
+                        branchId: cloudBranchId,
                         syncStatus: 'SYNCED',
                     },
                 });
@@ -461,16 +489,24 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
 
         for (const tx of pendingTxs) {
             try {
+                // Traducir IDs de local a cloud
+                const cloudUserId = userMap.get(tx.userId);
+                const cloudBranchId = branchMap.get(tx.branchId);
+                if (!cloudUserId || !cloudBranchId) {
+                    logger.warn(`[Sync] Tx ${tx.id} skip: FK translation failed (user=${!!cloudUserId}, branch=${!!cloudBranchId})`);
+                    continue;
+                }
+
                 // Verificar FKs en cloud
                 const [userInCloud, branchInCloud, cashRegInCloud] = await Promise.all([
-                    cloud.user.findFirst({ where: { id: tx.userId }, select: { id: true } }),
-                    cloud.branch.findFirst({ where: { id: tx.branchId }, select: { id: true } }),
+                    cloud.user.findFirst({ where: { id: cloudUserId }, select: { id: true } }),
+                    cloud.branch.findFirst({ where: { id: cloudBranchId }, select: { id: true } }),
                     tx.cashRegisterId
                         ? cloud.cashRegister.findUnique({ where: { id: tx.cashRegisterId }, select: { id: true } })
                         : Promise.resolve(true),
                 ]);
                 if (!userInCloud || !branchInCloud || !cashRegInCloud) {
-                    logger.warn(`[Sync] Tx ${tx.id} skip: FK faltante en cloud`);
+                    logger.warn(`[Sync] Tx ${tx.id} skip: FK faltante en cloud (user=${!!userInCloud}, branch=${!!branchInCloud}, cashReg=${!!cashRegInCloud})`);
                     continue;
                 }
 
@@ -487,8 +523,8 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                         invoiceNumber: (tx as any).invoiceNumber ?? null,
                         paymentMethods: (tx as any).paymentMethods ?? null,
                         createdAt: tx.createdAt,
-                        userId: tx.userId,
-                        branchId: tx.branchId,
+                        userId: cloudUserId,
+                        branchId: cloudBranchId,
                         cashRegisterId: tx.cashRegisterId ?? null,
                         syncStatus: 'SYNCED',
                         syncedAt: new Date(),
@@ -505,8 +541,8 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                         invoiceNumber: (tx as any).invoiceNumber ?? null,
                         paymentMethods: (tx as any).paymentMethods ?? null,
                         createdAt: tx.createdAt,
-                        userId: tx.userId,
-                        branchId: tx.branchId,
+                        userId: cloudUserId,
+                        branchId: cloudBranchId,
                         cashRegisterId: tx.cashRegisterId ?? null,
                         syncStatus: 'SYNCED',
                         syncedAt: new Date(),
@@ -568,10 +604,18 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
 
         for (const merma of pendingMermas) {
             try {
+                // Traducir IDs de local a cloud
+                const cloudUserId = userMap.get(merma.createdById);
+                const cloudBranchId = branchMap.get(merma.branchId);
+                if (!cloudUserId || !cloudBranchId) {
+                    logger.warn(`[Sync] Merma ${merma.id} skip: FK translation failed (user=${!!cloudUserId}, branch=${!!cloudBranchId})`);
+                    continue;
+                }
+
                 // Verificar FKs en cloud
                 const [userInCloud, branchInCloud, productInCloud] = await Promise.all([
-                    cloud.user.findFirst({ where: { id: merma.createdById }, select: { id: true } }),
-                    cloud.branch.findFirst({ where: { id: merma.branchId }, select: { id: true } }),
+                    cloud.user.findFirst({ where: { id: cloudUserId }, select: { id: true } }),
+                    cloud.branch.findFirst({ where: { id: cloudBranchId }, select: { id: true } }),
                     cloud.product.findFirst({ where: { id: merma.productId }, select: { id: true } }),
                 ]);
                 if (!userInCloud || !branchInCloud || !productInCloud) {
@@ -589,9 +633,9 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                     },
                     create: {
                         id: merma.id,
-                        branchId: merma.branchId,
+                        branchId: cloudBranchId,
                         productId: merma.productId,
-                        createdById: merma.createdById,
+                        createdById: cloudUserId,
                         quantity: Number(merma.quantity),
                         reason: merma.reason as $Enums.MermaReason,
                         description: merma.description ?? null,
@@ -622,10 +666,18 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
 
         for (const count of pendingCounts) {
             try {
+                // Traducir IDs de local a cloud
+                const cloudUserId = userMap.get(count.createdById);
+                const cloudBranchId = branchMap.get(count.branchId);
+                if (!cloudUserId || !cloudBranchId) {
+                    logger.warn(`[Sync] StockCount ${count.id} skip: FK translation failed (user=${!!cloudUserId}, branch=${!!cloudBranchId})`);
+                    continue;
+                }
+
                 // Verificar FKs
                 const [userInCloud, branchInCloud] = await Promise.all([
-                    cloud.user.findFirst({ where: { id: count.createdById }, select: { id: true } }),
-                    cloud.branch.findFirst({ where: { id: count.branchId }, select: { id: true } }),
+                    cloud.user.findFirst({ where: { id: cloudUserId }, select: { id: true } }),
+                    cloud.branch.findFirst({ where: { id: cloudBranchId }, select: { id: true } }),
                 ]);
                 if (!userInCloud || !branchInCloud) {
                     logger.warn(`[Sync] StockCount ${count.id} skip: FK faltante en cloud`);
@@ -642,8 +694,8 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                     },
                     create: {
                         id: count.id,
-                        branchId: count.branchId,
-                        createdById: count.createdById,
+                        branchId: cloudBranchId,
+                        createdById: cloudUserId,
                         status: count.status as $Enums.StockCountStatus,
                         notes: count.notes ?? null,
                         createdAt: count.createdAt,
@@ -691,10 +743,14 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
 
         for (const batch of allBatches) {
             try {
+                // Traducir IDs locales a cloud
+                const cloudBranchId = branchMap.get(batch.branchId);
+                if (!cloudBranchId) continue;
+
                 // Verificar FKs
                 const [productInCloud, branchInCloud] = await Promise.all([
                     cloud.product.findUnique({ where: { id: batch.productId }, select: { id: true } }),
-                    cloud.branch.findUnique({ where: { id: batch.branchId }, select: { id: true } }),
+                    cloud.branch.findUnique({ where: { id: cloudBranchId }, select: { id: true } }),
                 ]);
                 if (!productInCloud || !branchInCloud) continue;
 
@@ -710,7 +766,7 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                         id: batch.id,
                         batchCode: batch.batchCode,
                         productId: batch.productId,
-                        branchId: batch.branchId,
+                        branchId: cloudBranchId,
                         quantity: Number(batch.quantity),
                         costPrice: batch.costPrice ? Number(batch.costPrice) : null,
                         expiryDate: batch.expiryDate,

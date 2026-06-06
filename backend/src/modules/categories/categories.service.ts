@@ -13,8 +13,9 @@ import { CreateGroupInput, UpdateGroupInput, CreateSubGroupInput, UpdateSubGroup
 /**
  * Listar todos los grupos con conteo de subgrupos
  */
-export const getAllGroups = async () => {
+export const getAllGroups = async (includeInactive = false) => {
     return prisma.group.findMany({
+        where: includeInactive ? {} : { isActive: true },
         include: { 
             _count: { 
                 select: { subGroups: true } 
@@ -61,11 +62,22 @@ export const updateGroup = async (id: string, data: UpdateGroupInput) => {
 };
 
 /**
- * Eliminar grupo (Solo si no tiene subgrupos asociados)
+ * Eliminar grupo (borrado lógico — desactiva)
  */
 export const deleteGroup = async (id: string) => {
-    return prisma.group.delete({
+    return prisma.group.update({
         where: { id },
+        data: { isActive: false },
+    });
+};
+
+/**
+ * Cambiar estado de un grupo (activar/desactivar)
+ */
+export const toggleGroupStatus = async (id: string, isActive: boolean) => {
+    return prisma.group.update({
+        where: { id },
+        data: { isActive },
     });
 };
 
@@ -76,9 +88,13 @@ export const deleteGroup = async (id: string) => {
 /**
  * Listar todos los subgrupos (opcionalmente filtrados por grupo)
  */
-export const getAllSubGroups = async (groupId?: string) => {
+export const getAllSubGroups = async (groupId?: string, includeInactive = false) => {
+    const where: any = {};
+    if (groupId) where.groupId = groupId;
+    if (!includeInactive) where.isActive = true;
+
     return prisma.subGroup.findMany({
-        where: groupId ? { groupId } : undefined,
+        where,
         include: { 
             _count: { 
                 select: { products: true } 
@@ -122,10 +138,21 @@ export const updateSubGroup = async (id: string, data: UpdateSubGroupInput) => {
 };
 
 /**
- * Eliminar subgrupo (Solo si no tiene productos asociados)
+ * Eliminar subgrupo (borrado lógico — desactiva)
  */
 export const deleteSubGroup = async (id: string) => {
-    return prisma.subGroup.delete({
+    return prisma.subGroup.update({
         where: { id },
+        data: { isActive: false },
+    });
+};
+
+/**
+ * Cambiar estado de un subgrupo (activar/desactivar)
+ */
+export const toggleSubGroupStatus = async (id: string, isActive: boolean) => {
+    return prisma.subGroup.update({
+        where: { id },
+        data: { isActive },
     });
 };

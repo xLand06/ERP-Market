@@ -10,6 +10,7 @@ export interface Group {
     id: string;
     name: string;
     description?: string;
+    isActive: boolean;
 }
 
 export interface SubGroup {
@@ -17,6 +18,7 @@ export interface SubGroup {
     name: string;
     description?: string;
     groupId: string;
+    isActive: boolean;
 }
 
 export interface SystemConfig {

@@ -130,25 +130,14 @@ export function useInventory(branchId: string) {
     const { data, isLoading, error, refetch } = useQuery({
         queryKey: ['inventory', branchId],
         queryFn: async () => {
-            // 1. Intentar primero la API (fuente principal)
-            if (isOnline) {
-                try {
-                    const apiData = await fetchFromApi();
-                    if (apiData.length > 0 && apiData.some((i: InventoryItem) => i.product.price > 0)) {
-                        return apiData;
-                    }
-                } catch { /* continuar */ }
+            try {
+                const apiData = await fetchFromApi();
+                if (apiData.length > 0) {
+                    return apiData;
+                }
+            } catch (err) {
+                console.error('[useInventory] Error fetching inventory from API:', err);
             }
-            
-            // 2. Fallback a local solo si API falló o no tiene precios
-            if (isElectron) {
-                try {
-                    const local = await fetchFromLocal();
-                    if (local.length > 0) return local;
-                } catch { /* continuar */ }
-            }
-            
-            // 3. Return empty si todo falla
             return [];
         },
         enabled: !!branchId && branchId !== 'all',
@@ -158,28 +147,10 @@ export function useInventory(branchId: string) {
 
     const updateStockMutation = useMutation({
         mutationFn: async ({ product, quantity, minStock }: { product: any; quantity: number, minStock?: number }) => {
-            if (isElectron) {
-                await db.updateStock(product, branchId, quantity, minStock || 0);
-                
-                await db.addPendingChange({
-                    id: `${Date.now()}-${product.id}`,
-                    type: 'STOCK_UPDATE',
-                    data: { productId: product.id, quantity, newStock: quantity, ...(minStock !== undefined && { minStock }) },
-                    createdAt: new Date().toISOString(),
-                    branchId,
-                });
-                
-                return { success: true, offline: true };
-            }
-            
-            if (isOnline) {
-                const payload: any = { productId: product.id, branchId, stock: quantity };
-                if (minStock !== undefined) payload.minStock = minStock;
-                const res = await api.put('/inventory/stock', payload);
-                return res.data;
-            }
-            
-            throw new Error('Offline');
+            const payload: any = { productId: product.id, branchId, stock: quantity };
+            if (minStock !== undefined) payload.minStock = minStock;
+            const res = await api.put('/inventory/stock', payload);
+            return res.data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['inventory', branchId] });
