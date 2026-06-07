@@ -27,12 +27,13 @@ interface ClosingData {
 export function CashClosureModal({
     open, onClose, openingBalance, expectedBalance, onConfirm,
 }: CashClosureModalProps) {
-    const { fmtCOP, rates } = useConfigStore();
+    const { fmtCOP, rates, autoCloseTime } = useConfigStore();
     const [countedCop, setCountedCop] = useState('');
     const [countedUsd, setCountedUsd] = useState('');
     const [countedVes, setCountedVes] = useState('');
     const [notes, setNotes] = useState('');
     const [error, setError] = useState('');
+    const [showEarlyWarning, setShowEarlyWarning] = useState(false);
 
     const usdRate = rates['USD'] || rates['COP'] || 3600;
     const vesRate = rates['VES'] || 5.5;
@@ -52,6 +53,24 @@ export function CashClosureModal({
             setError('Ingresa montos contados válidos.');
             return;
         }
+
+        // Verificar cierre anticipado si está configurada la hora
+        if (autoCloseTime && !showEarlyWarning) {
+            try {
+                const [closeHour, closeMinute] = autoCloseTime.split(':').map(Number);
+                const now = new Date();
+                const curHour = now.getHours();
+                const curMin = now.getMinutes();
+                const isEarly = (curHour < closeHour) || (curHour === closeHour && curMin < closeMinute);
+                if (isEarly) {
+                    setShowEarlyWarning(true);
+                    return;
+                }
+            } catch (e) {
+                console.error('Error al validar cierre anticipado:', e);
+            }
+        }
+
         onConfirm({ closingAmount: totalCountedCop, notes });
         handleClose();
     };
@@ -62,23 +81,64 @@ export function CashClosureModal({
         setCountedVes('');
         setNotes('');
         setError('');
+        setShowEarlyWarning(false);
         onClose();
     };
 
     return (
         <Dialog open={open} onOpenChange={o => !o && handleClose()}>
             <DialogContent className="sm:max-w-137.5">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
-                            <AlertTriangle className="w-4 h-4 text-amber-600" />
+                {showEarlyWarning ? (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2 text-amber-600">
+                                <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                                </div>
+                                Cierre Anticipado
+                            </DialogTitle>
+                            <DialogDescription className="font-semibold text-slate-500 mt-2">
+                                Estás intentando cerrar la caja antes de la hora configurada.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-amber-900 text-sm">
+                            <p className="font-black">
+                                El cierre automático de seguridad está configurado para las {autoCloseTime}.
+                            </p>
+                            <p className="text-xs text-amber-700 leading-normal">
+                                Al cerrar la caja antes de tiempo, registrarás tu efectivo contado actual y finalizarás tu turno anticipadamente en el sistema. ¿Estás seguro de que querés continuar?
+                            </p>
                         </div>
-                        Cierre de Caja
-                    </DialogTitle>
-                    <DialogDescription>
-                        Verifica el efectivo antes de cerrar el turno.
-                    </DialogDescription>
-                </DialogHeader>
+
+                        <DialogFooter className="border-t border-slate-100 flex gap-2 pt-4 justify-end">
+                            <Button variant="outline" onClick={() => setShowEarlyWarning(false)}>
+                                Volver y revisar
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    onConfirm({ closingAmount: totalCountedCop, notes });
+                                    handleClose();
+                                }}
+                                className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
+                            >
+                                Sí, Cerrar Caja
+                            </Button>
+                        </DialogFooter>
+                    </>
+                ) : (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                                </div>
+                                Cierre de Caja
+                            </DialogTitle>
+                            <DialogDescription>
+                                Verifica el efectivo antes de cerrar el turno.
+                            </DialogDescription>
+                        </DialogHeader>
 
                 <div className="px-6 py-4 space-y-5">
                     {/* Summary Grid */}
@@ -212,6 +272,8 @@ export function CashClosureModal({
                         Confirmar Cierre
                     </Button>
                 </DialogFooter>
+                    </>
+                )}
             </DialogContent>
         </Dialog>
     );

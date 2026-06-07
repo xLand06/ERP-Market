@@ -21,6 +21,6 @@ router.get('/rates', ctrl.getRates);
 /**
  * POST /api/finance/rates — Crear o actualizar una tasa de cambio (Solo OWNER)
  */
-router.post('/rates', roleGuard('OWNER'), validate(updateExchangeRateSchema), ctrl.updateRate);
+router.post('/rates', roleGuard('OWNER', 'SELLER'), validate(updateExchangeRateSchema), ctrl.updateRate);
 
 export default router;

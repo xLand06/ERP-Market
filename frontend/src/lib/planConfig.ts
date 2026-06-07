@@ -83,7 +83,8 @@ export const ROLE_CONFIG: Record<RoleType, RoleConfig> = {
             '/sales',
             '/finance/cash-register',
             '/directory',
-            '/merma'
+            '/merma',
+            '/settings'
         ]
     }
 };

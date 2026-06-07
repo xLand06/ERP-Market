@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Settings2, DollarSign, Percent, Clock, Save } from 'lucide-react';
 import { useConfigStore } from '@/hooks/useConfigStore';
+import { useAuthStore } from '@/features/auth/store/authStore';
 import toast from 'react-hot-toast';
 
 export function SystemSettings() {
+    const { user } = useAuthStore();
+    const isOwner = user?.role === 'OWNER';
+
     const { 
         rates, iva, autoOpenTime, autoCloseTime, purgeRetentionDays, purgeLogRetentionDays,
         updateRate, updateSettings, fetchSettings
@@ -117,11 +121,12 @@ export function SystemSettings() {
                                         type="text"
                                         inputMode="numeric"
                                         value={localIva}
+                                        disabled={!isOwner}
                                         onChange={(e) => {
                                             const val = e.target.value;
                                             if (val === '' || /^\d+$/.test(val)) setLocalIva(val);
                                         }}
-                                        className="w-full pl-4 pr-10 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono"
+                                        className="w-full pl-4 pr-10 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono disabled:opacity-60 disabled:bg-slate-100 disabled:cursor-not-allowed"
                                     />
                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">%</span>
                                 </div>
@@ -144,8 +149,9 @@ export function SystemSettings() {
                                     <input
                                         type="time"
                                         value={localCloseTime}
+                                        disabled={!isOwner}
                                         onChange={(e) => setLocalCloseTime(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all font-mono"
+                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all font-mono disabled:opacity-60 disabled:bg-slate-100 disabled:cursor-not-allowed"
                                     />
                                 </div>
                                 <p className="text-xs text-slate-400 px-1">Si una caja queda abierta, se cerrará automáticamente a esta hora con el saldo del sistema.</p>
@@ -158,11 +164,12 @@ export function SystemSettings() {
                                         type="text"
                                         inputMode="numeric"
                                         value={localPurgeDays}
+                                        disabled={!isOwner}
                                         onChange={(e) => {
                                             const val = e.target.value;
                                             if (val === '' || /^\d+$/.test(val)) setLocalPurgeDays(val);
                                         }}
-                                        className="w-full pl-4 pr-12 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono"
+                                        className="w-full pl-4 pr-12 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono disabled:opacity-60 disabled:bg-slate-100 disabled:cursor-not-allowed"
                                     />
                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] font-bold uppercase">días</span>
                                 </div>
@@ -175,11 +182,12 @@ export function SystemSettings() {
                                         type="text"
                                         inputMode="numeric"
                                         value={localLogDays}
+                                        disabled={!isOwner}
                                         onChange={(e) => {
                                             const val = e.target.value;
                                             if (val === '' || /^\d+$/.test(val)) setLocalLogDays(val);
                                         }}
-                                        className="w-full pl-4 pr-12 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono"
+                                        className="w-full pl-4 pr-12 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono disabled:opacity-60 disabled:bg-slate-100 disabled:cursor-not-allowed"
                                     />
                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] font-bold uppercase">días</span>
                                 </div>

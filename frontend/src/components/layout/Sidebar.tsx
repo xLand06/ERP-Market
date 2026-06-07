@@ -29,7 +29,7 @@ const navItems: NavItem[] = [
     { name: 'Reportes', path: '/reports', icon: BarChart2 },
     { name: 'Usuarios', path: '/users', icon: Users, roles: ['OWNER'] },
     { name: 'Auditoría', path: '/audit', icon: ShieldCheck, roles: ['OWNER'] },
-    { name: 'Configuración', path: '/settings', icon: Settings, roles: ['OWNER'] },
+    { name: 'Configuración', path: '/settings', icon: Settings, roles: ['OWNER', 'SELLER'] },
 ];
 
 export interface SidebarProps {

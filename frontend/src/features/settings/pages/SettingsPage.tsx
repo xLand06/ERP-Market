@@ -4,11 +4,14 @@ import { api } from '@/lib/api';
 import { Settings2, Building2, Tag, AlertTriangle, HardDrive } from 'lucide-react';
 import { SystemSettings, BranchesTab, CategoriesTab, MaintenanceTab } from '../components';
 import { BackupPanel } from '@/features/backup/BackupPanel';
+import { useAuthStore } from '@/features/auth/store/authStore';
 
 type Tab = 'branches' | 'categories' | 'maintenance' | 'system' | 'backup';
 
 export default function SettingsPage() {
-    const [activeTab, setActiveTab] = useState<Tab>('branches');
+    const { user } = useAuthStore();
+    const isOwner = user?.role === 'OWNER';
+    const [activeTab, setActiveTab] = useState<Tab>(isOwner ? 'branches' : 'system');
 
     const { data: branches = [] } = useQuery({
         queryKey: ['branches', 'all'],
@@ -28,13 +31,15 @@ export default function SettingsPage() {
         retry: false
     });
 
-    const tabs = [
+    const allTabs = [
         { id: 'branches' as Tab, label: 'Sucursales', icon: Building2, count: branches.length },
         { id: 'categories' as Tab, label: 'Grupos y Subgrupos', icon: Tag, count: groups.length },
         { id: 'system' as Tab, label: 'Configuración Global', icon: Settings2 },
         { id: 'maintenance' as Tab, label: 'Mantenimiento', icon: AlertTriangle },
         { id: 'backup' as Tab, label: 'Backup & Nube', icon: HardDrive },
     ];
+
+    const tabs = isOwner ? allTabs : allTabs.filter(t => t.id === 'system');
 
     const renderContent = () => {
         switch (activeTab) {
