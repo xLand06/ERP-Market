@@ -24,7 +24,12 @@ export const openRegister = async (req: AuthRequest, res: Response): Promise<voi
         await logAudit({
             action: 'CASH_OPEN',
             module: 'cashFlow',
-            details: { branchId: data.branchId, openingAmount: data.openingAmount, cashRegisterId: register.id },
+            details: {
+                sucursalId: data.branchId,
+                montoApertura: data.openingAmount,
+                moneda: 'COP',
+                cajaId: register.id,
+            },
             userId: req.user!.id,
             ipAddress: extractIp(req),
         });
@@ -49,9 +54,11 @@ export const closeRegister = async (req: AuthRequest, res: Response): Promise<vo
             action: 'CASH_CLOSE',
             module: 'cashFlow',
             details: {
-                cashRegisterId: id,
-                closingAmount,
-                difference: register.difference,
+                cajaId: id,
+                montoApertura: Number(register.openingAmount),
+                montoCierre: closingAmount,
+                diferencia: Number(register.difference),
+                moneda: 'COP',
             },
             userId: req.user!.id,
             ipAddress: extractIp(req),

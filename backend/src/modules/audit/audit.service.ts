@@ -6,8 +6,30 @@
 import { prisma } from '../../config/prisma';
 import { Prisma } from '@prisma/client';
 import { parseDateRange } from '../../core/utils/helpers';
+import { generarDescripcion, extraerPosicionConsolidada } from './audit.language';
 
-export const getAuditLogs = (filters: {
+/**
+ * Enriquece un log de auditoría con descripción en lenguaje natural
+ * y posición consolidada (si aplica).
+ */
+const enrichLog = (log: any) => {
+    const descripcion = generarDescripcion({
+        action: log.action,
+        module: log.module,
+        details: log.details,
+        user: log.user,
+    });
+    const posicionConsolidada = extraerPosicionConsolidada({
+        action: log.action,
+        module: log.module,
+        details: log.details,
+        user: log.user,
+    });
+
+    return { ...log, descripcion, posicionConsolidada };
+};
+
+export const getAuditLogs = async (filters: {
     userId?: string;
     action?: string;
     module?: string;
@@ -18,7 +40,7 @@ export const getAuditLogs = (filters: {
 }) => {
     const { userId, action, module, from, to, page = 1, limit = 100 } = filters;
 
-    return (prisma as any).auditLog.findMany({
+    const logs = await (prisma as any).auditLog.findMany({
         where: {
             ...(userId && { userId }),
             ...(action && { action: { contains: action } }),
@@ -42,13 +64,17 @@ export const getAuditLogs = (filters: {
         skip: (page - 1) * limit,
         take: limit,
     });
+
+    return logs.map(enrichLog);
 };
 
-export const getAuditLogById = (id: string) =>
-    (prisma as any).auditLog.findUnique({
+export const getAuditLogById = async (id: string) => {
+    const log = await (prisma as any).auditLog.findUnique({
         where: { id },
         include: { user: { select: { id: true, username: true, nombre: true, apellido: true, email: true } } },
     });
+    return log ? enrichLog(log) : null;
+};
 
 export const getAuditStats = async () => {
     const isSQLite = process.env.ELECTRON === 'true';

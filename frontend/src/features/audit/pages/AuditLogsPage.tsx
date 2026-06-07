@@ -72,15 +72,35 @@ const ACTION_DICTIONARY: Record<string, string> = {
     'LOGIN_FAILED': 'Intento de Inicio Fallido'
 };
 
-const renderDetails = (details: any, _action?: string) => {
-    if (!details) return <p>No se registraron datos técnicos para este evento.</p>;
+const renderDetails = (log: AuditLog) => {
+    // Si el backend ya generó una descripción en lenguaje natural, usarla
+    if (log.descripcion) {
+        return (
+            <div className="space-y-3">
+                <p className="text-slate-700 leading-relaxed">{log.descripcion}</p>
+                {log.details && (
+                    <details className="mt-2">
+                        <summary className="text-xs text-slate-400 cursor-pointer hover:text-slate-600 transition-colors">
+                            Ver datos técnicos originales
+                        </summary>
+                        <pre className="mt-2 text-[10px] font-mono text-slate-500 whitespace-pre-wrap bg-slate-50 p-2 rounded border border-slate-100">
+                            {typeof log.details === 'string' ? log.details : JSON.stringify(log.details, null, 2)}
+                        </pre>
+                    </details>
+                )}
+            </div>
+        );
+    }
+
+    // Fallback para logs viejos sin descripcion
+    if (!log.details) return <p className="text-slate-400 italic">No se registraron datos para este evento.</p>;
     
-    let parsedDetails = details;
-    if (typeof details === 'string') {
+    let parsedDetails = log.details;
+    if (typeof log.details === 'string') {
         try {
-            parsedDetails = JSON.parse(details);
-        } catch (e) {
-            return <p>{details}</p>;
+            parsedDetails = JSON.parse(log.details);
+        } catch {
+            return <p className="text-slate-500">{log.details}</p>;
         }
     }
 
@@ -119,7 +139,20 @@ const renderDetails = (details: any, _action?: string) => {
         purchaseId: 'Referencia de Compra',
         paymentMethod: 'Método de Pago',
         reason: 'Motivo',
-        customerName: 'Nombre del Cliente'
+        customerName: 'Nombre del Cliente',
+        // Campos en español (nuevos)
+        monto: 'Monto',
+        moneda: 'Moneda',
+        metodoPago: 'Método de Pago',
+        cantidadProductos: 'Cantidad de Productos',
+        sucursalId: 'Sucursal',
+        cajaAnterior: 'Caja Anterior',
+        cajaNueva: 'Caja Nueva',
+        montoApertura: 'Monto de Apertura',
+        montoCierre: 'Monto de Cierre',
+        transaccionId: 'Transacción',
+        motivo: 'Motivo',
+        cajaId: 'Caja',
     };
 
     let targetObject = parsedDetails;
@@ -158,7 +191,6 @@ const renderDetails = (details: any, _action?: string) => {
                     displayValue = 'Datos internos detallados';
                 }
             } else if (typeof value === 'string' && key.endsWith('Id') && value.length > 15) {
-                // Acortar visualmente pero permitir copiar el completo
                 displayValue = value.substring(0, 8) + '...';
                 isCopyable = true;
                 copyText = value;
@@ -207,15 +239,6 @@ const renderDetails = (details: any, _action?: string) => {
             <div className="space-y-3">
                 {headerMsg && <p>{headerMsg}</p>}
                 <p>Se afectaron {targetObject.length} elemento(s) en esta acción.</p>
-            </div>
-        );
-    }
-
-    if (typeof targetObject === 'string') {
-        return (
-            <div className="space-y-3">
-                {headerMsg && <p>{headerMsg}</p>}
-                <p>{targetObject}</p>
             </div>
         );
     }
@@ -444,6 +467,53 @@ const AuditLogsPage: React.FC = () => {
                                 </div>
                                 
                                 <div className="space-y-4">
+                                    {/* 📝 Descripción en lenguaje natural */}
+                                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center gap-2 text-blue-800">
+                                                <Database className="w-4 h-4" />
+                                                <span className="text-sm font-semibold">Descripción</span>
+                                            </div>
+                                        </div>
+                                        <div className="bg-white p-3 rounded-lg border border-blue-100 shadow-sm text-sm text-slate-700 max-h-[200px] overflow-y-auto custom-scrollbar">
+                                            {renderDetails(selectedLog)}
+                                        </div>
+                                    </div>
+
+                                    {/* 💰 Posición Consolidada */}
+                                    {selectedLog.posicionConsolidada && (
+                                        <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200">
+                                            <div className="flex items-center gap-2 text-emerald-800 mb-3">
+                                                <CreditCard className="w-4 h-4" />
+                                                <span className="text-sm font-semibold">Posición de Caja</span>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div className="bg-white p-2.5 rounded-lg border border-emerald-100 text-center">
+                                                    <span className="block text-[10px] text-slate-400 mb-1">Anterior</span>
+                                                    <span className="text-sm font-bold text-slate-700">
+                                                        ${selectedLog.posicionConsolidada.anterior.toLocaleString('es-CO')}
+                                                    </span>
+                                                </div>
+                                                <div className="bg-white p-2.5 rounded-lg border border-emerald-100 text-center">
+                                                    <span className="block text-[10px] text-slate-400 mb-1">Ingreso</span>
+                                                    <span className="text-sm font-bold text-emerald-600">
+                                                        +${selectedLog.posicionConsolidada.ingreso.toLocaleString('es-CO')}
+                                                    </span>
+                                                </div>
+                                                <div className="bg-white p-2.5 rounded-lg border border-emerald-100 text-center">
+                                                    <span className="block text-[10px] text-slate-400 mb-1">Total</span>
+                                                    <span className="text-sm font-bold text-emerald-700">
+                                                        ${selectedLog.posicionConsolidada.total.toLocaleString('es-CO')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] text-emerald-500 text-center mt-2 font-medium">
+                                                {selectedLog.posicionConsolidada.moneda}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* 👤 Usuario Responsable */}
                                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                                         <div className="flex items-center gap-2 mb-3">
                                             <UserIcon className="w-4 h-4 text-slate-400" />
@@ -461,18 +531,6 @@ const AuditLogsPage: React.FC = () => {
                                                     {selectedLog.user?.role ? `Rol: ${selectedLog.user.role}` : 'Sistema Automatizado'}
                                                 </div>
                                             </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <div className="flex items-center gap-2 text-blue-800">
-                                                <Database className="w-4 h-4" />
-                                                <span className="text-sm font-semibold">Detalles de la Acción</span>
-                                            </div>
-                                        </div>
-                                        <div className="bg-white p-3 rounded-lg border border-blue-100 shadow-sm text-sm text-slate-700 max-h-[250px] overflow-y-auto custom-scrollbar">
-                                            {renderDetails(selectedLog.details, selectedLog.action)}
                                         </div>
                                     </div>
 

@@ -5,7 +5,7 @@ export interface AuditLog {
     id: string;
     action: string;
     module: string;
-    details: any; // Cambiado a any porque Prisma/JSON ya lo trae parseado o como objeto
+    details: any;
     ipAddress?: string;
     userAgent?: string;
     createdAt: string;
@@ -16,6 +16,14 @@ export interface AuditLog {
         apellido: string | null;
         email: string | null;
         role: string;
+    } | null;
+    // Campos enriquecidos (generados por el backend)
+    descripcion?: string;
+    posicionConsolidada?: {
+        anterior: number;
+        ingreso: number;
+        total: number;
+        moneda: string;
     } | null;
 }
 
