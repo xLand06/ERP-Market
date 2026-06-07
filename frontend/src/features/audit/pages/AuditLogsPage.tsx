@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
     Search, 
     Filter, 
@@ -13,7 +14,8 @@ import {
     ChevronLeft,
     ChevronRight,
     Loader2,
-    Copy
+    Copy,
+    Eye
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getAuditLogs, AuditLog, AuditFilters } from '../services/auditService';
@@ -257,7 +259,25 @@ const renderDetails = (log: AuditLog) => {
     }
 };
 
+/**
+ * Extrae el ID de transacción de los detalles del log, 
+ * soportando tanto campos viejos (transactionId) como nuevos (transaccionId).
+ */
+const extraerTransaccionId = (log: AuditLog): string | null => {
+    if (!log.details) return null;
+    const d = typeof log.details === 'string' ? (() => { try { return JSON.parse(log.details); } catch { return log.details; } })() : log.details;
+    // Campos nuevos (español)
+    if (d.transaccionId) return d.transaccionId;
+    // Campos viejos (inglés)
+    if (d.transactionId) return d.transactionId;
+    // Anidado en request (middleware viejo)
+    if (d.request?.body?.transactionId) return d.request.body.transactionId;
+    if (d.request?.body?.transaccionId) return d.request.body.transaccionId;
+    return null;
+};
+
 const AuditLogsPage: React.FC = () => {
+    const navigate = useNavigate();
     const [logs, setLogs] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [filters, setFilters] = useState<AuditFilters>({ page: 1, limit: 20 });
@@ -465,7 +485,18 @@ const AuditLogsPage: React.FC = () => {
                                         </p>
                                     </div>
                                 </div>
-                                
+
+                                {/* 🔗 Acciones rápidas: ir a detalle de venta */}
+                                {(selectedLog.action === 'SALE_CREATE' || selectedLog.action === 'SALE_CANCEL') && extraerTransaccionId(selectedLog) && (
+                                    <button
+                                        onClick={() => navigate(`/finance/cash-register?tx=${extraerTransaccionId(selectedLog)}`)}
+                                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl border border-indigo-200 transition-colors text-sm font-medium"
+                                    >
+                                        <Eye className="w-4 h-4" />
+                                        Ver detalle de la venta
+                                    </button>
+                                )}
+
                                 <div className="space-y-4">
                                     {/* 📝 Descripción en lenguaje natural */}
                                     <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">

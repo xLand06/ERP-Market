@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     TrendingUp, TrendingDown, DollarSign, ArrowUpCircle,
     Plus, Lock, Circle, Play, History, ChevronLeft, ChevronRight, Calendar, Copy, Eye, ShoppingBag, PackageMinus, Store
@@ -45,6 +46,32 @@ export default function CashRegisterPage() {
     const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
     const [searchTxId, setSearchTxId] = useState('');
     const [searchLoading, setSearchLoading] = useState(false);
+    
+    const [searchParams] = useSearchParams();
+
+    // Auto-buscar transacción si viene por query param (ej: desde auditoría)
+    useEffect(() => {
+        const txParam = searchParams.get('tx');
+        if (txParam && txParam.trim()) {
+            setSearchTxId(txParam.trim());
+            // Disparamos el search inmediatamente
+            const doSearch = async () => {
+                setSearchLoading(true);
+                try {
+                    const res = await api.get(`/sales/${txParam.trim()}`);
+                    if (res.data && res.data.id) {
+                        setSelectedSaleId(res.data.id);
+                        setSearchTxId('');
+                    }
+                } catch {
+                    // Silencioso, el usuario puede buscar manualmente
+                } finally {
+                    setSearchLoading(false);
+                }
+            };
+            doSearch();
+        }
+    }, []); // Solo al montar
     
     const { rates } = useConfigStore();
     const [filterMode, setFilterMode] = useState<'range' | 'month'>('range');
