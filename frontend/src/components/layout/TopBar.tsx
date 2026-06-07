@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { 
-    ArrowLeftRight, Bell, ChevronDown, LogOut, Settings, User, Menu, Keyboard,
+    ArrowLeftRight, ChevronDown, LogOut, Settings, User, Menu, Keyboard,
     ShoppingCart, Package, Layers, Banknote
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -136,12 +136,6 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                         title="Atajos de teclado (K)"
                     >
                         <Keyboard className="w-4.5 h-4.5" />
-                    </button>
-
-                    {/* Bell */}
-                    <button className="relative w-10 h-10 lg:w-9 lg:h-9 flex items-center justify-center text-slate-500 hover:bg-white hover:text-emerald-600 rounded-lg transition-all active:scale-95 min-w-10" aria-label="Notificaciones">
-                        <Bell className="w-4.5 h-4.5" />
-                        <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full border border-white" />
                     </button>
                 </div>
 
