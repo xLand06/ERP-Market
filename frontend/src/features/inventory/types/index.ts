@@ -3,6 +3,8 @@ export interface InventoryProduct {
     code: string;
     name: string;
     category: string;
+    subGroupId?: string | null;
+    groupId?: string | null;
     cost: number;
     price: number;
     stock: number;

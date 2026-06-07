@@ -58,6 +58,8 @@ export function useInventory(branchId: string) {
             category: typeof item.product.subGroup === 'object' 
                 ? (item.product.subGroup as any)?.name || 'Varios' 
                 : (item.product.subGroup || 'Varios'),
+            subGroupId: typeof item.product.subGroup === 'object' ? (item.product.subGroup as any)?.id || null : null,
+            groupId: typeof item.product.subGroup === 'object' ? (item.product.subGroup as any)?.groupId || null : null,
             presentations: item.product.presentations || [],
             barcodes: item.product.barcodes || [],
         }));

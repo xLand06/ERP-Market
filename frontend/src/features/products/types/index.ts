@@ -44,6 +44,7 @@ export interface ProductListParams {
     limit: number;
     search?: string;
     subGroupId?: string;
+    groupId?: string;
     isActive?: boolean;
 }
 

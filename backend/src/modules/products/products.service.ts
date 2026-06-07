@@ -7,6 +7,7 @@ import type { ApiListResponse } from '../../core/types/responses';
 
 interface ProductListParams extends PaginationParams {
     subGroupId?: string;
+    groupId?: string;
     isActive?: boolean;
 }
 
@@ -109,11 +110,12 @@ function validateBarcodes(barcodes?: Array<{ code: string; label?: string | null
 }
 
 export const getAllProducts = async (filters: ProductListParams): Promise<ApiListResponse<ProductDTO>> => {
-    const { page = 1, limit = 20, search, subGroupId, isActive } = filters;
+    const { page = 1, limit = 20, search, subGroupId, groupId, isActive } = filters;
     const skip = (page - 1) * limit;
 
     const where = {
         ...(subGroupId && { subGroupId }),
+        ...(!subGroupId && groupId && { subGroup: { groupId } }),
         ...(isActive !== undefined && { isActive }),
         ...(search && {
             OR: [
@@ -190,7 +192,7 @@ export const createProduct = async (data: CreateProductInput): Promise<ProductDT
                 create: presentations ?? [],
             },
             barcodes: {
-                create: (barcodes ?? []).map(b => ({
+                create: (barcodes ?? []).map((b: any) => ({
                     code: b.code,
                     label: b.label || null,
                 })),
@@ -253,7 +255,7 @@ export const updateProduct = async (id: string, data: UpdateProductInput): Promi
             }),
             ...(barcodes !== undefined && {
                 barcodes: {
-                    create: barcodes.map(b => ({
+                    create: barcodes.map((b: any) => ({
                         code: b.code,
                         label: b.label || null,
                     })),

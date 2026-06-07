@@ -33,6 +33,7 @@ export default function ProductsPage() {
         page,
         limit,
         search: search || undefined,
+        groupId: filterGroup !== 'all' ? filterGroup : undefined,
         subGroupId: filterCategory !== 'all' ? filterCategory : undefined,
         isActive: filterStatus === 'all' ? undefined : filterStatus === 'active',
     });
@@ -58,13 +59,12 @@ export default function ProductsPage() {
     };
 
     useEffect(() => {
-        if (search) setPage(1);
-    }, [search]);
+        setFilterCategory('all');
+    }, [filterGroup]);
 
     useEffect(() => {
-        if (filterGroup) setFilterCategory('all');
-        if (filterGroup || filterCategory || filterStatus) setPage(1);
-    }, [filterGroup, filterCategory, filterStatus]);
+        setPage(1);
+    }, [search, filterGroup, filterCategory, filterStatus]);
 
     return (
         <>

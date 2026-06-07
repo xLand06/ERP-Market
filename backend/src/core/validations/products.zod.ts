@@ -51,6 +51,7 @@ export const updateProductSchema = createProductSchema.partial();
  */
 export const productFiltersSchema = paginationSchema.extend({
     subGroupId: z.string().optional(),
+    groupId: z.string().optional(),
     isActive: z.preprocess((val) => val === 'true' || val === true, z.boolean()).optional(),
 });
 

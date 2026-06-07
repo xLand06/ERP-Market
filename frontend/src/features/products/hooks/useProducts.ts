@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import type { Product, ProductListParams, CreateProductPayload, UpdateProductPayload } from '../types';
 
 export function useProducts(params: ProductListParams) {
-    const queryKey = ['products', params.search, params.subGroupId, params.isActive, params.page, params.limit];
+    const queryKey = ['products', params.search, params.subGroupId, params.groupId, params.isActive, params.page, params.limit];
 
     const queryFn = async () => {
         const queryParams: Record<string, unknown> = {
@@ -13,6 +13,7 @@ export function useProducts(params: ProductListParams) {
         };
         if (params.search) queryParams.search = params.search;
         if (params.subGroupId) queryParams.subGroupId = params.subGroupId;
+        if (params.groupId) queryParams.groupId = params.groupId;
         if (params.isActive !== undefined) queryParams.isActive = params.isActive;
 
         const res = await api.get('/products', { params: queryParams });
