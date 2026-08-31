@@ -448,7 +448,7 @@ export default function POSPage() {
 
             {/* Mobile Bottom Sticky Bar (< lg) */}
             {mobileTab === 'catalog' && totals.itemCount > 0 && (
-                <div className="fixed bottom-3 left-3 right-3 z-40 lg:hidden bg-slate-900 text-white p-3 rounded-2xl shadow-2xl border border-slate-800 flex items-center justify-between animate-slide-up">
+                <div className="fixed bottom-14 left-3 right-3 z-35 sm:bottom-3 lg:hidden bg-slate-900 text-white p-3 rounded-2xl shadow-2xl border border-slate-800 flex items-center justify-between animate-slide-up">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-emerald-500 text-slate-950 font-black flex items-center justify-center text-sm shadow-md">
                             {totals.itemCount}
