@@ -25,6 +25,7 @@ export interface UsePaymentReturn {
     isChangeOver: boolean;
     canConfirm: boolean;
     addRow: () => void;
+    splitEvenly: (parts: number) => void;
     updateRow: (key: string, updates: Partial<Omit<PaymentMethodRow, 'key'>>) => void;
     removeRow: (key: string) => void;
     reset: (totalInUSD: number) => void;
@@ -131,6 +132,39 @@ export function usePayment(
         }]);
     }, []);
 
+    // Dividir total equitativamente en N partes (ej: 50/50 o en 3 partes)
+    const splitEvenly = useCallback((parts: number) => {
+        if (parts < 2 || totalInUSD <= 0) return;
+        const partUSD = Number((totalInUSD / parts).toFixed(2));
+
+        const newRows: PaymentMethodRow[] = Array.from({ length: parts }).map((_, idx) => {
+            if (idx === 0) {
+                return {
+                    key: crypto.randomUUID(),
+                    type: 'cash',
+                    currency: 'USD',
+                    amount: partUSD,
+                };
+            }
+            if (idx === 1) {
+                return {
+                    key: crypto.randomUUID(),
+                    type: 'transfer',
+                    currency: 'VES',
+                    amount: Number((partUSD * vesRate).toFixed(2)),
+                };
+            }
+            return {
+                key: crypto.randomUUID(),
+                type: 'card',
+                currency: 'VES',
+                amount: Number((partUSD * vesRate).toFixed(2)),
+            };
+        });
+
+        setRows(newRows);
+    }, [totalInUSD, vesRate]);
+
     const updateRow = useCallback((
         key: string,
         updates: Partial<Omit<PaymentMethodRow, 'key'>>
@@ -201,6 +235,7 @@ export function usePayment(
         isChangeOver,
         canConfirm,
         addRow,
+        splitEvenly,
         updateRow,
         removeRow,
         reset,

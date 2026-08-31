@@ -168,40 +168,41 @@ export function PaymentDialog({
 
     return (
         <Dialog open={open} onOpenChange={o => !o && onClose()}>
-            <DialogContent className="w-[95vw] sm:max-w-lg max-h-[92vh] overflow-y-auto custom-scrollbar p-0 bg-white rounded-2xl border border-slate-200 shadow-2xl">
+            <DialogContent className="w-[96vw] sm:max-w-2xl lg:max-w-3xl max-h-[92vh] overflow-y-auto custom-scrollbar p-0 bg-white rounded-2xl border border-slate-200 shadow-2xl">
                 
                 {/* Modal Header */}
-                <div className="p-5 bg-slate-900 text-white rounded-t-2xl space-y-3">
+                <div className="p-6 bg-slate-900 text-white rounded-t-2xl space-y-4">
                     <DialogHeader className="text-left">
-                        <DialogTitle className="text-lg font-black tracking-tight text-white flex items-center justify-between">
+                        <DialogTitle className="text-xl font-black tracking-tight text-white flex items-center justify-between">
                             <span>Cobro Rápido POS</span>
-                            <span className="text-xs font-bold px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-full border border-emerald-500/30">
-                                Principal: {mainCurrency}
+                            <span className="text-xs font-bold px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-full border border-emerald-500/30">
+                                Moneda Principal: {mainCurrency}
                             </span>
                         </DialogTitle>
                         <DialogDescription className="text-xs text-slate-400">
-                            Procesa el pago e imprime la factura térmica.
+                            Procesa el pago con un clic, divide la cuenta o imprime el comprobante.
                         </DialogDescription>
                     </DialogHeader>
 
-                    {/* Prominent Main Currency Total */}
-                    <div className="bg-slate-800/90 p-4 rounded-xl border border-slate-700 flex items-center justify-between">
+                    {/* Prominent Main Currency Total Card */}
+                    <div className="bg-slate-800/90 p-5 rounded-2xl border border-slate-700/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner">
                         <div>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Venta</span>
-                            <span className="text-2xl font-black text-emerald-400 tabular-nums">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">TOTAL A COBRAR</span>
+                            <span className="text-3xl font-black text-emerald-400 tabular-nums">
                                 {mainCurrency === 'VES' ? fmtVES(totalVES) : mainCurrency === 'USD' ? fmtUSD(totalUSD) : fmtCOP(totalCOP)}
                             </span>
                         </div>
-                        <div className="text-right text-xs text-slate-300 font-medium">
-                            {mainCurrency !== 'VES' && <p>Bs. {totalVES.toFixed(2)} VES</p>}
-                            {mainCurrency !== 'USD' && <p>{fmtUSD(totalUSD)} USD</p>}
+                        <div className="flex items-center gap-3 text-xs text-slate-300 font-bold bg-slate-900/60 p-3 rounded-xl border border-slate-700/50">
+                            {mainCurrency !== 'USD' && <div><span className="text-slate-400 text-[10px] block font-normal">USD</span>{fmtUSD(totalUSD)}</div>}
+                            {mainCurrency !== 'VES' && <div><span className="text-slate-400 text-[10px] block font-normal">VES</span>Bs. {totalVES.toFixed(2)}</div>}
+                            {mainCurrency !== 'COP' && <div><span className="text-slate-400 text-[10px] block font-normal">COP</span>{fmtCOP(totalCOP)}</div>}
                         </div>
                     </div>
                 </div>
 
                 {/* Weight Items Adjustment */}
                 {weightItems.length > 0 && (
-                    <div className="px-5 py-3 bg-indigo-50/50 border-b border-indigo-100 space-y-2">
+                    <div className="px-6 py-3 bg-indigo-50/50 border-b border-indigo-100 space-y-2">
                         <p className="text-xs font-bold text-indigo-700 uppercase tracking-wide">
                             Ajustar Peso de Productos ({weightItems.length})
                         </p>
@@ -218,12 +219,62 @@ export function PaymentDialog({
                     </div>
                 )}
 
+                {/* Accesos Rápidos para Dividir Pago (Pago Mixto / Mitad) */}
+                <div className="px-6 pt-5 space-y-2">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                            Dividir Pago / Preestablecidos
+                        </span>
+                        <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">
+                            Un Clic para Dividir
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <button
+                            type="button"
+                            onClick={() => splitEvenly(2)}
+                            className="h-11 px-3 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 rounded-xl font-bold text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-2xs"
+                        >
+                            <ArrowRightLeft className="w-4 h-4 text-indigo-600 shrink-0" />
+                            <span>Dividir 50% / 50%</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => splitEvenly(3)}
+                            className="h-11 px-3 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 rounded-xl font-bold text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-2xs"
+                        >
+                            <ArrowRightLeft className="w-4 h-4 text-indigo-600 shrink-0" />
+                            <span>Dividir en 3</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => splitEvenly(4)}
+                            className="h-11 px-3 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 rounded-xl font-bold text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-2xs"
+                        >
+                            <ArrowRightLeft className="w-4 h-4 text-indigo-600 shrink-0" />
+                            <span>Dividir en 4</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={addRow}
+                            className="h-11 px-3 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-xl font-bold text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-2xs"
+                        >
+                            <Plus className="w-4 h-4 text-slate-500 shrink-0" />
+                            <span>+ Método Libre</span>
+                        </button>
+                    </div>
+                </div>
+
                 {/* Métodos de Pago */}
-                <div className="p-4 sm:p-5 space-y-4">
+                <div className="p-6 space-y-4">
                     {rows.map((row, i) => (
-                        <div key={row.key} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                        <div key={row.key} className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-3.5 shadow-2xs">
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-black text-slate-700 uppercase tracking-wide">
+                                <span className="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                                    <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[10px]">
+                                        {i + 1}
+                                    </span>
                                     Pago #{i + 1}
                                 </span>
                                 {rows.length > 1 && (
@@ -237,66 +288,68 @@ export function PaymentDialog({
                                 )}
                             </div>
 
-                            {/* Seleccionar Moneda de Pago con Botones Táctiles */}
-                            <div className="space-y-1">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Moneda de Pago</span>
-                                <div className="grid grid-cols-3 gap-1.5">
-                                    {[
-                                        { code: 'USD', label: 'USD ($)' },
-                                        { code: 'VES', label: 'VES (Bs.)' },
-                                        { code: 'COP', label: 'COP ($)' },
-                                    ].map(c => (
-                                        <button
-                                            key={c.code}
-                                            type="button"
-                                            onClick={() => updateRow(row.key, { currency: c.code as Currency })}
-                                            className={cn(
-                                                'h-10 px-2 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center border active:scale-95',
-                                                row.currency === c.code
-                                                    ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                                                    : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                                            )}
-                                        >
-                                            {c.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Seleccionar Forma de Pago con Botones Táctiles */}
-                            <div className="space-y-1">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Forma de Pago</span>
-                                <div className="grid grid-cols-3 gap-1.5">
-                                    {[
-                                        { type: 'cash', label: 'Efectivo', icon: Wallet },
-                                        { type: 'transfer', label: 'Pago Móvil', icon: Send },
-                                        { type: 'card', label: 'Tarjeta', icon: CreditCard },
-                                    ].map(m => {
-                                        const Icon = m.icon;
-                                        const isSelected = row.type === m.type;
-                                        return (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {/* Seleccionar Moneda de Pago con Botones Táctiles */}
+                                <div className="space-y-1">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Moneda de Pago</span>
+                                    <div className="grid grid-cols-3 gap-1.5">
+                                        {[
+                                            { code: 'USD', label: 'USD ($)' },
+                                            { code: 'VES', label: 'VES (Bs.)' },
+                                            { code: 'COP', label: 'COP ($)' },
+                                        ].map(c => (
                                             <button
-                                                key={m.type}
+                                                key={c.code}
                                                 type="button"
-                                                onClick={() => updateRow(row.key, { type: m.type as PaymentMethodType })}
+                                                onClick={() => updateRow(row.key, { currency: c.code as Currency })}
                                                 className={cn(
-                                                    'h-11 px-2 rounded-xl font-extrabold text-xs transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 border active:scale-95 text-center',
-                                                    isSelected
-                                                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                                    'h-10 px-2 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center border active:scale-95',
+                                                    row.currency === c.code
+                                                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
                                                         : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
                                                 )}
                                             >
-                                                <Icon className={cn('w-4 h-4 shrink-0', isSelected ? 'text-white' : 'text-slate-400')} />
-                                                <span className="truncate">{m.label}</span>
+                                                {c.label}
                                             </button>
-                                        );
-                                    })}
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Seleccionar Forma de Pago con Botones Táctiles */}
+                                <div className="space-y-1">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Forma de Pago</span>
+                                    <div className="grid grid-cols-3 gap-1.5">
+                                        {[
+                                            { type: 'cash', label: 'Efectivo', icon: Wallet },
+                                            { type: 'transfer', label: 'Pago Móvil', icon: Send },
+                                            { type: 'card', label: 'Tarjeta', icon: CreditCard },
+                                        ].map(m => {
+                                            const Icon = m.icon;
+                                            const isSelected = row.type === m.type;
+                                            return (
+                                                <button
+                                                    key={m.type}
+                                                    type="button"
+                                                    onClick={() => updateRow(row.key, { type: m.type as PaymentMethodType })}
+                                                    className={cn(
+                                                        'h-10 px-2 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center gap-1.5 border active:scale-95 text-center',
+                                                        isSelected
+                                                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                                            : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                                                    )}
+                                                >
+                                                    <Icon className={cn('w-3.5 h-3.5 shrink-0', isSelected ? 'text-white' : 'text-slate-400')} />
+                                                    <span className="truncate">{m.label}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Input Monto */}
-                            <div className="relative">
-                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                            <div className="relative pt-1">
+                                <span className="absolute left-3.5 top-[calc(50%+2px)] -translate-y-1/2 text-base font-black text-slate-400">
                                     {row.currency === 'VES' ? 'Bs.' : '$'}
                                 </span>
                                 <Input
@@ -305,7 +358,7 @@ export function PaymentDialog({
                                     min="0"
                                     value={row.amount || ''}
                                     onChange={e => updateRow(row.key, { amount: parseFloat(e.target.value) || 0 })}
-                                    className="pl-10 h-12 text-lg font-black text-slate-900 bg-white border-slate-200 rounded-xl focus:ring-emerald-500"
+                                    className="pl-12 h-12 text-xl font-black text-slate-900 bg-white border-slate-200 rounded-xl focus:ring-emerald-500 shadow-2xs"
                                     placeholder="Monto a entregar"
                                 />
                             </div>
@@ -318,7 +371,7 @@ export function PaymentDialog({
                                             key={idx}
                                             type="button"
                                             onClick={() => updateRow(row.key, { amount: b.val })}
-                                            className="px-3 py-1 bg-white hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 transition-all active:scale-95 shadow-2xs"
+                                            className="px-3.5 py-1.5 bg-white hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 rounded-xl text-xs font-extrabold text-slate-700 transition-all active:scale-95 shadow-2xs"
                                         >
                                             {b.label}
                                         </button>
@@ -327,15 +380,6 @@ export function PaymentDialog({
                             )}
                         </div>
                     ))}
-
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={addRow}
-                        className="w-full h-9 border-dashed border-slate-300 text-xs font-bold text-slate-600 hover:text-indigo-600 rounded-xl"
-                    >
-                        <Plus className="w-3.5 h-3.5 mr-1" /> Dividir Pago (Pago Mixto)
-                    </Button>
                 </div>
 
                 {/* Vuelto / Cambio al Cliente */}
