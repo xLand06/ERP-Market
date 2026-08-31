@@ -50,10 +50,10 @@ export function usePayment(
         setRows([{
             key: crypto.randomUUID(),
             type: 'cash',
-            currency: 'COP',
-            amount: totalCOP,
+            currency: 'USD',
+            amount: Number((totalCOP / usdRate).toFixed(2)),
         }]);
-    }, []);
+    }, [usdRate]);
 
     // Actualiza el total cuando cambia durante la edición de cantidades
     const updateTotal = useCallback((newTotalCOP: number) => {
@@ -63,21 +63,21 @@ export function usePayment(
                 const firstRow = prev[0];
                 let newAmount = newTotalCOP;
                 if (firstRow.currency === 'USD') newAmount = newTotalCOP / usdRate;
-                if (firstRow.currency === 'VES') newAmount = newTotalCOP / vesRate;
+                if (firstRow.currency === 'VES') newAmount = (newTotalCOP / usdRate) * vesRate;
                 return [{
                     ...firstRow,
-                    amount: Number(newAmount.toFixed(4))
+                    amount: Number(newAmount.toFixed(2))
                 }];
             }
             return prev;
         });
     }, [usdRate, vesRate]);
 
-    // Convertir una fila a COP
+    // Convertir una fila a COP (COP es la moneda base interna)
     const toCOP = useCallback((row: PaymentMethodRow): number => {
         if (row.currency === 'COP') return row.amount;
         if (row.currency === 'USD') return row.amount * usdRate;
-        if (row.currency === 'VES') return row.amount * vesRate;
+        if (row.currency === 'VES') return vesRate > 0 ? (row.amount / vesRate) * usdRate : 0;
         return row.amount;
     }, [usdRate, vesRate]);
 
@@ -146,8 +146,8 @@ export function usePayment(
                 if (updates.type || updates.currency) {
                     let newAmount = remainingCOP;
                     if (next.currency === 'USD') newAmount = remainingCOP / usdRate;
-                    if (next.currency === 'VES') newAmount = remainingCOP / vesRate;
-                    next.amount = Number(newAmount.toFixed(4));
+                    if (next.currency === 'VES') newAmount = (remainingCOP / usdRate) * vesRate;
+                    next.amount = Number(newAmount.toFixed(2));
                 }
 
                 return next;
