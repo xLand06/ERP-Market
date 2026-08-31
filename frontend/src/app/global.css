@@ -157,52 +157,64 @@
     background-color: #FFE4E6 !important;
   }
 
+  /* ── 5. MODO OSCURO TOTAL (PURE DARK MODE) ── */
   html[data-theme="dark"], html.theme-dark {
-    --background: 15 23 42;
-    --foreground: 248 250 252;
-    --card: 30 41 59;
-    --card-foreground: 248 250 252;
-    --popover: 30 41 59;
-    --popover-foreground: 248 250 252;
-    --primary: 16 185 129;
-    --primary-foreground: 15 23 42;
-    --secondary: 51 65 85;
-    --secondary-foreground: 248 250 252;
-    --muted: 51 65 85;
-    --muted-foreground: 148 163 184;
-    --accent: 30 41 59;
+    --background: 13 17 23;            /* #0D1117 */
+    --foreground: 240 246 252;          /* #F0F6FC */
+    --card: 22 27 34;                   /* #161B22 */
+    --card-foreground: 240 246 252;
+    --popover: 22 27 34;
+    --popover-foreground: 240 246 252;
+    --primary: 16 185 129;              /* emerald-500 */
+    --primary-foreground: 13 17 23;
+    --secondary: 33 38 45;              /* #21262D */
+    --secondary-foreground: 240 246 252;
+    --muted: 33 38 45;
+    --muted-foreground: 139 148 158;    /* #8B949E */
+    --accent: 33 38 45;
     --accent-foreground: 52 211 153;
-    --border: 51 65 85;
-    --input: 51 65 85;
+    --border: 48 54 61;                 /* #30363D */
+    --input: 48 54 61;
     --ring: 16 185 129;
-    --sidebar-bg: #020617;
+    --sidebar-bg: #0D1117;
     --sidebar-accent: #10B981;
   }
   html.theme-dark body {
-    background-color: #0F172A !important;
-    color: #F8FAFC !important;
+    background-color: #0D1117 !important;
+    color: #F0F6FC !important;
   }
   html.theme-dark .bg-white {
-    background-color: #1E293B !important;
-    color: #F8FAFC !important;
+    background-color: #161B22 !important;
+    color: #F0F6FC !important;
+    border-color: #30363D !important;
   }
   html.theme-dark .bg-slate-50,
   html.theme-dark .bg-slate-100 {
-    background-color: #0F172A !important;
-    color: #F8FAFC !important;
+    background-color: #21262D !important;
+    color: #F0F6FC !important;
   }
+  html.theme-dark .text-slate-950,
   html.theme-dark .text-slate-900,
   html.theme-dark .text-slate-800,
   html.theme-dark .text-slate-700 {
-    color: #F8FAFC !important;
+    color: #F0F6FC !important;
   }
+  html.theme-dark .text-slate-600,
   html.theme-dark .text-slate-500,
   html.theme-dark .text-slate-400 {
-    color: #94A3B8 !important;
+    color: #8B949E !important;
   }
+  html.theme-dark .border-slate-300,
   html.theme-dark .border-slate-200,
   html.theme-dark .border-slate-100 {
-    border-color: #334155 !important;
+    border-color: #30363D !important;
+  }
+  html.theme-dark input:not([type="checkbox"]):not([type="radio"]),
+  html.theme-dark select,
+  html.theme-dark textarea {
+    background-color: #0D1117 !important;
+    color: #F0F6FC !important;
+    border-color: #30363D !important;
   }
 }
 

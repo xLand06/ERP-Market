@@ -82,16 +82,16 @@ const getSidebarTheme = (theme: UITheme = 'emerald') => {
             };
         case 'dark':
             return {
-                bg: 'bg-[#020617] border-slate-900',
-                logoBg: 'bg-gradient-to-br from-cyan-500 via-teal-600 to-blue-700',
+                bg: 'bg-[#0D1117] border-[#30363D]',
+                logoBg: 'bg-gradient-to-br from-emerald-500 via-teal-600 to-emerald-700',
                 LogoIcon: Store,
-                logoTextColor: 'text-cyan-300 font-black tracking-wider shadow-xs',
-                activeLine: 'bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.7)]',
-                activeIcon: 'text-cyan-400',
-                hoverIcon: 'group-hover:text-cyan-400',
-                activeBg: 'bg-slate-900 text-cyan-100 ring-1 ring-cyan-500/40 shadow-sm',
-                footerBg: 'bg-slate-900/80 border-slate-800',
-                onlineBadge: 'bg-cyan-400',
+                logoTextColor: 'text-[#F0F6FC] font-black tracking-wider',
+                activeLine: 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]',
+                activeIcon: 'text-emerald-400',
+                hoverIcon: 'group-hover:text-emerald-400',
+                activeBg: 'bg-[#21262D] text-[#F0F6FC] ring-1 ring-emerald-500/30',
+                footerBg: 'bg-[#161B22] border-[#30363D]',
+                onlineBadge: 'bg-emerald-500',
             };
         case 'emerald':
         default:

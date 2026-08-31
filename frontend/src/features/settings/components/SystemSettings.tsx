@@ -106,9 +106,9 @@ export function SystemSettings() {
                         },
                         {
                             id: 'dark',
-                            name: 'Neón Nocturno',
-                            desc: 'Modo oscuro cyber para turnos de noche',
-                            primaryBg: 'bg-slate-950',
+                            name: 'Modo Oscuro Total',
+                            desc: 'Fondo oscuro profundo (#0D1117) y alto contraste de legibilidad',
+                            primaryBg: 'bg-slate-900 border border-slate-700',
                         },
                     ].map((t) => {
                         const isSel = (activeTheme || 'emerald') === t.id;
