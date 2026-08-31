@@ -31,7 +31,7 @@ const CartItemRow = React.memo(function CartItemRow({
     onUpdatePresentation: (productId: string, oldPresId: string | undefined, newPresId: string | 'base') => void;
     onRemoveItem: (productId: string, presentationId: string | undefined) => void;
 }) {
-    const { fmtCOP } = useConfigStore();
+    const { fmtUSD } = useConfigStore();
 
     return (
         <div className="flex flex-col border-b px-5 py-4 gap-2">
