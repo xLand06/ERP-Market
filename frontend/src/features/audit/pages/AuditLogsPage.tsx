@@ -41,36 +41,7 @@ const MODULE_COLORS: Record<string, string> = {
     'SYSTEM': 'text-slate-600 bg-slate-50',
 };
 
-    return (
-        <div className="space-y-3">
-            {summaryPhrase && (
-                <div className="flex items-center gap-2.5 p-3 bg-indigo-50/80 rounded-xl border border-indigo-100 text-indigo-900 text-xs sm:text-sm">
-                    <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0 animate-pulse" />
-                    <span className="font-semibold">{summaryPhrase}</span>
-                </div>
-            )}
-
-            {entries.length > 0 ? (
-                <div className="space-y-1.5 pt-1">
-                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Detalles de la Operación</div>
-                    {entries.map(([key, value]) => {
-                        const label = FIELD_LABELS[key] || key.replace(/([A-Z])/g, ' $1').toLowerCase();
-                        let displayVal = typeof value === 'object' ? JSON.stringify(value) : String(value);
-                        if (typeof value === 'boolean') displayVal = value ? 'Sí' : 'No';
-                        return (
-                            <div key={key} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 text-xs">
-                                <span className="font-medium text-slate-500 capitalize">{label}</span>
-                                <span className="font-bold text-slate-900 truncate max-w-[220px]" title={displayVal}>{displayVal}</span>
-                            </div>
-                        );
-                    })}
-                </div>
-            ) : !summaryPhrase ? (
-                <p className="text-sm text-slate-400 italic">Sin datos adicionales registrados</p>
-            ) : null}
-        </div>
-    );
-}
+const ACTION_DICTIONARY: Record<string, string> = {
     'PRICE_CHANGE': 'Cambio de Precio',
     'PRODUCT_CREATE': 'Creación de Producto',
     'PRODUCT_UPDATE': 'Actualización de Producto',
@@ -304,7 +275,6 @@ const extraerTransaccionId = (log: AuditLog): string | null => {
     if (d.request?.body?.transaccionId) return d.request.body.transaccionId;
     return null;
 };
->>>>>>> origin/feature-basic-v1
 
 const AuditLogsPage: React.FC = () => {
     const navigate = useNavigate();
@@ -623,7 +593,6 @@ const AuditLogsPage: React.FC = () => {
                                                 <span className="text-[10px] text-slate-400 font-mono">ID Registro: {selectedLog.id}</span>
                                             </div>
                                         </div>
-                                    </div>
                                     </div>
                                 </div>
                             </div>
