@@ -221,37 +221,38 @@ function PrinterFormModal({
                 onPointerDownOutside={(e) => e.preventDefault()}
                 onInteractOutside={(e) => e.preventDefault()}
                 onEscapeKeyDown={(e) => e.preventDefault()}
-                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] w-[95vw] max-w-xl max-h-[90vh] p-0 bg-white rounded-3xl border border-slate-300 shadow-2xl overflow-hidden flex flex-col"
+                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] w-[95vw] max-w-2xl max-h-[92vh] p-0 bg-slate-900 rounded-3xl border-2 border-slate-800 shadow-2xl overflow-hidden flex flex-col text-slate-950"
             >
-                <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400">
-                            <Printer className="w-5 h-5" />
+                {/* Header estilizado con pr-14 para evitar sobreposición con botón de cierre */}
+                <div className="px-6 py-5 bg-slate-950 text-white flex items-center justify-between border-b border-slate-800 shrink-0 pr-14">
+                    <div className="flex items-center gap-3.5">
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                            <Printer className="w-6 h-6" />
                         </div>
-                        <DialogHeader className="text-left p-0">
-                            <DialogTitle className="text-lg font-black text-white">
-                                {printerToEdit ? 'Editar Configuración de Impresora' : 'Agregar Nueva Impresora Térmica'}
-                            </DialogTitle>
-                            <DialogDescription className="text-xs text-slate-400">
-                                Vincula el hardware real por USB, Bluetooth o Red IP
-                            </DialogDescription>
-                        </DialogHeader>
+                        <div>
+                            <h2 className="text-xl font-black text-white tracking-tight leading-tight">
+                                {printerToEdit ? 'Editar Impresora Térmica' : 'Vincular Nueva Impresora Térmica'}
+                            </h2>
+                            <p className="text-xs font-semibold text-slate-400 mt-0.5">
+                                Configura la conexión física, tipo de red y parámetros de hardware
+                            </p>
+                        </div>
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+                <form onSubmit={handleSubmit} className="p-6 space-y-5 bg-slate-100 overflow-y-auto flex-1 custom-scrollbar">
                     
-                    {/* Seleccionar Tipo de Conexión */}
-                    <div>
-                        <label className="text-xs font-black text-slate-900 block mb-1.5 uppercase tracking-wider">
-                            1. Seleccionar Tipo de Conexión Real
+                    {/* 1. SELECCIONAR TIPO DE CONEXIÓN */}
+                    <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-900 block uppercase tracking-wider">
+                            1. Tipo de Conexión
                         </label>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-3">
                             {[
-                                { type: 'thermal_usb', label: 'USB (WebUSB Directo)', icon: Usb, desc: 'Impresora Térmica por Cable USB' },
-                                { type: 'thermal_network', label: 'Red / IP (ESC/POS)', icon: Wifi, desc: 'Ethernet o Wi-Fi Local' },
-                                { type: 'thermal_serial', label: 'Serial / Bluetooth', icon: Bluetooth, desc: 'Puerto COM / Bluetooth' },
-                                { type: 'browser', label: 'Impresora del Sistema', icon: Laptop, desc: 'Diálogo Normal Sistema' },
+                                { type: 'thermal_usb', label: 'USB (WebUSB Directo)', icon: Usb, desc: 'Impresora por cable USB POS' },
+                                { type: 'thermal_network', label: 'Red / IP (ESC/POS)', icon: Wifi, desc: 'Ethernet o Wi-Fi Local (Puerto 9100)' },
+                                { type: 'thermal_serial', label: 'Serial / Bluetooth', icon: Bluetooth, desc: 'Puerto COM / Bluetooth POS' },
+                                { type: 'browser', label: 'Impresora del Sistema', icon: Laptop, desc: 'Diálogo nativo del navegador' },
                             ].map(t => {
                                 const Icon = t.icon;
                                 const isSel = connectionType === t.type;
@@ -264,16 +265,16 @@ function PrinterFormModal({
                                             setConnectionVerified(false);
                                         }}
                                         className={cn(
-                                            'p-3 rounded-2xl border text-left flex items-start gap-2.5 transition-all active:scale-95',
+                                            'p-4 rounded-2xl border-2 text-left flex items-start gap-3 transition-all active:scale-[0.98] cursor-pointer',
                                             isSel
-                                                ? 'bg-emerald-50 border-emerald-600 shadow-xs ring-2 ring-emerald-600/20'
-                                                : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                                                ? 'bg-emerald-50 border-emerald-600 shadow-md ring-2 ring-emerald-600/30'
+                                                : 'bg-white border-slate-200 hover:border-slate-400 shadow-2xs'
                                         )}
                                     >
-                                        <Icon className={cn('w-5 h-5 mt-0.5 shrink-0', isSel ? 'text-emerald-600' : 'text-slate-400')} />
+                                        <Icon className={cn('w-6 h-6 mt-0.5 shrink-0', isSel ? 'text-emerald-600' : 'text-slate-400')} />
                                         <div>
-                                            <p className="text-xs font-black text-slate-950 leading-tight">{t.label}</p>
-                                            <p className="text-[10px] text-slate-500 font-medium">{t.desc}</p>
+                                            <p className="text-sm font-black text-slate-950 leading-tight">{t.label}</p>
+                                            <p className="text-[11px] text-slate-500 font-bold mt-0.5">{t.desc}</p>
                                         </div>
                                     </button>
                                 );
@@ -281,19 +282,19 @@ function PrinterFormModal({
                         </div>
                     </div>
 
-                    {/* VINCULACIÓN Y DETECCIÓN REAL DE HARDWARE */}
-                    <div className="p-4 bg-slate-100/90 border-2 border-slate-200 rounded-2xl space-y-3">
+                    {/* 2. VINCULACIÓN Y DETECCIÓN REAL DE HARDWARE */}
+                    <div className="p-4 bg-white border-2 border-slate-300 rounded-2xl space-y-3 shadow-xs">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
+                            <span className="text-xs font-black text-slate-950 uppercase tracking-wide flex items-center gap-1.5">
                                 <Signal className="w-4 h-4 text-emerald-600" />
                                 2. Vinculación y Prueba de Hardware Real
                             </span>
                             {connectionVerified ? (
-                                <span className="text-[10px] font-black px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-300 flex items-center gap-1">
-                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Conexión Verificada
+                                <span className="text-[10px] font-black px-3 py-1 bg-emerald-100 text-emerald-900 rounded-full border border-emerald-400 flex items-center gap-1">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Conexión Verificada
                                 </span>
                             ) : (
-                                <span className="text-[10px] font-black px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-full border border-amber-300">
+                                <span className="text-[10px] font-black px-3 py-1 bg-amber-100 text-amber-900 rounded-full border border-amber-400">
                                     Pendiente de Vincular
                                 </span>
                             )}
@@ -305,13 +306,13 @@ function PrinterFormModal({
                                     type="button"
                                     onClick={handlePairRealUsbDevice}
                                     disabled={scanningHardware}
-                                    className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-xs gap-2"
+                                    className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-xs gap-2"
                                 >
                                     {scanningHardware ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Usb className="w-4 h-4" />}
                                     Buscar y Vincular Impresora USB Real
                                 </Button>
                                 {pairedUsbDevice && (
-                                    <div className="p-3 bg-white border border-emerald-300 rounded-xl text-xs font-bold text-slate-800 flex items-center justify-between">
+                                    <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs font-black text-emerald-950 flex items-center justify-between">
                                         <span>Dispositivo USB: <strong>{pairedUsbDevice.name}</strong></span>
                                         <Check className="w-4 h-4 text-emerald-600" />
                                     </div>
@@ -325,13 +326,13 @@ function PrinterFormModal({
                                     type="button"
                                     onClick={handlePairRealSerialDevice}
                                     disabled={scanningHardware}
-                                    className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-xs gap-2"
+                                    className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-xs gap-2"
                                 >
                                     {scanningHardware ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Bluetooth className="w-4 h-4" />}
                                     Buscar Dispositivo Bluetooth / Puerto COM
                                 </Button>
                                 {pairedUsbDevice && (
-                                    <div className="p-3 bg-white border border-emerald-300 rounded-xl text-xs font-bold text-slate-800 flex items-center justify-between">
+                                    <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs font-black text-emerald-950 flex items-center justify-between">
                                         <span>Puerto Detectado: <strong>{pairedUsbDevice.name}</strong></span>
                                         <Check className="w-4 h-4 text-emerald-600" />
                                     </div>
@@ -340,24 +341,24 @@ function PrinterFormModal({
                         )}
 
                         {connectionType === 'thermal_network' && (
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-3 gap-3">
                                 <div className="col-span-2">
-                                    <label className="text-[10px] font-black text-slate-700 block mb-1">Dirección IP de Impresora</label>
+                                    <label className="text-[11px] font-black text-slate-900 block mb-1">Dirección IP de Impresora</label>
                                     <Input
                                         type="text"
                                         value={ipAddress}
                                         onChange={e => setIpAddress(e.target.value)}
                                         placeholder="192.168.1.200"
-                                        className="h-10 text-xs font-bold bg-white border-slate-300"
+                                        className="h-11 text-xs font-black bg-slate-50 border-2 border-slate-300 focus:bg-white text-slate-950"
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-700 block mb-1">Puerto TCP</label>
+                                    <label className="text-[11px] font-black text-slate-900 block mb-1">Puerto TCP</label>
                                     <Input
                                         type="number"
                                         value={port}
                                         onChange={e => setPort(parseInt(e.target.value) || 9100)}
-                                        className="h-10 text-xs font-bold bg-white text-center border-slate-300"
+                                        className="h-11 text-xs font-black bg-slate-50 border-2 border-slate-300 text-center focus:bg-white text-slate-950"
                                     />
                                 </div>
                             </div>
@@ -369,101 +370,102 @@ function PrinterFormModal({
                             variant="outline"
                             onClick={handleTestRealConnection}
                             disabled={testingConnection}
-                            className="w-full h-10 border-2 border-emerald-400 bg-white text-emerald-800 hover:bg-emerald-50 font-black text-xs rounded-xl gap-2 shadow-2xs"
+                            className="w-full h-11 border-2 border-emerald-500 bg-white text-emerald-900 hover:bg-emerald-50 font-black text-xs rounded-xl gap-2 shadow-2xs"
                         >
                             {testingConnection ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 text-emerald-600" />}
                             Probar Conexión Real con Impresora (Imprimir Test)
                         </Button>
                     </div>
 
-                    {/* Nombre Descriptivo */}
-                    <div>
-                        <label className="text-xs font-black text-slate-800 block mb-1">Nombre Descriptivo de la Impresora *</label>
-                        <Input
-                            type="text"
-                            value={name}
-                            onChange={e => setName(e.target.value)}
-                            placeholder="Ej: Impresora Caja Principal 80mm"
-                            className="h-11 text-xs font-bold text-slate-900 bg-slate-50 border-slate-300"
-                        />
-                    </div>
-
-                    {/* Rol & Ancho de Papel */}
-                    <div className="grid grid-cols-2 gap-3">
+                    {/* 3. NOMBRE Y ROL DE IMPRESORA */}
+                    <div className="space-y-3">
                         <div>
-                            <label className="text-xs font-black text-slate-800 block mb-1">Ancho del Papel</label>
-                            <select
-                                value={paperWidth}
-                                onChange={e => setPaperWidth(e.target.value as any)}
-                                className="w-full h-10 px-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
-                            >
-                                <option value="80mm">80 mm (Estándar 48 caracteres)</option>
-                                <option value="58mm">58 mm (Compacta 32 caracteres)</option>
-                            </select>
+                            <label className="text-xs font-black text-slate-950 block mb-1">Nombre Descriptivo de la Impresora *</label>
+                            <Input
+                                type="text"
+                                value={name}
+                                onChange={e => setName(e.target.value)}
+                                placeholder="Ej: Impresora Caja Principal 80mm"
+                                className="h-12 text-sm font-black text-slate-950 bg-white border-2 border-slate-300 focus:border-emerald-600"
+                            />
                         </div>
 
-                        <div>
-                            <label className="text-xs font-black text-slate-800 block mb-1">Uso / Rol</label>
-                            <select
-                                value={role}
-                                onChange={e => setRole(e.target.value as any)}
-                                className="w-full h-10 px-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
-                            >
-                                <option value="pos">Facturación / POS Principal</option>
-                                <option value="kitchen">Cocina / Comandas / Depósito</option>
-                                <option value="backup">Copia de Reserva / Backup</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Conmutadores Hardware */}
-                    <div className="space-y-2 pt-1">
-                        <label className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer">
+                        <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <span className="text-xs font-black text-slate-900 block">Corte Automático (Auto-Cut)</span>
-                                <span className="text-[10px] text-slate-500 font-medium">Envía comando ESC/POS al finalizar</span>
+                                <label className="text-xs font-black text-slate-950 block mb-1">Ancho del Papel</label>
+                                <select
+                                    value={paperWidth}
+                                    onChange={e => setPaperWidth(e.target.value as any)}
+                                    className="w-full h-12 px-3 bg-white border-2 border-slate-300 rounded-xl text-xs font-black text-slate-950 focus:border-emerald-600 outline-none"
+                                >
+                                    <option value="80mm">80 mm (Estándar 48 caracteres)</option>
+                                    <option value="58mm">58 mm (Compacta 32 caracteres)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-black text-slate-950 block mb-1">Uso / Rol de Impresión</label>
+                                <select
+                                    value={role}
+                                    onChange={e => setRole(e.target.value as any)}
+                                    className="w-full h-12 px-3 bg-white border-2 border-slate-300 rounded-xl text-xs font-black text-slate-950 focus:border-emerald-600 outline-none"
+                                >
+                                    <option value="pos">Facturación / POS Principal</option>
+                                    <option value="kitchen">Cocina / Comandas / Depósito</option>
+                                    <option value="backup">Copia de Reserva / Backup</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 4. CONMUTADORES HARDWARE */}
+                    <div className="space-y-2 pt-1">
+                        <label className="flex items-center justify-between p-3.5 bg-white border-2 border-slate-200 rounded-xl cursor-pointer hover:border-slate-300">
+                            <div>
+                                <span className="text-xs font-black text-slate-950 block">Corte Automático (Auto-Cut)</span>
+                                <span className="text-[11px] text-slate-500 font-bold">Envía comando de corte ESC/POS al finalizar</span>
                             </div>
                             <input
                                 type="checkbox"
                                 checked={autoCut}
                                 onChange={e => setAutoCut(e.target.checked)}
-                                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                                className="w-5 h-5 rounded text-emerald-600 focus:ring-emerald-500"
                             />
                         </label>
 
-                        <label className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer">
+                        <label className="flex items-center justify-between p-3.5 bg-white border-2 border-slate-200 rounded-xl cursor-pointer hover:border-slate-300">
                             <div>
-                                <span className="text-xs font-black text-slate-900 block">Apertura de Cajón Monedero</span>
-                                <span className="text-[10px] text-slate-500 font-medium">Envía pulso eléctrico al cajón</span>
+                                <span className="text-xs font-black text-slate-950 block">Apertura de Cajón Monedero</span>
+                                <span className="text-[11px] text-slate-500 font-bold">Envía pulso eléctrico al cajón de efectivo</span>
                             </div>
                             <input
                                 type="checkbox"
                                 checked={openCashDrawer}
                                 onChange={e => setOpenCashDrawer(e.target.checked)}
-                                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                                className="w-5 h-5 rounded text-emerald-600 focus:ring-emerald-500"
                             />
                         </label>
 
-                        <label className="flex items-center justify-between p-3 bg-emerald-50/80 border border-emerald-300 rounded-xl cursor-pointer">
+                        <label className="flex items-center justify-between p-3.5 bg-emerald-50 border-2 border-emerald-300 rounded-xl cursor-pointer">
                             <div>
                                 <span className="text-xs font-black text-emerald-950 block">Marcar como Impresora Principal (Default)</span>
-                                <span className="text-[10px] text-emerald-800 font-medium">Se usará por defecto para facturar en POS</span>
+                                <span className="text-[11px] text-emerald-800 font-bold">Se usará por defecto al cobrar en el POS</span>
                             </div>
                             <input
                                 type="checkbox"
                                 checked={isPrimary}
                                 onChange={e => setIsPrimary(e.target.checked)}
-                                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                                className="w-5 h-5 rounded text-emerald-600 focus:ring-emerald-500"
                             />
                         </label>
                     </div>
 
-                    {/* Footer Modal */}
-                    <div className="pt-3 flex gap-2">
-                        <Button type="button" variant="outline" onClick={onClose} className="flex-1 h-11 font-bold text-xs">
+                    {/* Footer Modal con botones de acción prominentes */}
+                    <div className="pt-3 flex gap-3">
+                        <Button type="button" variant="outline" onClick={onClose} className="flex-1 h-12 font-black text-xs border-2 border-slate-300 text-slate-800 rounded-2xl">
                             Cancelar
                         </Button>
-                        <Button type="submit" className="flex-[2] h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-md">
+                        <Button type="submit" className="flex-[2] h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-2xl shadow-md">
                             {printerToEdit ? 'Guardar Cambios' : 'Confirmar e Iniciar Impresora'}
                         </Button>
                     </div>
