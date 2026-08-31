@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Check, Loader2, Plus, Trash2, DollarSign, CreditCard, Send, Wallet, ArrowRightLeft } from 'lucide-react';
+import { Check, Loader2, Plus, Trash2, Wallet, Send, CreditCard, ArrowRightLeft, Printer } from 'lucide-react';
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -12,7 +12,7 @@ import type { PaymentMethodType, Currency, CartItem } from '../types';
 
 interface PaymentDialogProps {
     open: boolean;
-    total: number; // Siempre en COP interno
+    total: number; // En COP base interno
     cartItems: CartItem[];
     onUpdateQty: (productId: string, presentationId: string | undefined, newQty: number) => void;
     onClose: () => void;
@@ -24,26 +24,6 @@ interface PaymentDialogProps {
     }>) => void;
     isSubmitting: boolean;
 }
-
-const PAYMENT_METHODS: Array<{
-    type: PaymentMethodType;
-    label: string;
-    icon: any;
-}> = [
-    { type: 'cash', label: 'Efectivo', icon: Wallet },
-    { type: 'transfer', label: 'Pago Móvil / Transf.', icon: Send },
-    { type: 'card', label: 'Tarjeta / Punto', icon: CreditCard },
-];
-
-const CURRENCIES: Array<{
-    code: Currency;
-    label: string;
-    symbol: string;
-}> = [
-    { code: 'USD', label: 'USD ($)', symbol: '$' },
-    { code: 'VES', label: 'VES (Bs.)', symbol: 'Bs.' },
-    { code: 'COP', label: 'COP ($)', symbol: '$' },
-];
 
 function WeightItemRow({
     item,
@@ -136,7 +116,7 @@ export function PaymentDialog({
         setPrevOpen(open);
     }, [open, prevOpen, total, reset, updateTotal]);
 
-    // Filtrar productos que se venden por peso (KG o gramos)
+    // Productos por peso
     const weightItems = useMemo(() => {
         return cartItems.filter(item => {
             const unit = (item.baseUnit || '').toLowerCase().trim();
@@ -144,15 +124,45 @@ export function PaymentDialog({
         });
     }, [cartItems]);
 
-    // Conversión de total en las 3 monedas
+    // Totales en las 3 monedas
     const totalUSD = fromCOP(total, 'USD');
     const totalVES = fromCOP(total, 'VES');
     const totalCOP = total;
 
-    // Conversión de Vuelto en las 3 monedas
+    // Vuelto en las 3 monedas
     const changeUSD = fromCOP(Math.max(0, changeInCOP), 'USD');
     const changeVES = fromCOP(Math.max(0, changeInCOP), 'VES');
-    const changeCOP = Math.max(0, changeInCOP);
+
+    // Botones de billetes rápidos según la moneda de la primera fila de pago
+    const activeCurrency = rows[0]?.currency || 'USD';
+    const quickBills = useMemo(() => {
+        if (activeCurrency === 'USD') {
+            return [
+                { label: 'Exacto', val: Number(totalUSD.toFixed(2)) },
+                { label: '$5', val: 5 },
+                { label: '$10', val: 10 },
+                { label: '$20', val: 20 },
+                { label: '$50', val: 50 },
+                { label: '$100', val: 100 },
+            ];
+        }
+        if (activeCurrency === 'VES') {
+            return [
+                { label: 'Exacto', val: Number(totalVES.toFixed(2)) },
+                { label: 'Bs. 50', val: 50 },
+                { label: 'Bs. 100', val: 100 },
+                { label: 'Bs. 200', val: 200 },
+                { label: 'Bs. 500', val: 500 },
+            ];
+        }
+        return [
+            { label: 'Exacto', val: totalCOP },
+            { label: '$10.000', val: 10000 },
+            { label: '$20.000', val: 20000 },
+            { label: '$50.000', val: 50000 },
+            { label: '$100.000', val: 100000 },
+        ];
+    }, [activeCurrency, totalUSD, totalVES, totalCOP]);
 
     const handleConfirm = () => {
         const payload = getPayload();
@@ -161,61 +171,44 @@ export function PaymentDialog({
 
     return (
         <Dialog open={open} onOpenChange={o => !o && onClose()}>
-            <DialogContent className="max-w-xl max-h-[92vh] overflow-y-auto custom-scrollbar p-0 bg-slate-50 rounded-2xl border border-slate-200">
+            <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto custom-scrollbar p-0 bg-white rounded-2xl border border-slate-200 shadow-2xl">
                 
-                {/* Header Modal */}
-                <div className="p-5 bg-white border-b border-slate-200/80 rounded-t-2xl">
-                    <DialogHeader>
-                        <DialogTitle className="text-lg font-black text-slate-900 tracking-tight flex items-center justify-between">
-                            <span>Cobrar Venta</span>
-                            <span className="text-xs font-bold px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200/80 rounded-full">
-                                Moneda Principal: {mainCurrency}
+                {/* Modal Header */}
+                <div className="p-5 bg-slate-900 text-white rounded-t-2xl space-y-3">
+                    <DialogHeader className="text-left">
+                        <DialogTitle className="text-lg font-black tracking-tight text-white flex items-center justify-between">
+                            <span>Cobro Rápido POS</span>
+                            <span className="text-xs font-bold px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-full border border-emerald-500/30">
+                                Principal: {mainCurrency}
                             </span>
                         </DialogTitle>
-                        <DialogDescription className="text-xs text-slate-500 font-medium">
-                            Selecciona los métodos y monedas de pago del cliente.
+                        <DialogDescription className="text-xs text-slate-400">
+                            Procesa el pago e imprime la factura térmica.
                         </DialogDescription>
                     </DialogHeader>
 
-                    {/* Resumen Total Cobrar en 3 Monedas */}
-                    <div className="mt-4 p-4 bg-slate-900 text-white rounded-2xl shadow-sm space-y-2">
-                        <div className="flex items-baseline justify-between">
-                            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Total a Cobrar</span>
+                    {/* Prominent Main Currency Total */}
+                    <div className="bg-slate-800/90 p-4 rounded-xl border border-slate-700 flex items-center justify-between">
+                        <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Venta</span>
                             <span className="text-2xl font-black text-emerald-400 tabular-nums">
                                 {mainCurrency === 'VES' ? fmtVES(totalVES) : mainCurrency === 'USD' ? fmtUSD(totalUSD) : fmtCOP(totalCOP)}
                             </span>
                         </div>
-
-                        {/* Tasas de Cambio Bar */}
-                        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800 text-[11px] font-medium text-slate-300">
-                            <div className="bg-slate-800/80 p-1.5 rounded-lg text-center">
-                                <span className="text-[10px] text-slate-400 block">USD ($)</span>
-                                <span className="font-bold text-white">{fmtUSD(totalUSD)}</span>
-                            </div>
-                            <div className="bg-slate-800/80 p-1.5 rounded-lg text-center">
-                                <span className="text-[10px] text-slate-400 block">VES (Bs.)</span>
-                                <span className="font-bold text-white">Bs. {totalVES.toFixed(2)}</span>
-                            </div>
-                            <div className="bg-slate-800/80 p-1.5 rounded-lg text-center">
-                                <span className="text-[10px] text-slate-400 block">COP ($)</span>
-                                <span className="font-bold text-white">{fmtCOP(totalCOP)}</span>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-between items-center text-[10px] text-slate-400 pt-1">
-                            <span>Tasa VES: Bs. {vesRate.toFixed(2)} / USD</span>
-                            <span>Tasa COP: ${usdRate.toLocaleString('es-CO')} / USD</span>
+                        <div className="text-right text-xs text-slate-300 font-medium">
+                            {mainCurrency !== 'VES' && <p>Bs. {totalVES.toFixed(2)} VES</p>}
+                            {mainCurrency !== 'USD' && <p>{fmtUSD(totalUSD)} USD</p>}
                         </div>
                     </div>
                 </div>
 
-                {/* Ajuste de Peso de Productos si aplica */}
+                {/* Weight Items Adjustment */}
                 {weightItems.length > 0 && (
-                    <div className="px-5 py-3 bg-indigo-50/50 border-b border-indigo-100/60 space-y-2">
+                    <div className="px-5 py-3 bg-indigo-50/50 border-b border-indigo-100 space-y-2">
                         <p className="text-xs font-bold text-indigo-700 uppercase tracking-wide">
                             Ajustar Peso de Productos ({weightItems.length})
                         </p>
-                        <div className="flex flex-col gap-2 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
+                        <div className="flex flex-col gap-2 max-h-[120px] overflow-y-auto pr-1 custom-scrollbar">
                             {weightItems.map(item => (
                                 <WeightItemRow
                                     key={`${item.id}-${item.presentationId}`}
@@ -228,106 +221,81 @@ export function PaymentDialog({
                     </div>
                 )}
 
-                {/* Barra de Progreso de Pago */}
-                {paidTotalInCOP < totalInCOP && (
-                    <div className="px-5 py-3 bg-amber-50/60 border-b border-amber-100 space-y-1.5">
-                        <div className="flex justify-between text-xs font-bold">
-                            <span className="text-amber-800">Monto Faltante:</span>
-                            <span className="text-orange-600 font-black tabular-nums">
-                                ${fromCOP(remainingInCOP, 'USD').toFixed(2)} USD / Bs. {fromCOP(remainingInCOP, 'VES').toFixed(2)} VES
-                            </span>
-                        </div>
-                        <div className="h-2 bg-amber-200/60 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-emerald-500 transition-all duration-300"
-                                style={{ width: `${Math.min(100, (paidTotalInCOP / totalInCOP) * 100)}%` }}
-                            />
-                        </div>
-                    </div>
-                )}
-
-                {/* Filas de Formas de Pago */}
-                <div className="p-5 space-y-3">
-                    <p className="text-xs font-bold text-slate-700 uppercase tracking-wide">Métodos de Pago Registrados</p>
-                    
+                {/* Métodos de Pago */}
+                <div className="p-5 space-y-4">
                     {rows.map((row, i) => (
-                        <div key={row.key} className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-2.5">
-                            {/* Selector de Moneda y Método */}
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                {/* Selector Moneda */}
-                                <div className="flex items-center bg-slate-100 p-1 rounded-xl gap-1">
-                                    {CURRENCIES.map(c => (
+                        <div key={row.key} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-black text-slate-700 uppercase tracking-wide">
+                                    Pago #{i + 1}
+                                </span>
+
+                                <div className="flex items-center gap-1">
+                                    {/* Select Moneda */}
+                                    <select
+                                        value={row.currency}
+                                        onChange={e => updateRow(row.key, { currency: e.target.value as Currency })}
+                                        className="h-8 px-2.5 text-xs font-bold bg-white border border-slate-200 rounded-lg text-slate-800"
+                                    >
+                                        <option value="USD">USD ($)</option>
+                                        <option value="VES">VES (Bs.)</option>
+                                        <option value="COP">COP ($)</option>
+                                    </select>
+
+                                    {/* Select Método */}
+                                    <select
+                                        value={row.type}
+                                        onChange={e => updateRow(row.key, { type: e.target.value as PaymentMethodType })}
+                                        className="h-8 px-2.5 text-xs font-bold bg-white border border-slate-200 rounded-lg text-slate-800"
+                                    >
+                                        <option value="cash">Efectivo</option>
+                                        <option value="transfer">Pago Móvil / Transf.</option>
+                                        <option value="card">Tarjeta / Punto</option>
+                                    </select>
+
+                                    {rows.length > 1 && (
                                         <button
-                                            key={c.code}
                                             type="button"
-                                            onClick={() => updateRow(row.key, { currency: c.code })}
-                                            className={cn(
-                                                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all",
-                                                row.currency === c.code
-                                                    ? "bg-white text-indigo-600 shadow-2xs"
-                                                    : "text-slate-500 hover:text-slate-800"
-                                            )}
+                                            onClick={() => removeRow(row.key)}
+                                            className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg"
                                         >
-                                            {c.label}
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Input Monto */}
+                            <div className="relative">
+                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                                    {row.currency === 'VES' ? 'Bs.' : '$'}
+                                </span>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={row.amount || ''}
+                                    onChange={e => updateRow(row.key, { amount: parseFloat(e.target.value) || 0 })}
+                                    className="pl-10 h-12 text-lg font-black text-slate-900 bg-white border-slate-200 rounded-xl focus:ring-emerald-500"
+                                    placeholder="Monto a entregar"
+                                />
+                            </div>
+
+                            {/* Billetes Rápidos */}
+                            {i === 0 && (
+                                <div className="flex flex-wrap gap-1.5 pt-1">
+                                    {quickBills.map((b, idx) => (
+                                        <button
+                                            key={idx}
+                                            type="button"
+                                            onClick={() => updateRow(row.key, { amount: b.val })}
+                                            className="px-3 py-1 bg-white hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 transition-all active:scale-95 shadow-2xs"
+                                        >
+                                            {b.label}
                                         </button>
                                     ))}
                                 </div>
-
-                                {/* Selector Método */}
-                                <div className="flex items-center bg-slate-100 p-1 rounded-xl gap-1">
-                                    {PAYMENT_METHODS.map(m => {
-                                        const Icon = m.icon;
-                                        return (
-                                            <button
-                                                key={m.type}
-                                                type="button"
-                                                onClick={() => updateRow(row.key, { type: m.type })}
-                                                className={cn(
-                                                    "px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
-                                                    row.type === m.type
-                                                        ? "bg-white text-indigo-600 shadow-2xs"
-                                                        : "text-slate-500 hover:text-slate-800"
-                                                )}
-                                            >
-                                                <Icon className="w-3.5 h-3.5" />
-                                                <span>{m.label}</span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Input de Monto Pagado */}
-                            <div className="flex items-center gap-2 pt-1">
-                                <div className="relative flex-1">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                                        {row.currency === 'VES' ? 'Bs.' : '$'}
-                                    </span>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={row.amount || ''}
-                                        onChange={e => updateRow(row.key, { amount: parseFloat(e.target.value) || 0 })}
-                                        className="pl-9 h-11 text-base font-black text-slate-900 rounded-xl border-slate-200 focus:ring-indigo-500"
-                                        placeholder="Monto recibido"
-                                    />
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                                        {row.currency}
-                                    </span>
-                                </div>
-
-                                {rows.length > 1 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => removeRow(row.key)}
-                                        className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
-                                        title="Eliminar este método de pago"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                )}
-                            </div>
+                            )}
                         </div>
                     ))}
 
@@ -335,47 +303,35 @@ export function PaymentDialog({
                         type="button"
                         variant="outline"
                         onClick={addRow}
-                        className="w-full h-10 border-dashed border-slate-300 hover:border-indigo-300 text-xs font-bold text-slate-600 hover:text-indigo-600 rounded-xl transition-all flex items-center justify-center gap-1.5"
+                        className="w-full h-9 border-dashed border-slate-300 text-xs font-bold text-slate-600 hover:text-indigo-600 rounded-xl"
                     >
-                        <Plus className="w-4 h-4" />
-                        Agregar otro método de pago (Pago Mixto)
+                        <Plus className="w-3.5 h-3.5 mr-1" /> Dividir Pago (Pago Mixto)
                     </Button>
                 </div>
 
-                {/* Vuelto / Cambio en las 3 Monedas */}
+                {/* Vuelto / Cambio al Cliente */}
                 {changeInCOP > 0.01 && (
-                    <div className="mx-5 mb-4 p-4 bg-emerald-50 border border-emerald-200/80 rounded-2xl space-y-2">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-emerald-800 uppercase tracking-wide flex items-center gap-1.5">
-                                <ArrowRightLeft className="w-4 h-4 text-emerald-600" /> Cambio / Vuelto al Cliente
-                            </span>
-                            <span className="text-lg font-black text-emerald-700 tabular-nums">
-                                ${changeUSD.toFixed(2)} USD
+                    <div className="mx-5 mb-4 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
+                        <div>
+                            <span className="text-xs font-bold text-emerald-800 uppercase tracking-wide block">Vuelto al Cliente</span>
+                            <span className="text-[11px] font-bold text-emerald-600">
+                                Bs. {changeVES.toFixed(2)} VES
                             </span>
                         </div>
-
-                        {/* Equivale en VES y COP */}
-                        <div className="grid grid-cols-2 gap-2 text-xs font-bold text-emerald-900 border-t border-emerald-200/60 pt-2">
-                            <div className="bg-white/80 p-2 rounded-xl border border-emerald-100">
-                                <span className="text-[10px] text-emerald-600 block">Vuelto en Bolívares</span>
-                                <span className="text-sm font-black">Bs. {changeVES.toFixed(2)} VES</span>
-                            </div>
-                            <div className="bg-white/80 p-2 rounded-xl border border-emerald-100">
-                                <span className="text-[10px] text-emerald-600 block">Vuelto en Pesos</span>
-                                <span className="text-sm font-black">{fmtCOP(changeCOP)}</span>
-                            </div>
-                        </div>
+                        <span className="text-xl font-black text-emerald-700 tabular-nums">
+                            ${changeUSD.toFixed(2)} USD
+                        </span>
                     </div>
                 )}
 
-                {/* Acciones de Cierre de Modal */}
-                <div className="p-5 bg-white border-t border-slate-200/80 rounded-b-2xl flex gap-3">
+                {/* Actions */}
+                <div className="p-5 bg-slate-50 border-t border-slate-200 flex gap-3 rounded-b-2xl">
                     <Button
                         type="button"
                         variant="outline"
                         onClick={onClose}
                         disabled={isSubmitting}
-                        className="flex-1 h-12 rounded-xl font-bold text-slate-600 border-slate-200 hover:bg-slate-50 text-xs"
+                        className="flex-1 h-12 rounded-xl font-bold text-slate-600 border-slate-200 text-xs"
                     >
                         Cancelar
                     </Button>
@@ -393,12 +349,12 @@ export function PaymentDialog({
                         {isSubmitting ? (
                             <>
                                 <Loader2 className="w-4 h-4 animate-spin" />
-                                Procesando Venta...
+                                Procesando...
                             </>
                         ) : (
                             <>
-                                <Check className="w-5 h-5" />
-                                Confirmar y Procesar Venta
+                                <Printer className="w-5 h-5" />
+                                Confirmar e Imprimir Factura
                             </>
                         )}
                     </Button>

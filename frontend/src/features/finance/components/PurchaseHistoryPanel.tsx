@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { PackagePlus, Calendar, ChevronLeft, ChevronRight, TrendingDown, RefreshCw, Search, Package, X } from 'lucide-react';
+import { PackagePlus, Calendar, ChevronLeft, ChevronRight, TrendingDown, RefreshCw, Search, Package, X, Printer } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -435,8 +435,16 @@ export function PurchaseHistoryPanel({ branchId: propBranch }: PurchaseHistoryPa
                         </div>
                     )}
                     
-                    <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 sm:justify-between">
-                        <Button variant="outline" className="gap-2 w-full sm:w-auto ml-auto" onClick={() => setSelectedTx(null)}>
+                    <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 sm:justify-between flex-row gap-2">
+                        <Button
+                            type="button"
+                            onClick={() => window.print()}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold gap-2 rounded-xl"
+                        >
+                            <Printer className="w-4 h-4" />
+                            Imprimir Factura / Comprobante
+                        </Button>
+                        <Button variant="outline" className="gap-2 rounded-xl text-xs font-bold" onClick={() => setSelectedTx(null)}>
                             <X className="w-4 h-4" /> Cerrar
                         </Button>
                     </DialogFooter>
