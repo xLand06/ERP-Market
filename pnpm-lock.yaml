@@ -36,7 +36,7 @@ importers:
         version: 12.8.0
       body-parser:
         specifier: ^2.2.2
-        version: 2.2.2
+        version: 2.2.2(supports-color@5.5.0)
       cors:
         specifier: ^2.8.5
         version: 2.8.6
@@ -83,15 +83,12 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.13
-<<<<<<< HEAD
       '@types/pg':
         specifier: ^8.23.1
         version: 8.23.1
-=======
       '@types/supertest':
         specifier: ^6.0.2
         version: 6.0.3
->>>>>>> origin/feature-basic-v1
       nodemon:
         specifier: ^3.1.4
         version: 3.1.14
@@ -100,7 +97,7 @@ importers:
         version: 7.8.0(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(better-sqlite3@12.8.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3)
       supertest:
         specifier: ^7.0.0
-        version: 7.2.2
+        version: 7.2.2(supports-color@5.5.0)
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@types/node@22.19.13)(typescript@5.9.3)
@@ -109,34 +106,26 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.19.13)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.31.1)(sugarss@5.0.1(postcss@8.5.8))
+        version: 2.1.9(@types/node@22.19.13)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.31.1)(sugarss@5.0.1(postcss@8.5.8))(supports-color@5.5.0)
 
   desktop:
     dependencies:
       '@electron-toolkit/utils':
         specifier: ^3.0.0
-<<<<<<< HEAD
-        version: 3.0.0(electron@41.2.0(supports-color@5.5.0))
-=======
         version: 3.0.0(electron@31.2.0)
->>>>>>> origin/feature-basic-v1
       electron-store:
         specifier: ^8.2.0
         version: 8.2.0
       electron-updater:
         specifier: ^6.0.0
-        version: 6.8.3
+        version: 6.8.3(supports-color@5.5.0)
       sql.js:
         specifier: ^1.11.0
         version: 1.14.1
     devDependencies:
       '@electron-toolkit/preload':
         specifier: ^3.0.0
-<<<<<<< HEAD
-        version: 3.0.2(electron@41.2.0(supports-color@5.5.0))
-=======
         version: 3.0.2(electron@31.2.0)
->>>>>>> origin/feature-basic-v1
       '@electron-toolkit/tsconfig':
         specifier: ^2.0.0
         version: 2.0.0(@types/node@24.12.2)
@@ -147,13 +136,8 @@ importers:
         specifier: ^4.3.1
         version: 4.7.0(vite@5.4.21(@types/node@24.12.2)(lightningcss@1.31.1)(sugarss@5.0.1(postcss@8.5.8)))
       electron:
-<<<<<<< HEAD
-        specifier: ^41.2.0
-        version: 41.2.0(supports-color@5.5.0)
-=======
         specifier: 31.2.0
         version: 31.2.0
->>>>>>> origin/feature-basic-v1
       electron-builder:
         specifier: ^25.1.8
         version: 25.1.8(electron-builder-squirrel-windows@25.1.8)
@@ -4956,29 +4940,17 @@ snapshots:
 
   '@electric-sql/pglite@0.4.1': {}
 
-<<<<<<< HEAD
-  '@electron-toolkit/preload@3.0.2(electron@41.2.0(supports-color@5.5.0))':
-    dependencies:
-      electron: 41.2.0(supports-color@5.5.0)
-=======
   '@electron-toolkit/preload@3.0.2(electron@31.2.0)':
     dependencies:
       electron: 31.2.0
->>>>>>> origin/feature-basic-v1
 
   '@electron-toolkit/tsconfig@2.0.0(@types/node@24.12.2)':
     dependencies:
       '@types/node': 24.12.2
 
-<<<<<<< HEAD
-  '@electron-toolkit/utils@3.0.0(electron@41.2.0(supports-color@5.5.0))':
-    dependencies:
-      electron: 41.2.0(supports-color@5.5.0)
-=======
   '@electron-toolkit/utils@3.0.0(electron@31.2.0)':
     dependencies:
       electron: 31.2.0
->>>>>>> origin/feature-basic-v1
 
   '@electron/asar@3.4.1':
     dependencies:
@@ -4986,7 +4958,7 @@ snapshots:
       glob: 7.2.3
       minimatch: 3.1.5
 
-  '@electron/get@2.0.3(supports-color@5.5.0)':
+  '@electron/get@2.0.3':
     dependencies:
       debug: 4.4.3(supports-color@5.5.0)
       env-paths: 2.2.1
@@ -4994,7 +4966,7 @@ snapshots:
       got: 11.8.6
       progress: 2.0.3
       semver: 6.3.1
-      sumchecker: 3.0.1(supports-color@5.5.0)
+      sumchecker: 3.0.1
     optionalDependencies:
       global-agent: 3.0.0
     transitivePeerDependencies:
@@ -5314,13 +5286,8 @@ snapshots:
 
   '@prisma/adapter-pg@7.8.0':
     dependencies:
-<<<<<<< HEAD
-      '@prisma/driver-adapter-utils': 7.7.0
-      '@types/pg': 8.23.1
-=======
       '@prisma/driver-adapter-utils': 7.8.0
-      '@types/pg': 8.20.0
->>>>>>> origin/feature-basic-v1
+      '@types/pg': 8.23.1
       pg: 8.20.0
       postgres-array: 3.0.4
     transitivePeerDependencies:
@@ -6610,7 +6577,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  body-parser@2.2.2:
+  body-parser@2.2.2(supports-color@5.5.0):
     dependencies:
       bytes: 3.1.2
       content-type: 1.0.5
@@ -6674,7 +6641,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  builder-util-runtime@9.5.1:
+  builder-util-runtime@9.5.1(supports-color@5.5.0):
     dependencies:
       debug: 4.4.3(supports-color@5.5.0)
       sax: 1.6.0
@@ -7215,9 +7182,9 @@ snapshots:
 
   electron-to-chromium@1.5.307: {}
 
-  electron-updater@6.8.3:
+  electron-updater@6.8.3(supports-color@5.5.0):
     dependencies:
-      builder-util-runtime: 9.5.1
+      builder-util-runtime: 9.5.1(supports-color@5.5.0)
       fs-extra: 10.1.0
       js-yaml: 4.1.1
       lazy-val: 1.0.5
@@ -7240,19 +7207,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-<<<<<<< HEAD
-  electron@41.2.0(supports-color@5.5.0):
-    dependencies:
-      '@electron/get': 2.0.3(supports-color@5.5.0)
-      '@types/node': 24.12.2
-      extract-zip: 2.0.1(supports-color@5.5.0)
-=======
   electron@31.2.0:
     dependencies:
       '@electron/get': 2.0.3
       '@types/node': 20.19.40
       extract-zip: 2.0.1
->>>>>>> origin/feature-basic-v1
     transitivePeerDependencies:
       - supports-color
 
@@ -7408,7 +7367,7 @@ snapshots:
 
   exsolve@1.0.8: {}
 
-  extract-zip@2.0.1(supports-color@5.5.0):
+  extract-zip@2.0.1:
     dependencies:
       debug: 4.4.3(supports-color@5.5.0)
       get-stream: 5.2.0
@@ -9038,13 +8997,13 @@ snapshots:
       postcss: 8.5.8
     optional: true
 
-  sumchecker@3.0.1(supports-color@5.5.0):
+  sumchecker@3.0.1:
     dependencies:
       debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
-  superagent@10.3.0:
+  superagent@10.3.0(supports-color@5.5.0):
     dependencies:
       component-emitter: 1.3.1
       cookiejar: 2.1.4
@@ -9058,11 +9017,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  supertest@7.2.2:
+  supertest@7.2.2(supports-color@5.5.0):
     dependencies:
       cookie-signature: 1.2.2
       methods: 1.1.2
-      superagent: 10.3.0
+      superagent: 10.3.0(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -9307,7 +9266,7 @@ snapshots:
       d3-time: 3.1.0
       d3-timer: 3.0.1
 
-  vite-node@2.1.9(@types/node@22.19.13)(lightningcss@1.31.1)(sugarss@5.0.1(postcss@8.5.8)):
+  vite-node@2.1.9(@types/node@22.19.13)(lightningcss@1.31.1)(sugarss@5.0.1(postcss@8.5.8))(supports-color@5.5.0):
     dependencies:
       cac: 6.7.14
       debug: 4.4.3(supports-color@5.5.0)
@@ -9365,7 +9324,7 @@ snapshots:
       lightningcss: 1.31.1
       sugarss: 5.0.1(postcss@8.5.8)
 
-  vitest@2.1.9(@types/node@22.19.13)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.31.1)(sugarss@5.0.1(postcss@8.5.8)):
+  vitest@2.1.9(@types/node@22.19.13)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.31.1)(sugarss@5.0.1(postcss@8.5.8))(supports-color@5.5.0):
     dependencies:
       '@vitest/expect': 2.1.9
       '@vitest/mocker': 2.1.9(vite@5.4.21(@types/node@22.19.13)(lightningcss@1.31.1)(sugarss@5.0.1(postcss@8.5.8)))
@@ -9385,7 +9344,7 @@ snapshots:
       tinypool: 1.1.1
       tinyrainbow: 1.2.0
       vite: 5.4.21(@types/node@22.19.13)(lightningcss@1.31.1)(sugarss@5.0.1(postcss@8.5.8))
-      vite-node: 2.1.9(@types/node@22.19.13)(lightningcss@1.31.1)(sugarss@5.0.1(postcss@8.5.8))
+      vite-node: 2.1.9(@types/node@22.19.13)(lightningcss@1.31.1)(sugarss@5.0.1(postcss@8.5.8))(supports-color@5.5.0)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 22.19.13
