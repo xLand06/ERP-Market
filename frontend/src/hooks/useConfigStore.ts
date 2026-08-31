@@ -10,6 +10,7 @@ interface ExchangeRate {
 interface ConfigState {
     rates: Record<string, number>;
     iva: number;
+    mainCurrency: string; // 'USD' | 'VES' | 'COP'
     autoOpenTime: string | null; // 'HH:mm' o null para desactivado
     autoCloseTime: string | null; // 'HH:mm' o null para desactivado
     purgeRetentionDays: number; // Días de retención para transacciones en purga automática
@@ -22,6 +23,7 @@ interface ConfigState {
     fetchRates: () => Promise<void>;
     updateRate: (code: string, rate: number) => Promise<void>;
     setIva: (iva: number) => void;
+    setMainCurrency: (currency: string) => void;
     setAutoOpenTime: (time: string | null) => void;
     setAutoCloseTime: (time: string | null) => void;
     setPurgeRetention: (days: number) => void;
@@ -29,7 +31,7 @@ interface ConfigState {
     fetchSettings: () => Promise<void>;
     updateSettings: (settings: Partial<ConfigState>) => Promise<void>;
 
-    // Helpers de conversión (COP es la moneda base del sistema)
+    // Helpers de conversión (COP es la moneda base interna)
     /** Convierte desde cualquier moneda a COP */
     toCOP: (amount: number, currency: string) => number;
     /** Convierte desde COP a otra moneda */
@@ -40,6 +42,8 @@ interface ConfigState {
     fmtUSD: (amount: number) => string;
     /** Formatea en VES: Bs. 152.40 */
     fmtVES: (amount: number) => string;
+    /** Formatea según la moneda principal seleccionada por el dueño */
+    fmtMain: (amount: number) => string;
     /** Retorna el símbolo de una moneda */
     currencySymbol: (currency: string) => string;
 }
@@ -53,6 +57,7 @@ export const useConfigStore = create<ConfigState>()(
                 COP: 1,
             },
             iva: 0,
+            mainCurrency: 'USD',
             autoOpenTime: null,
             autoCloseTime: null,
             purgeRetentionDays: 30,
@@ -100,6 +105,13 @@ export const useConfigStore = create<ConfigState>()(
                     maximumFractionDigits: 2,
                 }).format(amount)}`,
 
+            fmtMain: (amount: number) => {
+                const main = get().mainCurrency || 'USD';
+                if (main === 'USD') return get().fmtUSD(get().fromCOP(amount, 'USD'));
+                if (main === 'VES') return get().fmtVES(get().fromCOP(amount, 'VES'));
+                return get().fmtCOP(amount);
+            },
+
             currencySymbol: (currency: string) => {
                 if (currency === 'COP') return '$';
                 if (currency === 'USD') return '$';
@@ -136,6 +148,7 @@ export const useConfigStore = create<ConfigState>()(
             },
 
             setIva: (iva) => set({ iva }),
+            setMainCurrency: (mainCurrency) => set({ mainCurrency }),
             setAutoOpenTime: (time) => set({ autoOpenTime: time }),
             setAutoCloseTime: (time) => set({ autoCloseTime: time }),
             setPurgeRetention: (days) => set({ purgeRetentionDays: days }),
@@ -147,6 +160,7 @@ export const useConfigStore = create<ConfigState>()(
                     if (res.data.success) {
                         set({
                             iva: res.data.data.iva,
+                            mainCurrency: res.data.data.mainCurrency || 'USD',
                             autoOpenTime: res.data.data.autoOpenTime,
                             autoCloseTime: res.data.data.autoCloseTime,
                             purgeRetentionDays: res.data.data.purgeRetentionDays,

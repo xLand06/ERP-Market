@@ -3,6 +3,7 @@ import { logger } from '../../core/utils/logger';
 
 export interface SystemSettings {
     iva: number;
+    mainCurrency: string;
     autoOpenTime: string | null;
     autoCloseTime: string | null;
     purgeRetentionDays: number;
@@ -11,6 +12,7 @@ export interface SystemSettings {
 
 const DEFAULT_SETTINGS: SystemSettings = {
     iva: 0,
+    mainCurrency: 'USD',
     autoOpenTime: null,
     autoCloseTime: null,
     purgeRetentionDays: 30,

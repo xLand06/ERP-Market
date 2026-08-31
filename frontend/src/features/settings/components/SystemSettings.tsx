@@ -11,12 +11,13 @@ export function SystemSettings() {
     const isOwner = user?.role === 'OWNER';
 
     const { 
-        rates, iva, autoOpenTime, autoCloseTime, purgeRetentionDays, purgeLogRetentionDays,
+        rates, iva, mainCurrency, autoOpenTime, autoCloseTime, purgeRetentionDays, purgeLogRetentionDays,
         updateRate, updateSettings, fetchSettings
     } = useConfigStore();
     const [localVes, setLocalVes] = useState(rates['VES']?.toString() || '5.5');
     const [localUsd, setLocalUsd] = useState((rates['USD'] || rates['COP'] || 3600).toString());
     const [localIva, setLocalIva] = useState((iva * 100).toString());
+    const [localMainCurrency, setLocalMainCurrency] = useState(mainCurrency || 'USD');
     const [localCloseTime, setLocalCloseTime] = useState(autoCloseTime || '');
     const [localPurgeDays, setLocalPurgeDays] = useState(purgeRetentionDays.toString());
     const [localLogDays, setLocalLogDays] = useState(purgeLogRetentionDays.toString());
@@ -32,10 +33,11 @@ export function SystemSettings() {
         setLocalVes(rates['VES']?.toString() || '5.5');
         setLocalUsd((rates['USD'] || rates['COP'] || 3600).toString());
         setLocalIva((iva * 100).toString());
+        setLocalMainCurrency(mainCurrency || 'USD');
         setLocalCloseTime(autoCloseTime || '');
         setLocalPurgeDays(purgeRetentionDays.toString());
         setLocalLogDays(purgeLogRetentionDays.toString());
-    }, [rates, iva, autoCloseTime, purgeRetentionDays, purgeLogRetentionDays]);
+    }, [rates, iva, mainCurrency, autoCloseTime, purgeRetentionDays, purgeLogRetentionDays]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -47,6 +49,7 @@ export function SystemSettings() {
             // 2. Configuración general (JSON backend + Store)
             await updateSettings({
                 iva: (parseFloat(localIva) || 0) / 100,
+                mainCurrency: localMainCurrency,
                 autoCloseTime: localCloseTime.trim() || null,
                 purgeRetentionDays: parseInt(localPurgeDays) || 30,
                 purgeLogRetentionDays: parseInt(localLogDays) || 90
@@ -132,6 +135,34 @@ export function SystemSettings() {
                                         >
                                             <span className="font-bold">{prov.label}</span>
                                             <span className="text-[10px] text-slate-400 font-normal">{prov.desc}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Seleccion de Moneda Principal del Sistema */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-slate-800">Moneda Principal del Sistema</label>
+                                <p className="text-xs text-slate-400">Es la moneda de visualización y trabajo predeterminada para precios y reportes.</p>
+                                <div className="grid grid-cols-3 gap-2 pt-1">
+                                    {[
+                                        { id: 'USD', label: '💵 USD ($)', desc: 'Dólares' },
+                                        { id: 'VES', label: '🇻🇪 VES (Bs.)', desc: 'Bolívares' },
+                                        { id: 'COP', label: '🇨🇴 COP ($)', desc: 'Pesos Col.' },
+                                    ].map((cur) => (
+                                        <button
+                                            key={cur.id}
+                                            type="button"
+                                            onClick={() => setLocalMainCurrency(cur.id)}
+                                            className={cn(
+                                                "p-3 rounded-xl border text-center transition-all text-xs font-extrabold flex flex-col items-center justify-center gap-1",
+                                                localMainCurrency === cur.id
+                                                    ? "bg-indigo-50 border-indigo-600 text-indigo-700 ring-2 ring-indigo-600/20 shadow-xs"
+                                                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                                            )}
+                                        >
+                                            <span className="text-sm">{cur.label}</span>
+                                            <span className="text-[10px] text-slate-400 font-normal">{cur.desc}</span>
                                         </button>
                                     ))}
                                 </div>
