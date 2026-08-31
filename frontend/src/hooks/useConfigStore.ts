@@ -26,7 +26,11 @@ interface ConfigState {
     fiscalPhone: string;
 
     // Impresora Térmica & Impresión
+    thermalPrinterEnabled: boolean;
     printerType: 'browser' | 'thermal_usb' | 'thermal_network' | 'thermal_serial';
+    selectedPrinterId: string | null;
+    selectedPrinterName: string | null;
+    printerNetworkIp: string;
     paperWidth: '80mm' | '58mm';
     autoCut: boolean;
     openCashDrawer: boolean;
@@ -101,7 +105,11 @@ export const useConfigStore = create<ConfigState>()(
             fiscalAddress: 'Calle Principal, Local #1',
             fiscalPhone: '0414-1234567',
 
+            thermalPrinterEnabled: true,
             printerType: 'browser',
+            selectedPrinterId: null,
+            selectedPrinterName: null,
+            printerNetworkIp: '192.168.1.200',
             paperWidth: '80mm',
             autoCut: true,
             openCashDrawer: true,
