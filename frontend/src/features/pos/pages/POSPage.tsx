@@ -457,7 +457,7 @@ export default function POSPage() {
                         <div>
                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ticket Actual</p>
                             <p className="text-base font-black text-white tabular-nums leading-none">
-                                {fmtCOP(totals.total)}
+                                {fmtMain(totals.total)}
                             </p>
                         </div>
                     </div>
@@ -520,7 +520,7 @@ export default function POSPage() {
                             }}
                                 className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all hover:scale-[1.02] font-bold text-slate-800">
                                 <span>Base ({activeProductForPres.baseUnit})</span>
-                                <span className="font-black">{fmtCOP(isSaleMode ? activeProductForPres.price : activeProductForPres.cost)}</span>
+                                <span className="font-black">{fmtMain(isSaleMode ? activeProductForPres.price : activeProductForPres.cost)}</span>
                             </button>
                         )}
                         {activeProductForPres?.presentations.map(pres => (
@@ -537,7 +537,7 @@ export default function POSPage() {
                                         Equivale a {pres.multiplier} {activeProductForPres.baseUnit}
                                     </span>
                                 </div>
-                                <span className="font-black">{fmtCOP(isSaleMode ? pres.price : activeProductForPres.cost * pres.multiplier)}</span>
+                                <span className="font-black">{fmtMain(isSaleMode ? pres.price : activeProductForPres.cost * pres.multiplier)}</span>
                             </button>
                         ))}
                     </div>
