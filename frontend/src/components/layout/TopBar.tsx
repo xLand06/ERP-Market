@@ -58,46 +58,47 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     ];
 
     return (
-        <header className="h-14 lg:h-16 bg-white border-b border-slate-200 flex items-center justify-between px-2.5 sm:px-4 lg:px-6 gap-2 sm:gap-4 transition-all duration-300 shadow-sm relative z-30">
+        <header className="h-14 lg:h-16 bg-white border-b border-slate-200 flex items-center justify-between px-2 sm:px-4 lg:px-6 gap-1.5 sm:gap-3 transition-all duration-300 shadow-sm relative z-30 min-w-0">
             {/* Left – Toggle + Logo */}
-            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
                 <button 
                     onClick={onToggleSidebar}
-                    className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all active:scale-95 min-w-10 min-h-10 flex items-center justify-center"
+                    className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all active:scale-95 min-w-9 min-h-9 flex items-center justify-center"
                     aria-label={collapsed ? 'Abrir menú' : 'Cerrar menú'}
                 >
                     <Menu className="w-5 h-5 lg:w-6 lg:h-6" />
                 </button>
 
                 <div className="flex items-center gap-2 shrink-0">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shrink-0">
-                        <Store className="w-4 h-4 text-white" />
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shrink-0">
+                        <Store className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                     </div>
-                    {/* Hide text on very small screens, show on sm+ */}
-                    <span className="font-black text-xs sm:text-sm text-slate-900 tracking-tight hidden sm:block uppercase">Abastos Sofimar</span>
+                    <span className="font-black text-xs sm:text-sm text-slate-900 tracking-tight hidden md:block uppercase truncate max-w-[140px] xl:max-w-none">
+                        Abastos Sofimar
+                    </span>
                 </div>
             </div>
 
-            {/* Center – Exchange Rate Widget (Desktop full, Mobile compact popover) */}
+            {/* Center – Exchange Rate Widget */}
             <div className="flex items-center shrink-0">
                 {/* Desktop Full Rates Bar */}
-                <div className="hidden lg:flex items-center gap-0 bg-slate-50 border border-slate-200 rounded-xl p-1 text-xs">
+                <div className="hidden lg:flex items-center gap-0 bg-slate-50 border border-slate-200/80 rounded-xl p-1 text-xs">
                     <div className="flex items-center gap-1.5 px-2 text-slate-400">
-                        <ArrowLeftRight className="w-3 h-3" />
-                        <span className="font-medium">Tasa</span>
+                        <ArrowLeftRight className="w-3.5 h-3.5 text-indigo-600" />
+                        <span className="font-semibold text-slate-600">Tasa</span>
                     </div>
-                    <div className="w-px h-5 bg-slate-200 mx-1" />
+                    <div className="w-px h-4 bg-slate-200 mx-1" />
 
                     {/* Currency tabs */}
-                    <div className="flex items-center">
+                    <div className="flex items-center bg-slate-200/50 p-0.5 rounded-lg">
                         {CURRENCIES.map(cur => (
                             <button
                                 key={cur}
                                 onClick={() => setBase(cur)}
                                 className={cn(
-                                    'px-2.5 py-1 rounded-lg font-semibold transition-all duration-150',
+                                    'px-2 py-0.5 rounded-md font-bold text-[11px] transition-all duration-150',
                                     base === cur
-                                        ? 'bg-white shadow-sm text-slate-900'
+                                        ? 'bg-white shadow-sm text-indigo-600'
                                         : 'text-slate-400 hover:text-slate-700'
                                 )}
                             >
@@ -106,19 +107,19 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                         ))}
                     </div>
 
-                    <div className="w-px h-5 bg-slate-200 mx-1" />
+                    <div className="w-px h-4 bg-slate-200 mx-1.5" />
 
                     {/* Rates display */}
                     <div className="flex items-center">
                         {others.map((cur, i) => (
                             <div key={cur} className="flex items-center">
-                                {i > 0 && <div className="w-px h-4 bg-slate-200 mx-2" />}
-                                <span className="px-2 tabular-nums text-slate-500">
+                                {i > 0 && <div className="w-px h-3.5 bg-slate-200 mx-2" />}
+                                <span className="px-1.5 tabular-nums text-slate-500 text-xs">
                                     <span className="text-slate-400">{SYMBOLS[cur]}1 = </span>
                                     <span className="font-bold text-slate-900">
                                         {SYMBOLS[base]}{formatRate(cur, base)}
                                     </span>
-                                    <span className="text-slate-400"> {base}</span>
+                                    <span className="text-slate-400 text-[10px]"> {base}</span>
                                 </span>
                             </div>
                         ))}
@@ -129,16 +130,16 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                 <div className="relative lg:hidden">
                     <button
                         onClick={() => setRatePopoverOpen(!ratePopoverOpen)}
-                        className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-all active:scale-95"
+                        className="flex items-center gap-1 px-2 py-1 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-all active:scale-95"
                         title="Ver tasas de cambio"
                     >
                         <ArrowLeftRight className="w-3.5 h-3.5 text-indigo-600" />
-                        <span className="font-bold">{base}</span>
+                        <span className="font-bold text-xs">{base}</span>
                         <ChevronDown className={cn("w-3 h-3 text-slate-400 transition-transform", ratePopoverOpen && "rotate-180")} />
                     </button>
 
                     {ratePopoverOpen && (
-                        <div className="absolute left-1/2 -translate-x-1/2 sm:left-0 sm:translate-x-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 animate-slide-up">
+                        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-60 sm:w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 animate-slide-up">
                             <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2">
                                 <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Moneda Base</span>
                                 <div className="flex bg-slate-100 p-0.5 rounded-lg">
@@ -158,7 +159,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                                     ))}
                                 </div>
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-1.5">
                                 {others.map((cur) => (
                                     <div key={cur} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100 text-xs">
                                         <span className="font-medium text-slate-500">{SYMBOLS[cur]} 1 {cur}</span>
@@ -171,55 +172,37 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                         </div>
                     )}
                 </div>
-
-                <div className={cn("w-px h-5 bg-slate-200 mx-1", collapsed ? "hidden lg:block" : "hidden xl:block")} />
-
-                {/* Desktop Rates display */}
-                <div className={cn("items-center", collapsed ? "hidden lg:flex" : "hidden xl:flex")}>
-                    {others.map((cur, i) => (
-                        <div key={cur} className="flex items-center">
-                            {i > 0 && <div className="w-px h-4 bg-slate-200 mx-2" />}
-                            <span className="px-2 tabular-nums text-slate-500 text-xs">
-                                <span className="text-slate-400">{SYMBOLS[base]}1 = </span>
-                                <span className="font-bold text-slate-900">
-                                    {SYMBOLS[cur]}{formatRate(base, cur)}
-                                </span>
-                                <span className="text-slate-400"> {cur}</span>
-                            </span>
-                        </div>
-                    ))}
-                </div>
             </div>
 
             {/* Right – BranchSelector + Shortcuts + Profile */}
-            <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-3 shrink-0">
+            <div className="flex items-center gap-1 sm:gap-2 lg:gap-3 shrink-0">
                 <CloudSyncWidget />
                 <BranchSelector />
 
-                <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/50">
+                <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-100/80 p-0.5 sm:p-1 rounded-xl border border-slate-200/50">
                     <button 
                         onClick={() => setShortcutsOpen(true)}
-                        className="hidden sm:flex w-8 h-8 lg:w-9 lg:h-9 items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95" 
+                        className="hidden sm:flex w-7 h-7 sm:w-8 sm:h-8 lg:w-9 lg:h-9 items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95" 
                         title="Atajos de teclado (K)"
                     >
-                        <Keyboard className="w-4 h-4 lg:w-4.5 lg:h-4.5" />
+                        <Keyboard className="w-4 h-4" />
                     </button>
                     <button 
-                        className="relative w-8 h-8 lg:w-9 lg:h-9 flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95"
+                        className="relative w-7 h-7 sm:w-8 sm:h-8 lg:w-9 lg:h-9 flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95"
                         aria-label="Notificaciones"
                     >
-                        <Bell className="w-4 h-4 lg:w-4.5 lg:h-4.5" />
-                        <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-white" />
+                        <Bell className="w-4 h-4" />
+                        <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full border border-white" />
                     </button>
                 </div>
 
                 <div className="relative">
                     <button
                         onClick={() => setProfileOpen(!profileOpen)}
-                        className="flex items-center gap-1.5 lg:py-1.5 py-1 px-1 lg:px-2 rounded-xl hover:bg-slate-100 transition-all active:scale-95"
+                        className="flex items-center gap-1.5 py-1 px-1 sm:px-2 rounded-xl hover:bg-slate-100 transition-all active:scale-95"
                     >
-                        <div className="w-8 h-8 lg:w-8 lg:h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center shadow-md shrink-0">
-                            <User className="w-4 h-4 text-white" />
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center shadow-md shrink-0">
+                            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                         </div>
                         <div className="hidden lg:block text-left">
                             <p className="text-xs font-bold text-slate-900 leading-none">{user?.nombre || 'Usuario'}</p>
