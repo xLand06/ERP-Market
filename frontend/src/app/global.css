@@ -187,34 +187,41 @@
     color: #F0F6FC !important;
   }
 
-  /* Structural Containers & Cards */
-  html.theme-dark .bg-white {
+  /* Structural Containers, Dialogs & Cards */
+  html.theme-dark .bg-white,
+  html.theme-dark [class*="bg-white"] {
     background-color: #161B22 !important;
     color: #F0F6FC !important;
     border-color: #30363D !important;
   }
-  html.theme-dark .bg-slate-50,
-  html.theme-dark [class*="bg-slate-100"],
-  html.theme-dark [class*="bg-slate-200"],
-  html.theme-dark [class*="bg-gray-50"],
-  html.theme-dark [class*="bg-gray-100"] {
+
+  /* All Gradients override */
+  html.theme-dark [class*="bg-gradient-to-"] {
+    background-image: none !important;
     background-color: #21262D !important;
     color: #F0F6FC !important;
   }
+
+  /* Slate, Gray, Indigo, Emerald, Amber backgrounds with or without opacity slashes */
+  html.theme-dark [class*="bg-slate-"],
+  html.theme-dark [class*="bg-gray-"] {
+    background-color: #21262D !important;
+    color: #F0F6FC !important;
+  }
+
   html.theme-dark header {
     background-color: #161B22 !important;
     border-color: #30363D !important;
   }
 
   /* Typography & High-Contrast Colors (Accessibility > 4.5:1 Ratio) */
-  html.theme-dark .text-slate-950,
-  html.theme-dark .text-slate-900,
-  html.theme-dark .text-slate-800,
-  html.theme-dark .text-slate-700,
-  html.theme-dark .text-slate-600,
-  html.theme-dark .text-gray-900,
-  html.theme-dark .text-gray-800,
-  html.theme-dark .text-gray-700,
+  html.theme-dark [class*="text-slate-9"],
+  html.theme-dark [class*="text-slate-8"],
+  html.theme-dark [class*="text-slate-7"],
+  html.theme-dark [class*="text-slate-6"],
+  html.theme-dark [class*="text-gray-9"],
+  html.theme-dark [class*="text-gray-8"],
+  html.theme-dark [class*="text-gray-7"],
   html.theme-dark .text-black,
   html.theme-dark .text-emerald-950,
   html.theme-dark .text-indigo-950,
@@ -223,10 +230,10 @@
     color: #F0F6FC !important;
   }
 
-  html.theme-dark .text-slate-500,
-  html.theme-dark .text-slate-400,
-  html.theme-dark .text-gray-500,
-  html.theme-dark .text-gray-400 {
+  html.theme-dark [class*="text-slate-5"],
+  html.theme-dark [class*="text-slate-4"],
+  html.theme-dark [class*="text-gray-5"],
+  html.theme-dark [class*="text-gray-4"] {
     color: #8B949E !important;
   }
 
@@ -293,26 +300,20 @@
   }
   html.theme-dark [role="tab"] .bg-white,
   html.theme-dark button[role="tab"] .bg-white,
-  html.theme-dark [role="tab"] .bg-slate-100,
-  html.theme-dark button[role="tab"] .bg-slate-100 {
+  html.theme-dark [role="tab"] [class*="bg-slate-"],
+  html.theme-dark button[role="tab"] [class*="bg-slate-"] {
     background-color: #161B22 !important;
     color: #F0F6FC !important;
     border: 1px solid #30363D !important;
   }
-  html.theme-dark [class*="hover:bg-slate-50"]:hover,
-  html.theme-dark [class*="hover:bg-slate-100"]:hover,
-  html.theme-dark [class*="hover:bg-indigo-50"]:hover {
+  html.theme-dark [class*="hover:bg-"]:hover {
     background-color: #30363D !important;
     color: #F0F6FC !important;
   }
 
   /* Borders & Dividers */
-  html.theme-dark .border-slate-300,
-  html.theme-dark .border-slate-200,
-  html.theme-dark .border-slate-100,
-  html.theme-dark .border-gray-300,
-  html.theme-dark .border-gray-200,
-  html.theme-dark .border-gray-100 {
+  html.theme-dark [class*="border-slate-"],
+  html.theme-dark [class*="border-gray-"] {
     border-color: #30363D !important;
   }
 
