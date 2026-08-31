@@ -140,7 +140,7 @@ export function ProductSearch({
             if (filteredProducts.length === 1) {
                 const prod = filteredProducts[0];
                 if (prod.stock === 0 && isSaleMode) {
-                    toast.error(`⚠️ ${prod.name} no tiene stock disponible`);
+                    toast.error(`${prod.name} no tiene stock disponible`);
                     return;
                 }
                 if (prod.presentations.length > 0) {
@@ -160,22 +160,43 @@ export function ProductSearch({
         <div className="flex flex-col gap-3 h-full">
             {/* Search Bar & Barcode Scanner Status Indicator */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2" onKeyDown={handleKeyDown}>
-                <div className="relative flex-1">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <Input
-                        ref={searchRef}
-                        placeholder="Buscar producto por nombre o escanear código de barras... [F2]"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        className="pl-10 pr-10 h-11 bg-white border-slate-200 shadow-2xs rounded-xl focus:border-indigo-500 text-sm font-medium"
-                    />
-                    <Barcode className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-indigo-500" />
+                <div className="relative flex-1 flex items-center gap-1.5">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Input
+                            ref={searchRef}
+                            placeholder="Buscar producto por nombre o escanear código... [F2]"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            className="pl-10 pr-10 h-11 bg-white border-slate-200 shadow-2xs rounded-xl focus:border-indigo-500 text-sm font-medium"
+                        />
+                        <Barcode className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-indigo-500" />
+                    </div>
+
+                    {/* Phone/Tablet Camera Scanner Trigger Button */}
+                    <Button
+                        type="button"
+                        onClick={() => setIsCameraOpen(true)}
+                        className="h-11 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-xs shrink-0 flex items-center gap-1.5 active:scale-95"
+                        title="Escanear con la cámara del teléfono"
+                    >
+                        <Camera className="w-4 h-4" />
+                        <span className="text-xs hidden xs:inline sm:inline">Cámara</span>
+                    </Button>
                 </div>
-                <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 border border-emerald-200/80 rounded-xl shrink-0 self-start sm:self-auto" title="El lector de código de barras está listo para recibir lecturas">
+
+                <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 border border-emerald-200/80 rounded-xl shrink-0 self-start sm:self-auto" title="El lector de código de barras físico o cámara está listo">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="text-[11px] font-bold text-emerald-700 tracking-tight">Escáner Activo</span>
                 </div>
             </div>
+
+            {/* Camera Barcode Scanner Modal */}
+            <CameraBarcodeScannerModal
+                open={isCameraOpen}
+                onClose={() => setIsCameraOpen(false)}
+                onScan={handleCameraScan}
+            />
 
             {/* Category chips */}
             <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar items-center">
