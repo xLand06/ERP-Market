@@ -1,10 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { Search, Barcode, Package, Loader2 } from 'lucide-react';
+import { Search, Barcode, Package, Loader2, Camera } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useProductSearch, findProductByBarcode } from '../hooks/useProductSearch';
+import { CameraBarcodeScannerModal } from '@/components/scanner/CameraBarcodeScannerModal';
 import toast from 'react-hot-toast';
 import type { Product, ProductPresentation, InventoryItem } from '../types';
 
