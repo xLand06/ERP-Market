@@ -1,0 +1,15 @@
+{
+  "appId": "com.erpmarket.app",
+  "appName": "ERP Market",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "plugins": {
+    "CapacitorSQLite": {
+      "androidIsEncryption": false
+    }
+  }
+}
