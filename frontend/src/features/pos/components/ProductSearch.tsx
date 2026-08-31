@@ -94,6 +94,7 @@ export function ProductSearch({
     onShowPresentations,
 }: ProductSearchProps) {
     const searchRef = React.useRef<HTMLInputElement>(null);
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
 
     const {
         search,
@@ -104,6 +105,31 @@ export function ProductSearch({
         filteredProducts,
         isSearching,
     } = useProductSearch(inventory, isSaleMode);
+
+    const handleCameraScan = useCallback((scannedCode: string) => {
+        const allProducts = inventory.map(item => item.product).filter(Boolean) as unknown as Product[];
+        const found = findProductByBarcode(filteredProducts, scannedCode) 
+            || findProductByBarcode(allProducts, scannedCode);
+
+        if (found) {
+            if (found.product.stock === 0 && isSaleMode) {
+                toast.error(`${found.product.name} no tiene stock disponible`);
+                return;
+            }
+            if (found.presentation) {
+                if (onAddToCart(found.product, found.presentation)) {
+                    toast.success(`✓ ${found.product.name} (${found.presentation.name}) añadido`);
+                }
+            } else {
+                if (onAddToCart(found.product)) {
+                    toast.success(`✓ ${found.product.name} añadido`);
+                }
+            }
+            setSearch('');
+        } else {
+            toast.error(`Código ${scannedCode} no encontrado`);
+        }
+    }, [inventory, filteredProducts, isSaleMode, onAddToCart, setSearch]);
 
     // Manejar hotkey F2 y Enter para escanear código de barras estando enfocado en el input
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
