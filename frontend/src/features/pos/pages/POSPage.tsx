@@ -248,30 +248,36 @@ export default function POSPage() {
             const config = useConfigStore.getState();
             const primaryPrinter = config.printers.find(p => p.isPrimary) || config.printers[0] || null;
 
-            // Imprimir directamente la factura como en Backoffice
-            await printThermalReceiptReal(primaryPrinter, {
-                invoiceNumber: invoiceNum,
-                customerName: 'Consumidor Final',
-                customerTaxId: 'V-00000000-0',
-                businessName: config.businessName,
-                taxId: config.taxId,
-                fiscalAddress: config.fiscalAddress,
-                fiscalPhone: config.fiscalPhone,
-                items: saleItems,
-                totalUSD: totals.total,
-                totalVES: config.fromUSD(totals.total, 'VES'),
-                totalCOP: config.fromUSD(totals.total, 'COP'),
-                paymentMethods: formattedPayMethods,
-                footerMessage: config.footerMessage,
-            });
+            await api.post('/pos/transactions', payload);
 
-            toast.success('¡Venta realizada con éxito! Factura impresa.');
+            toast.success('¡Venta realizada con éxito!');
             setPayOpen(false);
             clearCart();
             refetch();
             queryClient.invalidateQueries({ queryKey: ['openRegister'] });
+
+            // Intentar imprimir el ticket térmico de forma asíncrona sin bloquear la venta realizada
+            try {
+                await printThermalReceiptReal(primaryPrinter, {
+                    invoiceNumber: invoiceNum,
+                    customerName: 'Consumidor Final',
+                    customerTaxId: 'V-00000000-0',
+                    businessName: config.businessName,
+                    taxId: config.taxId,
+                    fiscalAddress: config.fiscalAddress,
+                    fiscalPhone: config.fiscalPhone,
+                    items: saleItems,
+                    totalUSD: totals.total,
+                    totalVES: config.fromUSD(totals.total, 'VES'),
+                    totalCOP: config.fromUSD(totals.total, 'COP'),
+                    paymentMethods: formattedPayMethods,
+                    footerMessage: config.footerMessage,
+                });
+            } catch (printErr) {
+                console.warn('Aviso: No se completó el envío a la impresora:', printErr);
+            }
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Error al procesar la venta');
+            toast.error(error.response?.data?.error || 'Error al procesar la venta en la sucursal');
         } finally {
             setIsSubmitting(false);
         }
