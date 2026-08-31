@@ -250,26 +250,58 @@
     color: #FB7185 !important;
   }
 
-  /* Soft Background Accents & Badges */
-  html.theme-dark .bg-emerald-50,
-  html.theme-dark .bg-emerald-100\/50 {
-    background-color: rgba(6, 78, 59, 0.4) !important;
+  /* Soft Background Accents & Attribute-Based Class Matching */
+  html.theme-dark [class*="bg-emerald-50"],
+  html.theme-dark [class*="bg-emerald-100"] {
+    background-color: rgba(6, 78, 59, 0.5) !important;
     color: #6EE7B7 !important;
   }
-  html.theme-dark .bg-indigo-50,
-  html.theme-dark .bg-indigo-100\/50 {
-    background-color: rgba(49, 46, 129, 0.4) !important;
+  html.theme-dark [class*="bg-indigo-50"],
+  html.theme-dark [class*="bg-indigo-100"] {
+    background-color: rgba(49, 46, 129, 0.5) !important;
     color: #A5B4FC !important;
   }
-  html.theme-dark .bg-amber-50,
-  html.theme-dark .bg-amber-100\/50 {
-    background-color: rgba(120, 53, 15, 0.4) !important;
+  html.theme-dark [class*="bg-amber-50"],
+  html.theme-dark [class*="bg-amber-100"] {
+    background-color: rgba(120, 53, 15, 0.5) !important;
     color: #FDE68A !important;
   }
-  html.theme-dark .bg-rose-50,
-  html.theme-dark .bg-rose-100\/50 {
-    background-color: rgba(136, 19, 55, 0.4) !important;
+  html.theme-dark [class*="bg-rose-50"],
+  html.theme-dark [class*="bg-rose-100"] {
+    background-color: rgba(136, 19, 55, 0.5) !important;
     color: #FECDD3 !important;
+  }
+
+  /* Active Tabs Specific Contrast Fix for Dark Mode */
+  html.theme-dark [role="tab"],
+  html.theme-dark button[role="tab"] {
+    color: #8B949E !important;
+  }
+  html.theme-dark [role="tab"][aria-selected="true"],
+  html.theme-dark button[role="tab"][aria-selected="true"],
+  html.theme-dark button[aria-selected="true"] {
+    background-color: #21262D !important;
+    color: #F0F6FC !important;
+    border-color: #10B981 !important;
+  }
+  html.theme-dark [role="tab"] span,
+  html.theme-dark button[role="tab"] span,
+  html.theme-dark button[aria-selected="true"] span {
+    color: #F0F6FC !important;
+  }
+  html.theme-dark [role="tab"] .bg-white,
+  html.theme-dark button[role="tab"] .bg-white,
+  html.theme-dark [role="tab"] .bg-slate-100,
+  html.theme-dark button[role="tab"] .bg-slate-100 {
+    background-color: #161B22 !important;
+    color: #F0F6FC !important;
+    border: 1px solid #30363D !important;
+  }
+  html.theme-dark [class*="hover:bg-slate-50"]:hover,
+  html.theme-dark [class*="hover:bg-slate-100"]:hover,
+  html.theme-dark [class*="hover:bg-indigo-50"]:hover {
+    background-color: #30363D !important;
+    color: #F0F6FC !important;
   }
 
   /* Borders & Dividers */
