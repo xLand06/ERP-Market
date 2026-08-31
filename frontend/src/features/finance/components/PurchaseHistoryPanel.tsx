@@ -383,6 +383,11 @@ export function PurchaseHistoryPanel({ branchId: propBranch }: PurchaseHistoryPa
                                     <p className="text-sm font-semibold text-slate-800">{selectedTx.user?.nombre || selectedTx.user?.username || '—'}</p>
                                 </div>
                                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Cliente / Comprador</p>
+                                    <p className="text-sm font-bold text-slate-900">{selectedTx.customer?.name || (selectedTx as any).customerName || 'Consumidor Final'}</p>
+                                    <p className="text-[11px] font-medium text-slate-500 font-mono">{(selectedTx.customer?.taxId || (selectedTx as any).customerTaxId || 'V-00000000-0')}</p>
+                                </div>
+                                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
                                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Total Orig.</p>
                                     <p className="text-sm font-semibold text-slate-800">{formatOriginalCost(selectedTx)}</p>
                                 </div>
@@ -423,11 +428,7 @@ export function PurchaseHistoryPanel({ branchId: propBranch }: PurchaseHistoryPa
                                         ))}
                                     </tbody>
                                 </table>
-                            </div>
-
-                            {/* Totals */}
-                            <div className="space-y-1.5 text-sm pt-2">
-                                <div className="flex justify-between font-black text-base text-slate-900 pt-2 border-t border-slate-200">
+                                <div className="p-4 bg-slate-50 flex justify-between font-black text-base text-slate-900 pt-2 border-t border-slate-200">
                                     <span>Total Registrado (COP)</span>
                                     <span className="tabular-nums text-indigo-700">{fmtCOP(Number(selectedTx.total))}</span>
                                 </div>

@@ -35,6 +35,9 @@ export default function POSPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [summary, setSummary] = useState<{
         visible: boolean;
+        customerName?: string;
+        customerTaxId?: string;
+        customerPhone?: string;
         items: Array<{ name: string; qty: number; unitPrice: number; total: number }>;
         total: number;
         paymentMethods?: Array<{ type: string; amount: number; currency: string }>;
@@ -551,6 +554,9 @@ export default function POSPage() {
             <TransactionSummary
                 visible={summary.visible}
                 type={summary.type}
+                customerName={summary.customerName}
+                customerTaxId={summary.customerTaxId}
+                customerPhone={summary.customerPhone}
                 items={summary.items}
                 total={summary.total}
                 paymentMethods={summary.paymentMethods}
