@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
-    ShoppingCart, PackagePlus, Lock, Play, Store, Search, Barcode, Loader2
+    ShoppingCart, PackagePlus, Lock, Play, Store, Search, Barcode, Loader2, Package
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

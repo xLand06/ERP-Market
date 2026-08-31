@@ -168,8 +168,27 @@ export function SystemSettings() {
                                 </div>
                             </div>
 
+                            {/* Resumen de Equivalencias de las 3 Monedas */}
+                            <div className="p-3.5 bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-xl space-y-1.5 shadow-sm">
+                                <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 uppercase tracking-wider">
+                                    <span>Equivalencia de las 3 Monedas</span>
+                                    <span className="bg-indigo-500/30 text-indigo-300 px-2 py-0.5 rounded text-[10px]">
+                                        Moneda Principal: {localMainCurrency}
+                                    </span>
+                                </div>
+                                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 font-mono text-xs font-bold">
+                                    <span>💵 1 USD</span>
+                                    <span>=</span>
+                                    <span>🇨🇴 ${(parseFloat(localUsd) || 0).toLocaleString('es-CO')} COP</span>
+                                    <span>=</span>
+                                    <span>🇻🇪 Bs. {parseFloat(localVes) || 0} VES</span>
+                                </div>
+                            </div>
+
                             <div className="space-y-2">
-                                <label className="text-sm font-semibold text-slate-700">Tasa COP a USD (Dólares)</label>
+                                <label className="text-sm font-semibold text-slate-700">
+                                    {localMainCurrency === 'COP' ? 'Tasa COP a USD (Dólares)' : 'Tasa Base Dólar a COP ($ / USD)'}
+                                </label>
                                 <div className="relative">
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">$</span>
                                     <input
@@ -186,7 +205,9 @@ export function SystemSettings() {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-sm font-semibold text-slate-700">Tasa COP a VES (Bolívares)</label>
+                                <label className="text-sm font-semibold text-slate-700">
+                                    {localMainCurrency === 'VES' ? 'Tasa Dólar/Euro a Bolívares (Bs. / USD)' : 'Tasa Dólar a Bolívares (Bs. / USD)'}
+                                </label>
                                 <div className="relative">
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">Bs.</span>
                                     <input
