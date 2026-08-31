@@ -1,4 +1,3 @@
-import axios, { AxiosInstance } from 'axios';
 import { logger } from '../../core/utils/logger';
 
 const ELECTRON_PORT = process.env.ELECTRON_PORT || '3001';
@@ -11,30 +10,29 @@ export type TransactionType = 'SALE' | 'RETURN' | 'ADJUST';
 export type TransactionStatus = 'COMPLETED' | 'CANCELLED' | 'PENDING';
 export type CashRegisterStatus = 'OPEN' | 'CLOSED';
 
-let apiClient: AxiosInstance | null = null;
-
-export function getElectronApi(): AxiosInstance {
-    if (!apiClient) {
-        apiClient = axios.create({
-            baseURL: ELECTRON_BASE_URL,
-            timeout: 10000,
-            headers: { 'Content-Type': 'application/json' },
-        });
-        
-        apiClient.interceptors.response.use(
-            (response) => response,
-            (error) => {
-                logger.error('[Electron API] Error de conexión', { 
-                    url: error.config?.url, 
-                    message: error.message 
-                });
-                return Promise.reject(error);
-            }
-        );
-        
-        logger.info('[Electron API] Cliente HTTP inicializado', { baseURL: ELECTRON_BASE_URL });
+async function fetchElectronJson<T = any>(endpoint: string, params?: Record<string, string>): Promise<T> {
+    let url = `${ELECTRON_BASE_URL}${endpoint}`;
+    if (params) {
+        const query = new URLSearchParams(params).toString();
+        url += `?${query}`;
     }
-    return apiClient;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    try {
+        const res = await fetch(url, {
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        return await res.json() as T;
+    } catch (error: any) {
+        clearTimeout(timeoutId);
+        logger.error('[Electron API] Error de conexión', { url, message: error.message });
+        throw error;
+    }
 }
 
 export interface ElectronUser {
@@ -91,8 +89,8 @@ export interface ElectronCashRegister {
 
 export async function fetchLocalUsers(): Promise<ElectronUser[]> {
     try {
-        const response = await getElectronApi().get('/users');
-        return response.data?.data || response.data || [];
+        const data = await fetchElectronJson<any>('/users');
+        return data?.data || data || [];
     } catch (error: any) {
         logger.error('[Electron] Error fetching users', { error: error.message });
         return [];
@@ -101,8 +99,8 @@ export async function fetchLocalUsers(): Promise<ElectronUser[]> {
 
 export async function fetchLocalBranches(): Promise<ElectronBranch[]> {
     try {
-        const response = await getElectronApi().get('/branches');
-        return response.data?.data || response.data || [];
+        const data = await fetchElectronJson<any>('/branches');
+        return data?.data || data || [];
     } catch (error: any) {
         logger.error('[Electron] Error fetching branches', { error: error.message });
         return [];
@@ -111,10 +109,8 @@ export async function fetchLocalBranches(): Promise<ElectronBranch[]> {
 
 export async function fetchPendingTransactions(): Promise<ElectronTransaction[]> {
     try {
-        const response = await getElectronApi().get('/transactions', {
-            params: { syncStatus: 'PENDING' }
-        });
-        return response.data?.data || response.data || [];
+        const data = await fetchElectronJson<any>('/transactions', { syncStatus: 'PENDING' });
+        return data?.data || data || [];
     } catch (error: any) {
         logger.error('[Electron] Error fetching transactions', { error: error.message });
         return [];
@@ -123,10 +119,8 @@ export async function fetchPendingTransactions(): Promise<ElectronTransaction[]>
 
 export async function fetchPendingCashRegisters(): Promise<ElectronCashRegister[]> {
     try {
-        const response = await getElectronApi().get('/cashregisters', {
-            params: { syncStatus: 'PENDING' }
-        });
-        return response.data?.data || response.data || [];
+        const data = await fetchElectronJson<any>('/cashregisters', { syncStatus: 'PENDING' });
+        return data?.data || data || [];
     } catch (error: any) {
         logger.error('[Electron] Error fetching cash registers', { error: error.message });
         return [];
@@ -135,7 +129,7 @@ export async function fetchPendingCashRegisters(): Promise<ElectronCashRegister[
 
 export async function checkElectronConnection(): Promise<boolean> {
     try {
-        await getElectronApi().get('/health', { timeout: 3000 });
+        await fetchElectronJson<any>('/health');
         return true;
     } catch {
         return false;

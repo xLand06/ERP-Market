@@ -565,3 +565,18 @@ model ProductBatch {
   @@index([expiryDate])
   @@map("product_batches")
 }
+
+// =============================================================================
+// PROCESSED SYNC EVENTS (Central Idempotency Tracking)
+// =============================================================================
+
+model ProcessedSyncEvents {
+  id           String   @id @default(cuid())
+  eventId      String   @unique
+  sourceNodeId String
+  eventType    String
+  processedAt  DateTime @default(now()) @db.Timestamptz
+
+  @@index([eventId, sourceNodeId])
+  @@map("processed_sync_events")
+}

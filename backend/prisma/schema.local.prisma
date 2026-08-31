@@ -51,6 +51,19 @@ enum SyncStatus {
   FAILED
 }
 
+enum SyncOperation {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum SyncQueueStatus {
+  PENDING
+  PROCESSING
+  FAILED
+  SYNCED
+}
+
 enum CedulaType {
   V
   E
@@ -564,4 +577,26 @@ model ProductBatch {
   @@index([productId, branchId])
   @@index([expiryDate])
   @@map("product_batches")
+}
+
+// =============================================================================
+// SYNC QUEUE (Offline Outbox)
+// =============================================================================
+
+model SyncQueue {
+  id          String          @id @default(cuid())
+  entityName  String
+  entityId    String
+  operation   SyncOperation
+  payload     String
+  status      SyncQueueStatus @default(PENDING)
+  retryCount  Int             @default(0)
+  errorLog    String?
+  createdAt   DateTime        @default(now())
+  processedAt DateTime?
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([entityName, entityId])
+  @@map("sync_queue")
 }
