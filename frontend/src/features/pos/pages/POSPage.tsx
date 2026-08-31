@@ -23,6 +23,7 @@ import { PaymentDialog } from '../components/PaymentDialog';
 import { TransactionSummary } from '../components/TransactionSummary';
 import { useCart } from '../hooks/useCart';
 import { printThermalReceiptReal } from '@/lib/thermalPrinter';
+import { ThermalReceiptTicket } from '@/components/common/ThermalReceiptTicket';
 import toast from 'react-hot-toast';
 
 import type { Product, PaymentMethodType, Currency, CreateTransactionPayload } from '../types';
