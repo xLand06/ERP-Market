@@ -69,17 +69,23 @@ export const useConfigStore = create<ConfigState>()(
             // ── Conversiones ────────────────────────────────────────────────
             toCOP: (amount: number, currency: string) => {
                 const r = get().rates;
+                const usdRate = r['USD'] || r['COP'] || 3600;
+                const vesRate = r['VES'] || 5.5;
+
                 if (currency === 'COP') return amount;
-                if (currency === 'USD') return amount * (r['USD'] || r['COP'] || 3600);
-                if (currency === 'VES') return amount * (r['VES'] || 5.5);
+                if (currency === 'USD') return amount * usdRate;
+                if (currency === 'VES') return (amount / vesRate) * usdRate;
                 return amount;
             },
 
             fromCOP: (copAmount: number, targetCurrency: string) => {
                 const r = get().rates;
+                const usdRate = r['USD'] || r['COP'] || 3600;
+                const vesRate = r['VES'] || 5.5;
+
                 if (targetCurrency === 'COP') return copAmount;
-                if (targetCurrency === 'USD') return copAmount / (r['USD'] || r['COP'] || 3600);
-                if (targetCurrency === 'VES') return copAmount / (r['VES'] || 5.5);
+                if (targetCurrency === 'USD') return copAmount / usdRate;
+                if (targetCurrency === 'VES') return (copAmount / usdRate) * vesRate;
                 return copAmount;
             },
 

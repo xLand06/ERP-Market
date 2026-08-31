@@ -125,7 +125,22 @@ export function SystemSettings() {
                                         <button
                                             key={prov.id}
                                             type="button"
-                                            onClick={() => setSelectedProvider(prov.id)}
+                                            onClick={async () => {
+                                                setSelectedProvider(prov.id);
+                                                if (prov.id !== 'manual') {
+                                                    try {
+                                                        const res = await api.post('/finance/rates/sync-dolarapi', { provider: prov.id });
+                                                        if (res.data.success) {
+                                                            const applied = res.data.data.appliedRate;
+                                                            toast.success(`Tasa ${applied} VES ajustada automáticamente desde DolarApi`);
+                                                            setLocalVes(applied.toString());
+                                                            fetchRates();
+                                                        }
+                                                    } catch (err: any) {
+                                                        toast.error(err.response?.data?.error || 'Error al conectar con DolarApi');
+                                                    }
+                                                }
+                                            }}
                                             className={cn(
                                                 "p-2.5 rounded-lg border text-left transition-all text-xs font-semibold flex flex-col gap-0.5",
                                                 selectedProvider === prov.id
