@@ -57,7 +57,7 @@ function PriceField({
 
     const copNum = valueCOP === '' ? 0 : Number(valueCOP);
     const usdVal = copNum > 0 ? (copNum / usdRate).toFixed(2) : '';
-    const vesVal = copNum > 0 ? (copNum / vesRate).toFixed(2) : '';
+    const vesVal = copNum > 0 ? ((copNum / usdRate) * vesRate).toFixed(2) : '';
 
     const handleUsdChange = (v: string) => {
         const n = parseFloat(v);
@@ -68,7 +68,7 @@ function PriceField({
     const handleVesChange = (v: string) => {
         const n = parseFloat(v);
         if (isNaN(n)) { onChange(''); return; }
-        onChange(Math.max(0, Math.round(n * vesRate)));
+        onChange(Math.max(0, Math.round((n / vesRate) * usdRate)));
     };
 
     const friendlyText = copNum > 0 ? `${fmtCOP(copNum)} (${formatInWords(copNum)})` : '';

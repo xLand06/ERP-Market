@@ -175,7 +175,8 @@ export function useCart(
 
     const totals = useMemo(() => {
         const subtotal = items.reduce((sum, i) => sum + (i.currentPrice * i.qty), 0);
-        const total = subtotal + (subtotal * iva);
+        const ivaRate = (iva && iva > 0) ? (iva > 1 ? iva / 100 : iva) : 0;
+        const total = subtotal + (subtotal * ivaRate);
         const itemCount = items.reduce((sum, i) => sum + i.qty, 0);
         return { subtotal, total, itemCount };
     }, [items, iva]);

@@ -157,7 +157,7 @@ export const CartPanel = React.memo(function CartPanel({
                                 ${fromCOP(totals.total, 'USD').toFixed(2)} <span className="text-slate-400 text-[9px]">USD</span>
                             </span>
                             <span className="inline-flex items-center gap-1 bg-white border border-slate-200 shadow-2xs px-2 py-0.5 rounded-lg text-[11px] font-extrabold text-slate-700">
-                                Bs. {Math.round(fromCOP(totals.total, 'VES')).toLocaleString('es-VE')} <span className="text-slate-400 text-[9px]">VES</span>
+                                Bs. {fromCOP(totals.total, 'VES').toFixed(2)} <span className="text-slate-400 text-[9px]">VES</span>
                             </span>
                         </div>
                     </div>
