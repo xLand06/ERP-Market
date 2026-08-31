@@ -7,17 +7,36 @@ interface ExchangeRate {
     rate: number;
 }
 
-interface ConfigState {
+export interface ThermalPrinterConfig {
+    id: string;
+    name: string;
+    connectionType: 'thermal_usb' | 'thermal_network' | 'thermal_serial' | 'browser';
+    ipAddress?: string;
+    port?: number;
+    paperWidth: '80mm' | '58mm';
+    autoCut: boolean;
+    openCashDrawer: boolean;
+    isPrimary: boolean;
+    role: 'pos' | 'kitchen' | 'backup';
+}
+
+export interface ConfigState {
+    // Monedas & Tasas
+    mainCurrency: string;
     rates: Record<string, number>;
+    updatedAt: string | null;
+
+    // IVA & Turnos
     iva: number;
     ivaEnabled: boolean;
     ivaPercent: number;
     ivaMode: 'included' | 'added';
-    mainCurrency: string; // 'USD' | 'VES' | 'COP'
-    autoOpenTime: string | null; // 'HH:mm' o null para desactivado
-    autoCloseTime: string | null; // 'HH:mm' o null para desactivado
-    purgeRetentionDays: number; // Días de retención para transacciones en purga automática
-    purgeLogRetentionDays: number; // Días de retención para logs en purga automática
+    autoOpenTime: string | null;
+    autoCloseTime: string | null;
+
+    // Mantenimiento & Purga de datos
+    purgeRetentionDays: number;
+    purgeLogRetentionDays: number;
 
     // Datos Fiscales & Negocio
     businessName: string;
@@ -25,8 +44,9 @@ interface ConfigState {
     fiscalAddress: string;
     fiscalPhone: string;
 
-    // Impresora Térmica & Impresión
+    // Impresoras Térmicas Múltiples
     thermalPrinterEnabled: boolean;
+    printers: ThermalPrinterConfig[];
     printerType: 'browser' | 'thermal_usb' | 'thermal_network' | 'thermal_serial';
     selectedPrinterId: string | null;
     selectedPrinterName: string | null;
@@ -62,6 +82,10 @@ interface ConfigState {
     setPurgeLogRetention: (days: number) => void;
     fetchSettings: () => Promise<void>;
     updateSettings: (settings: Partial<ConfigState>) => Promise<void>;
+    addPrinter: (printer: Omit<ThermalPrinterConfig, 'id'>) => void;
+    updatePrinter: (id: string, updates: Partial<ThermalPrinterConfig>) => void;
+    deletePrinter: (id: string) => void;
+    setPrimaryPrinter: (id: string) => void;
 
     // Helpers de conversión
     toUSD: (amount: number, currency: string) => number;
@@ -259,6 +283,85 @@ export const useConfigStore = create<ConfigState>()(
                 } catch (error) {
                     console.error('Error fetching settings:', error);
                 }
+            },
+
+            printers: [
+                {
+                    id: 'default-pos-usb',
+                    name: 'Impresora Caja Principal (USB 80mm)',
+                    connectionType: 'thermal_usb',
+                    paperWidth: '80mm',
+                    autoCut: true,
+                    openCashDrawer: true,
+                    isPrimary: true,
+                    role: 'pos',
+                },
+                {
+                    id: 'kitchen-epson-net',
+                    name: 'Impresora Cocina / Depósito (Red IP)',
+                    connectionType: 'thermal_network',
+                    ipAddress: '192.168.1.200',
+                    port: 9100,
+                    paperWidth: '80mm',
+                    autoCut: true,
+                    openCashDrawer: false,
+                    isPrimary: false,
+                    role: 'kitchen',
+                },
+            ],
+
+            addPrinter: (newP) => {
+                const id = `printer-${Date.now()}`;
+                const printer: ThermalPrinterConfig = { ...newP, id };
+                set(state => {
+                    const currentPrinters = state.printers || [];
+                    const updated = printer.isPrimary
+                        ? currentPrinters.map(p => ({ ...p, isPrimary: false })).concat(printer)
+                        : [...currentPrinters, printer];
+                    return { printers: updated, selectedPrinterId: printer.isPrimary ? printer.id : state.selectedPrinterId };
+                });
+            },
+
+            updatePrinter: (id, updates) => {
+                set(state => {
+                    const currentPrinters = state.printers || [];
+                    const updated = currentPrinters.map(p => {
+                        if (p.id !== id) {
+                            return updates.isPrimary ? { ...p, isPrimary: false } : p;
+                        }
+                        return { ...p, ...updates };
+                    });
+                    return { printers: updated };
+                });
+            },
+
+            deletePrinter: (id) => {
+                set(state => {
+                    const currentPrinters = state.printers || [];
+                    const updated = currentPrinters.filter(p => p.id !== id);
+                    if (updated.length > 0 && !updated.some(p => p.isPrimary)) {
+                        updated[0].isPrimary = true;
+                    }
+                    return { printers: updated };
+                });
+            },
+
+            setPrimaryPrinter: (id) => {
+                set(state => {
+                    const currentPrinters = state.printers || [];
+                    const updated = currentPrinters.map(p => ({
+                        ...p,
+                        isPrimary: p.id === id,
+                    }));
+                    const primary = updated.find(p => p.id === id);
+                    return {
+                        printers: updated,
+                        selectedPrinterId: id,
+                        selectedPrinterName: primary?.name || state.selectedPrinterName,
+                        printerType: primary?.connectionType || state.printerType,
+                        paperWidth: primary?.paperWidth || state.paperWidth,
+                    };
+                });
             },
 
             updateSettings: async (settings) => {
