@@ -66,7 +66,7 @@ export default function POSPage() {
         return branches.find((b: any) => b.id === selectedBranch);
     }, [selectedBranch, branches]);
 
-    const { iva, ivaEnabled, fmtCOP, rates } = useConfigStore();
+    const { iva, ivaEnabled, fmtCOP, fmtMain, rates } = useConfigStore();
     const effectiveBranch = selectedBranchData?.id || (selectedBranch === 'all' && user?.role === 'OWNER' ? null : selectedBranch);
     const effectiveIva = ivaEnabled ? iva : 0;
 
