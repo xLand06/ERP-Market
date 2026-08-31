@@ -177,15 +177,19 @@ function PrinterFormModal({
                     toast.error(res.message);
                 }
             } else if (connectionType === 'thermal_network') {
-                // Simulación o ping TCP de red IP
-                await new Promise(r => setTimeout(r, 600));
-                setConnectionVerified(true);
-                toast.success(`Conexión TCP con IP ${ipAddress}:${port} verificada`);
+                const res = await api.post('/settings/test-printer-ip', { ipAddress, port });
+                if (res.data.success) {
+                    setConnectionVerified(true);
+                    toast.success(res.data.message || `Conexión TCP con IP ${ipAddress}:${port} verificada`);
+                }
             } else {
                 await new Promise(r => setTimeout(r, 400));
                 setConnectionVerified(true);
-                toast.success('Impresora del sistema verificado');
+                toast.success('Impresora del sistema verificada');
             }
+        } catch (err: any) {
+            setConnectionVerified(false);
+            toast.error(err?.response?.data?.error || `No se pudo conectar a la IP ${ipAddress}:${port}`);
         } finally {
             setTestingConnection(false);
         }

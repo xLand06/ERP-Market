@@ -30,4 +30,49 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     }
 });
 
+// POST /api/settings/test-printer-ip
+router.post('/test-printer-ip', authMiddleware, async (req: AuthRequest, res: Response) => {
+    const { ipAddress, port = 9100 } = req.body;
+    if (!ipAddress) {
+        return res.status(400).json({ success: false, error: 'Debe especificar la dirección IP de la impresora.' });
+    }
+
+    const net = await import('net');
+    const socket = new net.Socket();
+    let responded = false;
+
+    socket.setTimeout(3000);
+
+    socket.connect(port, ipAddress, () => {
+        if (responded) return;
+        responded = true;
+        socket.write(Buffer.from([0x1b, 0x40]));
+        socket.end();
+        res.json({
+            success: true,
+            message: `Conexión TCP exitosa con la impresora de red en ${ipAddress}:${port}.`
+        });
+    });
+
+    socket.on('timeout', () => {
+        socket.destroy();
+        if (responded) return;
+        responded = true;
+        res.status(408).json({
+            success: false,
+            error: `Tiempo de espera agotado al conectar con IP ${ipAddress}:${port}. Verifica la red Wi-Fi/Ethernet.`
+        });
+    });
+
+    socket.on('error', (err) => {
+        socket.destroy();
+        if (responded) return;
+        responded = true;
+        res.status(500).json({
+            success: false,
+            error: `No se pudo establecer conexión con ${ipAddress}:${port} (${err.message}).`
+        });
+    });
+});
+
 export default router;
