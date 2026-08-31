@@ -22,6 +22,7 @@ import { CartPanel } from '../components/CartPanel';
 import { PaymentDialog } from '../components/PaymentDialog';
 import { TransactionSummary } from '../components/TransactionSummary';
 import { useCart } from '../hooks/useCart';
+import { printThermalReceiptReal } from '@/lib/thermalPrinter';
 import toast from 'react-hot-toast';
 
 import type { Product, PaymentMethodType, Currency, CreateTransactionPayload } from '../types';
@@ -220,25 +221,40 @@ export default function POSPage() {
                 paymentMethods,
             };
 
-            await api.post('/pos/transactions', payload);
+            const res = await api.post('/pos/transactions', payload);
+            const invoiceNum = res.data?.data?.invoiceNumber || 'FACT-000482';
 
-            setSummary({
-                visible: true,
+            // Impresora configurada como principal en /settings
+            const config = useConfigStore.getState();
+            const primaryPrinter = config.printers.find(p => p.isPrimary) || config.printers[0] || null;
+
+            // Imprimir directamente la factura como en Backoffice
+            await printThermalReceiptReal(primaryPrinter, {
+                invoiceNumber: invoiceNum,
+                customerName: 'Consumidor Final',
+                customerTaxId: 'V-00000000-0',
+                businessName: config.businessName,
+                taxId: config.taxId,
+                fiscalAddress: config.fiscalAddress,
+                fiscalPhone: config.fiscalPhone,
                 items: cart.map(c => ({
                     name: c.name,
                     qty: c.qty,
                     unitPrice: c.currentPrice,
                     total: c.currentPrice * c.qty,
                 })),
-                total: totals.total,
+                totalUSD: totals.total,
+                totalVES: config.fromUSD(totals.total, 'VES'),
+                totalCOP: config.fromUSD(totals.total, 'COP'),
                 paymentMethods: paymentMethods.map(pm => ({
                     type: pm.type,
                     amount: pm.amount,
                     currency: pm.currency,
                 })),
-                type: 'SALE',
+                footerMessage: config.footerMessage,
             });
 
+            toast.success('¡Venta realizada con éxito! Factura impresa.');
             setPayOpen(false);
             clearCart();
             refetch();
