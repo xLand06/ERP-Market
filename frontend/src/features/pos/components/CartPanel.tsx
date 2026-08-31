@@ -90,8 +90,8 @@ const CartItemRow = React.memo(function CartItemRow({
                     </button>
                 </div>
                 <div className="text-right">
-                    <p className="text-[10px] text-slate-400">{fmtCOP(item.currentPrice)} c/u</p>
-                    <p className="text-sm font-black">{fmtCOP(item.currentPrice * item.qty)}</p>
+                    <p className="text-[10px] text-slate-400">{fmtUSD(item.currentPrice)} c/u</p>
+                    <p className="text-sm font-black text-slate-900">{fmtUSD(item.currentPrice * item.qty)}</p>
                 </div>
             </div>
         </div>
@@ -110,7 +110,11 @@ export const CartPanel = React.memo(function CartPanel({
     onCheckout,
     isSubmitting,
 }: CartPanelProps) {
-    const { fmtCOP, fromCOP } = useConfigStore();
+    const { fmtUSD, fmtVES, fmtCOP, fromUSD, fmtMain } = useConfigStore();
+
+    const totalUSD = totals.total;
+    const totalVES = fromUSD(totals.total, 'VES');
+    const totalCOP = fromUSD(totals.total, 'COP');
 
     return (
         <>
@@ -154,16 +158,16 @@ export const CartPanel = React.memo(function CartPanel({
                         <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase block mb-1">TOTAL A PAGAR</span>
                         <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="inline-flex items-center gap-1 bg-white border border-slate-200 shadow-2xs px-2 py-0.5 rounded-lg text-[11px] font-extrabold text-slate-700">
-                                ${fromCOP(totals.total, 'USD').toFixed(2)} <span className="text-slate-400 text-[9px]">USD</span>
+                                {fmtUSD(totalUSD)} <span className="text-slate-400 text-[9px]">USD</span>
                             </span>
                             <span className="inline-flex items-center gap-1 bg-white border border-slate-200 shadow-2xs px-2 py-0.5 rounded-lg text-[11px] font-extrabold text-slate-700">
-                                Bs. {fromCOP(totals.total, 'VES').toFixed(2)} <span className="text-slate-400 text-[9px]">VES</span>
+                                {fmtVES(totalVES)} <span className="text-slate-400 text-[9px]">VES</span>
                             </span>
                         </div>
                     </div>
                     <div className="text-right">
                         <p className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-none tabular-nums">
-                            {fmtCOP(totals.total)}
+                            {fmtMain(totals.total)}
                         </p>
                         <p className="text-[10px] font-medium text-slate-400 mt-1">
                             {totals.itemCount} {totals.itemCount === 1 ? 'producto' : 'productos'} en ticket

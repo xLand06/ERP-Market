@@ -1,38 +1,46 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type { PaymentMethodRow, PaymentMethodType, Currency } from '../types';
 
-const DEFAULT_PAYMENT_OPTIONS: Array<{
-    id: string;
+export const DEFAULT_PAYMENT_OPTIONS: Array<{
     type: PaymentMethodType;
     label: string;
     currency: Currency;
 }> = [
-    { id: 'cash_cop', type: 'cash', label: 'Efectivo COP', currency: 'COP' },
-    { id: 'cash_usd', type: 'cash', label: 'Efectivo USD', currency: 'USD' },
-    { id: 'pagomovil', type: 'transfer', label: 'Pago Móvil VES', currency: 'VES' },
-    { id: 'card', type: 'card', label: 'Tarjeta', currency: 'COP' },
+    { type: 'cash', label: 'Efectivo USD', currency: 'USD' },
+    { type: 'cash', label: 'Efectivo VES', currency: 'VES' },
+    { type: 'transfer', label: 'Pago Móvil / Transf.', currency: 'VES' },
+    { type: 'card', label: 'Tarjeta / Punto', currency: 'VES' },
 ];
 
-interface UsePaymentReturn {
+export interface UsePaymentReturn {
     rows: PaymentMethodRow[];
-    totalInCOP: number;
+    totalInCOP: number; // para compatibilidad
+    totalInUSD: number;
+    paidTotalInUSD: number;
     paidTotalInCOP: number;
+    changeInUSD: number;
     changeInCOP: number;
+    remainingInUSD: number;
     remainingInCOP: number;
     isChangeOver: boolean;
     canConfirm: boolean;
     addRow: () => void;
     updateRow: (key: string, updates: Partial<Omit<PaymentMethodRow, 'key'>>) => void;
     removeRow: (key: string) => void;
-    reset: (totalCOP: number) => void;
-    updateTotal: (newTotalCOP: number) => void;
-    getPayload: () => Array<{ type: PaymentMethodType; amount: number; currency: Currency; exchangeRate?: number }>;
+    reset: (totalInUSD: number) => void;
+    updateTotal: (newTotalInUSD: number) => void;
+    getPayload: () => Array<{
+        type: PaymentMethodType;
+        amount: number;
+        currency: Currency;
+        exchangeRate?: number;
+    }>;
     lastChangeRow: PaymentMethodRow | null;
 }
 
 /**
- * Maneja el estado multi-pago en el diálogo decobro.
- * Convierte tudo a COP para calcular vuelto/faltante.
+ * Hook para gestionar los métodos de pago en el modal de cobro del POS.
+ * Trabaja con USD como referencia base principal.
  */
 export function usePayment(
     rates: Record<string, number>,
@@ -41,29 +49,30 @@ export function usePayment(
     const usdRate = rates['USD'] || rates['COP'] || 3600;
     const vesRate = rates['VES'] || 5.5;
 
-    const [totalInCOP, setTotalInCOP] = useState(0);
+    const [totalInUSD, setTotalInUSD] = useState(0);
     const [rows, setRows] = useState<PaymentMethodRow[]>([]);
 
-    // Reset cuando se abre el diálogo con un nuevo total
-    const reset = useCallback((totalCOP: number) => {
-        setTotalInCOP(totalCOP);
+    // Reset cuando se abre el diálogo con un nuevo total en USD
+    const reset = useCallback((usdTotal: number) => {
+        setTotalInUSD(usdTotal);
         setRows([{
             key: crypto.randomUUID(),
             type: 'cash',
             currency: 'USD',
-            amount: Number((totalCOP / usdRate).toFixed(2)),
+            amount: Number(usdTotal.toFixed(2)),
         }]);
-    }, [usdRate]);
+    }, []);
 
     // Actualiza el total cuando cambia durante la edición de cantidades
-    const updateTotal = useCallback((newTotalCOP: number) => {
-        setTotalInCOP(newTotalCOP);
+    const updateTotal = useCallback((newTotalUSD: number) => {
+        setTotalInUSD(newTotalUSD);
         setRows(prev => {
             if (prev.length === 1) {
                 const firstRow = prev[0];
-                let newAmount = newTotalCOP;
-                if (firstRow.currency === 'USD') newAmount = newTotalCOP / usdRate;
-                if (firstRow.currency === 'VES') newAmount = (newTotalCOP / usdRate) * vesRate;
+                let newAmount = newTotalUSD;
+                if (firstRow.currency === 'USD') newAmount = newTotalUSD;
+                if (firstRow.currency === 'VES') newAmount = newTotalUSD * vesRate;
+                if (firstRow.currency === 'COP') newAmount = newTotalUSD * usdRate;
                 return [{
                     ...firstRow,
                     amount: Number(newAmount.toFixed(2))
@@ -73,35 +82,41 @@ export function usePayment(
         });
     }, [usdRate, vesRate]);
 
-    // Convertir una fila a COP (COP es la moneda base interna)
-    const toCOP = useCallback((row: PaymentMethodRow): number => {
-        if (row.currency === 'COP') return row.amount;
-        if (row.currency === 'USD') return row.amount * usdRate;
-        if (row.currency === 'VES') return vesRate > 0 ? (row.amount / vesRate) * usdRate : 0;
+    // Convertir una fila a USD (referencia base)
+    const toUSD = useCallback((row: PaymentMethodRow): number => {
+        if (row.currency === 'USD') return row.amount;
+        if (row.currency === 'VES') return vesRate > 0 ? row.amount / vesRate : 0;
+        if (row.currency === 'COP') return usdRate > 0 ? row.amount / usdRate : 0;
         return row.amount;
     }, [usdRate, vesRate]);
 
-    // paidTotal en COP
-    const paidTotalInCOP = useMemo(() =>
-        rows.reduce((sum, r) => sum + toCOP(r), 0),
-    [rows, toCOP]);
+    // paidTotal en USD y COP
+    const paidTotalInUSD = useMemo(() =>
+        rows.reduce((sum, r) => sum + toUSD(r), 0),
+    [rows, toUSD]);
 
-    const remainingInCOP = useMemo(() =>
-        Math.max(0, totalInCOP - paidTotalInCOP),
-    [totalInCOP, paidTotalInCOP]);
+    const paidTotalInCOP = useMemo(() => paidTotalInUSD * usdRate, [paidTotalInUSD, usdRate]);
+    const totalInCOP = useMemo(() => totalInUSD * usdRate, [totalInUSD, usdRate]);
 
-    const changeInCOP = useMemo(() =>
-        paidTotalInCOP - totalInCOP,
-    [totalInCOP, paidTotalInCOP]);
+    const remainingInUSD = useMemo(() =>
+        Math.max(0, totalInUSD - paidTotalInUSD),
+    [totalInUSD, paidTotalInUSD]);
 
-    const isChangeOver = changeInCOP > 0.01; // tolerancia 1 centavo
+    const remainingInCOP = useMemo(() => remainingInUSD * usdRate, [remainingInUSD, usdRate]);
 
-    // puede confirmar si pagó al menos el total (o con tolerncia de $1)
+    const changeInUSD = useMemo(() =>
+        paidTotalInUSD - totalInUSD,
+    [totalInUSD, paidTotalInUSD]);
+
+    const changeInCOP = useMemo(() => changeInUSD * usdRate, [changeInUSD, usdRate]);
+
+    const isChangeOver = changeInUSD > 0.01;
+
+    // puede confirmar si pagó al menos el total (con tolerancia de 1 centavo USD)
     const canConfirm = useMemo(() =>
-        paidTotalInCOP >= (totalInCOP - 1),
-    [paidTotalInCOP, totalInCOP]);
+        paidTotalInUSD >= (totalInUSD - 0.01),
+    [paidTotalInUSD, totalInUSD]);
 
-    // La última fila en efectivo (para calcular vuelto visual)
     const lastChangeRow = useMemo<PaymentMethodRow | null>(() => {
         const cashRows = rows.filter(r => r.type === 'cash');
         return cashRows.length > 0 ? cashRows[cashRows.length - 1] : null;
@@ -111,7 +126,7 @@ export function usePayment(
         setRows(prev => [...prev, {
             key: crypto.randomUUID(),
             type: 'cash',
-            currency: 'USD', // siguiente será USD
+            currency: 'USD',
             amount: 0,
         }]);
     }, []);
@@ -124,36 +139,35 @@ export function usePayment(
             const idx = prev.findIndex(r => r.key === key);
             if (idx === -1) return prev;
 
-            const otherRowsCOP = prev.reduce((sum, r, i) => {
+            const otherRowsUSD = prev.reduce((sum, r, i) => {
                 if (i === idx) return sum;
-                return sum + toCOP(r);
+                return sum + toUSD(r);
             }, 0);
 
-            const remainingCOP = Math.max(0, totalInCOP - otherRowsCOP);
+            const remainingUSD = Math.max(0, totalInUSD - otherRowsUSD);
 
             return prev.map((r, i) => {
                 if (i !== idx) return r;
 
                 const next = { ...r, ...updates };
 
-                // Si cambió el tipo pero no la moneda, auto-ajustamos moneda si es necesario
                 if (updates.type && !updates.currency) {
                     const opt = DEFAULT_PAYMENT_OPTIONS.find(o => o.type === updates.type);
-                    next.currency = opt?.currency || 'COP';
+                    next.currency = opt?.currency || 'USD';
                 }
 
-                // Si cambió tipo o moneda, recalculamos monto sugerido si el monto actual es 0 o igual al anterior restante
                 if (updates.type || updates.currency) {
-                    let newAmount = remainingCOP;
-                    if (next.currency === 'USD') newAmount = remainingCOP / usdRate;
-                    if (next.currency === 'VES') newAmount = (remainingCOP / usdRate) * vesRate;
+                    let newAmount = remainingUSD;
+                    if (next.currency === 'USD') newAmount = remainingUSD;
+                    if (next.currency === 'VES') newAmount = remainingUSD * vesRate;
+                    if (next.currency === 'COP') newAmount = remainingUSD * usdRate;
                     next.amount = Number(newAmount.toFixed(2));
                 }
 
                 return next;
             });
         });
-    }, [totalInCOP, toCOP, usdRate, vesRate]);
+    }, [totalInUSD, toUSD, usdRate, vesRate]);
 
     const removeRow = useCallback((key: string) => {
         setRows(prev => {
@@ -177,8 +191,12 @@ export function usePayment(
     return {
         rows,
         totalInCOP,
+        totalInUSD,
+        paidTotalInUSD,
         paidTotalInCOP,
+        changeInUSD,
         changeInCOP,
+        remainingInUSD,
         remainingInCOP,
         isChangeOver,
         canConfirm,

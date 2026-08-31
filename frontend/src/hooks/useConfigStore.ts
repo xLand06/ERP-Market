@@ -59,7 +59,9 @@ interface ConfigState {
     fetchSettings: () => Promise<void>;
     updateSettings: (settings: Partial<ConfigState>) => Promise<void>;
 
-    // Helpers de conversión (COP es la moneda base interna)
+    // Helpers de conversión
+    toUSD: (amount: number, currency: string) => number;
+    fromUSD: (usdAmount: number, targetCurrency: string) => number;
     /** Convierte desde cualquier moneda a COP */
     toCOP: (amount: number, currency: string) => number;
     /** Convierte desde COP a otra moneda */
@@ -119,6 +121,28 @@ export const useConfigStore = create<ConfigState>()(
             get copRate() { return get().rates['USD'] || get().rates['COP'] || 3600; },
 
             // ── Conversiones ────────────────────────────────────────────────
+            toUSD: (amount: number, currency: string) => {
+                const r = get().rates;
+                const usdRate = r['USD'] || r['COP'] || 3600;
+                const vesRate = r['VES'] || 5.5;
+
+                if (currency === 'USD') return amount;
+                if (currency === 'VES') return vesRate > 0 ? amount / vesRate : amount;
+                if (currency === 'COP') return usdRate > 0 ? amount / usdRate : amount;
+                return amount;
+            },
+
+            fromUSD: (usdAmount: number, targetCurrency: string) => {
+                const r = get().rates;
+                const usdRate = r['USD'] || r['COP'] || 3600;
+                const vesRate = r['VES'] || 5.5;
+
+                if (targetCurrency === 'USD') return usdAmount;
+                if (targetCurrency === 'VES') return usdAmount * vesRate;
+                if (targetCurrency === 'COP') return usdAmount * usdRate;
+                return usdAmount;
+            },
+
             toCOP: (amount: number, currency: string) => {
                 const r = get().rates;
                 const usdRate = r['USD'] || r['COP'] || 3600;
@@ -163,11 +187,12 @@ export const useConfigStore = create<ConfigState>()(
                     maximumFractionDigits: 2,
                 }).format(amount)}`,
 
-            fmtMain: (amount: number) => {
+            fmtMain: (usdAmount: number) => {
                 const main = get().mainCurrency || 'USD';
-                if (main === 'USD') return get().fmtUSD(get().fromCOP(amount, 'USD'));
-                if (main === 'VES') return get().fmtVES(get().fromCOP(amount, 'VES'));
-                return get().fmtCOP(amount);
+                if (main === 'USD') return get().fmtUSD(usdAmount);
+                if (main === 'VES') return get().fmtVES(get().fromUSD(usdAmount, 'VES'));
+                if (main === 'COP') return get().fmtCOP(get().fromUSD(usdAmount, 'COP'));
+                return get().fmtUSD(usdAmount);
             },
 
             currencySymbol: (currency: string) => {

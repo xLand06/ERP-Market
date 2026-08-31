@@ -83,17 +83,14 @@ export function PaymentDialog({
     onConfirm,
     isSubmitting,
 }: PaymentDialogProps) {
-    const { rates, fmtCOP, fmtUSD, fmtVES, fromCOP, mainCurrency } = useConfigStore();
-
-    const usdRate = rates['USD'] || rates['COP'] || 3600;
-    const vesRate = rates['VES'] || 5.5;
+    const { rates, fmtCOP, fmtUSD, fmtVES, fromCOP, fromUSD, mainCurrency } = useConfigStore();
 
     const {
         rows,
-        totalInCOP,
-        paidTotalInCOP,
-        changeInCOP,
-        remainingInCOP,
+        totalInUSD,
+        paidTotalInUSD,
+        changeInUSD,
+        remainingInUSD,
         canConfirm,
         addRow,
         updateRow,
@@ -125,13 +122,13 @@ export function PaymentDialog({
     }, [cartItems]);
 
     // Totales en las 3 monedas
-    const totalUSD = fromCOP(total, 'USD');
-    const totalVES = fromCOP(total, 'VES');
-    const totalCOP = total;
+    const totalUSD = total;
+    const totalVES = fromUSD(total, 'VES');
+    const totalCOP = fromUSD(total, 'COP');
 
     // Vuelto en las 3 monedas
-    const changeUSD = fromCOP(Math.max(0, changeInCOP), 'USD');
-    const changeVES = fromCOP(Math.max(0, changeInCOP), 'VES');
+    const changeUSD = Math.max(0, changeInUSD);
+    const changeVES = fromUSD(changeUSD, 'VES');
 
     // Botones de billetes rápidos según la moneda de la primera fila de pago
     const activeCurrency = rows[0]?.currency || 'USD';
@@ -311,7 +308,7 @@ export function PaymentDialog({
                 </div>
 
                 {/* Vuelto / Cambio al Cliente */}
-                {changeInCOP > 0.01 && (
+                {changeInUSD > 0.01 && (
                     <div className="mx-5 mb-4 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
                         <div>
                             <span className="text-xs font-bold text-emerald-800 uppercase tracking-wide block">Vuelto al Cliente</span>
