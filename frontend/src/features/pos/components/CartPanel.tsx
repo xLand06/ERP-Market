@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, X } from 'lucide-react';
+import { Package, X, CreditCard, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useConfigStore } from '@/hooks/useConfigStore';
@@ -154,10 +154,10 @@ export const CartPanel = React.memo(function CartPanel({
                         <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase block mb-1">TOTAL A PAGAR</span>
                         <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="inline-flex items-center gap-1 bg-white border border-slate-200 shadow-2xs px-2 py-0.5 rounded-lg text-[11px] font-extrabold text-slate-700">
-                                💵 ${fromCOP(totals.total, 'USD').toFixed(2)} <span className="text-slate-400 text-[9px]">USD</span>
+                                ${fromCOP(totals.total, 'USD').toFixed(2)} <span className="text-slate-400 text-[9px]">USD</span>
                             </span>
                             <span className="inline-flex items-center gap-1 bg-white border border-slate-200 shadow-2xs px-2 py-0.5 rounded-lg text-[11px] font-extrabold text-slate-700">
-                                🇻🇪 Bs. {Math.round(fromCOP(totals.total, 'VES')).toLocaleString('es-VE')} <span className="text-slate-400 text-[9px]">VES</span>
+                                Bs. {Math.round(fromCOP(totals.total, 'VES')).toLocaleString('es-VE')} <span className="text-slate-400 text-[9px]">VES</span>
                             </span>
                         </div>
                     </div>
@@ -193,7 +193,7 @@ export const CartPanel = React.memo(function CartPanel({
                     ) : isSaleMode ? (
                         <>
                             <span className="flex items-center gap-2">
-                                <span className="text-lg">💳</span> PAGAR AHORA
+                                <CreditCard className="w-5 h-5" /> PAGAR AHORA
                             </span>
                             <kbd className="bg-black/20 text-white text-[11px] px-2.5 py-1 rounded-lg font-bold font-mono tracking-tight">
                                 Ctrl + Enter

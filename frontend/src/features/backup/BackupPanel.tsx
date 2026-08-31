@@ -466,10 +466,10 @@ function CloudPurgeSection() {
                                 {(stats as any[])?.map(s => (
                                     <tr key={s.table} className="hover:bg-slate-50">
                                         <td className="px-4 py-2.5 font-mono text-slate-700">
-                                            {s.table === 'transactionItems' ? '📦 Detalle de Transacciones' :
-                                             s.table === 'transactions' ? '📝 Transacciones / Ventas' :
-                                             s.table === 'cashRegisters' ? '💰 Sesiones de Caja' :
-                                             s.table === 'auditLogs' ? '🔍 Logs de Auditoría' : s.table}
+                                            {s.table === 'transactionItems' ? 'Detalle de Transacciones' :
+                                             s.table === 'transactions' ? 'Transacciones / Ventas' :
+                                             s.table === 'cashRegisters' ? 'Sesiones de Caja' :
+                                             s.table === 'auditLogs' ? 'Logs de Auditoría' : s.table}
                                         </td>
                                         <td className={`px-4 py-2.5 text-right font-bold ${s.count > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
                                             {s.count.toLocaleString()}

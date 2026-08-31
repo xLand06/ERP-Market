@@ -5,6 +5,7 @@ import { TopBar } from './TopBar';
 import { cn } from '@/lib/utils';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useSyncStore } from '@/services/sync.service';
+import { ShoppingCart, Package, LayoutDashboard, Banknote, Settings } from 'lucide-react';
 
 export function AppShellLayout() {
     const { fetchRates } = useConfigStore();
@@ -137,23 +138,24 @@ export function AppShellLayout() {
                 {/* Mobile / Compact Tablet Bottom Navigation Bar (< sm/md) */}
                 <nav aria-label="Navegación móvil" className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex items-center justify-around py-2 px-2 sm:hidden text-white shadow-2xl">
                     {[
-                        { path: '/pos', label: 'POS', icon: '🛒' },
-                        { path: '/products', label: 'Productos', icon: '📦' },
-                        { path: '/', label: 'Inicio', icon: '📊' },
-                        { path: '/cash-registers', label: 'Cajas', icon: '💵' },
-                        { path: '/settings', label: 'Ajustes', icon: '⚙️' },
+                        { path: '/pos', label: 'POS', icon: ShoppingCart },
+                        { path: '/products', label: 'Productos', icon: Package },
+                        { path: '/', label: 'Inicio', icon: LayoutDashboard },
+                        { path: '/cash-registers', label: 'Cajas', icon: Banknote },
+                        { path: '/settings', label: 'Ajustes', icon: Settings },
                     ].map((navItem) => {
                         const isActive = location.pathname === navItem.path;
+                        const Icon = navItem.icon;
                         return (
                             <button
                                 key={navItem.path}
                                 onClick={() => navigate(navItem.path)}
                                 className={cn(
-                                    "flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-xl transition-all text-center",
+                                    "flex flex-col items-center justify-center gap-1 px-3 py-1 rounded-xl transition-all text-center",
                                     isActive ? "text-emerald-400 font-extrabold bg-slate-800 scale-105" : "text-slate-400 hover:text-slate-200"
                                 )}
                             >
-                                <span className="text-lg leading-none">{navItem.icon}</span>
+                                <Icon className="w-4 h-4 shrink-0" />
                                 <span className="text-[10px] font-bold">{navItem.label}</span>
                             </button>
                         );

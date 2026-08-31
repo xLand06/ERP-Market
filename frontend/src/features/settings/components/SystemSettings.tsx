@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings2, DollarSign, Percent, Clock, Save } from 'lucide-react';
+import { Settings2, DollarSign, Percent, Clock, Save, RefreshCw } from 'lucide-react';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { api } from '@/lib/api';
@@ -108,19 +108,19 @@ export function SystemSettings() {
                                             }
                                         }}
                                         disabled={!selectedProvider || selectedProvider === 'manual'}
-                                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 transition-colors flex items-center gap-1"
+                                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 transition-colors flex items-center gap-1.5"
                                     >
-                                        ⚡ Obtener de DolarApi
+                                        <RefreshCw className="w-3.5 h-3.5" /> Sincronizar DolarApi
                                     </button>
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     {[
-                                        { id: 've_dolar_oficial', label: '🇻🇪 BCV Dólar Oficial', desc: 'Tasa oficial del BCV' },
-                                        { id: 've_dolar_paralelo', label: '📈 Dólar Paralelo', desc: 'Promedio EnParaleloVzla' },
-                                        { id: 've_euro_oficial', label: '💶 BCV Euro Oficial', desc: 'Tasa Euro Oficial para USD' },
-                                        { id: 've_euro_paralelo', label: '💱 Euro Paralelo', desc: 'Euro Promedio Paralelo' },
-                                        { id: 'manual', label: '✏️ Personalizado / Manual', desc: 'Ajuste manual del dueño' },
+                                        { id: 've_dolar_oficial', label: 'BCV Dólar Oficial', desc: 'Tasa oficial del BCV' },
+                                        { id: 've_dolar_paralelo', label: 'Dólar Paralelo', desc: 'Promedio EnParaleloVzla' },
+                                        { id: 've_euro_oficial', label: 'BCV Euro Oficial', desc: 'Tasa Euro Oficial para USD' },
+                                        { id: 've_euro_paralelo', label: 'Euro Paralelo', desc: 'Euro Promedio Paralelo' },
+                                        { id: 'manual', label: 'Personalizado / Manual', desc: 'Ajuste manual del dueño' },
                                     ].map((prov) => (
                                         <button
                                             key={prov.id}
@@ -161,9 +161,9 @@ export function SystemSettings() {
                                 <p className="text-xs text-slate-400">Es la moneda de visualización y trabajo predeterminada para precios y reportes.</p>
                                 <div className="grid grid-cols-3 gap-2 pt-1">
                                     {[
-                                        { id: 'USD', label: '💵 USD ($)', desc: 'Dólares' },
-                                        { id: 'VES', label: '🇻🇪 VES (Bs.)', desc: 'Bolívares' },
-                                        { id: 'COP', label: '🇨🇴 COP ($)', desc: 'Pesos Col.' },
+                                        { id: 'USD', label: 'USD ($)', desc: 'Dólares' },
+                                        { id: 'VES', label: 'VES (Bs.)', desc: 'Bolívares' },
+                                        { id: 'COP', label: 'COP ($)', desc: 'Pesos Col.' },
                                     ].map((cur) => (
                                         <button
                                             key={cur.id}
@@ -192,11 +192,11 @@ export function SystemSettings() {
                                     </span>
                                 </div>
                                 <div className="flex flex-wrap items-center justify-between gap-2 pt-1 font-mono text-xs font-bold">
-                                    <span>💵 1 USD</span>
+                                    <span>1 USD</span>
                                     <span>=</span>
-                                    <span>🇨🇴 ${(parseFloat(localUsd) || 0).toLocaleString('es-CO')} COP</span>
+                                    <span>${(parseFloat(localUsd) || 0).toLocaleString('es-CO')} COP</span>
                                     <span>=</span>
-                                    <span>🇻🇪 Bs. {parseFloat(localVes) || 0} VES</span>
+                                    <span>Bs. {parseFloat(localVes) || 0} VES</span>
                                 </div>
                             </div>
 

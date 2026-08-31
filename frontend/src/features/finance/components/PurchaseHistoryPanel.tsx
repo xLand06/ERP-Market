@@ -10,7 +10,7 @@ import { useConfigStore } from '@/hooks/useConfigStore';
 
 type Period = 'day' | 'week' | 'month';
 
-const CURRENCY_FLAGS: Record<string, string> = { COP: '🇨🇴', USD: '🇺🇸', VES: '🇻🇪' };
+const CURRENCY_FLAGS: Record<string, string> = { COP: 'COP', USD: 'USD', VES: 'VES' };
 const CURRENCY_SYMBOLS: Record<string, string> = { COP: '$', USD: '$', VES: 'Bs.' };
 
 interface PurchaseHistoryPanelProps {
@@ -204,8 +204,8 @@ export function PurchaseHistoryPanel({ branchId: propBranch }: PurchaseHistoryPa
             {/* Summary card */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="bg-slate-50 rounded-xl p-4 flex items-center gap-3 border border-slate-100">
-                    <div className="w-10 h-10 bg-slate-200/50 rounded-xl flex items-center justify-center text-slate-500 font-bold text-xs">
-                        🇨🇴 COP
+                    <div className="w-10 h-10 bg-slate-200/50 rounded-xl flex items-center justify-center text-slate-700 font-extrabold text-xs">
+                        COP
                     </div>
                     <div>
                         <p className="text-[10px] text-slate-400 font-bold uppercase">Pesos (COP)</p>
@@ -216,8 +216,8 @@ export function PurchaseHistoryPanel({ branchId: propBranch }: PurchaseHistoryPa
                 </div>
                 
                 <div className="bg-slate-50 rounded-xl p-4 flex items-center gap-3 border border-slate-100">
-                    <div className="w-10 h-10 bg-slate-200/50 rounded-xl flex items-center justify-center text-slate-500 font-bold text-xs">
-                        🇺🇸 USD
+                    <div className="w-10 h-10 bg-slate-200/50 rounded-xl flex items-center justify-center text-slate-700 font-extrabold text-xs">
+                        USD
                     </div>
                     <div>
                         <p className="text-[10px] text-slate-400 font-bold uppercase">Dólares (USD)</p>
@@ -228,8 +228,8 @@ export function PurchaseHistoryPanel({ branchId: propBranch }: PurchaseHistoryPa
                 </div>
 
                 <div className="bg-slate-50 rounded-xl p-4 flex items-center gap-3 border border-slate-100">
-                    <div className="w-10 h-10 bg-slate-200/50 rounded-xl flex items-center justify-center text-slate-500 font-bold text-xs">
-                        🇻🇪 VES
+                    <div className="w-10 h-10 bg-slate-200/50 rounded-xl flex items-center justify-center text-slate-700 font-extrabold text-xs">
+                        VES
                     </div>
                     <div>
                         <p className="text-[10px] text-slate-400 font-bold uppercase">Bolívares (VES)</p>

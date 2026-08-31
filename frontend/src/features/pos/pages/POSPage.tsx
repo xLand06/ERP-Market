@@ -463,9 +463,9 @@ export default function POSPage() {
                     <Button
                         size="sm"
                         onClick={() => setMobileTab('cart')}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs px-4 h-10 rounded-xl"
+                        className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs px-4 h-10 rounded-xl flex items-center gap-1.5"
                     >
-                        Ver Ticket 🛒
+                        <ShoppingCart className="w-4 h-4" /> Ver Ticket
                     </Button>
                 </div>
             )}
