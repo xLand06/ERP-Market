@@ -28,7 +28,7 @@ import toast from 'react-hot-toast';
 
 import type { Product, PaymentMethodType, Currency, CreateTransactionPayload } from '../types';
 
-// ─── Main Component ────────────────────────────────────────────────
+// ─── Main Component (Refreshed) ────────────────────────────────────
 export default function POSPage() {
     const [isSaleMode, setIsSaleMode] = useState(true);
     const [payOpen, setPayOpen] = useState(false);
