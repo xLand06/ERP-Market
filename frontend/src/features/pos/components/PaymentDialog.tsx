@@ -221,45 +221,76 @@ export function PaymentDialog({
                 {/* Métodos de Pago */}
                 <div className="p-4 sm:p-5 space-y-4">
                     {rows.map((row, i) => (
-                        <div key={row.key} className="p-3 sm:p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 overflow-hidden">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div key={row.key} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                            <div className="flex items-center justify-between">
                                 <span className="text-xs font-black text-slate-700 uppercase tracking-wide">
                                     Pago #{i + 1}
                                 </span>
-
-                                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
-                                    {/* Select Moneda */}
-                                    <select
-                                        value={row.currency}
-                                        onChange={e => updateRow(row.key, { currency: e.target.value as Currency })}
-                                        className="flex-1 sm:flex-none h-9 px-2 text-xs font-bold bg-white border border-slate-200 rounded-xl text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                                {rows.length > 1 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => removeRow(row.key)}
+                                        className="text-xs font-bold text-red-500 hover:bg-red-50 p-1.5 rounded-lg flex items-center gap-1 transition-colors"
                                     >
-                                        <option value="USD">USD ($)</option>
-                                        <option value="VES">VES (Bs.)</option>
-                                        <option value="COP">COP ($)</option>
-                                    </select>
+                                        <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                                    </button>
+                                )}
+                            </div>
 
-                                    {/* Select Método */}
-                                    <select
-                                        value={row.type}
-                                        onChange={e => updateRow(row.key, { type: e.target.value as PaymentMethodType })}
-                                        className="flex-1 sm:flex-none h-9 px-2 text-xs font-bold bg-white border border-slate-200 rounded-xl text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                                    >
-                                        <option value="cash">Efectivo</option>
-                                        <option value="transfer">Pago Móvil / Transf.</option>
-                                        <option value="card">Tarjeta / Punto</option>
-                                    </select>
-
-                                    {rows.length > 1 && (
+                            {/* Seleccionar Moneda de Pago con Botones Táctiles */}
+                            <div className="space-y-1">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Moneda de Pago</span>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                    {[
+                                        { code: 'USD', label: 'USD ($)' },
+                                        { code: 'VES', label: 'VES (Bs.)' },
+                                        { code: 'COP', label: 'COP ($)' },
+                                    ].map(c => (
                                         <button
+                                            key={c.code}
                                             type="button"
-                                            onClick={() => removeRow(row.key)}
-                                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0"
-                                            title="Eliminar este método de pago"
+                                            onClick={() => updateRow(row.key, { currency: c.code as Currency })}
+                                            className={cn(
+                                                'h-10 px-2 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center border active:scale-95',
+                                                row.currency === c.code
+                                                    ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                                                    : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                                            )}
                                         >
-                                            <Trash2 className="w-4 h-4" />
+                                            {c.label}
                                         </button>
-                                    )}
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Seleccionar Forma de Pago con Botones Táctiles */}
+                            <div className="space-y-1">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Forma de Pago</span>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                    {[
+                                        { type: 'cash', label: 'Efectivo', icon: Wallet },
+                                        { type: 'transfer', label: 'Pago Móvil', icon: Send },
+                                        { type: 'card', label: 'Tarjeta', icon: CreditCard },
+                                    ].map(m => {
+                                        const Icon = m.icon;
+                                        const isSelected = row.type === m.type;
+                                        return (
+                                            <button
+                                                key={m.type}
+                                                type="button"
+                                                onClick={() => updateRow(row.key, { type: m.type as PaymentMethodType })}
+                                                className={cn(
+                                                    'h-11 px-2 rounded-xl font-extrabold text-xs transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 border active:scale-95 text-center',
+                                                    isSelected
+                                                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                                        : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                                                )}
+                                            >
+                                                <Icon className={cn('w-4 h-4 shrink-0', isSelected ? 'text-white' : 'text-slate-400')} />
+                                                <span className="truncate">{m.label}</span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
