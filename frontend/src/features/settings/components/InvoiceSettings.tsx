@@ -420,45 +420,45 @@ export function InvoiceSettings() {
                             <span>TOTAL</span>
                         </div>
 
-                        {/* Sample Items */}
+                        {/* Sample Items in VES (Bs.) */}
                         <div className="space-y-1 text-[11px] pt-1">
                             <div className="flex justify-between font-semibold">
                                 <span>2 x Harina Pan 1kg</span>
-                                <span>$2.50</span>
+                                <span>Bs. 131,13</span>
                             </div>
                             <div className="flex justify-between font-semibold">
                                 <span>1 x Aceite Vegetal 1L</span>
-                                <span>$3.80</span>
+                                <span>Bs. 199,31</span>
                             </div>
                         </div>
 
                         <div className="border-b border-dashed border-slate-400 my-1.5" />
 
-                        {/* Totals & Tax Breakdown */}
+                        {/* Totals & Tax Breakdown in VES */}
                         <div className="space-y-1 text-[11px]">
                             <div className="flex justify-between">
                                 <span>SUBTOTAL NETO:</span>
-                                <span>$6.30</span>
+                                <span>Bs. 330,44</span>
                             </div>
 
                             {showIvaBreakdown && ivaEnabled && (
                                 <div className="flex justify-between text-slate-700">
                                     <span>IVA ({ivaPercent}% {ivaMode === 'included' ? 'inc.' : 'adicional'}):</span>
-                                    <span>${((6.30 * (ivaPercent / 100))).toFixed(2)}</span>
+                                    <span>Bs. {((330.44 * (ivaPercent / 100))).toFixed(2)}</span>
                                 </div>
                             )}
 
                             <div className="flex justify-between font-black text-sm border-t border-slate-400 pt-1 mt-1">
-                                <span>TOTAL PAGAR:</span>
-                                <span>${(6.30 + (ivaEnabled && ivaMode === 'added' ? (6.30 * (ivaPercent / 100)) : 0)).toFixed(2)} USD</span>
+                                <span>TOTAL A PAGAR:</span>
+                                <span>Bs. {(330.44 + (ivaEnabled && ivaMode === 'added' ? (330.44 * (ivaPercent / 100)) : 0)).toFixed(2)} VES</span>
                             </div>
                         </div>
 
-                        {/* Multi-Currency Equivalence */}
+                        {/* Multi-Currency Equivalence Reference */}
                         {showMultiCurrencySummary && (
                             <div className="bg-amber-100/80 p-2 rounded border border-amber-300/60 text-[10px] space-y-0.5 font-bold">
-                                <p>🇻🇪 Bs. {((6.30 + (ivaEnabled && ivaMode === 'added' ? (6.30 * (ivaPercent / 100)) : 0)) * 52.45).toFixed(2)} VES</p>
-                                <p>🇨🇴 ${(Math.round((6.30 + (ivaEnabled && ivaMode === 'added' ? (6.30 * (ivaPercent / 100)) : 0)) * 4200)).toLocaleString('es-CO')} COP</p>
+                                <p>Ref. USD: ${(((330.44 + (ivaEnabled && ivaMode === 'added' ? (330.44 * (ivaPercent / 100)) : 0)) / 52.45)).toFixed(2)} USD</p>
+                                <p>Ref. COP: ${(Math.round((((330.44 + (ivaEnabled && ivaMode === 'added' ? (330.44 * (ivaPercent / 100)) : 0)) / 52.45) * 4200))).toLocaleString('es-CO')} COP</p>
                             </div>
                         )}
 
