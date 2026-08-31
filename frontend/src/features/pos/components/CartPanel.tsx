@@ -147,46 +147,60 @@ export const CartPanel = React.memo(function CartPanel({
                 )}
             </div>
 
-            {/* Totals */}
-            <div className="px-6 py-5 bg-slate-50 border-t">
-                <div className="flex justify-between items-center">
-                    <span className="text-sm font-black text-slate-400 uppercase">TOTAL</span>
-                    <div className="text-right">
-                        <p className="text-3xl font-black text-slate-900">{fmtCOP(totals.total)}</p>
-                        <div className="flex gap-2 justify-end mt-0.5">
-                            <p className="text-[11px] text-slate-400">
-                                ${fromCOP(totals.total, 'USD').toFixed(2)} USD
-                            </p>
-                            <p className="text-[11px] text-slate-400">
-                                Bs. {Math.round(fromCOP(totals.total, 'VES'))} VES
-                            </p>
+            {/* Totals Section */}
+            <div className="px-5 py-4 bg-gradient-to-b from-slate-50 to-slate-100/80 border-t border-slate-200">
+                <div className="flex justify-between items-end">
+                    <div>
+                        <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase block mb-1">TOTAL A PAGAR</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="inline-flex items-center gap-1 bg-white border border-slate-200 shadow-2xs px-2 py-0.5 rounded-lg text-[11px] font-extrabold text-slate-700">
+                                💵 ${fromCOP(totals.total, 'USD').toFixed(2)} <span className="text-slate-400 text-[9px]">USD</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1 bg-white border border-slate-200 shadow-2xs px-2 py-0.5 rounded-lg text-[11px] font-extrabold text-slate-700">
+                                🇻🇪 Bs. {Math.round(fromCOP(totals.total, 'VES')).toLocaleString('es-VE')} <span className="text-slate-400 text-[9px]">VES</span>
+                            </span>
                         </div>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-none tabular-nums">
+                            {fmtCOP(totals.total)}
+                        </p>
+                        <p className="text-[10px] font-medium text-slate-400 mt-1">
+                            {totals.itemCount} {totals.itemCount === 1 ? 'producto' : 'productos'} en ticket
+                        </p>
                     </div>
                 </div>
             </div>
 
-            {/* Checkout button */}
-            <div className="px-5 pb-6 pt-4">
+            {/* Checkout action button */}
+            <div className="p-4 bg-white border-t border-slate-100">
                 <Button
                     size="lg"
                     className={cn(
-                        'w-full h-14 font-black text-base transition-colors',
+                        'w-full h-14 font-black text-base transition-all duration-200 shadow-md active:scale-[0.99] rounded-2xl flex items-center justify-between px-6',
                         isSaleMode
-                            ? 'bg-emerald-600 hover:bg-emerald-700'
-                            : 'bg-indigo-600 hover:bg-indigo-700'
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+                            : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20'
                     )}
                     disabled={items.length === 0 || isSubmitting}
                     onClick={onCheckout}
                 >
                     {isSubmitting ? (
-                        <span className="flex items-center gap-2">
+                        <span className="flex items-center gap-2 mx-auto">
                             <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            Procesando...
+                            Procesando Venta...
                         </span>
                     ) : isSaleMode ? (
-                        'Pagar [Ctrl+Enter]'
+                        <>
+                            <span className="flex items-center gap-2">
+                                <span className="text-lg">💳</span> PAGAR AHORA
+                            </span>
+                            <kbd className="bg-black/20 text-white text-[11px] px-2.5 py-1 rounded-lg font-bold font-mono tracking-tight">
+                                Ctrl + Enter
+                            </kbd>
+                        </>
                     ) : (
-                        'Registrar Entrada'
+                        <span className="mx-auto">Registrar Entrada de Inventario</span>
                     )}
                 </Button>
             </div>

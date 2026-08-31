@@ -157,31 +157,37 @@ export function ProductSearch({
     }, [search, filteredProducts, inventory, onAddToCart, onShowPresentations, setSearch, isSaleMode]);
 
     return (
-        <div className="flex flex-col gap-4 h-full">
-            {/* Search */}
-            <div className="relative" onKeyDown={handleKeyDown}>
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input
-                    ref={searchRef}
-                    placeholder="Buscar o escanear... [F2]"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    className="pl-9 h-11"
-                />
-                <Barcode className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <div className="flex flex-col gap-3 h-full">
+            {/* Search Bar & Barcode Scanner Status Indicator */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2" onKeyDown={handleKeyDown}>
+                <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
+                        ref={searchRef}
+                        placeholder="Buscar producto por nombre o escanear código de barras... [F2]"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="pl-10 pr-10 h-11 bg-white border-slate-200 shadow-2xs rounded-xl focus:border-indigo-500 text-sm font-medium"
+                    />
+                    <Barcode className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-indigo-500" />
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 border border-emerald-200/80 rounded-xl shrink-0 self-start sm:self-auto" title="El lector de código de barras está listo para recibir lecturas">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[11px] font-bold text-emerald-700 tracking-tight">Escáner Activo</span>
+                </div>
             </div>
 
             {/* Category chips */}
-            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar items-center">
                 {categories.map(cat => (
                     <button
                         key={cat}
                         onClick={() => setCategory(cat)}
                         className={cn(
-                            'px-4 py-1.5 rounded-full text-xs font-semibold border transition-all whitespace-nowrap',
+                            'px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap active:scale-95',
                             category === cat
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                                : 'bg-white text-slate-500 border-slate-200'
+                                ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-600/20'
+                                : 'bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-100'
                         )}
                     >
                         {cat}
