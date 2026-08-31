@@ -69,7 +69,6 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                     <Menu className="w-5 h-5 lg:w-6 lg:h-6" />
                 </button>
 
-<<<<<<< HEAD
                 <div className="flex items-center gap-2 shrink-0">
                     <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shrink-0">
                         <Store className="w-4 h-4 text-white" />
@@ -88,22 +87,6 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                         <span className="font-medium">Tasa</span>
                     </div>
                     <div className="w-px h-5 bg-slate-200 mx-1" />
-=======
-                
-            </div>
-
-            {/* Center – Exchange Rate Widget */}
-            <div className={cn(
-                "items-center gap-0 bg-slate-50 border border-slate-200 rounded-xl p-1 text-xs shrink-0 max-w-[140px] sm:max-w-none overflow-x-auto no-scrollbar",
-                collapsed ? "hidden md:flex" : "hidden xl:flex"
-            )}>
-                {/* Label */}
-                <div className="hidden sm:flex items-center gap-1.5 px-2 text-slate-400">
-                    <ArrowLeftRight className="w-3 h-3" />
-                    <span className="font-medium hidden md:block">Tasa</span>
-                </div>
-                <div className="hidden sm:block w-px h-5 bg-slate-200 mx-1" />
->>>>>>> origin/feature-basic-v1
 
                     {/* Currency tabs */}
                     <div className="flex items-center">
@@ -123,7 +106,6 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                         ))}
                     </div>
 
-<<<<<<< HEAD
                     <div className="w-px h-5 bg-slate-200 mx-1" />
 
                     {/* Rates display */}

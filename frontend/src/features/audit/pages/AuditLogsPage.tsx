@@ -458,17 +458,12 @@ const AuditLogsPage: React.FC = () => {
                                             className={`hover:bg-slate-50 cursor-pointer transition-colors group ${selectedLog?.id === log.id ? 'bg-indigo-50' : ''}`}
                                         >
                                             <td className="px-6 py-4">
-<<<<<<< HEAD
-                                                <div className="text-sm font-semibold text-slate-900">{ACTION_LABELS[log.action] || log.action}</div>
-                                                <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[150px]">{log.id}</div>
-=======
-                                                <div className="text-sm font-medium text-slate-900">
+                                                <div className="text-sm font-semibold text-slate-900">
                                                     {ACTION_DICTIONARY[log.action] || log.action}
                                                 </div>
                                                 <div className="text-[10px] text-slate-400 mt-0.5 max-w-[200px] truncate">
                                                     {getDisplayName(log.user)} ejecutó esta acción
                                                 </div>
->>>>>>> origin/feature-basic-v1
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium ${MODULE_COLORS[log.module] || 'bg-slate-100 text-slate-600'}`}>
@@ -477,22 +472,6 @@ const AuditLogsPage: React.FC = () => {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4">
-<<<<<<< HEAD
-                                                {(() => {
-                                                    const userName = log.user?.nombre || log.user?.username || log.user?.name || 'Usuario';
-                                                    return (
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold">
-                                                                {userName.charAt(0).toUpperCase()}
-                                                            </div>
-                                                            <div>
-                                                                <div className="text-sm text-slate-700">{userName}</div>
-                                                                <div className="text-[11px] text-slate-400 italic uppercase">{log.user?.role || 'Sistema'}</div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })()}
-=======
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold uppercase">
                                                         {log.user ? (log.user.nombre?.charAt(0) || log.user.username?.charAt(0) || 'U') : 'S'}
@@ -504,7 +483,6 @@ const AuditLogsPage: React.FC = () => {
                                                         <div className="text-[11px] text-slate-400 italic uppercase">{log.user?.role || 'SISTEMA'}</div>
                                                     </div>
                                                 </div>
->>>>>>> origin/feature-basic-v1
                                             </td>
                                             <td className="px-6 py-4 text-xs text-slate-500 font-mono">
                                                 {format(new Date(log.createdAt), "dd MMM, HH:mm:ss", { locale: es })}
