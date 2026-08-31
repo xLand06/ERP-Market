@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Settings2, Building2, Tag, AlertTriangle, HardDrive } from 'lucide-react';
-import { SystemSettings, BranchesTab, CategoriesTab, MaintenanceTab } from '../components';
+import { Settings2, Building2, Tag, AlertTriangle, HardDrive, Printer } from 'lucide-react';
+import { SystemSettings, InvoiceSettings, BranchesTab, CategoriesTab, MaintenanceTab } from '../components';
 import { BackupPanel } from '@/features/backup/BackupPanel';
 import { useAuthStore } from '@/features/auth/store/authStore';
 
-type Tab = 'branches' | 'categories' | 'maintenance' | 'system' | 'backup';
+type Tab = 'branches' | 'categories' | 'invoice' | 'system' | 'maintenance' | 'backup';
 
 export default function SettingsPage() {
     const { user } = useAuthStore();
@@ -34,12 +34,13 @@ export default function SettingsPage() {
     const allTabs = [
         { id: 'branches' as Tab, label: 'Sucursales', icon: Building2, count: branches.length },
         { id: 'categories' as Tab, label: 'Grupos y Subgrupos', icon: Tag, count: groups.length },
+        { id: 'invoice' as Tab, label: 'Facturación e Impresora', icon: Printer },
         { id: 'system' as Tab, label: 'Configuración Global', icon: Settings2 },
         { id: 'maintenance' as Tab, label: 'Mantenimiento', icon: AlertTriangle },
         { id: 'backup' as Tab, label: 'Backup & Nube', icon: HardDrive },
     ];
 
-    const tabs = isOwner ? allTabs : allTabs.filter(t => t.id === 'system');
+    const tabs = isOwner ? allTabs : allTabs.filter(t => t.id === 'system' || t.id === 'invoice');
 
     const renderContent = () => {
         switch (activeTab) {
@@ -47,6 +48,8 @@ export default function SettingsPage() {
                 return <BranchesTab />;
             case 'categories':
                 return <CategoriesTab />;
+            case 'invoice':
+                return <InvoiceSettings />;
             case 'system':
                 return <SystemSettings />;
             case 'backup':

@@ -10,11 +10,39 @@ interface ExchangeRate {
 interface ConfigState {
     rates: Record<string, number>;
     iva: number;
+    ivaEnabled: boolean;
+    ivaPercent: number;
+    ivaMode: 'included' | 'added';
     mainCurrency: string; // 'USD' | 'VES' | 'COP'
     autoOpenTime: string | null; // 'HH:mm' o null para desactivado
     autoCloseTime: string | null; // 'HH:mm' o null para desactivado
     purgeRetentionDays: number; // Días de retención para transacciones en purga automática
     purgeLogRetentionDays: number; // Días de retención para logs en purga automática
+
+    // Datos Fiscales & Negocio
+    businessName: string;
+    taxId: string;
+    fiscalAddress: string;
+    fiscalPhone: string;
+
+    // Impresora Térmica & Impresión
+    printerType: 'browser' | 'thermal_usb' | 'thermal_network' | 'thermal_serial';
+    paperWidth: '80mm' | '58mm';
+    autoCut: boolean;
+    openCashDrawer: boolean;
+    printCopies: number;
+    autoPrintOnCheckout: boolean;
+
+    // Visibilidad & Plantilla de Factura
+    showBusinessHeader: boolean;
+    showTaxId: boolean;
+    showFiscalAddress: boolean;
+    showCustomer: boolean;
+    showMultiCurrencySummary: boolean;
+    showPaymentMethods: boolean;
+    showIvaBreakdown: boolean;
+    footerMessage: string;
+
     // Convenience getters
     vesRate: number;
     copRate: number;
@@ -56,12 +84,36 @@ export const useConfigStore = create<ConfigState>()(
                 USD: 3600,
                 COP: 1,
             },
-            iva: 0,
+            iva: 16,
+            ivaEnabled: true,
+            ivaPercent: 16,
+            ivaMode: 'added',
             mainCurrency: 'USD',
             autoOpenTime: null,
             autoCloseTime: null,
             purgeRetentionDays: 30,
             purgeLogRetentionDays: 90,
+
+            businessName: 'ABASTOS SOFIMAR',
+            taxId: 'J-12345678-9',
+            fiscalAddress: 'Calle Principal, Local #1',
+            fiscalPhone: '0414-1234567',
+
+            printerType: 'browser',
+            paperWidth: '80mm',
+            autoCut: true,
+            openCashDrawer: true,
+            printCopies: 1,
+            autoPrintOnCheckout: false,
+
+            showBusinessHeader: true,
+            showTaxId: true,
+            showFiscalAddress: true,
+            showCustomer: true,
+            showMultiCurrencySummary: true,
+            showPaymentMethods: true,
+            showIvaBreakdown: true,
+            footerMessage: '¡Gracias por su compra! Vuelva pronto',
 
             get vesRate() { return get().rates['VES'] || 5.5; },
             get copRate() { return get().rates['USD'] || get().rates['COP'] || 3600; },
@@ -165,12 +217,9 @@ export const useConfigStore = create<ConfigState>()(
                     const res = await api.get('/settings');
                     if (res.data.success) {
                         set({
-                            iva: res.data.data.iva,
+                            ...res.data.data,
+                            iva: res.data.data.ivaPercent ?? res.data.data.iva ?? 16,
                             mainCurrency: res.data.data.mainCurrency || 'USD',
-                            autoOpenTime: res.data.data.autoOpenTime,
-                            autoCloseTime: res.data.data.autoCloseTime,
-                            purgeRetentionDays: res.data.data.purgeRetentionDays,
-                            purgeLogRetentionDays: res.data.data.purgeLogRetentionDays
                         });
                     }
                 } catch (error) {
