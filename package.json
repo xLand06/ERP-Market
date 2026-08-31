@@ -4,10 +4,11 @@
   "description": "Un moderno sistema ERP diseñado específicamente para bodegones y minimarkets. Facilita la gestión integral del negocio: desde el ingreso de productos y seguimiento Kanban, hasta el control de inventario, finanzas multimoneda y cálculo de comisiones.",
   "main": "index.js",
   "scripts": {
-    "dev": "pnpm --filter ** dev",
-    "postinstall": "pnpm --filter ** postinstall",
-    "setup": "pnpm --filter ** db:setup",
-    "build": "pnpm --filter ** build",
+    "dev": "pnpm --parallel --filter './backend' --filter './frontend' dev",
+    "dev:desktop": "pnpm --parallel --filter './backend' --filter './frontend' --filter './desktop' dev",
+    "postinstall": "pnpm --filter './backend' postinstall",
+    "setup": "pnpm --filter './backend' db:setup:local",
+    "build": "pnpm --filter './backend' --filter './frontend' build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

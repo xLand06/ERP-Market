@@ -15,6 +15,9 @@ export function AppShellLayout() {
 
     // Keyboard Shortcuts Logic
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
+        // Ignorar si se presionan combinaciones con Ctrl, Cmd/Meta o Alt (ej: Ctrl+C para copiar)
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+
         // Ignorar si el usuario está escribiendo en un input, textarea o contentEditable
         const target = e.target as HTMLElement;
         const isTyping = 

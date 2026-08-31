@@ -12,9 +12,13 @@
  */
 import path from 'path';
 import os from 'os';
+import fs from 'fs';
+import dotenv from 'dotenv';
 import { PrismaClient } from '../node_modules/.prisma/client-local';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
 import bcrypt from 'bcryptjs';
+
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // ── Detectar la ruta de la DB ─────────────────────────────────────────────────
 function resolveDbUrl(): string {
@@ -28,7 +32,11 @@ function resolveDbUrl(): string {
             ? path.join(os.homedir(), 'Library', 'Application Support')
             : path.join(os.homedir(), '.config'));
 
-    const electronDb = path.join(appDataPath, 'erp-market-desktop', 'erp-market.db');
+    const dirPath = path.join(appDataPath, 'erp-market-desktop');
+    if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+    }
+    const electronDb = path.join(dirPath, 'erp-market.db');
     return `file:${electronDb}`;
 }
 

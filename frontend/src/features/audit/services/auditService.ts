@@ -9,11 +9,14 @@ export interface AuditLog {
     ipAddress?: string;
     userAgent?: string;
     createdAt: string;
-    user: {
+    user?: {
         id: string;
-        name: string;
-        email: string;
-        role: string;
+        nombre?: string;
+        apellido?: string;
+        username?: string;
+        name?: string;
+        email?: string;
+        role?: string;
     };
 }
 

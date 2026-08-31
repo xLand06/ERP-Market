@@ -36,6 +36,199 @@ const MODULE_COLORS: Record<string, string> = {
     'SYSTEM': 'text-slate-600 bg-slate-50',
 };
 
+const ACTION_LABELS: Record<string, string> = {
+    'PRICE_CHANGE': 'Cambio de Precio',
+    'PRODUCT_CREATE': 'Creación de Producto',
+    'PRODUCT_UPDATE': 'Modificación de Producto',
+    'PRODUCT_DELETE': 'Eliminación de Producto',
+    'CREATE_PRODUCT': 'Creación de Producto',
+    'UPDATE_PRODUCT': 'Modificación de Producto',
+    'DELETE_PRODUCT': 'Eliminación de Producto',
+    'STOCK_ADJUST': 'Ajuste de Inventario',
+    'STOCK_SET': 'Fijación de Stock',
+    'SALE_CREATE': 'Venta Realizada',
+    'SALE': 'Venta Realizada',
+    'SALE_CANCEL': 'Venta Anulada',
+    'INVENTORY_IN': 'Entrada de Mercancía',
+    'CASH_OPEN': 'Apertura de Caja',
+    'CASH_CLOSE': 'Cierre de Caja',
+    'OPEN_CASH_REGISTER': 'Apertura de Caja',
+    'CLOSE_CASH_REGISTER': 'Cierre de Caja',
+    'USER_CREATE': 'Registro de Usuario',
+    'USER_UPDATE': 'Modificación de Usuario',
+    'USER_DELETE': 'Eliminación de Usuario',
+    'BRANCH_CREATE': 'Creación de Sucursal',
+    'BRANCH_UPDATE': 'Modificación de Sucursal',
+    'BRANCH_DELETE': 'Eliminación de Sucursal',
+    'CATEGORY_CREATE': 'Creación de Categoría',
+    'CATEGORY_UPDATE': 'Modificación de Categoría',
+    'CATEGORY_DELETE': 'Eliminación de Categoría',
+    'FINANCE_RATE_UPDATE': 'Tasa de Cambio',
+    'PURCHASE_CREATE': 'Orden de Compra',
+    'PURCHASE_STATUS_UPDATE': 'Estado de Compra',
+    'PURCHASE_CANCEL': 'Compra Cancelada',
+    'SUPPLIER_CREATE': 'Registro de Proveedor',
+    'SUPPLIER_UPDATE': 'Modificación de Proveedor',
+    'SUPPLIER_DELETE': 'Eliminación de Proveedor',
+    'SYSTEM_PURGE': 'Limpieza de Sistema',
+    'LOGIN': 'Inicio de Sesión',
+    'LOGIN_FAILED': 'Intento Fallido de Sesión',
+    'LOGOUT': 'Cierre de Sesión',
+};
+
+const FIELD_LABELS: Record<string, string> = {
+    username: 'Usuario',
+    nombre: 'Nombre',
+    apellido: 'Apellido',
+    email: 'Correo Electrónico',
+    role: 'Rol de Acceso',
+    price: 'Precio de Venta',
+    cost: 'Costo de Compra',
+    stock: 'Stock Actual',
+    quantity: 'Cantidad',
+    total: 'Monto Total',
+    method: 'Método de Pago',
+    status: 'Estado',
+    code: 'Código',
+    barcode: 'Código de Barras',
+    branchId: 'Sucursal',
+    id: 'Identificador',
+    description: 'Descripción',
+    reason: 'Motivo / Nota',
+    amount: 'Monto',
+    rate: 'Tasa de Cambio',
+    currency: 'Moneda',
+    type: 'Tipo de Operación',
+    cedula: 'Identificación / Cédula',
+    telefono: 'Teléfono de Contacto',
+};
+
+function getNaturalSummaryText(action: string, data: any): string | null {
+    const username = data?.username || data?.request?.body?.username || data?.request?.body?.nombre || data?.user;
+
+    switch (action) {
+        case 'LOGIN':
+            return username ? `Inicio de sesión exitoso del usuario "${username}"` : 'Inicio de sesión exitoso en la plataforma';
+        case 'LOGIN_FAILED':
+            return username ? `Intento fallido de inicio de sesión para "${username}"` : 'Intento fallido de inicio de sesión';
+        case 'LOGOUT':
+            return 'Cierre de sesión de la plataforma';
+        case 'PRICE_CHANGE':
+            return 'Se actualizó el precio de venta de un producto';
+        case 'PRODUCT_CREATE':
+        case 'CREATE_PRODUCT':
+            return 'Se registró un nuevo producto en el inventario';
+        case 'PRODUCT_UPDATE':
+        case 'UPDATE_PRODUCT':
+            return 'Se modificaron las propiedades o precio de un producto';
+        case 'PRODUCT_DELETE':
+        case 'DELETE_PRODUCT':
+            return 'Se eliminó un producto del catálogo';
+        case 'STOCK_ADJUST':
+        case 'STOCK_SET':
+            return 'Se realizó un ajuste manual de inventario';
+        case 'SALE':
+        case 'SALE_CREATE':
+            return 'Se procesó una nueva venta en la caja';
+        case 'SALE_CANCEL':
+            return 'Se anuló una venta previamente registrada';
+        case 'INVENTORY_IN':
+            return 'Se registró un ingreso de inventario por compra o surtido';
+        case 'CASH_OPEN':
+        case 'OPEN_CASH_REGISTER':
+            return 'Se realizó la apertura de caja chica para el turno';
+        case 'CASH_CLOSE':
+        case 'CLOSE_CASH_REGISTER':
+            return 'Se realizó el cierre de caja del turno';
+        case 'USER_CREATE':
+            return 'Se creó una nueva cuenta de usuario en el sistema';
+        case 'USER_UPDATE':
+            return 'Se actualizaron los datos o permisos de un usuario';
+        case 'USER_DELETE':
+            return 'Se eliminó un usuario del sistema';
+        case 'BRANCH_CREATE':
+            return 'Se creó una nueva sucursal o sede';
+        case 'BRANCH_UPDATE':
+            return 'Se actualizó la información de una sucursal';
+        case 'BRANCH_DELETE':
+            return 'Se eliminó una sucursal del sistema';
+        case 'CATEGORY_CREATE':
+            return 'Se creó una nueva categoría de productos';
+        case 'CATEGORY_UPDATE':
+            return 'Se modificó el nombre o datos de una categoría';
+        case 'CATEGORY_DELETE':
+            return 'Se eliminó una categoría de productos';
+        case 'FINANCE_RATE_UPDATE':
+            return 'Se actualizó la tasa oficial de cambio de divisas';
+        case 'PURCHASE_CREATE':
+            return 'Se generó una nueva orden de compra a proveedor';
+        case 'PURCHASE_STATUS_UPDATE':
+            return 'Se actualizó el estado de una orden de compra';
+        case 'PURCHASE_CANCEL':
+            return 'Se canceló una orden de compra';
+        case 'SUPPLIER_CREATE':
+            return 'Se dio de alta a un nuevo proveedor';
+        case 'SUPPLIER_UPDATE':
+            return 'Se modificaron los datos de un proveedor';
+        case 'SUPPLIER_DELETE':
+            return 'Se eliminó un proveedor del sistema';
+        case 'SYSTEM_PURGE':
+            return 'Se ejecutó una limpieza general de registros del sistema';
+        default:
+            return null;
+    }
+}
+
+function renderNaturalDetails(details: any, action?: string): React.ReactNode {
+    let parsed = details;
+    if (typeof details === 'string') {
+        try {
+            parsed = JSON.parse(details);
+        } catch {
+            return <p className="text-sm text-slate-700 font-medium">{details}</p>;
+        }
+    }
+
+    if (!parsed || typeof parsed !== 'object') {
+        return <p className="text-sm text-slate-700 font-medium">{String(parsed || 'Sin información adicional')}</p>;
+    }
+
+    const summaryPhrase = action ? getNaturalSummaryText(action, parsed) : null;
+    const targetObj = parsed.request?.body || parsed.body || parsed;
+    const ignoredKeys = new Set(['request', 'response', 'statusCode', 'password', 'token', 'secret']);
+    const entries = Object.entries(targetObj).filter(([k]) => !ignoredKeys.has(k));
+
+    return (
+        <div className="space-y-3">
+            {summaryPhrase && (
+                <div className="flex items-center gap-2.5 p-3 bg-indigo-50/80 rounded-xl border border-indigo-100 text-indigo-900 text-xs sm:text-sm">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0 animate-pulse" />
+                    <span className="font-semibold">{summaryPhrase}</span>
+                </div>
+            )}
+
+            {entries.length > 0 ? (
+                <div className="space-y-1.5 pt-1">
+                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Detalles de la Operación</div>
+                    {entries.map(([key, value]) => {
+                        const label = FIELD_LABELS[key] || key.replace(/([A-Z])/g, ' $1').toLowerCase();
+                        let displayVal = typeof value === 'object' ? JSON.stringify(value) : String(value);
+                        if (typeof value === 'boolean') displayVal = value ? 'Sí' : 'No';
+                        return (
+                            <div key={key} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 text-xs">
+                                <span className="font-medium text-slate-500 capitalize">{label}</span>
+                                <span className="font-bold text-slate-900 truncate max-w-[220px]" title={displayVal}>{displayVal}</span>
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : !summaryPhrase ? (
+                <p className="text-sm text-slate-400 italic">Sin datos adicionales registrados</p>
+            ) : null}
+        </div>
+    );
+}
+
 const AuditLogsPage: React.FC = () => {
     const [logs, setLogs] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(true);
@@ -165,7 +358,7 @@ const AuditLogsPage: React.FC = () => {
                                             className={`hover:bg-slate-50 cursor-pointer transition-colors group ${selectedLog?.id === log.id ? 'bg-indigo-50' : ''}`}
                                         >
                                             <td className="px-6 py-4">
-                                                <div className="text-sm font-medium text-slate-900">{log.action}</div>
+                                                <div className="text-sm font-semibold text-slate-900">{ACTION_LABELS[log.action] || log.action}</div>
                                                 <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[150px]">{log.id}</div>
                                             </td>
                                             <td className="px-6 py-4">
@@ -175,15 +368,20 @@ const AuditLogsPage: React.FC = () => {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold">
-                                                        {log.user.name.charAt(0)}
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-sm text-slate-700">{log.user.name}</div>
-                                                        <div className="text-[11px] text-slate-400 italic uppercase">{log.user.role}</div>
-                                                    </div>
-                                                </div>
+                                                {(() => {
+                                                    const userName = log.user?.nombre || log.user?.username || log.user?.name || 'Usuario';
+                                                    return (
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold">
+                                                                {userName.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <div>
+                                                                <div className="text-sm text-slate-700">{userName}</div>
+                                                                <div className="text-[11px] text-slate-400 italic uppercase">{log.user?.role || 'Sistema'}</div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </td>
                                             <td className="px-6 py-4 text-xs text-slate-500 font-mono">
                                                 {format(new Date(log.createdAt), "dd MMM, HH:mm:ss", { locale: es })}
@@ -223,13 +421,9 @@ const AuditLogsPage: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
-                                        <div className="text-[10px] uppercase tracking-wider text-blue-600 mb-2 font-bold">Resumen de Cambios</div>
-                                        <pre className="text-xs font-mono text-blue-800 whitespace-pre-wrap max-h-[300px] overflow-y-auto custom-scrollbar">
-                                            {typeof selectedLog.details === 'string' 
-                                                ? selectedLog.details 
-                                                : JSON.stringify(selectedLog.details, null, 2)}
-                                        </pre>
+                                    <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100">
+                                        <div className="text-[10px] uppercase tracking-wider text-indigo-700 mb-2.5 font-bold">Resumen de Cambios</div>
+                                        {renderNaturalDetails(selectedLog.details, selectedLog.action)}
                                     </div>
                                 </div>
 

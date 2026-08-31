@@ -8,6 +8,8 @@ export default defineConfig({
   earlyAccess: true,
   schema: isLocal ? './prisma/schema.local.prisma' : './prisma/schema.prisma',
   datasource: { 
-    url: isLocal ? (env('LOCAL_DATABASE_URL') || 'file:./erp-market.db') : env('DIRECT_URL'),
+    url: isLocal 
+      ? (process.env.LOCAL_DATABASE_URL || 'file:./erp-market.db') 
+      : (process.env.DIRECT_URL || process.env.DATABASE_URL || 'postgresql://localhost:5432/dummy'),
   },
 });
