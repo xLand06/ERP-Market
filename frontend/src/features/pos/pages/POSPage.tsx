@@ -222,7 +222,26 @@ export default function POSPage() {
             };
 
             const res = await api.post('/pos/transactions', payload);
-            const invoiceNum = res.data?.data?.invoiceNumber || 'FACT-000482';
+            const saleItems = cart.map(c => ({
+                name: c.name,
+                qty: c.qty,
+                unitPrice: c.currentPrice,
+                total: c.currentPrice * c.qty,
+            }));
+            const formattedPayMethods = paymentMethods.map(pm => ({
+                type: pm.type,
+                amount: pm.amount,
+                currency: pm.currency,
+            }));
+
+            // Actualizar datos del ticket impreso en el DOM (sin mostrar modal en pantalla)
+            setSummary({
+                visible: false,
+                items: saleItems,
+                total: totals.total,
+                paymentMethods: formattedPayMethods,
+                type: 'SALE',
+            });
 
             // Impresora configurada como principal en /settings
             const config = useConfigStore.getState();
@@ -237,20 +256,11 @@ export default function POSPage() {
                 taxId: config.taxId,
                 fiscalAddress: config.fiscalAddress,
                 fiscalPhone: config.fiscalPhone,
-                items: cart.map(c => ({
-                    name: c.name,
-                    qty: c.qty,
-                    unitPrice: c.currentPrice,
-                    total: c.currentPrice * c.qty,
-                })),
+                items: saleItems,
                 totalUSD: totals.total,
                 totalVES: config.fromUSD(totals.total, 'VES'),
                 totalCOP: config.fromUSD(totals.total, 'COP'),
-                paymentMethods: paymentMethods.map(pm => ({
-                    type: pm.type,
-                    amount: pm.amount,
-                    currency: pm.currency,
-                })),
+                paymentMethods: formattedPayMethods,
                 footerMessage: config.footerMessage,
             });
 
@@ -566,7 +576,7 @@ export default function POSPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Transaction Summary */}
+            {/* Transaction Summary Modal (If manually triggered) */}
             <TransactionSummary
                 visible={summary.visible}
                 type={summary.type}
@@ -578,6 +588,20 @@ export default function POSPage() {
                 paymentMethods={summary.paymentMethods}
                 onDismiss={() => setSummary(prev => ({ ...prev, visible: false }))}
             />
+
+            {/* Contenedor estático para la impresión de navegador en POS */}
+            <div className="hidden print:block printable-ticket-container">
+                <ThermalReceiptTicket
+                    invoiceNumber="FACT-000482"
+                    customerName={summary.customerName || 'Consumidor Final'}
+                    customerTaxId={summary.customerTaxId || 'V-00000000-0'}
+                    customerPhone={summary.customerPhone}
+                    items={summary.items}
+                    totalUSD={summary.total}
+                    paymentMethods={summary.paymentMethods}
+                    isPreview={false}
+                />
+            </div>
         </div>
     );
 }
