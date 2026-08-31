@@ -173,7 +173,7 @@ export function PaymentDialog({
                 onPointerDownOutside={(e) => e.preventDefault()}
                 onInteractOutside={(e) => e.preventDefault()}
                 onEscapeKeyDown={(e) => e.preventDefault()}
-                className="w-[96vw] max-w-4xl max-h-[92vh] p-0 bg-slate-50 backdrop-blur-xl rounded-3xl border border-slate-300 shadow-2xl overflow-hidden flex flex-col relative"
+                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] w-[95vw] max-w-4xl max-h-[90vh] p-0 bg-slate-50 backdrop-blur-xl rounded-3xl border border-slate-300 shadow-2xl overflow-hidden flex flex-col"
             >
                 {/* Header Elegante con suficiente espacio a la derecha (pr-14) para evitar solapamientos */}
                 <div className="pl-6 pr-14 py-4 bg-white border-b border-slate-200/80 flex items-center justify-between gap-4 shrink-0">
