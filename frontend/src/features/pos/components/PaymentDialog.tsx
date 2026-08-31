@@ -171,7 +171,7 @@ export function PaymentDialog({
 
     return (
         <Dialog open={open} onOpenChange={o => !o && onClose()}>
-            <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto custom-scrollbar p-0 bg-white rounded-2xl border border-slate-200 shadow-2xl">
+            <DialogContent className="w-[95vw] sm:max-w-lg max-h-[92vh] overflow-y-auto custom-scrollbar p-0 bg-white rounded-2xl border border-slate-200 shadow-2xl">
                 
                 {/* Modal Header */}
                 <div className="p-5 bg-slate-900 text-white rounded-t-2xl space-y-3">
@@ -222,20 +222,20 @@ export function PaymentDialog({
                 )}
 
                 {/* Métodos de Pago */}
-                <div className="p-5 space-y-4">
+                <div className="p-4 sm:p-5 space-y-4">
                     {rows.map((row, i) => (
-                        <div key={row.key} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-                            <div className="flex items-center justify-between gap-2">
+                        <div key={row.key} className="p-3 sm:p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 overflow-hidden">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                 <span className="text-xs font-black text-slate-700 uppercase tracking-wide">
                                     Pago #{i + 1}
                                 </span>
 
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
                                     {/* Select Moneda */}
                                     <select
                                         value={row.currency}
                                         onChange={e => updateRow(row.key, { currency: e.target.value as Currency })}
-                                        className="h-8 px-2.5 text-xs font-bold bg-white border border-slate-200 rounded-lg text-slate-800"
+                                        className="flex-1 sm:flex-none h-9 px-2 text-xs font-bold bg-white border border-slate-200 rounded-xl text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                                     >
                                         <option value="USD">USD ($)</option>
                                         <option value="VES">VES (Bs.)</option>
@@ -246,7 +246,7 @@ export function PaymentDialog({
                                     <select
                                         value={row.type}
                                         onChange={e => updateRow(row.key, { type: e.target.value as PaymentMethodType })}
-                                        className="h-8 px-2.5 text-xs font-bold bg-white border border-slate-200 rounded-lg text-slate-800"
+                                        className="flex-1 sm:flex-none h-9 px-2 text-xs font-bold bg-white border border-slate-200 rounded-xl text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                                     >
                                         <option value="cash">Efectivo</option>
                                         <option value="transfer">Pago Móvil / Transf.</option>
@@ -257,7 +257,8 @@ export function PaymentDialog({
                                         <button
                                             type="button"
                                             onClick={() => removeRow(row.key)}
-                                            className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg"
+                                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0"
+                                            title="Eliminar este método de pago"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>
