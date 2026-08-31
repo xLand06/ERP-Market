@@ -354,26 +354,70 @@ export default function POSPage() {
         );
     }
 
+    // Estado para vista móvil/tablet (Catálogo vs Ticket)
+    const [mobileTab, setMobileTab] = useState<'catalog' | 'cart'>('catalog');
+
     // ── Main POS Layout ──────────────────────────────────────────────
     return (
-        <div className="flex flex-col lg:flex-row gap-4 h-full lg:h-[calc(100dvh-112px)] overflow-hidden">
-            {/* LEFT: Products */}
-            <div className="flex-[6] flex flex-col gap-4 bg-white rounded-xl border p-4 shadow-sm overflow-hidden">
-                <div className="flex border border-slate-200 p-1 rounded-lg w-fit mb-1">
-                    <button onClick={() => { setIsSaleMode(true); clearCart(); }}
-                        className={cn("px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2",
-                            isSaleMode ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700")}>
-                        <ShoppingCart className="w-4 h-4" /> Venta
-                    </button>
-                    <button onClick={() => { setIsSaleMode(false); clearCart(); }}
-                        className={cn("px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2",
-                            !isSaleMode ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}>
-                        <PackagePlus className="w-4 h-4" /> Entrada / Restock
-                    </button>
+        <div className="flex flex-col lg:flex-row gap-4 h-full lg:h-[calc(100dvh-112px)] overflow-hidden pb-16 lg:pb-0 relative">
+            {/* Mobile/Tablet View Switcher Bar (< lg) */}
+            <div className="flex lg:hidden bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
+                <button
+                    onClick={() => setMobileTab('catalog')}
+                    className={cn(
+                        "flex-1 py-2 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-2",
+                        mobileTab === 'catalog' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                    )}
+                >
+                    <Package className="w-4 h-4" /> Catálogo
+                </button>
+                <button
+                    onClick={() => setMobileTab('cart')}
+                    className={cn(
+                        "flex-1 py-2 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-2 relative",
+                        mobileTab === 'cart' ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600"
+                    )}
+                >
+                    <ShoppingCart className="w-4 h-4" /> Ticket
+                    {totals.itemCount > 0 && (
+                        <span className={cn(
+                            "px-1.5 py-0.5 rounded-full text-[10px] font-black",
+                            mobileTab === 'cart' ? "bg-white text-emerald-700" : "bg-emerald-600 text-white"
+                        )}>
+                            {totals.itemCount}
+                        </span>
+                    )}
+                </button>
+            </div>
+
+            {/* LEFT: Products (Visible on desktop or when catalog tab active on mobile) */}
+            <div className={cn(
+                "flex-[6] flex flex-col gap-3 bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-2xs overflow-hidden",
+                mobileTab === 'catalog' ? 'flex' : 'hidden lg:flex'
+            )}>
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                    <div className="flex border border-slate-200 p-1 rounded-xl bg-slate-50/80">
+                        <button onClick={() => { setIsSaleMode(true); clearCart(); }}
+                            className={cn("px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+                                isSaleMode ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-700")}>
+                            <ShoppingCart className="w-3.5 h-3.5 text-emerald-600" /> Venta
+                        </button>
+                        <button onClick={() => { setIsSaleMode(false); clearCart(); }}
+                            className={cn("px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+                                !isSaleMode ? "bg-white text-indigo-600 shadow-2xs" : "text-slate-500 hover:text-slate-700")}>
+                            <PackagePlus className="w-3.5 h-3.5 text-indigo-600" /> Entrada / Restock
+                        </button>
+                    </div>
+
+                    {/* Stock Entry Quick Action */}
+                    {!isSaleMode && (
+                        <Button size="sm" variant="outline" className="h-8 text-xs font-bold text-indigo-600 border-indigo-200" onClick={handleStockEntry}>
+                            + Nueva Carga
+                        </Button>
+                    )}
                 </div>
 
-
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto min-h-0">
                     <ProductSearch
                         inventory={inventoryItems}
                         isSaleMode={isSaleMode}
@@ -383,8 +427,11 @@ export default function POSPage() {
                 </div>
             </div>
 
-            {/* RIGHT: Cart */}
-            <div className="flex-[4] flex flex-col bg-white rounded-xl border shadow-sm overflow-hidden">
+            {/* RIGHT: Cart (Visible on desktop or when cart tab active on mobile) */}
+            <div className={cn(
+                "flex-[4] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden h-full min-h-[380px] lg:min-h-0",
+                mobileTab === 'cart' ? 'flex' : 'hidden lg:flex'
+            )}>
                 <CartPanel
                     items={cart}
                     totals={totals}
@@ -398,6 +445,30 @@ export default function POSPage() {
                     isSubmitting={isSubmitting}
                 />
             </div>
+
+            {/* Mobile Bottom Sticky Bar (< lg) */}
+            {mobileTab === 'catalog' && totals.itemCount > 0 && (
+                <div className="fixed bottom-3 left-3 right-3 z-40 lg:hidden bg-slate-900 text-white p-3 rounded-2xl shadow-2xl border border-slate-800 flex items-center justify-between animate-slide-up">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-500 text-slate-950 font-black flex items-center justify-center text-sm shadow-md">
+                            {totals.itemCount}
+                        </div>
+                        <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ticket Actual</p>
+                            <p className="text-base font-black text-white tabular-nums leading-none">
+                                {fmtCOP(totals.total)}
+                            </p>
+                        </div>
+                    </div>
+                    <Button
+                        size="sm"
+                        onClick={() => setMobileTab('cart')}
+                        className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs px-4 h-10 rounded-xl"
+                    >
+                        Ver Ticket 🛒
+                    </Button>
+                </div>
+            )}
 
             {/* Payment Dialog */}
             {isSaleMode && (

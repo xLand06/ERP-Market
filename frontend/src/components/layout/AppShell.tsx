@@ -130,9 +130,35 @@ export function AppShellLayout() {
                     <TopBar onToggleSidebar={() => setCollapsed(!collapsed)} collapsed={collapsed} />
                 </div>
 
-                <main className="flex-1 overflow-y-auto mt-14 lg:mt-16 p-3 lg:p-6 xl:p-8">
+                <main className="flex-1 overflow-y-auto mt-14 lg:mt-16 p-2 sm:p-4 lg:p-6 xl:p-8 pb-20 sm:pb-24 lg:pb-6">
                     <Outlet />
                 </main>
+
+                {/* Mobile / Compact Tablet Bottom Navigation Bar (< sm/md) */}
+                <nav aria-label="Navegación móvil" className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex items-center justify-around py-2 px-2 sm:hidden text-white shadow-2xl">
+                    {[
+                        { path: '/pos', label: 'POS', icon: '🛒' },
+                        { path: '/products', label: 'Productos', icon: '📦' },
+                        { path: '/', label: 'Inicio', icon: '📊' },
+                        { path: '/cash-registers', label: 'Cajas', icon: '💵' },
+                        { path: '/settings', label: 'Ajustes', icon: '⚙️' },
+                    ].map((navItem) => {
+                        const isActive = location.pathname === navItem.path;
+                        return (
+                            <button
+                                key={navItem.path}
+                                onClick={() => navigate(navItem.path)}
+                                className={cn(
+                                    "flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-xl transition-all text-center",
+                                    isActive ? "text-emerald-400 font-extrabold bg-slate-800 scale-105" : "text-slate-400 hover:text-slate-200"
+                                )}
+                            >
+                                <span className="text-lg leading-none">{navItem.icon}</span>
+                                <span className="text-[10px] font-bold">{navItem.label}</span>
+                            </button>
+                        );
+                    })}
+                </nav>
             </div>
         </div>
     );
