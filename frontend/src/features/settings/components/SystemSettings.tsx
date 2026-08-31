@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Settings2, DollarSign, Percent, Clock, Save, RefreshCw } from 'lucide-react';
-import { useConfigStore } from '@/hooks/useConfigStore';
+import { Settings2, DollarSign, Percent, Clock, Save, RefreshCw, Palette } from 'lucide-react';
+import { useConfigStore, UITheme } from '@/hooks/useConfigStore';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -12,7 +12,7 @@ export function SystemSettings() {
 
     const { 
         rates, iva, mainCurrency, autoOpenTime, autoCloseTime, purgeRetentionDays, purgeLogRetentionDays,
-        updateRate, updateSettings, fetchSettings
+        activeTheme, setTheme, updateRate, updateSettings, fetchSettings
     } = useConfigStore();
     const [localVes, setLocalVes] = useState(rates['VES']?.toString() || '5.5');
     const [localUsd, setLocalUsd] = useState((rates['USD'] || rates['COP'] || 3600).toString());
@@ -65,6 +65,85 @@ export function SystemSettings() {
 
     return (
         <div className="max-w-4xl space-y-6 animate-fade-in">
+            
+            {/* SECCIÓN TEMA DE INTERFAZ Y APARIENCIA (5 PRESETS) */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+                    <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                        <Palette className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">Tema de Interfaz y Apariencia</h3>
+                        <p className="text-xs text-slate-500 font-medium">Personaliza el diseño de la aplicación eligiendo entre 5 temas preestablecidos.</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {[
+                        {
+                            id: 'emerald',
+                            name: 'Esmeralda ERP',
+                            desc: 'Verde corporativo limpio',
+                            primaryBg: 'bg-emerald-500',
+                        },
+                        {
+                            id: 'indigo',
+                            name: 'Índigo Royal',
+                            desc: 'Azul moderno de alto contraste',
+                            primaryBg: 'bg-indigo-600',
+                        },
+                        {
+                            id: 'amber',
+                            name: 'Espresso & Ámbar',
+                            desc: 'Cálido para cafeterías y panaderías',
+                            primaryBg: 'bg-amber-600',
+                        },
+                        {
+                            id: 'rose',
+                            name: 'Bordó & Rosa',
+                            desc: 'Elegante para boutiques y retail',
+                            primaryBg: 'bg-rose-600',
+                        },
+                        {
+                            id: 'dark',
+                            name: 'Neón Nocturno',
+                            desc: 'Modo oscuro cyber para turnos de noche',
+                            primaryBg: 'bg-slate-950',
+                        },
+                    ].map((t) => {
+                        const isSel = (activeTheme || 'emerald') === t.id;
+                        return (
+                            <button
+                                key={t.id}
+                                type="button"
+                                onClick={() => {
+                                    setTheme(t.id as UITheme);
+                                    toast.success(`Tema "${t.name}" activado`);
+                                }}
+                                className={cn(
+                                    'p-4 rounded-2xl border-2 text-left transition-all active:scale-95 flex flex-col justify-between gap-2.5 cursor-pointer',
+                                    isSel
+                                        ? 'bg-indigo-50/50 border-indigo-600 shadow-md ring-2 ring-indigo-600/20'
+                                        : 'bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+                                )}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div className={cn('w-4 h-4 rounded-full shadow-xs', t.primaryBg)} />
+                                        <span className="text-xs font-black text-slate-950">{t.name}</span>
+                                    </div>
+                                    {isSel && (
+                                        <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+                                    )}
+                                </div>
+                                <p className="text-[11px] text-slate-500 font-bold leading-tight">{t.desc}</p>
+                                <div className={cn('h-2 rounded-full w-full', t.primaryBg)} />
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                 <div className="flex items-center gap-3 mb-6">
                     <div className="p-2 bg-indigo-50 rounded-lg">
