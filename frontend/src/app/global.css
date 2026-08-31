@@ -65,6 +65,27 @@
     --ring: 79 70 229;
     --sidebar-accent: #6366F1;
   }
+  html.theme-indigo .bg-emerald-600,
+  html.theme-indigo .bg-emerald-500 {
+    background-color: #4F46E5 !important;
+  }
+  html.theme-indigo .hover\:bg-emerald-700:hover,
+  html.theme-indigo .hover\:bg-emerald-600:hover {
+    background-color: #4338CA !important;
+  }
+  html.theme-indigo .text-emerald-600,
+  html.theme-indigo .text-emerald-700,
+  html.theme-indigo .text-emerald-800 {
+    color: #4F46E5 !important;
+  }
+  html.theme-indigo .border-emerald-600,
+  html.theme-indigo .border-emerald-500 {
+    border-color: #4F46E5 !important;
+  }
+  html.theme-indigo .bg-emerald-50,
+  html.theme-indigo .bg-emerald-100 {
+    background-color: #EEF2FF !important;
+  }
 
   html[data-theme="amber"], html.theme-amber {
     --primary: 217 119 6;
@@ -73,6 +94,33 @@
     --ring: 217 119 6;
     --sidebar-accent: #F59E0B;
   }
+  html.theme-amber .bg-emerald-600,
+  html.theme-amber .bg-emerald-500,
+  html.theme-amber .bg-indigo-600,
+  html.theme-amber .bg-indigo-500 {
+    background-color: #D97706 !important;
+  }
+  html.theme-amber .hover\:bg-emerald-700:hover,
+  html.theme-amber .hover\:bg-indigo-700:hover {
+    background-color: #B45309 !important;
+  }
+  html.theme-amber .text-emerald-600,
+  html.theme-amber .text-emerald-700,
+  html.theme-amber .text-emerald-800,
+  html.theme-amber .text-indigo-600,
+  html.theme-amber .text-indigo-700 {
+    color: #D97706 !important;
+  }
+  html.theme-amber .border-emerald-600,
+  html.theme-amber .border-emerald-500,
+  html.theme-amber .border-indigo-600 {
+    border-color: #D97706 !important;
+  }
+  html.theme-amber .bg-emerald-50,
+  html.theme-amber .bg-emerald-100,
+  html.theme-amber .bg-indigo-50 {
+    background-color: #FEF3C7 !important;
+  }
 
   html[data-theme="rose"], html.theme-rose {
     --primary: 225 29 72;
@@ -80,6 +128,33 @@
     --accent-foreground: 190 18 60;
     --ring: 225 29 72;
     --sidebar-accent: #F43F5E;
+  }
+  html.theme-rose .bg-emerald-600,
+  html.theme-rose .bg-emerald-500,
+  html.theme-rose .bg-indigo-600,
+  html.theme-rose .bg-indigo-500 {
+    background-color: #E11D48 !important;
+  }
+  html.theme-rose .hover\:bg-emerald-700:hover,
+  html.theme-rose .hover\:bg-indigo-700:hover {
+    background-color: #BE123C !important;
+  }
+  html.theme-rose .text-emerald-600,
+  html.theme-rose .text-emerald-700,
+  html.theme-rose .text-emerald-800,
+  html.theme-rose .text-indigo-600,
+  html.theme-rose .text-indigo-700 {
+    color: #E11D48 !important;
+  }
+  html.theme-rose .border-emerald-600,
+  html.theme-rose .border-emerald-500,
+  html.theme-rose .border-indigo-600 {
+    border-color: #E11D48 !important;
+  }
+  html.theme-rose .bg-emerald-50,
+  html.theme-rose .bg-emerald-100,
+  html.theme-rose .bg-indigo-50 {
+    background-color: #FFE4E6 !important;
   }
 
   html[data-theme="dark"], html.theme-dark {
@@ -102,6 +177,32 @@
     --ring: 16 185 129;
     --sidebar-bg: #020617;
     --sidebar-accent: #10B981;
+  }
+  html.theme-dark body {
+    background-color: #0F172A !important;
+    color: #F8FAFC !important;
+  }
+  html.theme-dark .bg-white {
+    background-color: #1E293B !important;
+    color: #F8FAFC !important;
+  }
+  html.theme-dark .bg-slate-50,
+  html.theme-dark .bg-slate-100 {
+    background-color: #0F172A !important;
+    color: #F8FAFC !important;
+  }
+  html.theme-dark .text-slate-900,
+  html.theme-dark .text-slate-800,
+  html.theme-dark .text-slate-700 {
+    color: #F8FAFC !important;
+  }
+  html.theme-dark .text-slate-500,
+  html.theme-dark .text-slate-400 {
+    color: #94A3B8 !important;
+  }
+  html.theme-dark .border-slate-200,
+  html.theme-dark .border-slate-100 {
+    border-color: #334155 !important;
   }
 }
 

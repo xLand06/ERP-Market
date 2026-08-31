@@ -22,13 +22,19 @@ import InitialSyncScreen from '@/components/loading/InitialSyncScreen';
 import api from '@/lib/api';
 
 export default function App() {
-    const { fetchSettings } = useConfigStore();
+    const { fetchSettings, activeTheme } = useConfigStore();
     const [initialSyncDone, setInitialSyncDone] = useState(true); // Por defecto: pasar directo
     const [checking, setChecking] = useState(true);
 
     useEffect(() => {
         fetchSettings();
     }, [fetchSettings]);
+
+    useEffect(() => {
+        const theme = activeTheme || 'emerald';
+        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.className = `theme-${theme}`;
+    }, [activeTheme]);
 
     useEffect(() => {
         async function checkFirstRun() {
