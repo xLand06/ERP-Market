@@ -48,6 +48,61 @@
     --danger: 239 68 68;
     --info: 59 130 246;
   }
+
+  /* ── 5 TEMAS PREESTABLECIDOS ── */
+  html[data-theme="emerald"], html.theme-emerald {
+    --primary: 16 185 129;
+    --accent: 236 253 245;
+    --accent-foreground: 5 150 105;
+    --ring: 16 185 129;
+    --sidebar-accent: #10B981;
+  }
+
+  html[data-theme="indigo"], html.theme-indigo {
+    --primary: 79 70 229;
+    --accent: 238 242 255;
+    --accent-foreground: 67 56 202;
+    --ring: 79 70 229;
+    --sidebar-accent: #6366F1;
+  }
+
+  html[data-theme="amber"], html.theme-amber {
+    --primary: 217 119 6;
+    --accent: 254 243 199;
+    --accent-foreground: 180 83 9;
+    --ring: 217 119 6;
+    --sidebar-accent: #F59E0B;
+  }
+
+  html[data-theme="rose"], html.theme-rose {
+    --primary: 225 29 72;
+    --accent: 255 241 242;
+    --accent-foreground: 190 18 60;
+    --ring: 225 29 72;
+    --sidebar-accent: #F43F5E;
+  }
+
+  html[data-theme="dark"], html.theme-dark {
+    --background: 15 23 42;
+    --foreground: 248 250 252;
+    --card: 30 41 59;
+    --card-foreground: 248 250 252;
+    --popover: 30 41 59;
+    --popover-foreground: 248 250 252;
+    --primary: 16 185 129;
+    --primary-foreground: 15 23 42;
+    --secondary: 51 65 85;
+    --secondary-foreground: 248 250 252;
+    --muted: 51 65 85;
+    --muted-foreground: 148 163 184;
+    --accent: 30 41 59;
+    --accent-foreground: 52 211 153;
+    --border: 51 65 85;
+    --input: 51 65 85;
+    --ring: 16 185 129;
+    --sidebar-bg: #020617;
+    --sidebar-accent: #10B981;
+  }
 }
 
 /* ─── Base Styles ─────────────────────────────────────── */

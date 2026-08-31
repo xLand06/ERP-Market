@@ -20,11 +20,16 @@ export interface ThermalPrinterConfig {
     role: 'pos' | 'kitchen' | 'backup';
 }
 
+export type UITheme = 'emerald' | 'indigo' | 'amber' | 'rose' | 'dark';
+
 export interface ConfigState {
     // Monedas & Tasas
     mainCurrency: string;
     rates: Record<string, number>;
     updatedAt: string | null;
+
+    // Tema de Interfaz
+    activeTheme: UITheme;
 
     // IVA & Turnos
     iva: number;
@@ -74,6 +79,7 @@ export interface ConfigState {
     // Actions
     fetchRates: () => Promise<void>;
     updateRate: (code: string, rate: number) => Promise<void>;
+    setTheme: (theme: UITheme) => void;
     setIva: (iva: number) => void;
     setMainCurrency: (currency: string) => void;
     setAutoOpenTime: (time: string | null) => void;
@@ -362,6 +368,15 @@ export const useConfigStore = create<ConfigState>()(
                         paperWidth: primary?.paperWidth || state.paperWidth,
                     };
                 });
+            },
+
+            activeTheme: 'emerald',
+            setTheme: (theme) => {
+                set({ activeTheme: theme });
+                if (typeof document !== 'undefined') {
+                    document.documentElement.setAttribute('data-theme', theme);
+                    document.documentElement.className = `theme-${theme}`;
+                }
             },
 
             updateSettings: async (settings) => {
