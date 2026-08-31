@@ -522,3 +522,46 @@
     @apply bg-slate-50/70;
   }
 }
+
+/* ─── PRINT MEDIA STYLES ─────────────────────────────────────────────── */
+@media print {
+  @page {
+    margin: 0 !important;
+    size: auto;
+  }
+
+  body, body * {
+    visibility: hidden !important;
+    background: transparent !important;
+  }
+
+  .printable-ticket,
+  .printable-ticket * {
+    visibility: visible !important;
+  }
+
+  .printable-ticket {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 2mm !important;
+    border: none !important;
+    box-shadow: none !important;
+    background-color: white !important;
+    color: black !important;
+    font-family: monospace !important;
+    font-size: 11px !important;
+  }
+
+  .printable-ticket p,
+  .printable-ticket span,
+  .printable-ticket div,
+  .printable-ticket td,
+  .printable-ticket th {
+    color: black !important;
+    background-color: transparent !important;
+  }
+}
