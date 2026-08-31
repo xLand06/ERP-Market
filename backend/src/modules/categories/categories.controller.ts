@@ -1,64 +1,69 @@
 // =============================================================================
-// CATEGORIES MODULE — CONTROLLER
-// Manejo de peticiones para la gestión de categorías
+// GROUPS MODULE — CONTROLLER
+// Manejo de peticiones para la gestión de grupos y subgrupos
 // =============================================================================
 
 import { Request, Response } from 'express';
-import * as categoriesService from './categories.service';
+import * as groupsService from './categories.service';
 import { AuthRequest } from '../../core/middlewares/auth.middleware';
 import { validatedData } from '../../core/middlewares/validate.middleware';
 import { logAudit, extractIp } from '../../core/middlewares/audit.middleware';
 
+// =============================================================================
+// GROUPS
+// =============================================================================
+
 /**
- * Listar categorías
+ * Listar grupos
  */
-export const getAll = async (_req: Request, res: Response) => {
+export const getAllGroups = async (req: Request, res: Response) => {
     try {
-        const categories = await categoriesService.getAllCategories();
-        res.json({ success: true, data: categories });
+        const includeInactive = req.query.includeInactive === 'true';
+        const groups = await groupsService.getAllGroups(includeInactive);
+        res.json({ success: true, data: groups });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });
     }
 };
 
 /**
- * Obtener una categoría
+ * Obtener un grupo
  */
-export const getOne = async (req: Request, res: Response) => {
+export const getGroup = async (req: Request, res: Response) => {
     try {
         const { id } = validatedData(req, 'params');
-        const category = await categoriesService.getCategoryById(id);
+        const group = await groupsService.getGroupById(id);
         
-        if (!category) {
-            return res.status(404).json({ success: false, error: 'Categoría no encontrada' });
+        if (!group) {
+            return res.status(404).json({ success: false, error: 'Grupo no encontrado' });
         }
         
-        res.json({ success: true, data: category });
+        res.json({ success: true, data: group });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });
     }
 };
 
 /**
- * Crear categoría (Auditado)
+ * Crear grupo (Auditado)
  */
-export const create = async (req: AuthRequest, res: Response) => {
+export const createGroup = async (req: AuthRequest, res: Response) => {
     try {
         const data = validatedData(req, 'body');
-        const category = await categoriesService.createCategory(data);
+        const group = await groupsService.createGroup(data);
         
         await logAudit({
-            action: 'CATEGORY_CREATE',
-            module: 'categories',
-            details: { name: category.name },
+            action: 'GROUP_CREATE',
+            module: 'groups',
+            details: { name: group.name },
             userId: req.user!.id,
             ipAddress: extractIp(req),
         });
         
-        res.status(201).json({ success: true, data: category });
+        res.status(201).json({ success: true, data: group });
     } catch (error: any) {
         if (error.code === 'P2002') {
-            res.status(409).json({ success: false, error: 'El nombre de la categoría ya existe' });
+            res.status(409).json({ success: false, error: 'El nombre del grupo ya existe' });
         } else {
             res.status(500).json({ success: false, error: error.message });
         }
@@ -66,51 +71,205 @@ export const create = async (req: AuthRequest, res: Response) => {
 };
 
 /**
- * Actualizar categoría (Auditado)
+ * Actualizar grupo (Auditado)
  */
-export const update = async (req: AuthRequest, res: Response) => {
+export const updateGroup = async (req: AuthRequest, res: Response) => {
     try {
         const { id } = validatedData(req, 'params');
         const data = validatedData(req, 'body');
         
-        const category = await categoriesService.updateCategory(id, data);
+        const group = await groupsService.updateGroup(id, data);
         
         await logAudit({
-            action: 'CATEGORY_UPDATE',
-            module: 'categories',
+            action: 'GROUP_UPDATE',
+            module: 'groups',
             details: { id, changes: data },
             userId: req.user!.id,
             ipAddress: extractIp(req),
         });
         
-        res.json({ success: true, data: category });
+        res.json({ success: true, data: group });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });
     }
 };
 
 /**
- * Eliminar categoría (Auditado)
+ * Eliminar grupo (borrado lógico) (Auditado)
  */
-export const remove = async (req: AuthRequest, res: Response) => {
+export const deleteGroup = async (req: AuthRequest, res: Response) => {
     try {
         const { id } = validatedData(req, 'params');
-        await categoriesService.deleteCategory(id);
+        await groupsService.deleteGroup(id);
         
         await logAudit({
-            action: 'CATEGORY_DELETE',
-            module: 'categories',
-            details: { id },
+            action: 'GROUP_DELETE',
+            module: 'groups',
+            details: { id, isActive: false },
             userId: req.user!.id,
             ipAddress: extractIp(req),
         });
         
-        res.status(200).json({ success: true, message: 'Categoría eliminada' });
+        res.status(200).json({ success: true, message: 'Grupo desactivado' });
     } catch (error: any) {
-        if (error.code === 'P2003') {
-            res.status(400).json({ success: false, error: 'No se puede eliminar una categoría con productos asociados' });
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Cambiar estado de un grupo (activar/desactivar) (Auditado)
+ */
+export const toggleGroupStatus = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = validatedData(req, 'params');
+        const { isActive } = validatedData(req, 'body');
+        
+        const group = await groupsService.toggleGroupStatus(id, isActive);
+        
+        await logAudit({
+            action: isActive ? 'GROUP_ACTIVATE' : 'GROUP_DEACTIVATE',
+            module: 'groups',
+            details: { id, isActive },
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
+        });
+        
+        res.json({ success: true, data: group });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+// =============================================================================
+// SUBGROUPS
+// =============================================================================
+
+/**
+ * Listar subgrupos
+ */
+export const getAllSubGroups = async (req: Request, res: Response) => {
+    try {
+        const { groupId, includeInactive } = req.query;
+        const subGroups = await groupsService.getAllSubGroups(
+            groupId as string | undefined,
+            includeInactive === 'true'
+        );
+        res.json({ success: true, data: subGroups });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Obtener un subgrupo
+ */
+export const getSubGroup = async (req: Request, res: Response) => {
+    try {
+        const { id } = validatedData(req, 'params');
+        const subGroup = await groupsService.getSubGroupById(id);
+        
+        if (!subGroup) {
+            return res.status(404).json({ success: false, error: 'Subgrupo no encontrado' });
+        }
+        
+        res.json({ success: true, data: subGroup });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Crear subgrupo (Auditado)
+ */
+export const createSubGroup = async (req: AuthRequest, res: Response) => {
+    try {
+        const data = validatedData(req, 'body');
+        const subGroup = await groupsService.createSubGroup(data);
+        
+        await logAudit({
+            action: 'SUBGROUP_CREATE',
+            module: 'groups',
+            details: { name: subGroup.name, groupId: subGroup.groupId },
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
+        });
+        
+        res.status(201).json({ success: true, data: subGroup });
+    } catch (error: any) {
+        if (error.code === 'P2002') {
+            res.status(409).json({ success: false, error: 'El nombre del subgrupo ya existe en este grupo' });
         } else {
             res.status(500).json({ success: false, error: error.message });
         }
+    }
+};
+
+/**
+ * Actualizar subgrupo (Auditado)
+ */
+export const updateSubGroup = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = validatedData(req, 'params');
+        const data = validatedData(req, 'body');
+        
+        const subGroup = await groupsService.updateSubGroup(id, data);
+        
+        await logAudit({
+            action: 'SUBGROUP_UPDATE',
+            module: 'groups',
+            details: { id, changes: data },
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
+        });
+        
+        res.json({ success: true, data: subGroup });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Eliminar subgrupo (borrado lógico) (Auditado)
+ */
+export const deleteSubGroup = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = validatedData(req, 'params');
+        await groupsService.deleteSubGroup(id);
+        
+        await logAudit({
+            action: 'SUBGROUP_DELETE',
+            module: 'groups',
+            details: { id, isActive: false },
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
+        });
+        
+        res.status(200).json({ success: true, message: 'Subgrupo desactivado' });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Cambiar estado de un subgrupo (activar/desactivar) (Auditado)
+ */
+export const toggleSubGroupStatus = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = validatedData(req, 'params');
+        const { isActive } = validatedData(req, 'body');
+        
+        const subGroup = await groupsService.toggleSubGroupStatus(id, isActive);
+        
+        await logAudit({
+            action: isActive ? 'SUBGROUP_ACTIVATE' : 'SUBGROUP_DEACTIVATE',
+            module: 'groups',
+            details: { id, isActive },
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
+        });
+        
+        res.json({ success: true, data: subGroup });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
     }
 };

@@ -32,9 +32,19 @@ generate_skill.py
 SKILL.md
 
 .agent
+temp-backend/   
 
 ##Electron
 out/
 dist/
 
 .unlighthouse
+standalone/
+
+# Databases & test databases
+*.db
+*.db-shm
+*.db-wal
+backend/erp-market.db*
+backend/prisma/test-*.db*
+backend/prisma/test-auth.db*

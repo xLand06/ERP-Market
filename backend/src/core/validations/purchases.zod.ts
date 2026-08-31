@@ -10,7 +10,7 @@ import { paginationSchema } from './common.zod';
  * Esquema para un ítem de orden de compra
  */
 const purchaseOrderItemSchema = z.object({
-    productId: z.string().cuid('ID de producto inválido'),
+    productId: z.string().min(1, 'ID de producto inválido'),
     quantity: z.number().positive('La cantidad debe ser mayor a 0'),
     unitCost: z.number().positive('El costo unitario debe ser mayor a 0'),
 });
@@ -19,8 +19,8 @@ const purchaseOrderItemSchema = z.object({
  * Esquema para crear una orden de compra
  */
 export const createPurchaseOrderSchema = z.object({
-    supplierId: z.string().cuid('ID de proveedor inválido'),
-    branchId: z.string().cuid('ID de sede inválido'),
+    supplierId: z.string().min(1, 'ID de proveedor inválido'),
+    branchId: z.string().min(1, 'ID de sede inválido'),
     items: z.array(purchaseOrderItemSchema).min(1, 'Debe incluir al menos un producto'),
     notes: z.string().max(500, 'Las notas son muy largas').optional().or(z.literal('')),
     expectedAt: z.string().datetime().optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
@@ -38,8 +38,8 @@ export const updatePurchaseOrderStatusSchema = z.object({
  * Filtros para listar órdenes de compra
  */
 export const purchaseOrderFiltersSchema = paginationSchema.extend({
-    supplierId: z.string().cuid().optional(),
-    branchId: z.string().cuid().optional(),
+    supplierId: z.string().optional(),
+    branchId: z.string().optional(),
     status: z.enum(['DRAFT', 'SENT', 'RECEIVED', 'CANCELLED']).optional(),
     from: z.string().datetime().optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
     to: z.string().datetime().optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),

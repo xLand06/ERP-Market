@@ -7,6 +7,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { useConfigStore } from '@/hooks/useConfigStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CashClosureModalProps {
@@ -26,45 +27,118 @@ interface ClosingData {
 export function CashClosureModal({
     open, onClose, openingBalance, expectedBalance, onConfirm,
 }: CashClosureModalProps) {
-    const [counted, setCounted] = useState('');
+    const { fmtCOP, rates, autoCloseTime } = useConfigStore();
+    const [countedCop, setCountedCop] = useState('');
+    const [countedUsd, setCountedUsd] = useState('');
+    const [countedVes, setCountedVes] = useState('');
     const [notes, setNotes] = useState('');
     const [error, setError] = useState('');
+    const [showEarlyWarning, setShowEarlyWarning] = useState(false);
 
-    const countedNum = parseFloat(counted) || 0;
-    const difference = countedNum - expectedBalance;
+    const usdRate = rates['USD'] || rates['COP'] || 3600;
+    const vesRate = rates['VES'] || 5.5;
+
+    const countedCopNum = parseFloat(countedCop) || 0;
+    const countedUsdNum = parseFloat(countedUsd) || 0;
+    const countedVesNum = parseFloat(countedVes) || 0;
+
+    const totalCountedCop = countedCopNum + (countedUsdNum * usdRate) + (countedVesNum * vesRate);
+
+    const difference = totalCountedCop - expectedBalance;
     const isShort = difference < 0;
     const isOver = difference > 0;
 
     const handleConfirm = () => {
-        if (!counted || countedNum < 0) {
-            setError('Ingresa un monto contado válido.');
+        if (countedCopNum < 0 || countedUsdNum < 0 || countedVesNum < 0) {
+            setError('Ingresa montos contados válidos.');
             return;
         }
-        onConfirm({ closingAmount: countedNum, notes });
+
+        // Verificar cierre anticipado si está configurada la hora
+        if (autoCloseTime && !showEarlyWarning) {
+            try {
+                const [closeHour, closeMinute] = autoCloseTime.split(':').map(Number);
+                const now = new Date();
+                const curHour = now.getHours();
+                const curMin = now.getMinutes();
+                const isEarly = (curHour < closeHour) || (curHour === closeHour && curMin < closeMinute);
+                if (isEarly) {
+                    setShowEarlyWarning(true);
+                    return;
+                }
+            } catch (e) {
+                console.error('Error al validar cierre anticipado:', e);
+            }
+        }
+
+        onConfirm({ closingAmount: totalCountedCop, notes });
         handleClose();
     };
 
     const handleClose = () => {
-        setCounted('');
+        setCountedCop('');
+        setCountedUsd('');
+        setCountedVes('');
         setNotes('');
         setError('');
+        setShowEarlyWarning(false);
         onClose();
     };
 
     return (
         <Dialog open={open} onOpenChange={o => !o && handleClose()}>
             <DialogContent className="sm:max-w-137.5">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
-                            <AlertTriangle className="w-4 h-4 text-amber-600" />
+                {showEarlyWarning ? (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2 text-amber-600">
+                                <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                                </div>
+                                Cierre Anticipado
+                            </DialogTitle>
+                            <DialogDescription className="font-semibold text-slate-500 mt-2">
+                                Estás intentando cerrar la caja antes de la hora configurada.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-amber-900 text-sm">
+                            <p className="font-black">
+                                El cierre automático de seguridad está configurado para las {autoCloseTime}.
+                            </p>
+                            <p className="text-xs text-amber-700 leading-normal">
+                                Al cerrar la caja antes de tiempo, registrarás tu efectivo contado actual y finalizarás tu turno anticipadamente en el sistema. ¿Estás seguro de que querés continuar?
+                            </p>
                         </div>
-                        Cierre de Caja
-                    </DialogTitle>
-                    <DialogDescription>
-                        Verifica el efectivo antes de cerrar el turno.
-                    </DialogDescription>
-                </DialogHeader>
+
+                        <DialogFooter className="border-t border-slate-100 flex gap-2 pt-4 justify-end">
+                            <Button variant="outline" onClick={() => setShowEarlyWarning(false)}>
+                                Volver y revisar
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    onConfirm({ closingAmount: totalCountedCop, notes });
+                                    handleClose();
+                                }}
+                                className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
+                            >
+                                Sí, Cerrar Caja
+                            </Button>
+                        </DialogFooter>
+                    </>
+                ) : (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                                </div>
+                                Cierre de Caja
+                            </DialogTitle>
+                            <DialogDescription>
+                                Verifica el efectivo antes de cerrar el turno.
+                            </DialogDescription>
+                        </DialogHeader>
 
                 <div className="px-6 py-4 space-y-5">
                     {/* Summary Grid */}
@@ -76,7 +150,7 @@ export function CashClosureModal({
                             <div key={item.label} className="bg-slate-50 rounded-xl p-3 border border-slate-200">
                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">{item.label}</p>
                                 <p className={cn('text-lg font-black tabular-nums', item.color)}>
-                                    ${item.value.toFixed(2)}
+                                    {fmtCOP(item.value)}
                                 </p>
                             </div>
                         ))}
@@ -89,33 +163,71 @@ export function CashClosureModal({
                                 'text-lg font-black tabular-nums',
                                 isShort ? 'text-red-600' : isOver ? 'text-emerald-600' : 'text-slate-700'
                             )}>
-                                {isShort ? '' : isOver ? '+' : ''}{difference.toFixed(2)}
+                                {isShort ? '' : isOver ? '+' : ''}
+                                {fmtCOP(difference)}
                             </p>
                         </div>
                     </div>
 
-                    {/* Counted Input */}
-                    <div className="space-y-1.5">
-                        <label htmlFor="counted" className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                    {/* Counted Inputs for each currency */}
+                    <div className="space-y-3">
+                        <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
                             Monto Físico Contado <span className="text-red-500">*</span>
                         </label>
-                        <Input
-                            id="counted"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="0.00"
-                            value={counted}
-                            onChange={e => { setCounted(e.target.value); setError(''); }}
-                            className={cn('text-lg font-bold tabular-nums h-12', error && 'border-red-400')}
-                            aria-invalid={!!error}
-                            aria-describedby={error ? 'counted-err' : undefined}
-                        />
+                        
+                        <div className="flex items-center gap-2">
+                            <span className="w-16 font-bold text-slate-600 text-sm">COP</span>
+                            <div className="relative flex-1">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                <Input
+                                    type="number"
+                                    step="1"
+                                    min="0"
+                                    placeholder="0"
+                                    value={countedCop}
+                                    onChange={e => { setCountedCop(e.target.value); setError(''); }}
+                                    className={cn('text-base font-bold tabular-nums h-10 pl-8', error && 'border-red-400')}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <span className="w-16 font-bold text-slate-600 text-sm">USD</span>
+                            <div className="relative flex-1">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="0.00"
+                                    value={countedUsd}
+                                    onChange={e => { setCountedUsd(e.target.value); setError(''); }}
+                                    className={cn('text-base font-bold tabular-nums h-10 pl-8', error && 'border-red-400')}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <span className="w-16 font-bold text-slate-600 text-sm">VES</span>
+                            <div className="relative flex-1">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">Bs.</span>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="0.00"
+                                    value={countedVes}
+                                    onChange={e => { setCountedVes(e.target.value); setError(''); }}
+                                    className={cn('text-base font-bold tabular-nums h-10 pl-10', error && 'border-red-400')}
+                                />
+                            </div>
+                        </div>
+
                         {error && <p id="counted-err" className="text-xs text-red-500">{error}</p>}
                     </div>
 
                     {/* Difference Indicator */}
-                    {counted && (
+                    {(countedCop || countedUsd || countedVes) && (
                         <div className={cn(
                             'flex items-center gap-3 p-3 rounded-xl border',
                             isShort
@@ -127,9 +239,9 @@ export function CashClosureModal({
                             <AlertTriangle className="w-4 h-4 shrink-0" />
                             <p className="text-sm font-semibold">
                                 {isShort
-                                    ? `Faltante de $${Math.abs(difference).toFixed(2)} en caja.`
+                                    ? `Faltante de  ${fmtCOP(Math.abs(difference))} COP en caja.`
                                     : isOver
-                                        ? `Sobrante de $${difference.toFixed(2)} en caja.`
+                                        ? `Sobrante de +${fmtCOP(difference)} en caja.`
                                         : 'Caja cuadrada correctamente.'}
                             </p>
                         </div>
@@ -160,6 +272,8 @@ export function CashClosureModal({
                         Confirmar Cierre
                     </Button>
                 </DialogFooter>
+                    </>
+                )}
             </DialogContent>
         </Dialog>
     );

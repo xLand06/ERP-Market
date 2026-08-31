@@ -1,315 +1,268 @@
 process.env.ELECTRON = 'true';
 
-import { app, BrowserWindow, shell } from 'electron';
-import { join } from 'path';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { is } from '@electron-toolkit/utils';
-import { startExpressServer } from './express-bridge';
-import Store from 'electron-store';
-import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
+import { app, BrowserWindow, shell, Menu, Tray, nativeImage, Notification } from 'electron';
 
-const store = new Store<{ token: string | null; branchId: string | null }>({
-    defaults: { token: null, branchId: null },
+// Deshabilitar DNS over HTTPS para evitar errores de SSL handshake en redes con filtros (dns.google, cloudflare-dns)
+app.commandLine.appendSwitch('disable-features', 'DnsOverHttps');
+import { join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
+import { is } from '@electron-toolkit/utils';
+import { startExpressServer, stopExpressServer } from './express-bridge';
+import Store from 'electron-store';
+
+// =============================================================================
+// ELECTRON STORE — Persistencia ligera para token JWT y configuración
+// =============================================================================
+const store = new Store<{
+    token: string | null;
+    branchId: string | null;
+    schemaVersion: string | undefined;
+    windowState: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        isMaximized: boolean;
+    } | null;
+}>({
+    defaults: { token: null, branchId: null, schemaVersion: undefined, windowState: null },
 });
 
 (global as Record<string, unknown>).erpStore = store;
 
 import { ipcMain } from 'electron';
 
+// ── Store IPCs ────────────────────────────────────────────────────────────────
 ipcMain.handle('store-get', (_event, key: string) => store.get(key));
 ipcMain.handle('store-set', (_event, key: string, value: any) => store.set(key, value));
 ipcMain.handle('store-delete', (_event, key: string) => store.delete(key));
 ipcMain.handle('get-app-path', () => app.getAppPath());
 ipcMain.handle('get-user-data-path', () => app.getPath('userData'));
 
-let db: SqlJsDatabase;
-let dbPath: string;
 
-function saveDatabase() {
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    writeFileSync(dbPath, buffer);
+// =============================================================================
+// WINDOW STATE PERSISTENCE
+// =============================================================================
+interface WindowState {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    isMaximized: boolean;
 }
 
-function queryAll(sql: string, params: any[] = []): any[] {
-    const stmt = db.prepare(sql);
-    if (params.length > 0) {
-        stmt.bind(params);
-    }
-    const results: any[] = [];
-    while (stmt.step()) {
-        const row = stmt.getAsObject();
-        results.push(row);
-    }
-    stmt.free();
-    return results;
-}
+const DEFAULT_WINDOW_STATE: WindowState = {
+    x: 0,
+    y: 0,
+    width: 1280,
+    height: 800,
+    isMaximized: false,
+};
 
-function queryOne(sql: string, params: any[] = []): any | undefined {
-    const stmt = db.prepare(sql);
-    if (params.length > 0) {
-        stmt.bind(params);
-    }
-    let row: any = undefined;
-    if (stmt.step()) {
-        row = stmt.getAsObject();
-    }
-    stmt.free();
-    return row;
-}
+function getWindowState(): WindowState {
+    const saved = store.get('windowState');
+    if (!saved) return DEFAULT_WINDOW_STATE;
 
-function runSql(sql: string, params: any[] = []) {
-    db.run(sql, params);
-}
+    // Si las coordenadas están fuera de pantalla, resetear
+    const { screen } = require('electron');
+    const displays = screen.getAllDisplays();
+    const isVisible = displays.some((display: { bounds: { x: number; y: number; width: number; height: number } }) => {
+        const b = display.bounds;
+        return (
+            saved.x >= b.x &&
+            saved.x < b.x + b.width &&
+            saved.y >= b.y &&
+            saved.y < b.y + b.height
+        );
+    });
 
-async function initDatabase(userDataPath: string) {
-    dbPath = join(userDataPath, 'erp-market.db');
-    
-    const SQL = await initSqlJs();
-    
-    if (existsSync(dbPath)) {
-        const fileBuffer = readFileSync(dbPath);
-        db = new SQL.Database(fileBuffer);
-    } else {
-        db = new SQL.Database();
-    }
-    
-    db.run(`
-        CREATE TABLE IF NOT EXISTS products (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            barcode TEXT,
-            price REAL,
-            cost REAL,
-            baseUnit TEXT DEFAULT 'UNIDAD',
-            category TEXT,
-            categoryId TEXT,
-            isActive INTEGER DEFAULT 1,
-            createdAt TEXT,
-            updatedAt TEXT
-        )
-    `);
-
-    db.run(`
-        CREATE TABLE IF NOT EXISTS product_presentations (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            multiplier REAL,
-            price REAL,
-            barcode TEXT,
-            productId TEXT,
-            FOREIGN KEY(productId) REFERENCES products(id) ON DELETE CASCADE
-        )
-    `);
-    
-    db.run(`
-        CREATE TABLE IF NOT EXISTS branch_inventory (
-            id TEXT PRIMARY KEY,
-            productId TEXT,
-            branchId TEXT,
-            stock INTEGER DEFAULT 0,
-            minStock INTEGER DEFAULT 0,
-            updatedAt TEXT,
-            UNIQUE(productId, branchId)
-        )
-    `);
-    
-    db.run(`
-        CREATE TABLE IF NOT EXISTS pending_changes (
-            id TEXT PRIMARY KEY,
-            type TEXT,
-            data TEXT,
-            createdAt TEXT,
-            branchId TEXT,
-            synced INTEGER DEFAULT 0
-        )
-    `);
-    
-    db.run(`
-        CREATE TABLE IF NOT EXISTS sync_meta (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        )
-    `);
-    
-    db.run(`CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)`);
-    db.run(`CREATE INDEX IF NOT EXISTS idx_inventory_branch ON branch_inventory(branchId)`);
-    db.run(`CREATE INDEX IF NOT EXISTS idx_pending_synced ON pending_changes(synced)`);
-    
-    saveDatabase();
-    
-    return db;
-}
-
-function getAllData() {
-    return {
-        products: queryAll('SELECT * FROM products WHERE isActive = 1'),
-        inventory: queryAll('SELECT * FROM branch_inventory'),
-        syncMeta: queryAll('SELECT * FROM sync_meta'),
-    };
-}
-
-function purgeDatabase() {
-    runSql('DELETE FROM branch_inventory');
-    runSql('DELETE FROM products');
-    runSql('DELETE FROM pending_changes');
-    runSql('DELETE FROM sync_meta');
-    saveDatabase();
-}
-
-function getProducts(branchId: string) {
-    return queryAll(`
-        SELECT p.*, bi.stock, bi.minStock, bi.updatedAt as stockUpdatedAt
-        FROM products p
-        LEFT JOIN branch_inventory bi ON p.id = bi.productId AND bi.branchId = ?
-        WHERE p.isActive = 1
-        ORDER BY p.name ASC
-    `, [branchId]);
-}
-
-function saveProducts(branchId: string, products: any[]) {
-    for (const p of products) {
-        runSql(`
-            INSERT OR REPLACE INTO products (id, name, barcode, price, cost, baseUnit, category, categoryId, isActive, createdAt, updatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
-        `, [p.id, p.name, p.barcode, p.price, p.cost, p.baseUnit || 'UNIDAD', p.category, p.categoryId]);
-
-        if (p.presentations && Array.isArray(p.presentations)) {
-            runSql('DELETE FROM product_presentations WHERE productId = ?', [p.id]);
-            for (const pres of p.presentations) {
-                runSql(`
-                    INSERT INTO product_presentations (id, name, multiplier, price, barcode, productId)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                `, [pres.id, pres.name, pres.multiplier, pres.price, pres.barcode, p.id]);
-            }
-        }
-    }
-    saveDatabase();
-}
-
-function getStock(branchId: string) {
-    const inventory = queryAll(`
-        SELECT bi.*, p.name as productName, p.barcode, p.price as productPrice, p.cost as productCost, p.baseUnit, p.category as categoryName, p.categoryId
-        FROM branch_inventory bi
-        JOIN products p ON bi.productId = p.id
-        WHERE bi.branchId = ?
-        ORDER BY p.name ASC
-    `, [branchId]);
-
-    for (const item of inventory) {
-        item.productPresentations = queryAll(`
-            SELECT * FROM product_presentations WHERE productId = ?
-        `, [item.productId]);
+    if (!isVisible) {
+        console.log('[WindowState] Saved coords out of screen, using defaults');
+        return DEFAULT_WINDOW_STATE;
     }
 
-    return inventory;
+    return saved;
 }
 
-function updateStock(product: any, branchId: string, quantity: number, minStock: number = 0) {
-    // 1. Asegurar que el producto existe localmente
-    runSql(`
-        INSERT OR REPLACE INTO products (id, name, barcode, price, cost, baseUnit, category, categoryId, isActive, updatedAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
-    `, [product.id, product.name, product.barcode || '', product.price, product.cost || 0, product.baseUnit || 'UNIDAD', product.category || 'Varios', product.categoryId || null]);
-
-    // 2. Calcular nuevo stock
-    const newStock = quantity; 
-    
-    runSql(`
-        INSERT OR REPLACE INTO branch_inventory (id, productId, branchId, stock, minStock, updatedAt)
-        VALUES (?, ?, ?, ?, ?, datetime('now'))
-    `, [`${branchId}_${product.id}`, product.id, branchId, newStock, minStock]);
-    
-    saveDatabase();
+function saveWindowState(): void {
+    if (!mainWindow) return;
+    const bounds = mainWindow.getBounds();
+    store.set('windowState', {
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        isMaximized: mainWindow.isMaximized(),
+    });
 }
 
-function saveStock(branchId: string, inventory: any[]) {
-    for (const i of inventory) {
-        const p = i.product;
-        if (p) {
-            runSql(`
-                INSERT OR REPLACE INTO products (id, name, barcode, price, cost, baseUnit, category, categoryId, isActive, updatedAt)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
-            `, [p.id, p.name, p.barcode || '', p.price, p.cost || 0, p.baseUnit || 'UNIDAD', p.category?.name || p.category || 'Varios', p.categoryId || null]);
+// =============================================================================
+// SYSTEM TRAY
+// =============================================================================
+let tray: Tray | null = null;
 
-            if (p.presentations && Array.isArray(p.presentations)) {
-                runSql('DELETE FROM product_presentations WHERE productId = ?', [p.id]);
-                for (const pres of p.presentations) {
-                    runSql(`
-                        INSERT INTO product_presentations (id, name, multiplier, price, barcode, productId)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    `, [pres.id, pres.name, pres.multiplier, pres.price, pres.barcode, p.id]);
+function createTray(): void {
+    const iconPath = join(__dirname, is.dev ? '../../resources/icon.png' : '../resources/icon.png');
+    const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+    tray = new Tray(icon);
+    tray.setToolTip('ALLMARKET -- AbastosSofimar');
+
+    const contextMenu = Menu.buildFromTemplate([
+        {
+            label: 'Abrir ALLMARKET',
+            click: () => {
+                if (mainWindow) {
+                    mainWindow.show();
+                    mainWindow.focus();
                 }
+            },
+        },
+        {
+            label: 'Sincronizar ahora',
+            click: () => {
+                if (mainWindow) {
+                    mainWindow.webContents.send('sync-now');
+                }
+            },
+        },
+        { type: 'separator' },
+        {
+            label: 'Salir',
+            click: () => {
+                if (mainWindow) {
+                    mainWindow.destroy();
+                }
+                app.quit();
+            },
+        },
+    ]);
+
+    tray.setContextMenu(contextMenu);
+
+    tray.on('click', () => {
+        if (mainWindow) {
+            if (mainWindow.isVisible()) {
+                mainWindow.hide();
+            } else {
+                mainWindow.show();
+                mainWindow.focus();
             }
         }
-
-        runSql(`
-            INSERT OR REPLACE INTO branch_inventory (id, productId, branchId, stock, minStock, updatedAt)
-            VALUES (?, ?, ?, ?, ?, datetime('now'))
-        `, [i.id || `${branchId}_${i.productId}`, i.productId, branchId, i.stock, i.minStock || 0]);
-    }
-    saveDatabase();
+    });
 }
 
-function getPendingChanges() {
-    return queryAll('SELECT * FROM pending_changes WHERE synced = 0 ORDER BY createdAt ASC');
+// =============================================================================
+// NATIVE MENU
+// =============================================================================
+function createMenu(): void {
+    const template: Electron.MenuItemConstructorOptions[] = [
+        {
+            label: 'Archivo',
+            submenu: [
+                {
+                    label: 'Configuración',
+                    accelerator: 'CmdOrCtrl+,',
+                    click: () => {
+                        if (mainWindow) {
+                            mainWindow.webContents.send('open-settings');
+                        }
+                    },
+                },
+                {
+                    label: 'Cerrar sesión',
+                    accelerator: 'CmdOrCtrl+Shift+Q',
+                    click: () => {
+                        if (mainWindow) {
+                            mainWindow.webContents.send('logout');
+                        }
+                    },
+                },
+                { type: 'separator' },
+                {
+                    label: 'Salir',
+                    accelerator: 'Alt+F4',
+                    role: 'quit',
+                },
+            ],
+        },
+        {
+            label: 'Editar',
+            submenu: [
+                { label: 'Cortar', accelerator: 'CmdOrCtrl+X', role: 'cut' },
+                { label: 'Copiar', accelerator: 'CmdOrCtrl+C', role: 'copy' },
+                { label: 'Pegar', accelerator: 'CmdOrCtrl+V', role: 'paste' },
+                { type: 'separator' },
+                { label: 'Seleccionar todo', accelerator: 'CmdOrCtrl+A', role: 'selectAll' },
+            ],
+        },
+        {
+            label: 'Ver',
+            submenu: [
+                { label: 'Recargar', accelerator: 'CmdOrCtrl+R', role: 'reload' },
+                {
+                    label: 'Pantalla completa',
+                    accelerator: 'F11',
+                    role: 'togglefullscreen',
+                },
+                { type: 'separator' },
+                {
+                    label: 'DevTools',
+                    accelerator: 'CmdOrCtrl+Shift+I',
+                    click: () => {
+                        if (mainWindow) {
+                            mainWindow.webContents.toggleDevTools();
+                        }
+                    },
+                },
+            ],
+        },
+        {
+            label: 'Ayuda',
+            submenu: [
+                {
+                    label: 'Acerca de ALLMARKET',
+                    click: () => {
+                        if (mainWindow) {
+                            mainWindow.webContents.send('open-about');
+                        }
+                    },
+                },
+                {
+                    label: 'Versión',
+                    click: () => {
+                        if (mainWindow) {
+                            mainWindow.webContents.send('show-version');
+                        }
+                    },
+                },
+
+            ],
+        },
+    ];
+
+    const menu = Menu.buildFromTemplate(template);
+    Menu.setApplicationMenu(menu);
 }
 
-function addPendingChange(change: { id: string; type: string; data: any; createdAt: string; branchId: string }) {
-    runSql(`
-        INSERT OR REPLACE INTO pending_changes (id, type, data, createdAt, branchId, synced)
-        VALUES (?, ?, ?, ?, ?, 0)
-    `, [change.id, change.type, JSON.stringify(change.data), change.createdAt, change.branchId]);
-    saveDatabase();
-}
-
-function markSynced(ids: string[]) {
-    for (const id of ids) {
-        runSql('UPDATE pending_changes SET synced = 1 WHERE id = ?', [id]);
-    }
-    saveDatabase();
-}
-
-function clearSyncedChanges() {
-    runSql('DELETE FROM pending_changes WHERE synced = 1');
-    saveDatabase();
-}
-
-function getLastSync() {
-    const row = queryOne('SELECT value FROM sync_meta WHERE key = ?', ['lastSync']);
-    return row?.value;
-}
-
-function setLastSync(time: string) {
-    runSql('INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)', ['lastSync', time]);
-    saveDatabase();
-}
-
-ipcMain.handle('db-getAllData', () => getAllData());
-ipcMain.handle('db-getProducts', (_event, branchId: string) => getProducts(branchId));
-ipcMain.handle('db-saveProducts', (_event, branchId: string, products: any[]) => saveProducts(branchId, products));
-ipcMain.handle('db-getStock', (_event, branchId: string) => getStock(branchId));
-ipcMain.handle('db-updateStock', (_event, product: any, branchId: string, quantity: number, minStock: number) => updateStock(product, branchId, quantity, minStock));
-ipcMain.handle('db-saveStock', (_event, branchId: string, inventory: any[]) => saveStock(branchId, inventory));
-ipcMain.handle('db-purge', () => purgeDatabase());
-ipcMain.handle('db-getPendingChanges', () => getPendingChanges());
-ipcMain.handle('db-addPendingChange', (_event, change: any) => addPendingChange(change));
-ipcMain.handle('db-markSynced', (_event, ids: string[]) => markSynced(ids));
-ipcMain.handle('db-clearSyncedChanges', () => clearSyncedChanges());
-ipcMain.handle('db-getLastSync', () => getLastSync());
-ipcMain.handle('db-setLastSync', (_event, time: string) => setLastSync(time));
-
+// =============================================================================
+// MAIN WINDOW
+// =============================================================================
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow(): void {
+    const windowState = getWindowState();
+
     mainWindow = new BrowserWindow({
-        width: 1280,
-        height: 800,
+        x: windowState.x,
+        y: windowState.y,
+        width: windowState.width,
+        height: windowState.height,
         minWidth: 1024,
         minHeight: 600,
-        title: 'ERP-Market — Abastos Sofimar',
+        title: 'ALLMARKET -- AbastosSofimar',
+        icon: join(__dirname, is.dev ? '../../resources/icon.png' : '../resources/icon.png'),
         show: false,
-        autoHideMenuBar: true,
+        autoHideMenuBar: false, // Menú nativo visible en producción
         webPreferences: {
             preload: join(__dirname, '../preload/index.js'),
             contextIsolation: true,
@@ -317,6 +270,11 @@ function createWindow(): void {
             sandbox: false,
         },
     });
+
+    // Restaurar maximized state
+    if (windowState.isMaximized) {
+        mainWindow.maximize();
+    }
 
     mainWindow.on('ready-to-show', () => {
         mainWindow!.show();
@@ -328,6 +286,23 @@ function createWindow(): void {
         return { action: 'deny' };
     });
 
+    // Guardar estado al mover/redimensionar (con debounce implícito por cierre)
+    mainWindow.on('moved', saveWindowState);
+    mainWindow.on('resized', saveWindowState);
+
+    // Al cerrar → minimizar a tray (no salir)
+    mainWindow.on('close', (event) => {
+        if (!app.isQuitting) {
+            event.preventDefault();
+            mainWindow?.hide();
+            // En macOS el comportamiento difiere, la app no se cierra al cerrar ventana
+            if (process.platform !== 'darwin') {
+                // No fazer nada especial en Windows/Linux — solo hide
+                // La app permanece en background
+            }
+        }
+    });
+
     if (is.dev && process.env.ELECTRON_RENDERER_URL) {
         mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
     } else {
@@ -335,24 +310,68 @@ function createWindow(): void {
     }
 }
 
+// =============================================================================
+// APP LIFECYCLE
+// =============================================================================
 app.whenReady().then(async () => {
     const userDataPath = app.getPath('userData');
-    
+
     if (!existsSync(userDataPath)) {
         mkdirSync(userDataPath, { recursive: true });
     }
-    
+
+    // Configurar la URL de la base de datos local (SQLite vía Prisma en el backend)
     const dbFileName = 'erp-market.db';
-    const fullDbPath = join(userDataPath, dbFileName);
+    const fullDbPath = join(userDataPath, dbFileName).replace(/\\/g, '/');
+
+    // ── Gestión del schema local ──────────────────────────────────────────────
+    // La DB empaquetada solo tiene el schema (tablas vacías).
+    // Los datos iniciales se descargan desde Supabase en el primer inicio.
+    const SCHEMA_VERSION = '3';
+    const storedSchemaVersion = store.get('schemaVersion') as string | undefined;
+
+    const bundledDbPath = is.dev
+        ? join(app.getAppPath(), '../backend', dbFileName)
+        : join(process.resourcesPath, 'seed', dbFileName);
+
+    const needsSchemaRestore = (): boolean => {
+        if (!existsSync(fullDbPath)) return true;
+
+        const dbSize = require('fs').statSync(fullDbPath).size;
+        if (dbSize < 8192) return true;
+        // Si no hay schemaVersion guardado (primera vez/actualización)
+        // O es una versión distinta → restaurar schema fresco
+        if (!storedSchemaVersion || storedSchemaVersion !== SCHEMA_VERSION) return true;
+
+        return false;
+    };
+
+    if (needsSchemaRestore()) {
+        if (existsSync(bundledDbPath)) {
+            const fs = require('fs');
+            if (existsSync(fullDbPath)) fs.unlinkSync(fullDbPath);
+            fs.copyFileSync(bundledDbPath, fullDbPath);
+            store.set('schemaVersion', SCHEMA_VERSION);
+            console.log(`[Electron] Schema copiado a ${fullDbPath}`);
+        } else {
+            console.warn(`[Electron] Schema DB no encontrada en ${bundledDbPath}`);
+        }
+    } else {
+        console.log(`[Electron] DB local encontrada en ${fullDbPath}`);
+    }
+
     process.env.LOCAL_DATABASE_URL = `file:${fullDbPath}`;
 
     console.log(`[Electron] SQLite DB: ${fullDbPath}`);
+    console.log(`[Electron] Iniciando backend Express en puerto 3001...`);
 
-    await initDatabase(userDataPath);
-
+    // Levantar el backend Express embebido (puerto 3001)
+    // Toda la lógica de negocio, base de datos y sincronización vive ahí.
     await startExpressServer();
 
     createWindow();
+    createMenu();
+    createTray();
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -360,5 +379,14 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
+    if (process.platform !== 'darwin') {
+        app.quit();
+    }
+});
+
+// Flag para distinguir close intencional de hide
+app.on('before-quit', async () => {
+    (app as any).isQuitting = true;
+    saveWindowState();
+    await stopExpressServer();
 });

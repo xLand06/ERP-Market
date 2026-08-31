@@ -15,9 +15,10 @@ export const getKPIs = async (req: AuthRequest, res: Response) => {
     try {
         const filters = validatedData(req, 'query');
         const branchId = filters.branchId === 'all' ? undefined : filters.branchId;
+        const range = filters.range || 'today';
         
         const client = dashboardService.getPreferredClient(req.user?.role);
-        const kpis = await dashboardService.getDashboardKPIs(client, branchId);
+        const kpis = await dashboardService.getDashboardKPIs(client, branchId, range);
         
         res.json({ success: true, data: kpis });
     } catch (error: any) {
@@ -32,9 +33,10 @@ export const getSalesTrend = async (req: AuthRequest, res: Response) => {
     try {
         const filters = validatedData(req, 'query');
         const branchId = filters.branchId === 'all' ? undefined : filters.branchId;
+        const range = filters.range || 'month';
         
         const client = dashboardService.getPreferredClient(req.user?.role);
-        const trend = await dashboardService.getSalesTrend(client, branchId, filters.days);
+        const trend = await dashboardService.getSalesTrend(client, branchId, range);
         
         res.json({ success: true, data: trend });
     } catch (error: any) {
@@ -49,9 +51,10 @@ export const getTopProducts = async (req: AuthRequest, res: Response) => {
     try {
         const filters = validatedData(req, 'query');
         const branchId = filters.branchId === 'all' ? undefined : filters.branchId;
+        const range = filters.range || 'month';
         
         const client = dashboardService.getPreferredClient(req.user?.role);
-        const top = await dashboardService.getTopProducts(client, branchId, filters.limit);
+        const top = await dashboardService.getTopProducts(client, branchId, filters.limit, range);
         
         res.json({ success: true, data: top });
     } catch (error: any) {

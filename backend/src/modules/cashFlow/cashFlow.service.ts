@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma';
+import { parseDateRange } from '../../core/utils/helpers';
 
 export const openCashRegister = async (data: {
     branchId: string;
@@ -6,6 +7,9 @@ export const openCashRegister = async (data: {
     openingAmount: number;
     notes?: string;
 }) => {
+    const branch = await prisma.branch.findUnique({ where: { id: data.branchId }, select: { isActive: true } });
+    if (!branch?.isActive) throw new Error('No se puede abrir caja en una sucursal desactivada.');
+
     const existing = await prisma.cashRegister.findFirst({
         where: { branchId: data.branchId, status: 'OPEN' },
     });
@@ -25,7 +29,10 @@ export const openCashRegister = async (data: {
 export const closeCashRegister = async (
     cashRegisterId: string,
     closingAmount: number,
-    notes?: string
+    notes?: string,
+    /** Si se pasa, se usa este valor como expectedAmount en lugar de calcularlo internamente.
+     *  Útil para cierres automáticos donde no hay conteo físico y el expected ES el closing. */
+    expectedOverride?: number
 ) => {
     const cashRegister = await prisma.cashRegister.findUnique({
         where: { id: cashRegisterId },
@@ -44,7 +51,7 @@ export const closeCashRegister = async (
         (sum: number, tx) => sum + Number(tx.total),
         0
     );
-    const expectedAmount = Number(cashRegister.openingAmount) + salesTotal;
+    const expectedAmount = expectedOverride ?? (Number(cashRegister.openingAmount) + salesTotal);
     const difference = closingAmount - expectedAmount;
 
     return prisma.cashRegister.update({
@@ -74,35 +81,53 @@ export const getCurrentOpenRegister = (branchId: string) =>
         },
     });
 
-export const getCashRegisterHistory = (filters: {
+export const getCashRegisterHistory = async (filters: {
     branchId?: string;
     from?: string;
     to?: string;
-    page?: number;
-    limit?: number;
+    page?: string | number;
+    limit?: string | number;
 }) => {
-    const { branchId, from, to, page = 1, limit = 30 } = filters;
-    return prisma.cashRegister.findMany({
-        where: {
-            ...(branchId && { branchId }),
-            ...(from || to
-                ? {
+    const { branchId, from, to } = filters;
+    const page = Number(filters.page) || 1;
+    const limit = Number(filters.limit) || 30;
+
+    const whereClause = {
+        ...(branchId && { branchId }),
+        ...(from || to
+            ? (() => {
+                  const { fromDate, toDate } = parseDateRange(from, to);
+                  return {
                       openedAt: {
-                          ...(from && { gte: new Date(from) }),
-                          ...(to && { lte: new Date(to) }),
+                          ...(fromDate && { gte: fromDate }),
+                          ...(toDate && { lte: toDate }),
                       },
-                  }
-                : {}),
-        },
-        include: {
-            user: { select: { id: true, nombre: true, username: true } },
-            branch: { select: { id: true, name: true } },
-            _count: { select: { transactions: true } },
-        },
-        orderBy: { openedAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-    });
+                  };
+              })()
+            : {}),
+    };
+
+    const [total, registers] = await Promise.all([
+        prisma.cashRegister.count({ where: whereClause }),
+        prisma.cashRegister.findMany({
+            where: whereClause,
+            include: {
+                user: { select: { id: true, nombre: true, username: true } },
+                branch: { select: { id: true, name: true } },
+                _count: { select: { transactions: true } },
+            },
+            orderBy: { openedAt: 'desc' },
+            skip: (page - 1) * limit,
+            take: limit,
+        })
+    ]);
+
+    return {
+        registers,
+        total,
+        totalPages: Math.ceil(total / limit),
+        currentPage: page
+    };
 };
 
 export const getCashRegisterById = (id: string) =>

@@ -7,11 +7,13 @@
         "dev": "electron-vite dev",
         "build": "electron-vite build",
         "preview": "electron-vite preview",
-        "build:installer": "electron-builder --config electron-builder.yml"
+        "build:schema": "cd ..\\backend && pnpm run db:build:schema",
+        "build:installer": "node scripts/prepare-backend.mjs && pnpm run build && pnpm run build:schema && electron-builder --config electron-builder.yml"
     },
     "dependencies": {
         "@electron-toolkit/utils": "^3.0.0",
         "electron-store": "^8.2.0",
+        "electron-updater": "^6.0.0",
         "sql.js": "^1.11.0"
     },
     "devDependencies": {
@@ -19,7 +21,7 @@
         "@electron-toolkit/tsconfig": "^2.0.0",
         "@tailwindcss/vite": "^4.2.1",
         "@vitejs/plugin-react": "^4.3.1",
-        "electron": "^41.2.0",
+        "electron": "31.2.0",
         "electron-builder": "^25.1.8",
         "electron-vite": "^2.3.0",
         "tailwindcss": "^4.2.1",

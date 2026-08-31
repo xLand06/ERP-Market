@@ -12,10 +12,12 @@ import { validatedData } from '../../core/middlewares/validate.middleware';
 /**
  * Obtener stock consolidado de todas las sedes (Solo OWNER)
  */
-export const getAllStock = async (_req: Request, res: Response) => {
+export const getAllStock = async (req: Request, res: Response) => {
     try {
-        const stock = await inventoryService.getAllStock();
-        res.json({ success: true, data: stock });
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 100;
+        const stock = await inventoryService.getAllStock(page, limit);
+        res.json({ success: true, ...stock });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });
     }
@@ -53,12 +55,23 @@ export const getStockByProduct = async (req: Request, res: Response) => {
 export const setStock = async (req: AuthRequest, res: Response) => {
     try {
         const data = validatedData(req, 'body');
+
+        if (req.user!.role === 'SELLER' && !req.user!.canManageInventory) {
+            res.status(403).json({ success: false, error: 'No tienes permiso para ajustar el inventario' });
+            return;
+        }
+
         const result = await inventoryService.upsertStock(data);
         
         await logAudit({
             action: 'STOCK_SET',
             module: 'inventory',
-            details: { productId: data.productId, branchId: data.branchId, stock: data.stock },
+            details: { 
+                productId: data.productId, 
+                branchId: data.branchId, 
+                stock: data.stock,
+                reason: data.reason || 'Ajuste manual de stock sin motivo'
+            },
             userId: req.user!.id,
             ipAddress: extractIp(req),
         });
@@ -78,6 +91,28 @@ export const getLowStock = async (req: Request, res: Response) => {
         const alerts = await inventoryService.getLowStockAlerts(branchId as string | undefined);
         res.json({ success: true, data: alerts });
     } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Exportar inventario a Excel
+ */
+export const exportInventoryExcel = async (req: Request, res: Response) => {
+    try {
+        const { branchId, branchName } = req.query;
+        const { generateInventoryExcel } = await import('./inventory.export.service');
+
+        const buffer = await generateInventoryExcel({
+            branchId: branchId as string | undefined,
+            branchName: branchName as string | undefined,
+        });
+
+        res.setHeader('Content-Disposition', `attachment; filename="Inventario_${new Date().toISOString().split('T')[0]}.xlsx"`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.send(buffer);
+    } catch (error: any) {
+        console.error('[InventoryController.exportInventoryExcel] Error:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 };

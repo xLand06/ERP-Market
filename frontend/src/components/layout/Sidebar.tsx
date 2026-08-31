@@ -4,7 +4,7 @@ import { useAuthStore } from '@/features/auth/store/authStore';
 import {
     LayoutDashboard, Package, ShoppingCart,
     Coins, Users, Truck, BarChart2, ShieldCheck, Store, PanelLeftClose, PanelLeftOpen, X,
-    Settings, Tag
+    Settings, Tag, TrendingDown, History, CalendarClock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isPathAllowed } from '@/lib/planConfig';
@@ -19,16 +19,17 @@ interface NavItem {
 const navItems: NavItem[] = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Punto de Venta', path: '/pos', icon: ShoppingCart },
+    { name: 'Flujo de Caja', path: '/finance/cash-register', icon: Coins },
     { name: 'Productos', path: '/products', icon: Tag },
     { name: 'Inventario', path: '/inventory', icon: Package },
-    { name: 'Flujo de Caja', path: '/finance/cash-register', icon: Coins },
-    { name: 'Configuración', path: '/settings', icon: Settings, roles: ['OWNER'] },
-    { name: 'Auditoría', path: '/audit', icon: ShieldCheck, roles: ['OWNER'] },
-    { name: 'Empleados', path: '/directory', icon: Users },
+    { name: 'Lotes y Vencimientos', path: '/inventory/batches', icon: CalendarClock },
+    { name: 'Merma', path: '/merma', icon: TrendingDown },
     { name: 'Compras', path: '/purchases', icon: Truck },
-    { name: 'Finanzas', path: '/finance', icon: Coins },
-    { name: 'Reportes', path: '/reports', icon: BarChart2 },
     { name: 'Proveedores', path: '/suppliers', icon: Users },
+    { name: 'Reportes', path: '/reports', icon: BarChart2 },
+    { name: 'Usuarios', path: '/users', icon: Users, roles: ['OWNER'] },
+    { name: 'Auditoría', path: '/audit', icon: ShieldCheck, roles: ['OWNER'] },
+    { name: 'Configuración', path: '/settings', icon: Settings, roles: ['OWNER', 'SELLER'] },
 ];
 
 export interface SidebarProps {
@@ -50,7 +51,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                     </div>
                     {!collapsed && (
                         <span className="font-bold text-white text-base lg:text-lg tracking-tight whitespace-nowrap animate-in fade-in duration-300 delay-150">
-                            ABASTOS SOFIMAR
+                            ALLMARKET
                         </span>
                     )}
                 </div>
@@ -58,6 +59,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                     <button
                         onClick={onToggleDesktop || onCloseMobile}
                         className="p-1.5 lg:p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors hidden lg:block min-w-10 min-h-10"
+                        aria-label="Colapsar sidebar"
                     >
                         <PanelLeftClose className="w-5 h-5" />
                     </button>
@@ -66,6 +68,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                     <button
                         onClick={onCloseMobile}
                         className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors lg:hidden min-w-11 min-h-11"
+                        aria-label="Cerrar menú"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -83,6 +86,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                         <button
                             onClick={onToggleDesktop}
                             className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0 hidden lg:flex min-w-11 min-h-11"
+                            aria-label="Expandir sidebar"
                             title="Expandir"
                         >
                             <PanelLeftOpen className="w-5 h-5" />

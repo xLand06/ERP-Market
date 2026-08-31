@@ -19,9 +19,9 @@ export type { CreateProductInput, UpdateProductInput, ProductFiltersInput } from
 export { createTransactionSchema, transactionFiltersSchema, cancelTransactionSchema } from './pos.zod';
 export type { CreateTransactionInput, TransactionFiltersInput, CancelTransactionInput } from './pos.zod';
 
-// Categories schemas
-export { createCategorySchema, updateCategorySchema } from './categories.zod';
-export type { CreateCategoryInput, UpdateCategoryInput } from './categories.zod';
+// Groups schemas
+export { createGroupSchema, updateGroupSchema, createSubGroupSchema, updateSubGroupSchema } from './groups.zod';
+export type { CreateGroupInput, UpdateGroupInput, CreateSubGroupInput, UpdateSubGroupInput } from './groups.zod';
 
 // Users schemas
 export { createUserSchema, userFiltersSchema } from './users.zod';

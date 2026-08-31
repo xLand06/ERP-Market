@@ -5,6 +5,7 @@
 
 import { prisma, getCloudPrisma } from '../../config/prisma';
 import type { KPIsDTO, SalesTrendDTO, TopProductDTO, SalesByBranchDTO } from '../../core/types/dto';
+import { parseDateRange } from '../../core/utils/helpers';
 
 /**
  * Selecciona el cliente Prisma adecuado:
@@ -23,38 +24,85 @@ export const getPreferredClient = (role?: string): any => {
     return prisma;
 };
 
-/** KPIs principales del dashboard */
-export const getDashboardKPIs = async (client: any, branchId?: string): Promise<KPIsDTO> => {
-    const now = new Date();
-    const startOfToday = new Date(now);
-    startOfToday.setHours(0, 0, 0, 0);
+/** Helper para calcular porcentaje de cambio */
+const calculateChange = (current: number, previous: number): number => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return ((current - previous) / previous) * 100;
+};
 
+/** KPIs principales del dashboard */
+export const getDashboardKPIs = async (client: any, branchId?: string, range: 'today' | 'month' | 'year' | 'all' = 'today'): Promise<KPIsDTO> => {
+    const now = new Date();
+    
+    // Calcular rangos para el filtro principal
+    let startDate: Date;
+    let compareStartDate: Date;
+    let compareEndDate: Date;
+
+    if (range === 'today') {
+        startDate = new Date(now);
+        startDate.setHours(0, 0, 0, 0);
+        compareStartDate = new Date(startDate);
+        compareStartDate.setDate(startDate.getDate() - 1);
+        compareEndDate = new Date(startDate);
+    } else if (range === 'month') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        compareStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        compareEndDate = new Date(startDate);
+    } else if (range === 'year') {
+        startDate = new Date(now.getFullYear(), 0, 1);
+        compareStartDate = new Date(now.getFullYear() - 1, 0, 1);
+        compareEndDate = new Date(startDate);
+    } else {
+        startDate = new Date(0);
+        compareStartDate = new Date(0);
+        compareEndDate = new Date(0);
+    }
+
+    // Rangos fijos para métricas secundarias
+    const startOfToday = new Date(now); startOfToday.setHours(0,0,0,0);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - 7);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
     const isSQLite = (client as any)._activeProvider === 'sqlite' || process.env.ELECTRON === 'true';
 
     const [
-        salesToday,
-        salesThisMonth,
-        salesThisWeek,
+        salesCurrent,
+        salesPrevious,
+        salesMonth,
+        salesLastMonth,
         totalProducts,
         lowStockCount,
         openRegister,
-        transactionsToday,
+        transactionsCurrent,
+        transactionsPrevious,
+        currentTransactionsList,
+        productsYesterday,
     ] = await Promise.all([
+        // 1. Rango actual seleccionado (para la tarjeta principal)
         client.transaction.aggregate({
             where: {
                 type: 'SALE',
                 status: 'COMPLETED',
-                createdAt: { gte: startOfToday },
+                createdAt: { gte: startDate },
                 ...(branchId && { branchId }),
             },
             _sum: { total: true },
             _count: true,
         }),
 
+        // 2. Rango anterior (para el % de cambio de la tarjeta principal)
+        range !== 'all' ? client.transaction.aggregate({
+            where: {
+                type: 'SALE',
+                status: 'COMPLETED',
+                createdAt: { gte: compareStartDate, lt: compareEndDate },
+                ...(branchId && { branchId }),
+            },
+            _sum: { total: true },
+        }) : Promise.resolve({ _sum: { total: 0 } }),
+
+        // 3. Ventas Mes Actual (fijo)
         client.transaction.aggregate({
             where: {
                 type: 'SALE',
@@ -66,15 +114,15 @@ export const getDashboardKPIs = async (client: any, branchId?: string): Promise<
             _count: true,
         }),
 
+        // 4. Ventas Mes Pasado (fijo para el % del mes)
         client.transaction.aggregate({
             where: {
                 type: 'SALE',
                 status: 'COMPLETED',
-                createdAt: { gte: startOfWeek },
+                createdAt: { gte: startOfLastMonth, lt: startOfMonth },
                 ...(branchId && { branchId }),
             },
             _sum: { total: true },
-            _count: true,
         }),
 
         client.product.count({ where: { isActive: true } }),
@@ -90,86 +138,173 @@ export const getDashboardKPIs = async (client: any, branchId?: string): Promise<
 
         client.transaction.count({
             where: {
-                createdAt: { gte: startOfToday },
+                createdAt: { gte: startDate },
                 ...(branchId && { branchId }),
             },
         }),
+
+        range !== 'all' ? client.transaction.count({
+            where: {
+                createdAt: { gte: compareStartDate, lt: compareEndDate },
+                ...(branchId && { branchId }),
+            },
+        }) : Promise.resolve(0),
+
+        client.transaction.findMany({
+            where: {
+                type: 'SALE',
+                status: 'COMPLETED',
+                createdAt: { gte: startDate },
+                ...(branchId && { branchId }),
+            },
+            select: {
+                total: true,
+                currency: true,
+                exchangeRate: true,
+                items: {
+                    select: {
+                        quantity: true,
+                        product: { select: { cost: true } }
+                    }
+                }
+            },
+            take: 1500,
+        }),
+
+        client.product.count({
+            where: { isActive: true, createdAt: { lt: startOfToday } }
+        }),
     ]);
+
+    // Ganancias
+    const currencyMap: Record<string, { totalSales: number; totalProfit: number; count: number }> = {};
+    for (const tx of currentTransactionsList) {
+        const curr = tx.currency || 'COP';
+        const rate = tx.exchangeRate ? Number(tx.exchangeRate) : 1;
+        const totalCOP = Number(tx.total);
+        let costCOP = 0;
+        for (const item of tx.items) {
+            costCOP += Number(item.quantity) * Number(item.product?.cost || 0);
+        }
+        const profitCOP = totalCOP - costCOP;
+        const totalOrig = (curr === 'COP' || rate <= 1) ? totalCOP : totalCOP / rate;
+        const profitOrig = (curr === 'COP' || rate <= 1) ? profitCOP : profitCOP / rate;
+
+        if (!currencyMap[curr]) currencyMap[curr] = { totalSales: 0, totalProfit: 0, count: 0 };
+        currencyMap[curr].totalSales += totalOrig;
+        currencyMap[curr].totalProfit += profitOrig;
+        currencyMap[curr].count += 1;
+    }
+
+    const salesByCurrency = Object.entries(currencyMap).map(([currency, data]) => ({
+        currency,
+        totalSales: data.totalSales,
+        totalProfit: data.totalProfit,
+        count: data.count,
+    }));
+
+    const totalSalesCurrent = salesCurrent._sum.total ? Number(salesCurrent._sum.total) : 0;
+    const totalSalesPrevious = (salesPrevious as any)._sum.total ? Number((salesPrevious as any)._sum.total) : 0;
+    const totalSalesMonth = salesMonth._sum.total ? Number(salesMonth._sum.total) : 0;
+    const totalSalesLastMonth = salesLastMonth._sum.total ? Number(salesLastMonth._sum.total) : 0;
 
     return {
         sales: {
             today: {
-                total: salesToday._sum.total ? Number(salesToday._sum.total) : 0,
-                count: salesToday._count,
+                total: totalSalesCurrent,
+                count: salesCurrent._count,
+                change: calculateChange(totalSalesCurrent, totalSalesPrevious),
             },
             thisMonth: {
-                total: salesThisMonth._sum.total ? Number(salesThisMonth._sum.total) : 0,
-                count: salesThisMonth._count,
+                total: totalSalesMonth,
+                count: salesMonth._count,
+                change: calculateChange(totalSalesMonth, totalSalesLastMonth),
             },
-            weekSales: salesThisWeek._sum.total ? Number(salesThisWeek._sum.total) : 0,
+            weekSales: totalSalesCurrent, 
         },
         inventory: {
             totalProducts,
             lowStockAlerts: Number((lowStockCount as any)?.[0]?.count ?? 0),
+            change: calculateChange(totalProducts, productsYesterday),
         },
         cashRegister: openRegister as KPIsDTO['cashRegister'],
-        transactionsToday,
+        transactionsToday: transactionsCurrent,
+        transactionsTodayChange: calculateChange(transactionsCurrent, transactionsPrevious as number),
+        salesByCurrency,
     };
 };
 
 /** Ventas por día de los últimos N días (para gráfica de líneas) */
-export const getSalesTrend = async (client: any, branchId?: string, days = 30): Promise<SalesTrendDTO[]> => {
-    const since = new Date();
-    since.setDate(since.getDate() - days);
+export const getSalesTrend = async (client: any, branchId?: string, range: 'today' | 'month' | 'year' | 'all' = 'month'): Promise<SalesTrendDTO[]> => {
+    const now = new Date();
+    let since = new Date();
 
-    const isSQLite = (client as any)._activeProvider === 'sqlite' || process.env.ELECTRON === 'true';
+    if (range === 'today') since.setHours(0,0,0,0);
+    else if (range === 'month') since.setDate(since.getDate() - 30);
+    else if (range === 'year') since.setFullYear(since.getFullYear() - 1);
+    else since = new Date(0);
 
-    let data;
-    if (isSQLite) {
-        data = await client.$queryRaw<{ day: string; total: number; count: bigint }[]>`
-            SELECT 
-                strftime('%Y-%m-%d', createdAt) as day,
-                SUM(total) as total,
-                COUNT(*) as count
-            FROM transactions
-            WHERE type = 'SALE'
-              AND status = 'COMPLETED'
-              AND createdAt > ${since}
-              ${branchId ? require('@prisma/client').Prisma.sql`AND branchId = ${branchId}` : require('@prisma/client').Prisma.empty}
-            GROUP BY day
-            ORDER BY day ASC
-        `;
-    } else {
-        data = await client.$queryRaw<{ day: string; total: number; count: bigint }[]>`
-            SELECT 
-                DATE("createdAt") as day,
-                SUM(total)::float as total,
-                COUNT(*) as count
-            FROM transactions
-            WHERE type = 'SALE'
-              AND status = 'COMPLETED'
-              AND "createdAt" > ${since}
-              ${branchId ? require('@prisma/client').Prisma.sql`AND "branchId" = ${branchId}` : require('@prisma/client').Prisma.empty}
-            GROUP BY DATE("createdAt")
-            ORDER BY day ASC
-        `;
+    const transactions = await client.transaction.findMany({
+        where: {
+            type: 'SALE',
+            status: 'COMPLETED',
+            createdAt: { gte: since },
+            ...(branchId && { branchId }),
+        },
+        select: {
+            createdAt: true,
+            total: true,
+            currency: true,
+            exchangeRate: true,
+        },
+    });
+
+    const dayMap: Record<string, { total: number; count: number; [currency: string]: any }> = {};
+
+    for (const tx of transactions) {
+        const dateStr = tx.createdAt.toLocaleDateString('en-CA'); // YYYY-MM-DD local time
+        const curr = tx.currency || 'COP';
+        const rate = tx.exchangeRate ? Number(tx.exchangeRate) : 1;
+        const totalCOP = Number(tx.total);
+        const totalOrig = (curr === 'COP' || rate <= 1) ? totalCOP : totalCOP / rate;
+
+        if (!dayMap[dateStr]) {
+            dayMap[dateStr] = { total: 0, count: 0 };
+        }
+
+        dayMap[dateStr].total += totalCOP;
+        dayMap[dateStr].count += 1;
+
+        if (!dayMap[dateStr][curr]) {
+            dayMap[dateStr][curr] = 0;
+        }
+        dayMap[dateStr][curr] += totalOrig;
     }
 
-    return (data as any).map((d: any) => ({
-        day: d.day,
-        total: d.total ?? 0,
-        count: Number(d.count),
+    const result = Object.entries(dayMap).map(([day, data]) => ({
+        day,
+        ...data,
     }));
+
+    return result.sort((a, b) => a.day.localeCompare(b.day));
 };
 
 /** Top 10 productos más vendidos (por unidades) */
-export const getTopProducts = async (client: any, branchId?: string, limit = 10): Promise<TopProductDTO[]> => {
+export const getTopProducts = async (client: any, branchId?: string, limit = 10, range: 'today' | 'month' | 'year' | 'all' = 'month'): Promise<TopProductDTO[]> => {
+    const now = new Date();
+    let startDate: Date;
+    if (range === 'today') { startDate = new Date(now); startDate.setHours(0,0,0,0); }
+    else if (range === 'month') { startDate = new Date(now.getFullYear(), now.getMonth(), 1); }
+    else if (range === 'year') { startDate = new Date(now.getFullYear(), 0, 1); }
+    else { startDate = new Date(0); }
+
     const data = await client.transactionItem.groupBy({
         by: ['productId'],
         where: {
             transaction: {
                 type: 'SALE',
                 status: 'COMPLETED',
+                createdAt: { gte: startDate },
                 ...(branchId && { branchId }),
             },
         },
@@ -185,9 +320,10 @@ export const getTopProducts = async (client: any, branchId?: string, limit = 10)
         where: { id: { in: productIds } },
         select: { id: true, name: true, barcode: true, price: true },
     });
+    const productMap = new Map(products.map((p: any) => [p.id, p]));
 
     return data.map((d: any) => ({
-        product: products.find((p: any) => p.id === d.productId),
+        product: productMap.get(d.productId),
         totalQuantity: d._sum.quantity ?? 0,
         totalRevenue: d._sum.subtotal ? Number(d._sum.subtotal) : 0,
     }));
@@ -201,12 +337,15 @@ export const getSalesByBranch = async (client: any, from?: string, to?: string):
             type: 'SALE',
             status: 'COMPLETED',
             ...(from || to
-                ? {
-                      createdAt: {
-                          ...(from && { gte: new Date(from) }),
-                          ...(to && { lte: new Date(to) }),
-                      },
-                  }
+                ? (() => {
+                      const { fromDate, toDate } = parseDateRange(from, to);
+                      return {
+                          createdAt: {
+                              ...(fromDate && { gte: fromDate }),
+                              ...(toDate && { lte: toDate }),
+                          },
+                      };
+                  })()
                 : {}),
         },
         _sum: { total: true },
@@ -218,9 +357,10 @@ export const getSalesByBranch = async (client: any, from?: string, to?: string):
         where: { id: { in: branchIds } },
         select: { id: true, name: true },
     });
+    const branchMap = new Map(branches.map((b: any) => [b.id, b]));
 
     return data.map((d: any) => ({
-        branch: branches.find((b: any) => b.id === d.branchId),
+        branch: branchMap.get(d.branchId),
         totalSales: d._sum.total ? Number(d._sum.total) : 0,
         transactionCount: d._count,
     }));

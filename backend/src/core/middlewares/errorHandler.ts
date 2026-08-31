@@ -66,7 +66,7 @@ export const errorHandler = (
     res: Response,
     _next: NextFunction
 ): void => {
-    const requestId = 'unknown';
+    const requestId = (req as any).requestId || 'unknown';
 
     if (err instanceof AppError) {
         logger.warn(err.message, {

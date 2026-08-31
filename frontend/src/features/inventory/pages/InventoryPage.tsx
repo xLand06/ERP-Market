@@ -1,41 +1,62 @@
 import { useState, useId, useMemo, useEffect } from 'react';
-import { Search, Plus, Download, Pencil, Check, X, Package, Loader2, Wifi, WifiOff } from 'lucide-react';
+import { Search, Plus, Download, Pencil, Check, X, Package, Loader2, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { ProductFormModal } from '../components/ProductFormModal';
-import { StockAdjustmentModal } from '../components/StockAdjustmentModal';
-import { useMutation } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { useAuthStore } from '../../auth/store/authStore';
-import { useInventory } from '@/hooks/useInventory';
 import toast from 'react-hot-toast';
+import { ProductFormModal } from '@/features/products/components/ProductFormModal';
+import { useGroups, useSubgroups } from '@/features/products/hooks';
+import { StockAdjustmentModal } from '../components/StockAdjustmentModal';
+import { StockEntryModal } from '../components/StockEntryModal';
+import { useAuthStore } from '@/features/auth/store/authStore';
+import { useInventory, useUpdatePrice, useUpdateStock } from '../hooks';
+import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
+import type { InventoryProduct } from '../types';
+import { api } from '@/lib/api';
 
-interface Product {
-    id: string; code: string; name: string; category: string;
-    cost: number; price: number; stock: number; minStock: number;
-    baseUnit: string;
-    isActive?: boolean;
-}
-
-type StockLevel = 'normal' | 'warning' | 'critical';
-const stockLevel = (stock: number, min: number): StockLevel =>
+const stockLevel = (stock: number, min: number): 'normal' | 'warning' | 'critical' =>
     stock <= min * 0.15 ? 'critical' : stock <= min * 0.6 ? 'warning' : 'normal';
 
-const getBadgeVariant = (level: StockLevel) =>
+const getBadgeVariant = (level: 'normal' | 'warning' | 'critical') =>
     level === 'critical' ? 'destructive' : level === 'warning' ? 'warning' : 'success';
 
-const STATUS_LABELS: Record<StockLevel, string> = { normal:'Normal', warning:'Alerta', critical:'Crítico' };
+const STATUS_LABELS: Record<string, string> = { normal:'Normal', warning:'Alerta', critical:'Crítico' };
+
+const handleExport = async (branchId: string | null, branchName?: string) => {
+    try {
+        toast.loading('Generando Excel...', { id: 'export-inventory' });
+        const params = new URLSearchParams();
+        if (branchId && branchId !== 'all') params.append('branchId', branchId);
+        if (branchName) params.append('branchName', branchName);
+        const url = `/inventory/export?${params.toString()}`;
+        const response = await api.get(url, { responseType: 'blob' });
+        const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.download = `Inventario_${new Date().toISOString().split('T')[0]}.xlsx`;
+        link.click();
+        window.URL.revokeObjectURL(link.href);
+        toast.success('Excel descargado correctamente', { id: 'export-inventory' });
+    } catch (err: any) {
+        toast.error('Error al exportar inventario', { id: 'export-inventory' });
+        console.error('[ExportInventory] Error:', err);
+    }
+};
 
 export default function InventoryPage() {
     const [search, setSearch]       = useState('');
-    const [category, setCategory]   = useState('Todos');
+    const [filterGroup, setFilterGroup] = useState<string>('all');
+    const [filterCategory, setFilterCategory] = useState<string>('all');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editPrice, setEditPrice] = useState('');
     const [selected, setSelected]   = useState<Set<string>>(new Set());
-    const [editTarget, setEditTarget] = useState<Product | null>(null);
+    const [editTarget, setEditTarget] = useState<InventoryProduct | null>(null);
     const [adjustmentOpen, setAdjustmentOpen] = useState(false);
+    const [stockEntryOpen, setStockEntryOpen] = useState(false);
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(25);
 
     const searchId    = useId();
     const pageSizeId  = useId();
@@ -44,9 +65,19 @@ export default function InventoryPage() {
     const selectedBranch = useAuthStore(s => s.selectedBranch);
     const user = useAuthStore(s => s.user);
     const isOwner = user?.role === 'OWNER';
+    const canManage = isOwner || user?.canManageInventory;
     const effectiveBranch = selectedBranch === 'all' && isOwner ? null : selectedBranch;
 
-    const { inventory, isLoading, refetch, isOnline, updateStock } = useInventory(effectiveBranch || '');
+    const { inventory, isLoading, refetch } = useInventory(effectiveBranch || '');
+    const updatePriceMutation = useUpdatePrice();
+    const updateStockMutation = useUpdateStock();
+
+    const { data: groups = [] } = useGroups();
+    const { data: subgroups = [] } = useSubgroups();
+
+    useBarcodeScanner((barcode) => {
+        setSearch(barcode);
+    });
 
     useEffect(() => {
         if (inventory.length > 0) {
@@ -54,46 +85,44 @@ export default function InventoryPage() {
         }
     }, [inventory.length]);
 
-    const PRODUCTS: Product[] = useMemo(() => {
-        return inventory.map(item => ({
-            id: item.product.id,
-            code: item.product.barcode || '',
-            name: item.product.name,
-            cost: Number(item.product.cost || 0),
-            price: Number(item.product.price || 0),
-            stock: Number(item.stock || 0),
-            minStock: Number(item.minStock || 0),
-            baseUnit: item.product.baseUnit || 'UNIDAD',
-            category: item.product.category || 'Varios',
-        }));
-    }, [inventory]);
+    useEffect(() => {
+        setFilterCategory('all');
+    }, [filterGroup]);
 
-    const CATEGORIES = useMemo(() => {
-        const cats = new Set(PRODUCTS.map(p => p.category));
-        return ['Todos', ...Array.from(cats)].sort();
-    }, [PRODUCTS]);
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, filterGroup, filterCategory]);
 
-    // Mutation to update price
-    const updatePriceMutation = useMutation({
-        mutationFn: async ({ id, price }: { id: string, price: number }) => {
-            await api.put(`/products/${id}`, { price });
-        },
-        onSuccess: () => {
-            toast.success('Precio actualizado');
-            setEditingId(null);
-            refetch();
-        },
-        onError: () => {
-            toast.error('Error al actualizar precio');
-        }
-    });
+    const filtered = useMemo(() => {
+        const queryStr = search.toLowerCase().trim();
+        return inventory.filter(p => {
+            const matchesGroup = filterGroup === 'all' || p.groupId === filterGroup;
+            if (!matchesGroup) return false;
 
-    
+            const matchesCategory = filterCategory === 'all' || p.subGroupId === filterCategory;
+            if (!matchesCategory) return false;
 
-    const filtered = PRODUCTS.filter(p =>
-        (category === 'Todos' || p.category === category) &&
-        (p.name.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase()))
-    );
+            const nameMatches = p.name.toLowerCase().includes(queryStr);
+            const codeMatches = p.code.toLowerCase().includes(queryStr);
+            
+            const barcodesMatches = p.barcodes?.some(b => 
+                b.code.toLowerCase().includes(queryStr)
+            );
+            
+            const presentationBarcodesMatches = p.presentations?.some(pr => 
+                pr.barcode?.toLowerCase().includes(queryStr)
+            );
+
+            return nameMatches || codeMatches || barcodesMatches || presentationBarcodesMatches;
+        });
+    }, [inventory, filterGroup, filterCategory, search]);
+
+    const paginated = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filtered.slice(start, start + pageSize);
+    }, [filtered, currentPage, pageSize]);
+
+    const totalPages = Math.ceil(filtered.length / pageSize) || 1;
 
     const allSelected  = filtered.length > 0 && filtered.every(p => selected.has(p.id));
     const someSelected = filtered.some(p => selected.has(p.id)) && !allSelected;
@@ -118,12 +147,12 @@ export default function InventoryPage() {
         });
     };
 
-    const startEdit = (p: Product) => {
+    const startEdit = (p: InventoryProduct) => {
         setEditingId(p.id);
         setEditPrice(p.price.toFixed(2));
     };
 
-    const confirmEdit = (p: Product) => {
+    const confirmEdit = (p: InventoryProduct) => {
         const val = parseFloat(editPrice);
         if (!isNaN(val) && val >= 0) {
             updatePriceMutation.mutate({ id: p.id, price: val });
@@ -143,26 +172,16 @@ export default function InventoryPage() {
     return (
         <>
         <div className="flex items-center gap-2 mb-4">
-            {isOnline ? (
-                <span className="flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-                    <Wifi className="w-3 h-3" /> En línea
-                </span>
-            ) : (
-                <span className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
-                    <WifiOff className="w-3 h-3" /> Sin conexión
-                </span>
-            )}
             <span className="text-xs text-slate-400">
-                {PRODUCTS.length} productos
+                {inventory.length} productos
             </span>
         </div>
         <ProductFormModal
             open={!!editTarget}
             onClose={() => setEditTarget(null)}
-            product={editTarget}
-            categories={CATEGORIES.map(c => ({ id: c, name: c })).filter(c => c.id !== 'Todos')}
-            initialStock={editTarget?.stock}
-            initialMinStock={editTarget?.minStock}
+            product={editTarget as any}
+            groups={groups}
+            subgroups={subgroups}
             onSuccess={() => {
                 refetch();
                 setEditTarget(null);
@@ -171,74 +190,125 @@ export default function InventoryPage() {
         <StockAdjustmentModal 
             open={adjustmentOpen}
             onClose={() => setAdjustmentOpen(false)}
-            onSave={({ product, quantity, minStock }) => {
-                updateStock({ product, quantity, minStock });
-                toast.success('Entrada de inventario registrada con éxito');
-                setAdjustmentOpen(false);
+            onSave={({ product, quantity, minStock, reason }) => {
+                if (!effectiveBranch) {
+                    toast.error('Seleccione una sede específica');
+                    return;
+                }
+                updateStockMutation.mutate({ 
+                    product: { id: product.id }, 
+                    quantity, 
+                    minStock,
+                    branchId: effectiveBranch,
+                    reason
+                }, {
+                    onSuccess: () => {
+                        toast.success('Inventario actualizado con éxito');
+                        setAdjustmentOpen(false);
+                        refetch();
+                    },
+                    onError: (err: any) => {
+                        toast.error(err?.response?.data?.error || 'Error al actualizar stock');
+                    }
+                });
+            }}
+        />
+        <StockEntryModal
+            open={stockEntryOpen}
+            onClose={() => setStockEntryOpen(false)}
+            branchId={effectiveBranch || undefined}
+            onSuccess={() => {
+                setStockEntryOpen(false);
                 setTimeout(refetch, 500);
             }}
         />
         <div className="flex flex-col gap-6 max-w-400 mx-auto pb-8">
-            {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
                         Gestión de Inventario
                     </h1>
                     <p className="text-xs text-slate-400 mt-1 font-medium" aria-live="polite">
-                        {filtered.length} de {PRODUCTS.length} productos mostrados
+                        {filtered.length} de {inventory.length} productos mostrados
                     </p>
                 </div>
                 <div className="flex flex-col xs:flex-row gap-2.5 w-full sm:w-auto">
-                    <Button variant="outline" size="lg" className="h-11 sm:h-10 text-slate-700 font-bold sm:px-4">
+                    <Button variant="outline" size="lg" className="h-11 sm:h-10 text-slate-700 font-bold sm:px-4" onClick={() => handleExport(effectiveBranch, selectedBranch === 'all' ? undefined : selectedBranch)}>
                         <Download className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Exportar Excel
                     </Button>
-                    <Button
-                        size="lg"
-                        className="h-11 sm:h-10 font-bold shadow-lg shadow-indigo-500/20 sm:px-4 bg-indigo-600 hover:bg-indigo-700 text-white"
-                        onClick={() => setAdjustmentOpen(true)}
-                    >
-                        <Plus className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Entrada Manual
-                    </Button>
-                </div>
-            </div>
-
-            {/* Filters */}
-            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-                <div className="flex gap-3 items-center flex-wrap">
-                    <div className="relative flex-1 min-w-50">
-                        <label htmlFor={searchId} className="sr-only">Buscar producto</label>
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
-                        <Input
-                            id={searchId}
-                            placeholder="Buscar por nombre, código..."
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            className="pl-9"
-                            type="search"
-                        />
-                    </div>
-                    <div className="flex gap-1.5 flex-wrap" role="group" aria-label="Filtrar por categoría">
-                        {CATEGORIES.map(cat => (
-                            <button
-                                key={cat}
-                                onClick={() => setCategory(cat)}
-                                aria-pressed={category === cat}
-                                className={cn(
-                                    'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all',
-                                    category === cat
-                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-                                )}
+                    {canManage && (
+                        <>
+                            <Button
+                                variant="outline"
+                                size="lg"
+                                className="h-11 sm:h-10 text-indigo-700 font-bold sm:px-4 border-indigo-200 hover:bg-indigo-50"
+                                onClick={() => setAdjustmentOpen(true)}
                             >
-                                {cat}
-                            </button>
-                        ))}
-                    </div>
+                                <ClipboardList className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Recuento Stock
+                            </Button>
+                            <Button
+                                size="lg"
+                                className="h-11 sm:h-10 font-bold shadow-lg shadow-indigo-500/20 sm:px-4 bg-indigo-600 hover:bg-indigo-700 text-white"
+                                onClick={() => {
+                                    if (!effectiveBranch) {
+                                        toast.error('Seleccione una sede específica para registrar la entrada');
+                                        return;
+                                    }
+                                    setStockEntryOpen(true);
+                                }}
+                            >
+                                <Plus className="w-4.5 h-4.5 mr-2" aria-hidden="true" /> Entrada de Mercancía
+                            </Button>
+                        </>
+                    )}
                 </div>
             </div>
 
-            {/* Table */}
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row gap-4 items-center">
+                <div className="relative flex-1 w-full">
+                    <label htmlFor={searchId} className="sr-only">Buscar producto</label>
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+                    <Input
+                        id={searchId}
+                        placeholder="Buscar por nombre, código..."
+                        value={search}
+                        onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+                        className="pl-9 w-full"
+                        type="search"
+                    />
+                </div>
+                
+                <div className="flex gap-3 w-full md:w-auto flex-wrap sm:flex-nowrap">
+                    <select 
+                        value={filterGroup}
+                        onChange={(e) => { 
+                            setFilterGroup(e.target.value); 
+                            setFilterCategory('all'); 
+                            setCurrentPage(1); 
+                        }}
+                        aria-label="Filtrar por Grupo"
+                        className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-[140px]"
+                    >
+                        <option value="all">Todos los Grupos</option>
+                        {groups.map((g: any) => (
+                            <option key={g.id} value={g.id}>{g.name}</option>
+                        ))}
+                    </select>
+
+                    <select 
+                        value={filterCategory}
+                        onChange={(e) => { setFilterCategory(e.target.value); setCurrentPage(1); }}
+                        aria-label="Filtrar por Subgrupo"
+                        className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-[140px]"
+                    >
+                        <option value="all">Todos los Subgrupos</option>
+                        {(filterGroup === 'all' ? subgroups : subgroups.filter((s: any) => s.groupId === filterGroup)).map((s: any) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[400px] relative">
                 {isLoading && (
                     <div className="absolute inset-0 z-10 bg-white/50 backdrop-blur-[2px] flex items-center justify-center">
@@ -268,11 +338,11 @@ export default function InventoryPage() {
                                 <th scope="col" className="text-center">Stock</th>
                                 <th scope="col" className="text-center">Mín.</th>
                                 <th scope="col">Estado</th>
-                                <th scope="col" className="w-20">Acciones</th>
-                            </tr>
-                        </thead>
+                                {isOwner && <th scope="col" className="w-20">Acciones</th>}
+                                </tr>
+                                </thead>
                         <tbody>
-                            {!isLoading && filtered.map(p => {
+                            {!isLoading && paginated.map(p => {
                                 const level = stockLevel(p.stock, p.minStock);
                                 const isEditing = editingId === p.id;
                                 const editInputId = `edit-price-${p.id}`;
@@ -291,7 +361,34 @@ export default function InventoryPage() {
                                                 <Package className="w-4.5 h-4.5" />
                                             </div>
                                         </td>
-                                        <td><span className="text-xs font-mono text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded">{p.code}</span></td>
+                                        <td>
+                                            {(() => {
+                                                const codes = Array.from(new Set([
+                                                    ...(p.code ? [p.code] : []),
+                                                    ...(p.barcodes ? p.barcodes.map(b => b.code) : []),
+                                                    ...(p.presentations ? p.presentations.map(pr => pr.barcode).filter(Boolean) as string[] : [])
+                                                ]));
+                                                if (codes.length === 0) {
+                                                    return (
+                                                        <span className="text-xs font-mono bg-slate-50 text-slate-400 px-2 py-0.5 rounded border border-dashed border-slate-200">
+                                                            —
+                                                        </span>
+                                                    );
+                                                }
+                                                return (
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-xs font-mono bg-slate-50 border border-slate-200 text-slate-600 px-2 py-0.5 rounded w-fit">
+                                                            {codes[0]}
+                                                        </span>
+                                                        {codes.length > 1 && (
+                                                            <span className="text-[10px] text-slate-400 font-medium">
+                                                                +{codes.length - 1} código{codes.length - 1 > 1 ? 's' : ''} más
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </td>
                                         <td><p className="text-sm font-semibold text-slate-800">{p.name}</p></td>
                                         <td><span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{p.category}</span></td>
                                         <td className="text-right tabular-nums text-sm text-slate-600">${p.cost.toFixed(2)}</td>
@@ -365,22 +462,45 @@ export default function InventoryPage() {
                     </table>
                 </div>
 
-                {/* Pagination */}
                 <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50 mt-auto">
-                    <p className="text-xs text-slate-500">Mostrando 1–{filtered.length} de {PRODUCTS.length} productos</p>
+                    <p className="text-xs text-slate-500">
+                        Mostrando {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, filtered.length)} de {filtered.length} productos
+                    </p>
                     <div className="flex items-center gap-2">
-                        <select id={pageSizeId} className="h-8 rounded-lg border border-slate-200 px-2 text-xs text-slate-600 bg-white">
-                            <option>25</option><option>50</option><option>100</option>
+                        <select 
+                            id={pageSizeId} 
+                            value={pageSize}
+                            onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                            className="h-8 rounded-lg border border-slate-200 px-2 text-xs text-slate-600 bg-white"
+                        >
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
                         </select>
-                        <nav aria-label="Paginación de inventario">
-                            <ul className="flex gap-1 list-none m-0 p-0">
-                                {[1].map((page, i) => (
-                                    <li key={i}>
-                                        <button className="w-8 h-8 rounded-lg text-xs font-medium bg-emerald-500 text-white">{page}</button>
-                                    </li>
-                                ))}
-                            </ul>
-                        </nav>
+                        <div className="flex items-center gap-1">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                disabled={currentPage === 1} 
+                                onClick={() => setCurrentPage(p => p - 1)}
+                                className="h-8 px-2 text-xs"
+                            >
+                                Anterior
+                            </Button>
+                            <span className="text-xs text-slate-600 px-2">
+                                Página {currentPage} de {totalPages}
+                            </span>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                disabled={currentPage >= totalPages} 
+                                onClick={() => setCurrentPage(p => p + 1)}
+                                className="h-8 px-2 text-xs"
+                            >
+                                Siguiente
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </div>

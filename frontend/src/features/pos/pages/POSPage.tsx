@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
-    Search, Barcode, Package, DollarSign, Smartphone, CreditCard, X, Check, Loader2, ShoppingCart, PackagePlus
+    ShoppingCart, PackagePlus, Lock, Play, Store, Search, Barcode, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,213 +15,42 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
 import { useInventory } from '@/hooks/useInventory';
 import { useConfigStore } from '@/hooks/useConfigStore';
+import { useAutoOpenRegister } from '@/hooks/useAutoOpenRegister';
+import { StockEntryModal } from '../../inventory/components/StockEntryModal';
+import { ProductSearch } from '../components/ProductSearch';
+import { CartPanel } from '../components/CartPanel';
+import { PaymentDialog } from '../components/PaymentDialog';
+import { TransactionSummary } from '../components/TransactionSummary';
+import { useCart } from '../hooks/useCart';
+import toast from 'react-hot-toast';
 
-// ─── Types ─────────────────────────────────────────────────────────
-interface ProductPresentation {
-    id: string;
-    name: string;
-    multiplier: number;
-    price: number;
-    barcode?: string | null;
-}
-
-interface Product { 
-    id: string; 
-    name: string; 
-    price: number; 
-    stock: number; 
-    category: string; 
-    code: string; 
-    baseUnit: string;
-    presentations: ProductPresentation[];
-}
-
-interface CartItem {
-    id: string; // productId
-    name: string;
-    basePrice: number; // Price of base unit
-    currentPrice: number; // Price of selected presentation
-    stock: number;
-    qty: number;
-    baseUnit: string;
-    presentationId?: string;
-    presentationName?: string;
-    multiplier: number;
-}
-
-// ─── Helpers ───────────────────────────────────────────────────────
-const toNum = (val: number | string) => typeof val === 'string' ? parseFloat(val) : val;
-
-const PAYMENT_OPTIONS = [
-    { id:'cash_usd',  label:'Efectivo USD',     icon:DollarSign, currency:'USD' as const },
-    { id:'pagomovil', label:'Pago Móvil VES',   icon:Smartphone, currency:'VES' as const },
-    { id:'tarjeta',   label:'Tarjeta',          icon:CreditCard, currency:'USD' as const },
-];
-
-// ─── Sub-Components ────────────────────────────────────────────────
-function StockBadge({ stock, unit }: { stock: number, unit: string }) {
-    const v = stock < 5 ? 'destructive' : stock < 12 ? 'warning' : 'success';
-    const label = `${stock.toFixed(unit === 'UNIDAD' ? 0 : 2)} ${unit}`;
-    return <Badge variant={v}>{label}</Badge>;
-}
-
-function ProductCard({ product, onAdd }: { product: Product; onAdd: (p: Product, pres?: ProductPresentation) => void }) {
-    const { rates } = useConfigStore();
-    const vesRate = rates['VES'] || 36.50;
-    
-    const [flash, setFlash] = useState(false);
-    const price = product.price;
-    const handle = () => {
-        if (product.stock === 0) return;
-        onAdd(product);
-        setFlash(true);
-        setTimeout(() => setFlash(false), 250);
-    };
-    return (
-        <button
-            onClick={handle}
-            disabled={product.stock === 0}
-            className={cn(
-                'flex flex-row sm:flex-col gap-3 p-3.5 rounded-xl border text-left transition-all duration-200 group relative',
-                'hover:border-emerald-400 hover:shadow-lg sm:hover:-translate-y-1 active:scale-[0.97]',
-                flash ? 'border-emerald-500 bg-emerald-50 shadow-inner' : 'border-slate-200 bg-white',
-                product.stock === 0 && 'opacity-40 cursor-not-allowed hover:border-slate-200 hover:shadow-none sm:hover:translate-y-0'
-            )}
-        >
-            <div className="w-12 h-12 sm:w-auto sm:h-auto rounded-lg bg-slate-50 sm:bg-transparent flex items-center justify-center shrink-0 group-hover:bg-white transition-colors">
-                <Package className="w-6 h-6 text-slate-400 group-hover:text-emerald-500 transition-all group-hover:scale-110" />
-            </div>
-            <div className="flex flex-col flex-1 min-w-0 justify-center sm:justify-start">
-                <p className="text-[13px] sm:text-xs font-bold text-slate-800 line-clamp-2 leading-snug mb-1">{product.name}</p>
-                <div className="flex flex-col sm:flex-row sm:items-end justify-between mt-auto gap-2">
-                    <div>
-                        <p className="text-sm font-black text-slate-900 tabular-nums leading-none">${price.toFixed(2)}</p>
-                        <p className="text-[11px] font-medium text-slate-400 tabular-nums mt-0.5 sm:hidden lg:block">Bs. {(price * vesRate).toFixed(0)}</p>
-                    </div>
-                    <div className="sm:opacity-80 group-hover:opacity-100 transition-opacity">
-                        <StockBadge stock={product.stock} unit={product.baseUnit} />
-                    </div>
-                </div>
-            </div>
-        </button>
-    );
-}
-
-function HybridPaymentDialog({ open, total, onClose, onConfirm, isSubmitting }: {
-    open: boolean; total: number; onClose: () => void; onConfirm: () => void; isSubmitting: boolean;
-}) {
-    const { rates } = useConfigStore();
-    const vesRate = rates['VES'] || 36.50;
-    type PaymentRow = { methodId: string; amount: number; currency: string };
-    const [rows, setRows] = useState<PaymentRow[]>([{ methodId: 'cash_usd', amount: total, currency: 'USD' }]);
-    const paidTotal = rows.reduce((s, r) => s + (r.amount / (rates[r.currency] || 1)), 0);
-    const change = paidTotal - total;
-    const canPay = paidTotal >= (total - 0.01) && !isSubmitting; // Tolerancia de decimales
-
-    // Reset when opened
-    useEffect(() => {
-        if (open) setRows([{ methodId: 'cash_usd', amount: total, currency: 'USD' }]);
-    }, [open, total]);
-
-    const addRow = () => setRows(p => [...p, { methodId: 'pagomovil', amount: 0, currency: 'VES' }]);
-    const updateRow = (i: number, field: string, val: any) =>
-        setRows(p => p.map((r, idx) => idx === i ? { ...r, [field]: val } : r) as PaymentRow[]);
-    const removeRow = (i: number) => setRows(p => p.filter((_, idx) => idx !== i));
-
-    return (
-        <Dialog open={open} onOpenChange={o => !o && onClose()}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Cobrar Venta</DialogTitle>
-                    <DialogDescription>Selecciona los métodos de pago</DialogDescription>
-                </DialogHeader>
-                <div className="px-6 py-3 bg-slate-50 border-y border-slate-100">
-                    <div className="flex items-baseline justify-between">
-                        <span className="text-sm text-slate-500">Total a Cobrar</span>
-                        <span className="text-xl font-black text-slate-900 tabular-nums">${total.toFixed(2)} USD</span>
-                    </div>
-                    <p className="text-[11px] text-slate-400 text-right mt-0.5 tabular-nums">= Bs. {(total * vesRate).toFixed(2)} VES</p>
-                </div>
-                <div className="px-6 py-4 flex flex-col gap-3">
-                    {rows.map((row, i) => (
-                        <div key={i} className="flex gap-2 items-center">
-                            <select
-                                value={row.methodId}
-                                onChange={e => {
-                                    const m = PAYMENT_OPTIONS.find(pm => pm.id === e.target.value)!;
-                                    updateRow(i, 'methodId', e.target.value);
-                                    updateRow(i, 'currency', m.currency);
-                                }}
-                                className="flex-1 h-11 rounded-lg border border-slate-200 px-3 text-sm bg-white"
-                            >
-                                {PAYMENT_OPTIONS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-                            </select>
-                            <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">{row.currency === 'VES' ? 'Bs.' : '$'}</span>
-                                <Input
-                                    type="number"
-                                    value={row.amount}
-                                    onChange={e => updateRow(i, 'amount', parseFloat(e.target.value) || 0)}
-                                    className="w-28 pl-8 font-semibold"
-                                />
-                            </div>
-                            {rows.length > 1 && <button onClick={() => removeRow(i)} className="p-2 text-slate-400"><X className="w-4 h-4" /></button>}
-                        </div>
-                    ))}
-                    <button onClick={addRow} className="border border-dashed border-slate-300 rounded-lg h-10 text-sm text-slate-400">+ Agregar Pago</button>
-                </div>
-                <div className="px-6 pb-2 flex justify-between items-center">
-                    <span className="text-sm text-slate-500">{change >= 0 ? 'Vuelto' : 'Faltante'}</span>
-                    <span className={cn('text-lg font-black tabular-nums', change >= 0 ? 'text-emerald-600' : 'text-red-500')}>
-                        ${Math.abs(change).toFixed(2)} USD
-                    </span>
-                </div>
-                <div className="px-6 pb-6 flex gap-3">
-                    <Button variant="outline" className="flex-1" onClick={onClose} disabled={isSubmitting}>Cancelar</Button>
-                    <button
-                        onClick={canPay ? onConfirm : undefined}
-                        disabled={!canPay}
-                        className={cn(
-                            'flex-[2] h-11 rounded-lg font-bold text-white transition-all flex items-center justify-center', 
-                            canPay ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-slate-200 cursor-not-allowed'
-                        )}
-                    >
-                        {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />} 
-                        {isSubmitting ? 'Procesando...' : 'Confirmar'}
-                    </button>
-                </div>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function Toast({ message, visible, isError }: { message: string; visible: boolean; isError?: boolean }) {
-    return (
-        <div className={cn(
-            'fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-2 px-5 py-3 rounded-xl bg-slate-900 text-white text-sm shadow-2xl transition-all duration-300',
-            visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6 pointer-events-none'
-        )}>
-            {isError ? <X className="w-4 h-4 text-red-400" /> : <Check className="w-4 h-4 text-emerald-400" />} {message}
-        </div>
-    );
-}
+import type { Product, PaymentMethodType, Currency, CreateTransactionPayload } from '../types';
 
 // ─── Main Component ────────────────────────────────────────────────
 export default function POSPage() {
-    const [search, setSearch]       = useState('');
-    const [category, setCategory]   = useState('Todos');
-    const [cart, setCart]           = useState<CartItem[]>([]);
-    const [payOpen, setPayOpen]     = useState(false);
     const [isSaleMode, setIsSaleMode] = useState(true);
-    const [toastMsg, setToastMsg]   = useState('');
-    const [toastVis, setToastVis]   = useState(false);
-    const [toastErr, setToastErr]   = useState(false);
+    const [payOpen, setPayOpen] = useState(false);
+    const [activeProductForPres, setActiveProductForPres] = useState<Product | null>(null);
+    const [stockEntryOpen, setStockEntryOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [summary, setSummary] = useState<{
+        visible: boolean;
+        items: Array<{ name: string; qty: number; unitPrice: number; total: number }>;
+        total: number;
+        paymentMethods?: Array<{ type: string; amount: number; currency: string }>;
+        type?: 'SALE' | 'INVENTORY_IN';
+    }>({ visible: false, items: [], total: 0 });
     const searchRef = useRef<HTMLInputElement>(null);
 
     const selectedBranch = useAuthStore(s => s.selectedBranch);
     const user = useAuthStore(s => s.user);
     const queryClient = useQueryClient();
+
+    // ── Open Register Dialog State ────────────────────────────────────
+    const [openCashOpen, setOpenCashOpen] = useState(false);
+    const [openCopVal, setOpenCopVal] = useState('0');
+    const [openUsdVal, setOpenUsdVal] = useState('0');
+    const [openVesVal, setOpenVesVal] = useState('0');
 
     const { data: branches = [] } = useQuery({
         queryKey: ['branches'],
@@ -237,169 +66,123 @@ export default function POSPage() {
         return branches.find((b: any) => b.id === selectedBranch);
     }, [selectedBranch, branches]);
 
-    const { iva, vesRate } = useConfigStore();
+    const { iva, fmtCOP, rates } = useConfigStore();
     const effectiveBranch = selectedBranchData?.id || (selectedBranch === 'all' && user?.role === 'OWNER' ? null : selectedBranch);
 
-    const { inventory, isLoading, refetch, isOnline } = useInventory(effectiveBranch || '');
+    // ── Open Register Query ──────────────────────────────────────────
+    const { data: openRegister, isLoading: registerLoading, refetch: refetchRegister } = useQuery({
+        queryKey: ['openRegister', effectiveBranch],
+        queryFn: async () => {
+            if (!effectiveBranch) return null;
+            try {
+                const res = await api.get(`/cash-flow/current/${effectiveBranch}`);
+                return res.data.data;
+            } catch (err: any) {
+                if (err.response?.status === 404) return null;
+                throw err;
+            }
+        },
+        enabled: !!effectiveBranch,
+        staleTime: 10_000,
+    });
 
-    const PRODUCTS: Product[] = useMemo(() => {
+    const usdRate = rates['USD'] || rates['COP'] || 3600;
+    const vesRate = rates['VES'] || 5.5;
+
+    const openMutation = useMutation({
+        mutationFn: async (openingAmount: number) => {
+            await api.post('/cash-flow/open', { branchId: effectiveBranch, openingAmount });
+        },
+        onSuccess: () => {
+            toast.success('Caja abierta correctamente');
+            setOpenCashOpen(false);
+            setOpenCopVal('0'); setOpenUsdVal('0'); setOpenVesVal('0');
+            refetchRegister();
+            queryClient.invalidateQueries({ queryKey: ['openRegister'] });
+        },
+        onError: (err: any) => {
+            toast.error(err.response?.data?.error || 'Error al abrir caja');
+        }
+    });
+
+    useAutoOpenRegister({
+        branchId: effectiveBranch || null,
+        hasOpenRegister: !!openRegister,
+        onOpened: () => { refetchRegister(); queryClient.invalidateQueries({ queryKey: ['openRegister'] }); },
+    });
+
+    const { inventory, refetch, isOnline } = useInventory(effectiveBranch || '');
+
+    const products = useMemo<Product[]>(() => {
         if (!inventory || !Array.isArray(inventory)) return [];
-        
         return inventory
-            .filter(item => item && item.product) // Asegurar que el producto existe
-            .map(item => ({
+            .filter((item: any) => item && item.product)
+            .map((item: any) => ({
                 id: item.product.id,
                 code: item.product.barcode || '',
+                barcodes: item.product.barcodes || [],
                 name: item.product.name,
                 price: Number(item.product.price),
+                cost: Number(item.product.cost || 0),
                 stock: Number(item.stock),
-                category: item.product.category || 'Varios',
+                category: typeof item.product.subGroup === 'object'
+                    ? (item.product.subGroup?.name || 'Varios')
+                    : (item.product.subGroup || 'Varios'),
                 baseUnit: item.product.baseUnit || 'UNIDAD',
                 presentations: (item.product.presentations || []).map((p: any) => ({
-                    id: p.id,
-                    name: p.name,
+                    id: p.id, name: p.name,
                     multiplier: Number(p.multiplier),
                     price: Number(p.price),
-                    barcode: p.barcode
+                    barcode: p.barcode,
                 })),
             }));
     }, [inventory]);
 
-    const CATEGORIES = useMemo(() => {
-        const cats = new Set(PRODUCTS.map(p => p.category));
-        return ['Todos', ...Array.from(cats)].sort();
-    }, [PRODUCTS]);
+    const inventoryItems = useMemo(() => {
+        return inventory?.map((item: any) => ({
+            product: products.find(p => p.id === item.product?.id) || item.product,
+            stock: Number(item.stock),
+        })) || [];
+    }, [inventory, products]);
 
-    const showToast = (msg: string, err = false) => {
-        setToastMsg(msg); 
-        setToastErr(err);
-        setToastVis(true);
-        setTimeout(() => setToastVis(false), 3000);
-    };
+    // ── Cart Hook ────────────────────────────────────────────────────
+    const {
+        items: cart,
+        addItem: addToCart,
+        updateQty: updateCartItemQty,
+        updatePresentation: updateCartItemPresentation,
+        removeItem: removeFromCart,
+        clearCart,
+        totals,
+    } = useCart({ isSaleMode }, products, iva);
 
-    const addToCart = useCallback((p: Product, pres?: ProductPresentation) => {
-        setCart(prev => {
-            const exIdx = prev.findIndex(i => i.id === p.id && i.presentationId === pres?.id);
-            
-            const multiplier = pres ? pres.multiplier : 1;
-            const price = pres ? pres.price : p.price;
-            
-            if (exIdx > -1) {
-                const ex = prev[exIdx];
-                const totalUnitsInCart = prev.filter(i => i.id === p.id).reduce((acc, i) => acc + (i.qty * i.multiplier), 0);
-                
-                if (totalUnitsInCart + multiplier > p.stock) {
-                    showToast(`Stock insuficiente para añadir más ${p.name}`, true);
-                    return prev;
-                }
-                
-                const newCart = [...prev];
-                newCart[exIdx] = { ...ex, qty: ex.qty + 1 };
-                return newCart;
-            } else {
-                const totalUnitsInCart = prev.filter(i => i.id === p.id).reduce((acc, i) => acc + (i.qty * i.multiplier), 0);
-                if (totalUnitsInCart + multiplier > p.stock) {
-                    showToast(`Stock insuficiente para ${p.name}`, true);
-                    return prev;
-                }
-
-                return [...prev, { 
-                    id: p.id, 
-                    name: p.name, 
-                    basePrice: p.price,
-                    currentPrice: price,
-                    stock: p.stock,
-                    baseUnit: p.baseUnit,
-                    qty: 1,
-                    presentationId: pres?.id,
-                    presentationName: pres?.name,
-                    multiplier: multiplier
-                }];
-            }
-        });
-    }, []);
-
-    const updateCartItemQty = (productId: string, presentationId: string | undefined, newQty: number) => {
-        setCart(prev => {
-            const item = prev.find(i => i.id === productId && i.presentationId === presentationId);
-            if (!item) return prev;
-            
-            const otherItemsUnits = prev.filter(i => i.id === productId && i.presentationId !== presentationId).reduce((acc, i) => acc + (i.qty * i.multiplier), 0);
-            if (otherItemsUnits + (newQty * item.multiplier) > item.stock) {
-                showToast(`Stock insuficiente`, true);
-                return prev;
-            }
-
-            return prev.map(i => (i.id === productId && i.presentationId === presentationId) ? { ...i, qty: newQty } : i);
-        });
-    };
-
-    const updateCartItemPresentation = (productId: string, oldPresId: string | undefined, newPresId: string | 'base') => {
-        setCart(prev => {
-            const item = prev.find(i => i.id === productId && i.presentationId === oldPresId);
-            if (!item) return prev;
-
-            const product = PRODUCTS.find(p => p.id === productId);
-            if (!product) return prev;
-
-            let multiplier = 1;
-            let price = product.price;
-            let name = undefined;
-            let finalPresId = undefined;
-
-            if (newPresId !== 'base') {
-                const pres = product.presentations.find(p => p.id === newPresId);
-                if (!pres) return prev;
-                multiplier = pres.multiplier;
-                price = pres.price;
-                name = pres.name;
-                finalPresId = pres.id;
-            }
-
-            // Validar stock
-            const otherItemsUnits = prev.filter(i => i.id === productId && i.presentationId !== oldPresId).reduce((acc, i) => acc + (i.qty * i.multiplier), 0);
-            if (otherItemsUnits + (item.qty * multiplier) > product.stock) {
-                showToast(`Stock insuficiente para esta presentación`, true);
-                return prev;
-            }
-
-            return prev.map(i => (i.id === productId && i.presentationId === oldPresId) ? { 
-                ...i, 
-                presentationId: finalPresId, 
-                presentationName: name,
-                multiplier: multiplier,
-                currentPrice: price
-            } : i);
-        });
-    };
-
-    const removeFromCart = (productId: string, presentationId: string | undefined) => {
-        setCart(prev => prev.filter(i => !(i.id === productId && i.presentationId === presentationId)));
-    };
-
-    // HOOK DEL ESCÁNER DE HARDWARE
+    // ── Barcode Scanner ──────────────────────────────────────────────
     useBarcodeScanner((barcode) => {
-        // Buscar por código base
-        const product = PRODUCTS.find(p => p.code === barcode);
-        if (product) {
-            addToCart(product);
-            showToast(`✓ ${product.name} añadido`);
+        const p = products.find(x => x.code === barcode);
+        if (p) {
+            if (addToCart(p)) toast.success(`✓ ${p.name} añadido`);
             return;
         }
 
-        // Buscar en presentaciones
-        for (const p of PRODUCTS) {
-            const pres = p.presentations.find(pr => pr.barcode === barcode);
-            if (pres) {
-                addToCart(p, pres);
-                showToast(`✓ ${p.name} (${pres.name}) añadido`);
+        for (const prod of products) {
+            if (prod.barcodes.some(b => b.code === barcode)) {
+                if (addToCart(prod)) toast.success(`✓ ${prod.name} añadido`);
                 return;
             }
         }
 
-        showToast(`⚠️ Código ${barcode} no encontrado en stock`, true);
+        for (const prod of products) {
+            const pres = prod.presentations.find(pr => pr.barcode === barcode);
+            if (pres) {
+                if (addToCart(prod, pres)) toast.success(`✓ ${prod.name} (${pres.name}) añadido`);
+                return;
+            }
+        }
+
+        toast.error(`⚠️ Código ${barcode} no encontrado`);
     });
 
+    // ── Hotkeys ──────────────────────────────────────────────────────
     useEffect(() => {
         const h = (e: KeyboardEvent) => {
             if (e.key === 'F2') { e.preventDefault(); searchRef.current?.focus(); }
@@ -409,11 +192,11 @@ export default function POSPage() {
         return () => window.removeEventListener('keydown', h);
     }, [cart]);
 
-    const handleCheckout = async () => {
-        if (!selectedBranch) {
-            showToast('No hay una sede seleccionada', true);
-            return;
-        }
+    // ── Handle Payment Confirm ───────────────────────────────────────
+    const handlePayment = async (paymentMethods: Array<{
+        type: PaymentMethodType; amount: number; currency: Currency; exchangeRate?: number;
+    }>) => {
+        if (!selectedBranch) { toast.error('No hay una sede seleccionada'); return; }
 
         setIsSubmitting(true);
         try {
@@ -424,233 +207,283 @@ export default function POSPage() {
                 unitPrice: c.currentPrice,
             }));
 
-            if (isOnline) {
-                await api.post('/pos/transactions', {
-                    type: isSaleMode ? 'SALE' : 'INVENTORY_IN',
-                    branchId: effectiveBranch,
-                    items,
-                });
-            } else {
-                // TODO: Actualizar lógica offline para UMB si es necesario
-                throw new Error('Sin conexión. Sincronización offline de UMB pendiente.');
-            }
+            const payload: CreateTransactionPayload = {
+                type: 'SALE',
+                branchId: effectiveBranch!,
+                items,
+                currency: 'COP',
+                exchangeRate: 1,
+                paymentMethods,
+            };
 
-            setCart([]);
+            await api.post('/pos/transactions', payload);
+
+            setSummary({
+                visible: true,
+                items: cart.map(c => ({
+                    name: c.name,
+                    qty: c.qty,
+                    unitPrice: c.currentPrice,
+                    total: c.currentPrice * c.qty,
+                })),
+                total: totals.total,
+                paymentMethods: paymentMethods.map(pm => ({
+                    type: pm.type,
+                    amount: pm.amount,
+                    currency: pm.currency,
+                })),
+                type: 'SALE',
+            });
+
             setPayOpen(false);
-            showToast(isSaleMode ? '✓ Venta registrada exitosamente' : '✓ Entrada registrada exitosamente');
+            clearCart();
             refetch();
-            
-            // Invalidar datos de caja para que el flujo se actualice inmediatamente
             queryClient.invalidateQueries({ queryKey: ['openRegister'] });
         } catch (error: any) {
-            console.error(error);
-            showToast(error.response?.data?.error || `Error al procesar la ${isSaleMode ? 'venta' : 'entrada'}`, true);
+            toast.error(error.response?.data?.error || 'Error al procesar la venta');
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const filtered = PRODUCTS.filter(p => {
-        const matchesCategory = category === 'Todos' || p.category === category;
-        const searchLower = search.toLowerCase();
-        const matchesName = p.name.toLowerCase().includes(searchLower);
-        const matchesBaseCode = p.code.includes(search);
-        const matchesPresentationCode = p.presentations.some(pr => pr.barcode?.includes(search));
-        
-        return matchesCategory && (matchesName || matchesBaseCode || matchesPresentationCode);
-    });
+    const handleStockEntry = async () => {
+        setStockEntryOpen(true);
+    };
 
-    const subtotal = cart.reduce((s, i) => s + i.currentPrice * i.qty, 0);
-    const total = subtotal + (subtotal * iva);
-
-    if (!selectedBranch) {
-        return <div className="h-full flex items-center justify-center text-slate-500 pb-20">Por favor, seleccione una sede en la configuración.</div>;
-    }
-
-    return (
-        <div className="flex flex-col lg:flex-row gap-4 h-full lg:h-[calc(100dvh-112px)] overflow-hidden">
-            {/* LADO IZQUIERDO: PRODUCTOS */}
-            <div className="flex-[6] flex flex-col gap-4 bg-white rounded-xl border p-4 shadow-sm overflow-hidden">
-                <div className="flex border border-slate-200 p-1 rounded-lg w-fit mb-1">
-                    <button 
-                        onClick={() => setIsSaleMode(true)}
-                        className={cn(
-                            "px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2",
-                            isSaleMode ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                        )}>
-                        <ShoppingCart className="w-4 h-4"/> Venta
-                    </button>
-                    <button 
-                        onClick={() => setIsSaleMode(false)}
-                        className={cn(
-                            "px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2",
-                            !isSaleMode ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                        )}>
-                        <PackagePlus className="w-4 h-4"/> Entrada / Restock
-                    </button>
+    // ── Branch Selection Screen ──────────────────────────────────────
+    if (!selectedBranch || selectedBranch === 'all') {
+        return (
+            <div className="flex flex-col items-center justify-center h-full max-w-2xl mx-auto text-center gap-6 pb-20">
+                <div className="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-full flex justify-center items-center mb-2">
+                    <Store className="w-8 h-8" />
                 </div>
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <Input
-                        ref={searchRef}
-                        placeholder="Buscar o escanear... [F2]"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        className="pl-9 h-11"
-                    />
-                    <Barcode className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                </div>
-
-                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                    {CATEGORIES.map(cat => (
-                        <button
-                            key={cat}
-                            onClick={() => setCategory(cat)}
-                            className={cn(
-                                'px-4 py-1.5 rounded-full text-xs font-semibold border transition-all whitespace-nowrap',
-                                category === cat ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-white text-slate-500 border-slate-200'
-                            )}
+                <h2 className="text-2xl font-black text-slate-800">Selecciona una Sucursal</h2>
+                <p className="text-slate-500 max-w-md">
+                    Para acceder al Punto de Venta, necesitas seleccionar en qué sucursal vas a operar.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full mt-4">
+                    {branches.map((b: any) => (
+                        <button key={b.id}
+                            onClick={() => useAuthStore.getState().setSelectedBranch(b.id)}
+                            className="p-5 rounded-2xl border border-slate-200 bg-white hover:border-indigo-500 hover:shadow-md transition-all flex items-center gap-4 text-left group"
                         >
-                            {cat}
+                            <div className="w-12 h-12 rounded-xl bg-slate-50 group-hover:bg-indigo-50 flex items-center justify-center shrink-0 transition-colors">
+                                <Store className="w-6 h-6 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">{b.name}</h3>
+                                <p className="text-xs text-slate-500 mt-1">Operar en esta sucursal</p>
+                            </div>
                         </button>
                     ))}
                 </div>
-
-                <div className="flex-1 overflow-y-auto grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-4 content-start">
-                    {isLoading ? (
-                        <div className="col-span-full h-32 flex items-center justify-center">
-                            <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
-                        </div>
-                    ) : filtered.length === 0 ? (
-                        <div className="col-span-full text-center text-slate-400 mt-10">No se encontraron productos.</div>
-                    ) : (
-                        filtered.map(p => (
-                            <div key={p.id} className="relative group">
-                                <ProductCard product={p} onAdd={addToCart} />
-                                {p.presentations.length > 0 && (
-                                    <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                        {p.presentations.map(pres => (
-                                            <button
-                                                key={pres.id}
-                                                onClick={(e) => { e.stopPropagation(); addToCart(p, pres); }}
-                                                className="bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg hover:bg-indigo-700 active:scale-95"
-                                                title={`Añadir ${pres.name}`}
-                                            >
-                                                +{pres.name.split(' ')[0]}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ))
-                    )}
-                </div>
             </div>
+        );
+    }
 
-            {/* LADO DERECHO: CARRITO */}
-            <div className="flex-[4] flex flex-col bg-white rounded-xl border shadow-sm overflow-hidden">
-                <div className="px-5 py-5 border-b flex justify-between items-center">
-                    <p className="font-bold">Ticket de Venta</p>
-                    {cart.length > 0 && <button onClick={() => setCart([])} className="text-xs text-red-500">Limpiar</button>}
+    // ── Closed Register Screen ───────────────────────────────────────
+    if (!registerLoading && !openRegister) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full max-w-md mx-auto text-center gap-4 pb-20">
+                <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex justify-center items-center">
+                    <Lock className="w-8 h-8" />
                 </div>
+                <h2 className="text-xl font-bold text-slate-800">Caja Cerrada</h2>
+                <p className="text-slate-500 text-sm">No puedes realizar ventas sin un turno de caja activo.</p>
 
-                <div className="flex-1 overflow-y-auto">
-                    {cart.map(item => {
-                        const product = PRODUCTS.find(p => p.id === item.id);
-                        return (
-                            <div key={`${item.id}-${item.presentationId}`} className="flex flex-col border-b px-5 py-4 gap-2">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded bg-slate-50 flex items-center justify-center shrink-0">
-                                        <Package className="w-4 h-4 text-slate-300" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-bold truncate">{item.name}</p>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            {product && product.presentations.length > 0 ? (
-                                                <select 
-                                                    value={item.presentationId || 'base'}
-                                                    onChange={(e) => updateCartItemPresentation(item.id, item.presentationId, e.target.value)}
-                                                    className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 hover:bg-slate-200 transition-colors border-none outline-none cursor-pointer"
-                                                >
-                                                    <option value="base">{product.baseUnit} (UMB)</option>
-                                                    {product.presentations.map(pres => (
-                                                        <option key={pres.id} value={pres.id}>{pres.name} (x{pres.multiplier})</option>
-                                                    ))}
-                                                </select>
-                                            ) : (
-                                                <span className="text-[10px] text-slate-400">{item.baseUnit}</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <button onClick={() => removeFromCart(item.id, item.presentationId)} className="text-slate-300 hover:text-red-500">
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                                <div className="flex items-center justify-between pl-11">
-                                    <div className="flex items-center border rounded-lg h-8 overflow-hidden">
-                                        <button 
-                                            onClick={() => updateCartItemQty(item.id, item.presentationId, Math.max(0, item.qty - 1))}
-                                            className="px-2 bg-slate-50 hover:bg-slate-100 text-slate-600 border-r"
-                                        >-</button>
-                                        <input 
-                                            type="number" 
-                                            step={item.baseUnit === 'UNIDAD' ? "1" : "0.01"}
-                                            value={item.qty}
-                                            onChange={(e) => updateCartItemQty(item.id, item.presentationId, parseFloat(e.target.value) || 0)}
-                                            className="w-12 text-center text-xs font-bold outline-none"
-                                        />
-                                        <button 
-                                            onClick={() => updateCartItemQty(item.id, item.presentationId, item.qty + 1)}
-                                            className="px-2 bg-slate-50 hover:bg-slate-100 text-slate-600 border-l"
-                                        >+</button>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-[10px] text-slate-400">${item.currentPrice.toFixed(2)} c/u</p>
-                                        <p className="text-sm font-black">${(item.currentPrice * item.qty).toFixed(2)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                    {cart.length === 0 && (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-3">
-                            <Package className="w-12 h-12" />
-                            <p className="text-sm">Carrito vacío</p>
-                        </div>
-                    )}
-                </div>
-
-                <div className="px-6 py-5 bg-slate-50 border-t">
-                    <div className="flex justify-between items-center">
-                        <span className="text-sm font-black text-slate-400 uppercase">TOTAL</span>
-                        <div className="text-right">
-                            <p className="text-3xl font-black text-slate-900">${total.toFixed(2)}</p>
-                            <p className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 rounded">Bs. {(total * vesRate).toFixed(2)} VES</p>
-                        </div>
-                    </div>
-                </div>
-
-
-                <div className="px-5 pb-6 pt-4">
-                    <Button
-                        size="lg"
-                        className="w-full h-14 font-black text-base bg-emerald-600 hover:bg-emerald-700"
-                        disabled={cart.length === 0}
-                        onClick={() => setPayOpen(true)}
-                    >
-                        Pagar [Ctrl+Enter]
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm w-full mt-4">
+                    <Button size="lg" className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 font-bold text-base shadow-sm"
+                        onClick={() => setOpenCashOpen(true)}>
+                        <Play className="w-4 h-4 mr-2" /> Abrir Caja Ahora
                     </Button>
                 </div>
+
+                <Dialog open={openCashOpen} onOpenChange={(o) => !o && setOpenCashOpen(false)}>
+                    <DialogContent className="max-w-md p-0 overflow-hidden border-none shadow-2xl bg-slate-50/50">
+                        <div className="bg-white p-8 space-y-6">
+                            <DialogHeader className="text-left">
+                                <DialogTitle className="text-xl font-bold text-slate-800">Abrir Turno de Caja</DialogTitle>
+                                <DialogDescription className="text-slate-500 text-sm mt-1">
+                                    Ingresa el monto de apertura (efectivo físico en caja) para iniciar.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-3">
+                                {([
+                                    { id: 'cop', label: 'COP', symbol: '$', val: openCopVal, set: setOpenCopVal, step: '1' },
+                                    { id: 'usd', label: 'USD', symbol: '$', val: openUsdVal, set: setOpenUsdVal, step: '0.01' },
+                                    { id: 'ves', label: 'VES', symbol: 'Bs.', val: openVesVal, set: setOpenVesVal, step: '0.01' },
+                                ] as const).map((f) => (
+                                    <div key={f.id} className="flex items-center gap-3">
+                                        <span className="w-16 font-bold text-slate-600 text-sm shrink-0">{f.label}</span>
+                                        <div className="relative flex-1">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">{f.symbol}</span>
+                                            <input type="number" step={f.step} min="0" value={f.val}
+                                                onChange={e => f.set(e.target.value)}
+                                                className="w-full text-right h-11 pl-10 pr-4 rounded-lg border border-slate-200 bg-white font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="p-4 bg-slate-900 rounded-xl text-white">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Total Estimado (COP)</span>
+                                    <Badge variant="outline" className="text-[9px] border-slate-700 text-slate-500 uppercase">Base</Badge>
+                                </div>
+                                <p className="text-2xl font-black tabular-nums">
+                                    {fmtCOP((parseFloat(openCopVal) || 0) + ((parseFloat(openUsdVal) || 0) * usdRate) + ((parseFloat(openVesVal) || 0) * vesRate))}
+                                </p>
+                            </div>
+                            <div className="flex gap-3 pt-2">
+                                <Button variant="ghost" className="flex-1 h-11 rounded-lg font-bold text-slate-500"
+                                    onClick={() => setOpenCashOpen(false)}>Cancelar</Button>
+                                <Button className="flex-[2] h-11 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md shadow-emerald-100"
+                                    disabled={openMutation.isPending}
+                                    onClick={() => {
+                                        const cop = parseFloat(openCopVal) || 0;
+                                        const usd = parseFloat(openUsdVal) || 0;
+                                        const ves = parseFloat(openVesVal) || 0;
+                                        openMutation.mutate(cop + (usd * usdRate) + (ves * vesRate));
+                                    }}>
+                                    {openMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Abriendo...</> : <><Play className="w-4 h-4 mr-2" /> Confirmar Apertura</>}
+                                </Button>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </div>
+        );
+    }
+
+    // ── Main POS Layout ──────────────────────────────────────────────
+    return (
+        <div className="flex flex-col lg:flex-row gap-4 h-full lg:h-[calc(100dvh-112px)] overflow-hidden">
+            {/* LEFT: Products */}
+            <div className="flex-[6] flex flex-col gap-4 bg-white rounded-xl border p-4 shadow-sm overflow-hidden">
+                <div className="flex border border-slate-200 p-1 rounded-lg w-fit mb-1">
+                    <button onClick={() => { setIsSaleMode(true); clearCart(); }}
+                        className={cn("px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2",
+                            isSaleMode ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700")}>
+                        <ShoppingCart className="w-4 h-4" /> Venta
+                    </button>
+                    <button onClick={() => { setIsSaleMode(false); clearCart(); }}
+                        className={cn("px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2",
+                            !isSaleMode ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}>
+                        <PackagePlus className="w-4 h-4" /> Entrada / Restock
+                    </button>
+                </div>
+
+
+                <div className="flex-1 overflow-y-auto">
+                    <ProductSearch
+                        inventory={inventoryItems}
+                        isSaleMode={isSaleMode}
+                        onAddToCart={addToCart}
+                        onShowPresentations={(prod) => setActiveProductForPres(prod)}
+                    />
+                </div>
             </div>
 
-            <HybridPaymentDialog 
-                open={payOpen} 
-                total={total} 
-                onClose={() => setPayOpen(false)} 
-                isSubmitting={isSubmitting}
-                onConfirm={handleCheckout} 
+            {/* RIGHT: Cart */}
+            <div className="flex-[4] flex flex-col bg-white rounded-xl border shadow-sm overflow-hidden">
+                <CartPanel
+                    items={cart}
+                    totals={totals}
+                    isSaleMode={isSaleMode}
+                    products={products}
+                    onUpdateQty={updateCartItemQty}
+                    onUpdatePresentation={updateCartItemPresentation}
+                    onRemoveItem={removeFromCart}
+                    onClearCart={clearCart}
+                    onCheckout={() => isSaleMode ? setPayOpen(true) : handleStockEntry()}
+                    isSubmitting={isSubmitting}
+                />
+            </div>
+
+            {/* Payment Dialog */}
+            {isSaleMode && (
+                <PaymentDialog
+                    open={payOpen}
+                    total={totals.total}
+                    cartItems={cart}
+                    onUpdateQty={updateCartItemQty}
+                    onClose={() => setPayOpen(false)}
+                    onConfirm={handlePayment}
+                    isSubmitting={isSubmitting}
+                />
+            )}
+
+            {/* Stock Entry Modal */}
+            <StockEntryModal
+                open={stockEntryOpen}
+                onClose={() => setStockEntryOpen(false)}
+                branchId={effectiveBranch || undefined}
+                preloadedItems={cart.map(c => ({
+                    productId: c.id,
+                    productName: c.name,
+                    quantity: c.qty * c.multiplier,
+                    suggestedCost: c.currentPrice / c.multiplier,
+                }))}
+                onSuccess={() => {
+                    clearCart();
+                    setStockEntryOpen(false);
+                    refetch();
+                }}
             />
-            <Toast message={toastMsg} visible={toastVis} isError={toastErr} />
+
+            {/* Presentation Selector Dialog */}
+            <Dialog open={!!activeProductForPres} onOpenChange={(open) => !open && setActiveProductForPres(null)}>
+                <DialogContent className="max-w-md p-6">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-black text-slate-900">{activeProductForPres?.name}</DialogTitle>
+                        <DialogDescription className="text-xs font-medium text-slate-400">
+                            Selecciona la presentación a agregar
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-3 py-4">
+                        {activeProductForPres && (
+                            <button onClick={() => {
+                                const added = addToCart(activeProductForPres);
+                                setActiveProductForPres(null);
+                                if (added) toast.success(`✓ ${activeProductForPres.name} añadido`);
+                            }}
+                                className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all hover:scale-[1.02] font-bold text-slate-800">
+                                <span>Base ({activeProductForPres.baseUnit})</span>
+                                <span className="font-black">{fmtCOP(isSaleMode ? activeProductForPres.price : activeProductForPres.cost)}</span>
+                            </button>
+                        )}
+                        {activeProductForPres?.presentations.map(pres => (
+                            <button key={pres.id}
+                                onClick={() => {
+                                    const added = addToCart(activeProductForPres, pres);
+                                    setActiveProductForPres(null);
+                                    if (added) toast.success(`✓ ${activeProductForPres.name} (${pres.name}) añadido`);
+                                }}
+                                className="flex items-center justify-between p-4 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 hover:border-indigo-200 rounded-xl transition-all hover:scale-[1.02] font-bold text-indigo-900">
+                                <div className="flex flex-col text-left">
+                                    <span>{pres.name}</span>
+                                    <span className="text-[10px] text-indigo-500 font-semibold mt-0.5">
+                                        Equivale a {pres.multiplier} {activeProductForPres.baseUnit}
+                                    </span>
+                                </div>
+                                <span className="font-black">{fmtCOP(isSaleMode ? pres.price : activeProductForPres.cost * pres.multiplier)}</span>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex justify-end pt-2">
+                        <Button variant="ghost" onClick={() => setActiveProductForPres(null)}>Cancelar</Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Transaction Summary */}
+            <TransactionSummary
+                visible={summary.visible}
+                type={summary.type}
+                items={summary.items}
+                total={summary.total}
+                paymentMethods={summary.paymentMethods}
+                onDismiss={() => setSummary(prev => ({ ...prev, visible: false }))}
+            />
         </div>
     );
 }

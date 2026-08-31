@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
 import { logger } from '../../core/utils/logger';
+import { generateToken, generateRefreshToken } from '../../core/middlewares/auth.middleware';
 
 export const login = async (username: string, password: string, ip?: string) => {
     // Buscar por username O cédula (V-12345678 o E-12345678)
@@ -40,7 +41,16 @@ export const login = async (username: string, password: string, ip?: string) => 
         return null;
     }
 
-    const token = jwt.sign({ id: user.id, role: user.role }, env.JWT_SECRET, { expiresIn: '12h' });
+    const token = generateToken({
+        id: user.id,
+        role: user.role,
+        name: user.nombre,
+        email: user.email || undefined,
+        branchId: user.branchId || undefined,
+        canManageInventory: user.canManageInventory
+    });
+
+    const refreshToken = generateRefreshToken({ id: user.id });
     
     logger.info('Login exitoso', {
         module: 'auth',
@@ -52,6 +62,7 @@ export const login = async (username: string, password: string, ip?: string) => 
     
     return {
         token,
+        refreshToken,
         user: { 
             id: user.id, 
             username: user.username,
@@ -59,7 +70,9 @@ export const login = async (username: string, password: string, ip?: string) => 
             apellido: user.apellido,
             email: user.email,
             telefono: user.telefono,
-            role: user.role 
+            role: user.role,
+            branchId: user.branchId,
+            canManageInventory: user.canManageInventory
         },
     };
 };
@@ -75,7 +88,9 @@ export const getUserById = (id: string) =>
             email: true,
             telefono: true,
             role: true, 
-            isActive: true 
+            isActive: true,
+            branchId: true,
+            canManageInventory: true
         },
     });
 

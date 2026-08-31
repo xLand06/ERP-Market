@@ -1,74 +1,48 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Edit2, PackageX, PackageCheck, AlertCircle, Download, PackageSearch } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Search, Edit2, PackageX, PackageCheck, AlertCircle, Download, PackageSearch, Percent } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { api } from '@/lib/api';
-import toast from 'react-hot-toast';
-import { ProductFormModal, Product, Category } from '../components/ProductFormModal';
+import { ProductFormModal } from '../components/ProductFormModal';
+import type { Product } from '../types';
+import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
+import { useConfigStore } from '@/hooks/useConfigStore';
+import { useAuthStore } from '@/features/auth/store/authStore';
+import { useProducts, useGroups, useSubgroups, useToggleProductStatus } from '../hooks';
 
 export default function ProductsPage() {
     const [search, setSearch] = useState('');
+    const [filterGroup, setFilterGroup] = useState<string>('all');
     const [filterCategory, setFilterCategory] = useState<string>('all');
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('active');
-    
-    // Modal State
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(25);
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-    const queryClient = useQueryClient();
+    const { fmtCOP } = useConfigStore();
+    const user = useAuthStore(s => s.user);
+    const isOwner = user?.role === 'OWNER';
 
-    // Data Fetching
-    const { data, isLoading, isError } = useQuery<{ data: Product[], meta: any }>({
-        queryKey: ['products'],
-        queryFn: async () => {
-            const res = await api.get('/products', { params: { limit: 100 } });
-            return res.data;
-        },
-        retry: false,
+    useBarcodeScanner((barcode) => {
+        setSearch(barcode);
     });
+
+    const { data, isLoading, isError, refetch } = useProducts({
+        page,
+        limit,
+        search: search || undefined,
+        groupId: filterGroup !== 'all' ? filterGroup : undefined,
+        subGroupId: filterCategory !== 'all' ? filterCategory : undefined,
+        isActive: filterStatus === 'all' ? undefined : filterStatus === 'active',
+    });
+
+    const { data: subgroups = [] } = useSubgroups();
+    const { data: groups = [] } = useGroups();
+    const toggleStatusMutation = useToggleProductStatus();
 
     const products = data?.data || [];
-
-    const { data: categories = [] } = useQuery<Category[]>({
-        queryKey: ['categories'],
-        queryFn: async () => {
-            const res = await api.get('/categories');
-            return res.data.data;
-        },
-        retry: false,
-    });
-
-    // Mutations
-    const toggleStatusMutation = useMutation({
-        mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-            await api.put(`/products/${id}`, { isActive });
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['products'] });
-            toast.success('Estado del producto actualizado');
-        },
-        onError: () => {
-            toast.error('Error al actualizar producto. Verifica la conexión.');
-        }
-    });
-
-    const filtered = products.filter((p: Product) => {
-        const searchText = search.toLowerCase();
-        const matchSearch =
-            p.name.toLowerCase().includes(searchText) ||
-            (p.barcode || '').toLowerCase().includes(searchText);
-            
-        const matchCategory = filterCategory === 'all' || p.categoryId === filterCategory;
-        const matchStatus = 
-            filterStatus === 'all' ? true :
-            filterStatus === 'active' ? p.isActive === true :
-            p.isActive === false;
-            
-        return matchSearch && matchCategory && matchStatus;
-    });
 
     const handleOpenCreate = () => {
         setSelectedProduct(null);
@@ -80,18 +54,30 @@ export default function ProductsPage() {
         setModalOpen(true);
     };
 
+    const handleSuccess = () => {
+        refetch();
+    };
+
+    useEffect(() => {
+        setFilterCategory('all');
+    }, [filterGroup]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [search, filterGroup, filterCategory, filterStatus]);
+
     return (
         <>
             <ProductFormModal 
                 open={modalOpen}
                 onClose={() => setModalOpen(false)}
                 product={selectedProduct}
-                categories={categories}
-                onSuccess={() => queryClient.invalidateQueries({ queryKey: ['products'] })}
+                groups={groups}
+                subgroups={subgroups}
+                onSuccess={handleSuccess}
             />
 
             <div className="flex flex-col gap-6 max-w-[1400px] mx-auto pb-8">
-                {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
@@ -105,42 +91,59 @@ export default function ProductsPage() {
                         <Button variant="outline" size="lg" className="h-10 font-bold text-slate-700">
                             <Download className="w-4.5 h-4.5 mr-2" /> Exportar
                         </Button>
-                        <Button onClick={handleOpenCreate} size="lg" className="h-10 font-bold shadow-sm shadow-indigo-500/20 bg-indigo-600 hover:bg-indigo-700 text-white">
-                            <Plus className="w-4.5 h-4.5 mr-2" /> Nuevo Producto
-                        </Button>
+                        {isOwner && (
+                            <Button onClick={handleOpenCreate} size="lg" className="h-10 font-bold shadow-sm shadow-indigo-500/20 bg-indigo-600 hover:bg-indigo-700 text-white">
+                                <Plus className="w-4.5 h-4.5 mr-2" /> Nuevo Producto
+                            </Button>
+                        )}
                     </div>
                 </div>
 
-                {/* Filters */}
                 <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row gap-4 items-center">
                     <div className="relative flex-1 w-full">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <Input
                             placeholder="Buscar por nombre o código de barras..."
                             value={search}
-                            onChange={e => setSearch(e.target.value)}
+                            onChange={e => { setSearch(e.target.value); setPage(1); }}
                             className="pl-9 w-full"
                             aria-label="Buscar productos"
                         />
                     </div>
                     
-                    <div className="flex gap-3 w-full md:w-auto">
+                    <div className="flex gap-3 w-full md:w-auto flex-wrap sm:flex-nowrap">
                         <select 
-                            value={filterCategory}
-                            onChange={(e) => setFilterCategory(e.target.value)}
-                            aria-label="Filtrar por categoría"
+                            value={filterGroup}
+                            onChange={(e) => { 
+                                setFilterGroup(e.target.value); 
+                                setFilterCategory('all'); 
+                                setPage(1); 
+                            }}
+                            aria-label="Filtrar por Grupo"
                             className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-[140px]"
                         >
-                            <option value="all">Todas las Categorías</option>
-                            {categories.map(c => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
+                            <option value="all">Todos los Grupos</option>
+                            {groups.map((g: any) => (
+                                <option key={g.id} value={g.id}>{g.name}</option>
+                            ))}
+                        </select>
+
+                        <select 
+                            value={filterCategory}
+                            onChange={(e) => { setFilterCategory(e.target.value); setPage(1); }}
+                            aria-label="Filtrar por Subgrupo"
+                            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-[140px]"
+                        >
+                            <option value="all">Todos los Subgrupos</option>
+                            {(filterGroup === 'all' ? subgroups : subgroups.filter((s: any) => s.groupId === filterGroup)).map((s: any) => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
                             ))}
                         </select>
                         <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
                             {(['all', 'active', 'inactive'] as const).map(s => (
                                 <button
                                     key={s}
-                                    onClick={() => setFilterStatus(s)}
+                                    onClick={() => { setFilterStatus(s); setPage(1); }}
                                     aria-label={`Mostrar productos ${s}`}
                                     className={cn(
                                         'px-3 py-1.5 rounded-md text-xs font-semibold transition-all',
@@ -163,7 +166,6 @@ export default function ProductsPage() {
                     </div>
                 )}
 
-                {/* Table */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full erp-table min-w-[800px]" aria-label="Catálogo de Productos">
@@ -171,21 +173,23 @@ export default function ProductsPage() {
                                 <tr>
                                     <th className="w-8"></th>
                                     <th>Producto</th>
-                                    <th>Categoría</th>
+                                    <th>Grupo / Subgrupo</th>
                                     <th>C. Barras</th>
+                                    <th className="text-right">Costo</th>
                                     <th className="text-right">Precio Venta</th>
+                                    <th className="text-center">Merma</th>
                                     <th className="text-center">Estado</th>
-                                    <th className="w-24 text-right">Acciones</th>
+                                    {isOwner && <th className="w-24 text-right">Acciones</th>}
                                 </tr>
                             </thead>
                             <tbody>
                                 {isLoading ? (
                                     <tr>
-                                        <td colSpan={7} className="text-center py-10 text-sm text-slate-400">
+                                        <td colSpan={9} className="text-center py-10 text-sm text-slate-400">
                                             Cargando productos...
                                         </td>
                                     </tr>
-                                ) : filtered.map((prod: Product) => (
+                                ) : products.map((prod: Product) => (
                                     <tr key={prod.id} className={cn(!prod.isActive && 'opacity-60 bg-slate-50')}>
                                         <td className="pr-0">
                                             <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center border border-slate-200 shrink-0">
@@ -200,55 +204,99 @@ export default function ProductsPage() {
                                         </td>
                                         <td>
                                             <span className="text-xs font-medium bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md">
-                                                {categories.find(c => c.id === prod.categoryId)?.name || 'N/A'}
+                                                {(() => {
+                                                    const sg = subgroups.find((s: any) => s.id === prod.subGroupId);
+                                                    const g = groups.find((gr: any) => gr.id === sg?.groupId);
+                                                    return g ? `${g.name} / ${sg?.name || 'N/A'}` : (sg?.name || 'N/A');
+                                                })()}
                                             </span>
                                         </td>
                                         <td>
-                                            <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded">
-                                                {prod.barcode || '—'}
+                                            {(() => {
+                                                const codes = Array.from(new Set([
+                                                    ...(prod.barcode ? [prod.barcode] : []),
+                                                    ...(prod.barcodes ? prod.barcodes.map(b => b.code) : []),
+                                                    ...(prod.presentations ? prod.presentations.map(pr => pr.barcode).filter(Boolean) as string[] : [])
+                                                ]));
+                                                if (codes.length === 0) {
+                                                    return (
+                                                        <span className="text-xs font-mono bg-slate-50 text-slate-400 px-2 py-1 rounded w-fit border border-dashed border-slate-200">
+                                                            —
+                                                        </span>
+                                                    );
+                                                }
+                                                return (
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded w-fit">
+                                                            {codes[0]}
+                                                        </span>
+                                                        {codes.length > 1 && (
+                                                            <span className="text-[10px] text-slate-400 font-medium">
+                                                                +{codes.length - 1} código{codes.length - 1 > 1 ? 's' : ''} más
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </td>
+                                        <td className="text-right">
+                                            <span className="text-sm font-medium text-slate-500">
+                                                {prod.cost ? fmtCOP(Number(prod.cost)) : '—'}
                                             </span>
                                         </td>
                                         <td className="text-right">
                                             <span className="text-sm font-bold text-emerald-600">
-                                                ${Number(prod.price || 0).toFixed(2)}
+                                                {fmtCOP(Number(prod.price || 0))}
                                             </span>
+                                        </td>
+                                        <td className="text-center">
+                                            {prod.expectedSpoilagePercent ? (
+                                                <span className="inline-flex items-center gap-1 text-xs font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md">
+                                                    <Percent className="w-3 h-3" />
+                                                    {prod.expectedSpoilagePercent}%
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-slate-300">—</span>
+                                            )}
                                         </td>
                                         <td className="text-center">
                                             <Badge variant={prod.isActive ? 'success' : 'default'} className="px-2 font-semibold">
                                                 {prod.isActive ? 'Activo' : 'Inactivo'}
                                             </Badge>
                                         </td>
-                                        <td className="text-right">
-                                            <div className="flex items-center justify-end gap-1">
-                                                <button
-                                                    onClick={() => handleOpenEdit(prod)}
-                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                                                    aria-label={`Editar producto ${prod.name}`}
-                                                >
-                                                    <Edit2 className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => toggleStatusMutation.mutate({ id: prod.id, isActive: !prod.isActive })}
-                                                    className={cn(
-                                                        'p-1.5 rounded-lg transition-colors',
-                                                        prod.isActive
-                                                            ? 'text-slate-400 hover:text-red-500 hover:bg-red-50'
-                                                            : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
-                                                    )}
-                                                    aria-label={prod.isActive ? `Inactivar ${prod.name}` : `Activar ${prod.name}`}
-                                                    disabled={toggleStatusMutation.isPending}
-                                                >
-                                                    {prod.isActive
-                                                        ? <PackageX className="w-4 h-4" />
-                                                        : <PackageCheck className="w-4 h-4" />}
-                                                </button>
-                                            </div>
-                                        </td>
+                                        {isOwner && (
+                                            <td className="text-right">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <button
+                                                        onClick={() => handleOpenEdit(prod)}
+                                                        className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                                        aria-label={`Editar producto ${prod.name}`}
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => toggleStatusMutation.mutate({ id: prod.id, isActive: !prod.isActive })}
+                                                        className={cn(
+                                                            'p-1.5 rounded-lg transition-colors',
+                                                            prod.isActive
+                                                                ? 'text-slate-400 hover:text-red-500 hover:bg-red-50'
+                                                                : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
+                                                        )}
+                                                        aria-label={prod.isActive ? `Inactivar ${prod.name}` : `Activar ${prod.name}`}
+                                                        disabled={toggleStatusMutation.isPending}
+                                                    >
+                                                        {prod.isActive
+                                                            ? <PackageX className="w-4 h-4" />
+                                                            : <PackageCheck className="w-4 h-4" />}
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        )}
                                     </tr>
                                 ))}
-                                {!isLoading && filtered.length === 0 && !isError && (
+                                {!isLoading && products.length === 0 && !isError && (
                                     <tr>
-                                        <td colSpan={7} className="text-center py-12">
+                                        <td colSpan={9} className="text-center py-12">
                                             <PackageX className="w-10 h-10 text-slate-300 mx-auto mb-3" />
                                             <p className="text-base font-semibold text-slate-700">No se encontraron productos</p>
                                             <p className="text-sm text-slate-500 mt-1">Ajusta los filtros o crea un nuevo registro.</p>
@@ -257,6 +305,47 @@ export default function ProductsPage() {
                                 )}
                             </tbody>
                         </table>
+                    </div>
+
+                    <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50 mt-auto">
+                        <p className="text-xs text-slate-500">
+                            Mostrando {((page - 1) * limit) + 1}–{Math.min(page * limit, data?.meta?.total || 0)} de {data?.meta?.total || 0} productos
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <select 
+                                value={limit} 
+                                onChange={e => { setLimit(Number(e.target.value)); setPage(1); }} 
+                                className="h-8 rounded-lg border border-slate-200 px-2 text-xs text-slate-600 bg-white"
+                            >
+                                <option value={10}>10</option>
+                                <option value={25}>25</option>
+                                <option value={50}>50</option>
+                                <option value={100}>100</option>
+                            </select>
+                            <div className="flex items-center gap-1">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    disabled={page === 1} 
+                                    onClick={() => setPage(p => p - 1)}
+                                    className="h-8 px-2 text-xs"
+                                >
+                                    Anterior
+                                </Button>
+                                <span className="text-xs text-slate-600 px-2">
+                                    Página {page} de {data?.meta?.totalPages || 1}
+                                </span>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    disabled={page >= (data?.meta?.totalPages || 1)} 
+                                    onClick={() => setPage(p => p + 1)}
+                                    className="h-8 px-2 text-xs"
+                                >
+                                    Siguiente
+                                </Button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

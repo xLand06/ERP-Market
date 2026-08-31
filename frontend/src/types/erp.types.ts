@@ -21,7 +21,7 @@ export interface Product {
     price: number;
     cost?: number | null;
     imageUrl?: string | null;
-    categoryId?: string | null;
+    subGroupId?: string | null;
     category?: { id: string; name: string } | null;
     isActive: boolean;
     createdAt: string;

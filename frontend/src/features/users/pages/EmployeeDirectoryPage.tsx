@@ -114,7 +114,7 @@ export default function EmployeeDirectoryPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                            Directorio de Empleados
+                            Gestión de Usuarios
                         </h1>
                         <p className="text-xs text-slate-400 mt-1 font-medium">
                             {users.filter(e => e.isActive).length} activos
@@ -126,7 +126,7 @@ export default function EmployeeDirectoryPage() {
                             <Download className="w-4.5 h-4.5 mr-2" /> Exportar
                         </Button>
                         <Button onClick={handleOpenCreate} size="lg" className="h-10 font-bold shadow-sm shadow-emerald-500/20">
-                            <Plus className="w-4.5 h-4.5 mr-2" /> Nuevo Empleado
+                            <Plus className="w-4.5 h-4.5 mr-2" /> Nuevo Usuario
                         </Button>
                     </div>
                 </div>
@@ -196,7 +196,10 @@ export default function EmployeeDirectoryPage() {
                                                 <Avatar name={emp.nombre} />
                                                 <div>
                                                     <p className="text-sm font-semibold text-slate-800">{emp.nombre} {emp.apellido}</p>
-                                                    <p className="text-xs text-slate-400">{emp.email || 'Sin email'}</p>
+                                                    <p className="text-xs text-slate-400 font-medium">
+                                                        C.I: {emp.cedula || 'Sin CI'} {emp.telefono ? `· Tlf: ${emp.telefono}` : ''}
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-400">{emp.email || 'Sin email'}</p>
                                                 </div>
                                             </div>
                                         </td>

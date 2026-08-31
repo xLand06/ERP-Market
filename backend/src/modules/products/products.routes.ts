@@ -19,9 +19,16 @@ router.use(authMiddleware);
 /**
  * GET /api/products
  * Lista productos con paginación
- * Query: ?page=1&limit=20&search=&categoryId=
+ * Query: ?page=1&limit=20&search=&subGroupId=
  */
 router.get('/', validate(productFiltersSchema, { source: 'query' }), ctrl.getProducts);
+
+/**
+ * GET /api/products/check-barcode?code=xxx&excludeId=yyy
+ * Verificar si un código de barras ya existe (cross-product)
+ * DEBE ir antes de /:id para que Express no lo confunda
+ */
+router.get('/check-barcode', ctrl.checkBarcode);
 
 /**
  * GET /api/products/:id
@@ -32,7 +39,7 @@ router.get('/:id', validate(idParamSchema, { source: 'params' }), ctrl.getProduc
 /**
  * POST /api/products
  * Crear producto (SOLO OWNER)
- * Body: { name, description, barcode, price, cost, categoryId }
+ * Body: { name, description, barcode, price, cost, subGroupId }
  */
 router.post('/', roleGuard('OWNER'), validate(createProductSchema), ctrl.createProduct);
 

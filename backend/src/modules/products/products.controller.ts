@@ -60,6 +60,8 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
     } catch (error: any) {
         if (error.code === 'P2002') {
             res.status(409).json({ success: false, error: 'El código de barras ya está registrado' });
+        } else if (error.status === 400) {
+            res.status(400).json({ success: false, error: error.message });
         } else {
             res.status(500).json({ success: false, error: error.message });
         }
@@ -86,7 +88,15 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
         
         res.json({ success: true, data: product });
     } catch (error: any) {
-        res.status(500).json({ success: false, error: error.message });
+        if (error.code === 'P2025') {
+            res.status(404).json({ success: false, error: 'Producto no encontrado' });
+        } else if (error.code === 'P2002') {
+            res.status(409).json({ success: false, error: 'El código de barras ya está registrado' });
+        } else if (error.status === 400) {
+            res.status(400).json({ success: false, error: error.message });
+        } else {
+            res.status(500).json({ success: false, error: error.message });
+        }
     }
 };
 
@@ -107,6 +117,23 @@ export const deleteProduct = async (req: AuthRequest, res: Response) => {
         });
         
         res.status(200).json({ success: true, message: 'Producto eliminado correctamente' });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Verificar si un código de barras ya existe (cross-product)
+ * GET /api/products/check-barcode?code=xxx&excludeId=yyy
+ */
+export const checkBarcode = async (req: AuthRequest, res: Response) => {
+    try {
+        const { code, excludeId } = req.query as { code?: string; excludeId?: string };
+        if (!code || typeof code !== 'string' || !code.trim()) {
+            return res.status(400).json({ success: false, error: 'El parámetro code es requerido' });
+        }
+        const result = await productsService.checkBarcodeExists(code.trim(), excludeId || undefined);
+        res.json({ success: true, ...result });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });
     }

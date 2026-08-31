@@ -1,17 +1,18 @@
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
 
 interface Product {
     id: string;
     name: string;
-    barcode: string;
-    price: number;
-    cost: number;
+    barcode: string; // legacy barcode
+    barcodes: { id: string; code: string; label?: string | null }[]; // multi-barcode
+    price: number;  // en COP
+    cost: number;   // en COP
     baseUnit: string;
     presentations: any[];
-    category: string;
-    categoryId?: string;
+    subGroup: string;
+    subGroupId?: string;
     isActive: boolean;
 }
 
@@ -71,12 +72,15 @@ export function useInventory(branchId: string) {
                         id: item.product.id,
                         name: item.product.name || 'Sin Nombre',
                         barcode: item.product.barcode || '',
+                        barcodes: item.product.barcodes || [],
                         price: Number(item.product.price || 0),
                         cost: Number(item.product.cost || 0),
                         baseUnit: item.product.baseUnit || 'UNIDAD',
                         presentations: item.product.presentations || [],
-                        category: item.product.category?.name || 'Varios',
-                        categoryId: item.product.categoryId,
+                        subGroup: typeof item.product.subGroup === 'object' 
+                            ? (item.product.subGroup?.group?.name || item.product.subGroup?.name || 'Varios') 
+                            : (item.product.subGroup || 'Varios'),
+                        subGroupId: item.product.subGroupId,
                         isActive: true,
                     },
                     stock: Number(item.stock || 0),
@@ -109,8 +113,8 @@ export function useInventory(branchId: string) {
                         price: Number(p.price),
                         barcode: p.barcode
                     })),
-                    category: item.categoryName || 'Varios',
-                    categoryId: item.categoryId,
+                    subGroup: item.subGroupName || 'Varios',
+                    subGroupId: item.subGroupId,
                     isActive: item.isActive ?? true,
                 },
                 stock: item.stock,
@@ -126,25 +130,14 @@ export function useInventory(branchId: string) {
     const { data, isLoading, error, refetch } = useQuery({
         queryKey: ['inventory', branchId],
         queryFn: async () => {
-            // 1. Intentar primero la API (fuente principal)
-            if (isOnline) {
-                try {
-                    const apiData = await fetchFromApi();
-                    if (apiData.length > 0 && apiData.some((i: InventoryItem) => i.product.price > 0)) {
-                        return apiData;
-                    }
-                } catch { /* continuar */ }
+            try {
+                const apiData = await fetchFromApi();
+                if (apiData.length > 0) {
+                    return apiData;
+                }
+            } catch (err) {
+                console.error('[useInventory] Error fetching inventory from API:', err);
             }
-            
-            // 2. Fallback a local solo si API falló o no tiene precios
-            if (isElectron) {
-                try {
-                    const local = await fetchFromLocal();
-                    if (local.length > 0) return local;
-                } catch { /* continuar */ }
-            }
-            
-            // 3. Return empty si todo falla
             return [];
         },
         enabled: !!branchId && branchId !== 'all',
@@ -154,28 +147,10 @@ export function useInventory(branchId: string) {
 
     const updateStockMutation = useMutation({
         mutationFn: async ({ product, quantity, minStock }: { product: any; quantity: number, minStock?: number }) => {
-            if (isElectron) {
-                await db.updateStock(product, branchId, quantity, minStock || 0);
-                
-                await db.addPendingChange({
-                    id: `${Date.now()}-${product.id}`,
-                    type: 'STOCK_UPDATE',
-                    data: { productId: product.id, quantity, newStock: quantity, ...(minStock !== undefined && { minStock }) },
-                    createdAt: new Date().toISOString(),
-                    branchId,
-                });
-                
-                return { success: true, offline: true };
-            }
-            
-            if (isOnline) {
-                const payload: any = { productId: product.id, branchId, stock: quantity };
-                if (minStock !== undefined) payload.minStock = minStock;
-                const res = await api.put('/inventory/stock', payload);
-                return res.data;
-            }
-            
-            throw new Error('Offline');
+            const payload: any = { productId: product.id, branchId, stock: quantity };
+            if (minStock !== undefined) payload.minStock = minStock;
+            const res = await api.put('/inventory/stock', payload);
+            return res.data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['inventory', branchId] });
@@ -241,13 +216,20 @@ export function useSyncService(branchId: string) {
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const queryClient = useQueryClient();
     const [lastSync, setLastSync] = useState<string | null>(null);
+    const syncPendingRef = useRef(false);
 
     useEffect(() => {
         if (!isElectron || !db) return;
 
         db.getLastSync().then(setLastSync);
 
-        const handleOnline = () => setIsOnline(true);
+        const handleOnline = () => {
+            setIsOnline(true);
+            if (!syncPendingRef.current) {
+                syncPendingRef.current = true;
+                triggerSync();
+            }
+        };
         const handleOffline = () => setIsOnline(false);
 
         window.addEventListener('online', handleOnline);
@@ -259,46 +241,42 @@ export function useSyncService(branchId: string) {
         };
     }, []);
 
-    useEffect(() => {
+    const triggerSync = async () => {
         if (!isElectron || !db || !isOnline) return;
+        syncPendingRef.current = false;
 
-        const SYNC_INTERVAL = 30 * 60 * 1000;
-        const interval = setInterval(async () => {
-            try {
-                const pending = await db.getPendingChanges();
-                
-                if (pending.length > 0) {
-                    for (const change of pending) {
-                        try {
-                            if (change.type === 'STOCK_UPDATE') {
-                                await api.put('/inventory/stock', change.data);
-                            }
-                        } catch (e) {
-                            console.error('Sync error:', e);
+        try {
+            const pending = await db.getPendingChanges();
+
+            if (pending.length > 0) {
+                for (const change of pending) {
+                    try {
+                        if (change.type === 'STOCK_UPDATE') {
+                            await api.put('/inventory/stock', change.data);
                         }
+                    } catch (e) {
+                        console.error('Sync error:', e);
                     }
-                    
-                    await db.markSynced(pending.map((p: any) => p.id));
                 }
 
-                const res = await api.get(`/inventory/stock/branch/${branchId}`);
-                const data = res.data.data;
-                
-                if (data.length > 0) {
-                    await db.saveStock(branchId, data);
-                }
-                
-                await db.setLastSync(new Date().toISOString());
-                await db.getLastSync().then(setLastSync);
-                
-                queryClient.invalidateQueries({ queryKey: ['inventory', branchId] });
-            } catch (error) {
-                console.error('Auto-sync error:', error);
+                await db.markSynced(pending.map((p: any) => p.id));
             }
-        }, SYNC_INTERVAL);
 
-        return () => clearInterval(interval);
-    }, [isOnline, branchId]);
+            const res = await api.get(`/inventory/stock/branch/${branchId}`);
+            const data = res.data.data;
 
-    return { isOnline, lastSync };
+            if (data.length > 0) {
+                await db.saveStock(branchId, data);
+            }
+
+            await db.setLastSync(new Date().toISOString());
+            await db.getLastSync().then(setLastSync);
+
+            queryClient.invalidateQueries({ queryKey: ['inventory', branchId] });
+        } catch (error) {
+            console.error('Sync error:', error);
+        }
+    };
+
+    return { isOnline, lastSync, triggerSync };
 }

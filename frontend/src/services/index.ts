@@ -24,3 +24,6 @@ export type { BranchInventory };
 
 export { default as syncApi, useSyncStore } from './sync.service';
 export type { SyncState, SyncResult } from './sync.service';
+
+export { default as batchesApi } from './batches.service';
+export type { Batch, CreateBatchPayload, UpdateBatchPayload, ExpiringBatchResult } from './batches.service';

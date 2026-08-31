@@ -6,14 +6,15 @@ import api from '../lib/api';
 import type { ApiResponse, ListParams } from '../types';
 
 export interface SalesKPIs {
-    today: { total: number; count: number };
-    thisMonth: { total: number; count: number };
+    today: { total: number; count: number; change?: number };
+    thisMonth: { total: number; count: number; change?: number };
     weekSales?: number;
 }
 
 export interface InventoryKPIs {
     totalProducts: number;
     lowStockAlerts: number;
+    change?: number;
 }
 
 export interface CashRegisterKPIs {
@@ -22,11 +23,20 @@ export interface CashRegisterKPIs {
     openedAt: string;
 }
 
+export interface CurrencySaleData {
+    currency: string;
+    totalSales: number;
+    totalProfit: number;
+    count: number;
+}
+
 export interface KPIsData {
     sales: SalesKPIs;
     inventory: InventoryKPIs;
     cashRegister: CashRegisterKPIs | null;
     transactionsToday: number;
+    transactionsTodayChange?: number;
+    salesByCurrency?: CurrencySaleData[];
 }
 
 export interface SalesTrendItem {
@@ -48,21 +58,21 @@ export interface SalesByBranch {
 }
 
 export const dashboardApi = {
-    getKPIs: async (params?: ListParams): Promise<KPIsData> => {
+    getKPIs: async (params?: { branchId?: string; range?: string }): Promise<KPIsData> => {
         const { data } = await api.get<ApiResponse<KPIsData>>('/dashboard/kpis', { params });
         return data.data;
     },
 
-    getSalesTrend: async (days = 30, branchId?: string): Promise<SalesTrendItem[]> => {
+    getSalesTrend: async (params: { range?: string; branchId?: string }): Promise<SalesTrendItem[]> => {
         const { data } = await api.get<ApiResponse<SalesTrendItem[]>>('/dashboard/sales-trend', {
-            params: { days, branchId },
+            params,
         });
         return data.data;
     },
 
-    getTopProducts: async (limit = 10, branchId?: string): Promise<TopProduct[]> => {
+    getTopProducts: async (params: { limit?: number; branchId?: string; range?: string }): Promise<TopProduct[]> => {
         const { data } = await api.get<ApiResponse<TopProduct[]>>('/dashboard/top-products', {
-            params: { limit, branchId },
+            params,
         });
         return data.data;
     },
@@ -76,9 +86,9 @@ export const dashboardApi = {
 };
 
 export const formatCurrency = (value: number): string => {
-    return new Intl.NumberFormat('es-VE', {
+    return new Intl.NumberFormat('es-CO', {
         style: 'currency',
-        currency: 'VES',
+        currency: 'COP',
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
     }).format(value);

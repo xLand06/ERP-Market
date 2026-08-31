@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
     Search, 
     Filter, 
@@ -12,11 +13,15 @@ import {
     ExternalLink,
     ChevronLeft,
     ChevronRight,
-    Loader2
+    Loader2,
+    Copy,
+    Eye
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { getAuditLogs, AuditLog, AuditFilters } from '../services/auditService';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useUsers } from '@/features/users/hooks';
 
 const MODULE_ICONS: Record<string, React.ReactNode> = {
     'AUTH': <Shield className="w-4 h-4" />,
@@ -35,168 +40,6 @@ const MODULE_COLORS: Record<string, string> = {
     'USERS': 'text-pink-600 bg-pink-50',
     'SYSTEM': 'text-slate-600 bg-slate-50',
 };
-
-const ACTION_LABELS: Record<string, string> = {
-    'PRICE_CHANGE': 'Cambio de Precio',
-    'PRODUCT_CREATE': 'Creación de Producto',
-    'PRODUCT_UPDATE': 'Modificación de Producto',
-    'PRODUCT_DELETE': 'Eliminación de Producto',
-    'CREATE_PRODUCT': 'Creación de Producto',
-    'UPDATE_PRODUCT': 'Modificación de Producto',
-    'DELETE_PRODUCT': 'Eliminación de Producto',
-    'STOCK_ADJUST': 'Ajuste de Inventario',
-    'STOCK_SET': 'Fijación de Stock',
-    'SALE_CREATE': 'Venta Realizada',
-    'SALE': 'Venta Realizada',
-    'SALE_CANCEL': 'Venta Anulada',
-    'INVENTORY_IN': 'Entrada de Mercancía',
-    'CASH_OPEN': 'Apertura de Caja',
-    'CASH_CLOSE': 'Cierre de Caja',
-    'OPEN_CASH_REGISTER': 'Apertura de Caja',
-    'CLOSE_CASH_REGISTER': 'Cierre de Caja',
-    'USER_CREATE': 'Registro de Usuario',
-    'USER_UPDATE': 'Modificación de Usuario',
-    'USER_DELETE': 'Eliminación de Usuario',
-    'BRANCH_CREATE': 'Creación de Sucursal',
-    'BRANCH_UPDATE': 'Modificación de Sucursal',
-    'BRANCH_DELETE': 'Eliminación de Sucursal',
-    'CATEGORY_CREATE': 'Creación de Categoría',
-    'CATEGORY_UPDATE': 'Modificación de Categoría',
-    'CATEGORY_DELETE': 'Eliminación de Categoría',
-    'FINANCE_RATE_UPDATE': 'Tasa de Cambio',
-    'PURCHASE_CREATE': 'Orden de Compra',
-    'PURCHASE_STATUS_UPDATE': 'Estado de Compra',
-    'PURCHASE_CANCEL': 'Compra Cancelada',
-    'SUPPLIER_CREATE': 'Registro de Proveedor',
-    'SUPPLIER_UPDATE': 'Modificación de Proveedor',
-    'SUPPLIER_DELETE': 'Eliminación de Proveedor',
-    'SYSTEM_PURGE': 'Limpieza de Sistema',
-    'LOGIN': 'Inicio de Sesión',
-    'LOGIN_FAILED': 'Intento Fallido de Sesión',
-    'LOGOUT': 'Cierre de Sesión',
-};
-
-const FIELD_LABELS: Record<string, string> = {
-    username: 'Usuario',
-    nombre: 'Nombre',
-    apellido: 'Apellido',
-    email: 'Correo Electrónico',
-    role: 'Rol de Acceso',
-    price: 'Precio de Venta',
-    cost: 'Costo de Compra',
-    stock: 'Stock Actual',
-    quantity: 'Cantidad',
-    total: 'Monto Total',
-    method: 'Método de Pago',
-    status: 'Estado',
-    code: 'Código',
-    barcode: 'Código de Barras',
-    branchId: 'Sucursal',
-    id: 'Identificador',
-    description: 'Descripción',
-    reason: 'Motivo / Nota',
-    amount: 'Monto',
-    rate: 'Tasa de Cambio',
-    currency: 'Moneda',
-    type: 'Tipo de Operación',
-    cedula: 'Identificación / Cédula',
-    telefono: 'Teléfono de Contacto',
-};
-
-function getNaturalSummaryText(action: string, data: any): string | null {
-    const username = data?.username || data?.request?.body?.username || data?.request?.body?.nombre || data?.user;
-
-    switch (action) {
-        case 'LOGIN':
-            return username ? `Inicio de sesión exitoso del usuario "${username}"` : 'Inicio de sesión exitoso en la plataforma';
-        case 'LOGIN_FAILED':
-            return username ? `Intento fallido de inicio de sesión para "${username}"` : 'Intento fallido de inicio de sesión';
-        case 'LOGOUT':
-            return 'Cierre de sesión de la plataforma';
-        case 'PRICE_CHANGE':
-            return 'Se actualizó el precio de venta de un producto';
-        case 'PRODUCT_CREATE':
-        case 'CREATE_PRODUCT':
-            return 'Se registró un nuevo producto en el inventario';
-        case 'PRODUCT_UPDATE':
-        case 'UPDATE_PRODUCT':
-            return 'Se modificaron las propiedades o precio de un producto';
-        case 'PRODUCT_DELETE':
-        case 'DELETE_PRODUCT':
-            return 'Se eliminó un producto del catálogo';
-        case 'STOCK_ADJUST':
-        case 'STOCK_SET':
-            return 'Se realizó un ajuste manual de inventario';
-        case 'SALE':
-        case 'SALE_CREATE':
-            return 'Se procesó una nueva venta en la caja';
-        case 'SALE_CANCEL':
-            return 'Se anuló una venta previamente registrada';
-        case 'INVENTORY_IN':
-            return 'Se registró un ingreso de inventario por compra o surtido';
-        case 'CASH_OPEN':
-        case 'OPEN_CASH_REGISTER':
-            return 'Se realizó la apertura de caja chica para el turno';
-        case 'CASH_CLOSE':
-        case 'CLOSE_CASH_REGISTER':
-            return 'Se realizó el cierre de caja del turno';
-        case 'USER_CREATE':
-            return 'Se creó una nueva cuenta de usuario en el sistema';
-        case 'USER_UPDATE':
-            return 'Se actualizaron los datos o permisos de un usuario';
-        case 'USER_DELETE':
-            return 'Se eliminó un usuario del sistema';
-        case 'BRANCH_CREATE':
-            return 'Se creó una nueva sucursal o sede';
-        case 'BRANCH_UPDATE':
-            return 'Se actualizó la información de una sucursal';
-        case 'BRANCH_DELETE':
-            return 'Se eliminó una sucursal del sistema';
-        case 'CATEGORY_CREATE':
-            return 'Se creó una nueva categoría de productos';
-        case 'CATEGORY_UPDATE':
-            return 'Se modificó el nombre o datos de una categoría';
-        case 'CATEGORY_DELETE':
-            return 'Se eliminó una categoría de productos';
-        case 'FINANCE_RATE_UPDATE':
-            return 'Se actualizó la tasa oficial de cambio de divisas';
-        case 'PURCHASE_CREATE':
-            return 'Se generó una nueva orden de compra a proveedor';
-        case 'PURCHASE_STATUS_UPDATE':
-            return 'Se actualizó el estado de una orden de compra';
-        case 'PURCHASE_CANCEL':
-            return 'Se canceló una orden de compra';
-        case 'SUPPLIER_CREATE':
-            return 'Se dio de alta a un nuevo proveedor';
-        case 'SUPPLIER_UPDATE':
-            return 'Se modificaron los datos de un proveedor';
-        case 'SUPPLIER_DELETE':
-            return 'Se eliminó un proveedor del sistema';
-        case 'SYSTEM_PURGE':
-            return 'Se ejecutó una limpieza general de registros del sistema';
-        default:
-            return null;
-    }
-}
-
-function renderNaturalDetails(details: any, action?: string): React.ReactNode {
-    let parsed = details;
-    if (typeof details === 'string') {
-        try {
-            parsed = JSON.parse(details);
-        } catch {
-            return <p className="text-sm text-slate-700 font-medium">{details}</p>;
-        }
-    }
-
-    if (!parsed || typeof parsed !== 'object') {
-        return <p className="text-sm text-slate-700 font-medium">{String(parsed || 'Sin información adicional')}</p>;
-    }
-
-    const summaryPhrase = action ? getNaturalSummaryText(action, parsed) : null;
-    const targetObj = parsed.request?.body || parsed.body || parsed;
-    const ignoredKeys = new Set(['request', 'response', 'statusCode', 'password', 'token', 'secret']);
-    const entries = Object.entries(targetObj).filter(([k]) => !ignoredKeys.has(k));
 
     return (
         <div className="space-y-3">
@@ -228,12 +71,248 @@ function renderNaturalDetails(details: any, action?: string): React.ReactNode {
         </div>
     );
 }
+    'PRICE_CHANGE': 'Cambio de Precio',
+    'PRODUCT_CREATE': 'Creación de Producto',
+    'PRODUCT_UPDATE': 'Actualización de Producto',
+    'PRODUCT_DELETE': 'Eliminación de Producto',
+    'STOCK_ADJUST': 'Ajuste de Inventario',
+    'STOCK_SET': 'Inventario Establecido',
+    'SALE_CREATE': 'Venta Registrada',
+    'SALE_CANCEL': 'Venta Anulada',
+    'INVENTORY_IN': 'Entrada de Inventario',
+    'CASH_OPEN': 'Apertura de Caja',
+    'CASH_CLOSE': 'Cierre de Caja',
+    'USER_CREATE': 'Creación de Usuario',
+    'USER_UPDATE': 'Actualización de Usuario',
+    'USER_DELETE': 'Eliminación de Usuario',
+    'BRANCH_CREATE': 'Creación de Sucursal',
+    'BRANCH_UPDATE': 'Actualización de Sucursal',
+    'BRANCH_DELETE': 'Eliminación de Sucursal',
+    'CATEGORY_CREATE': 'Creación de Categoría',
+    'CATEGORY_UPDATE': 'Actualización de Categoría',
+    'CATEGORY_DELETE': 'Eliminación de Categoría',
+    'FINANCE_RATE_UPDATE': 'Actualización de Tasa de Cambio',
+    'PURCHASE_CREATE': 'Creación de Orden de Compra',
+    'PURCHASE_STATUS_UPDATE': 'Actualización de Orden de Compra',
+    'PURCHASE_CANCEL': 'Anulación de Orden de Compra',
+    'SUPPLIER_CREATE': 'Creación de Proveedor',
+    'SUPPLIER_UPDATE': 'Actualización de Proveedor',
+    'SUPPLIER_DELETE': 'Eliminación de Proveedor',
+    'SYSTEM_PURGE': 'Limpieza del Sistema',
+    'LOGIN': 'Inicio de Sesión',
+    'LOGIN_FAILED': 'Intento de Inicio Fallido'
+};
+
+const renderDetails = (log: AuditLog) => {
+    // Si el backend ya generó una descripción en lenguaje natural, usarla
+    if (log.descripcion) {
+        return (
+            <div className="space-y-3">
+                <p className="text-slate-700 leading-relaxed">{log.descripcion}</p>
+                {log.details && (
+                    <details className="mt-2">
+                        <summary className="text-xs text-slate-400 cursor-pointer hover:text-slate-600 transition-colors">
+                            Ver datos técnicos originales
+                        </summary>
+                        <pre className="mt-2 text-[10px] font-mono text-slate-500 whitespace-pre-wrap bg-slate-50 p-2 rounded border border-slate-100">
+                            {typeof log.details === 'string' ? log.details : JSON.stringify(log.details, null, 2)}
+                        </pre>
+                    </details>
+                )}
+            </div>
+        );
+    }
+
+    // Fallback para logs viejos sin descripcion
+    if (!log.details) return <p className="text-slate-400 italic">No se registraron datos para este evento.</p>;
+    
+    let parsedDetails = log.details;
+    if (typeof log.details === 'string') {
+        try {
+            parsedDetails = JSON.parse(log.details);
+        } catch {
+            return <p className="text-slate-500">{log.details}</p>;
+        }
+    }
+
+    const FIELD_DICTIONARY: Record<string, string> = {
+        price: 'Precio',
+        cost: 'Costo',
+        stock: 'Cantidad en Stock',
+        minStock: 'Stock Mínimo',
+        name: 'Nombre',
+        nombre: 'Nombre',
+        apellido: 'Apellido',
+        description: 'Descripción',
+        status: 'Estado',
+        role: 'Rol de Sistema',
+        isActive: 'Estado Activo',
+        barcode: 'Código de Barras',
+        quantity: 'Cantidad',
+        total: 'Monto Total',
+        username: 'Nombre de Usuario',
+        email: 'Correo Electrónico',
+        telefono: 'Teléfono',
+        address: 'Dirección',
+        notes: 'Notas',
+        type: 'Tipo',
+        amount: 'Monto',
+        openingAmount: 'Monto de Apertura',
+        closingAmount: 'Monto de Cierre',
+        expectedAmount: 'Monto Esperado',
+        difference: 'Diferencia',
+        productId: 'Referencia de Producto',
+        branchId: 'Referencia de Sucursal',
+        categoryId: 'Referencia de Categoría',
+        supplierId: 'Referencia de Proveedor',
+        userId: 'Referencia de Usuario',
+        saleId: 'Referencia de Venta',
+        purchaseId: 'Referencia de Compra',
+        paymentMethod: 'Método de Pago',
+        reason: 'Motivo',
+        customerName: 'Nombre del Cliente',
+        // Campos en español (nuevos)
+        monto: 'Monto',
+        moneda: 'Moneda',
+        metodoPago: 'Método de Pago',
+        cantidadProductos: 'Cantidad de Productos',
+        sucursalId: 'Sucursal',
+        cajaAnterior: 'Caja Anterior',
+        cajaNueva: 'Caja Nueva',
+        montoApertura: 'Monto de Apertura',
+        montoCierre: 'Monto de Cierre',
+        transaccionId: 'Transacción',
+        motivo: 'Motivo',
+        cajaId: 'Caja',
+    };
+
+    let targetObject = parsedDetails;
+    let headerMsg = '';
+
+    if (parsedDetails && typeof parsedDetails === 'object' && 'request' in parsedDetails) {
+        if (parsedDetails.response === 'SUCCESS') {
+            headerMsg = '✅ El sistema procesó esta acción con éxito.';
+        } else if (parsedDetails.response === 'FAILED') {
+            headerMsg = '❌ Hubo un rechazo o error al intentar procesar esta acción.';
+        }
+        targetObject = parsedDetails.request?.body || parsedDetails.request || {};
+    }
+
+    if (targetObject && typeof targetObject === 'object' && !Array.isArray(targetObject) && Object.keys(targetObject).length > 0) {
+        let addedProps = false;
+        
+        const items = Object.entries(targetObject).map(([key, value]) => {
+            if (key === 'password' || key === 'token' || key === 'id') return null;
+            
+            const fieldName = FIELD_DICTIONARY[key] || key;
+            const formattedFieldName = FIELD_DICTIONARY[key] ? fieldName : fieldName.charAt(0).toUpperCase() + fieldName.slice(1);
+            
+            let displayValue: React.ReactNode = String(value);
+            let isCopyable = false;
+            let copyText = '';
+            
+            if (typeof value === 'boolean') {
+                displayValue = value ? 'Sí' : 'No';
+            } else if (value === null || value === '') {
+                displayValue = <span className="text-slate-400 italic">Ninguno / Vacío</span>;
+            } else if (typeof value === 'object') {
+                if (Array.isArray(value)) {
+                    displayValue = `${value.length} elemento(s)`;
+                } else {
+                    displayValue = 'Datos internos detallados';
+                }
+            } else if (typeof value === 'string' && key.endsWith('Id') && value.length > 15) {
+                displayValue = value.substring(0, 8) + '...';
+                isCopyable = true;
+                copyText = value;
+            }
+            
+            addedProps = true;
+            return (
+                <li key={key} className="mb-1.5 flex items-center flex-wrap gap-2">
+                    <span className="font-semibold">{formattedFieldName}:</span>
+                    {isCopyable ? (
+                        <span className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-mono text-[10px] sm:text-xs">
+                            <span title={copyText}>{displayValue}</span>
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(copyText);
+                                    toast.success('ID copiado');
+                                }}
+                                className="p-0.5 hover:bg-slate-200 rounded text-slate-500 transition-colors"
+                                title="Copiar ID completo"
+                            >
+                                <Copy className="w-3 h-3" />
+                            </button>
+                        </span>
+                    ) : (
+                        <span>{displayValue}</span>
+                    )}
+                </li>
+            );
+        }).filter(Boolean);
+        
+        return (
+            <div className="space-y-3">
+                {headerMsg && <p>{headerMsg}</p>}
+                <p>Se registraron los siguientes datos en el evento:</p>
+                <ul className="list-disc pl-5">
+                    {items}
+                    {!addedProps && <li>Solo se actualizaron referencias internas o identificadores.</li>}
+                </ul>
+            </div>
+        );
+    }
+
+    if (Array.isArray(targetObject)) {
+        return (
+            <div className="space-y-3">
+                {headerMsg && <p>{headerMsg}</p>}
+                <p>Se afectaron {targetObject.length} elemento(s) en esta acción.</p>
+            </div>
+        );
+    }
+
+    try {
+        return (
+            <div className="space-y-3">
+                {headerMsg && <p>{headerMsg}</p>}
+                <pre className="text-xs font-mono text-slate-700 whitespace-pre-wrap">
+                    {JSON.stringify(targetObject, null, 2)}
+                </pre>
+            </div>
+        );
+    } catch {
+        return <p>El evento no requirió modificar o enviar información adicional.</p>;
+    }
+};
+
+/**
+ * Extrae el ID de transacción de los detalles del log, 
+ * soportando tanto campos viejos (transactionId) como nuevos (transaccionId).
+ */
+const extraerTransaccionId = (log: AuditLog): string | null => {
+    if (!log.details) return null;
+    const d = typeof log.details === 'string' ? (() => { try { return JSON.parse(log.details); } catch { return log.details; } })() : log.details;
+    // Campos nuevos (español)
+    if (d.transaccionId) return d.transaccionId;
+    // Campos viejos (inglés)
+    if (d.transactionId) return d.transactionId;
+    // Anidado en request (middleware viejo)
+    if (d.request?.body?.transactionId) return d.request.body.transactionId;
+    if (d.request?.body?.transaccionId) return d.request.body.transaccionId;
+    return null;
+};
+>>>>>>> origin/feature-basic-v1
 
 const AuditLogsPage: React.FC = () => {
+    const navigate = useNavigate();
     const [logs, setLogs] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [filters, setFilters] = useState<AuditFilters>({ page: 1, limit: 20 });
     const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+    const { data: users = [] } = useUsers();
 
     const fetchLogs = async () => {
         setLoading(true);
@@ -254,6 +333,11 @@ const AuditLogsPage: React.FC = () => {
     const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFilters(prev => ({ ...prev, [name]: value, page: 1 }));
+    };
+
+    const getDisplayName = (user: AuditLog['user']) => {
+        if (!user) return 'Sistema';
+        return `${user.nombre || ''} ${user.apellido || ''}`.trim() || user.username;
     };
 
     return (
@@ -278,8 +362,8 @@ const AuditLogsPage: React.FC = () => {
                     </div>
                 </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+ 
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input 
@@ -303,6 +387,22 @@ const AuditLogsPage: React.FC = () => {
                         <option value="INVENTORY">Inventario</option>
                         <option value="FINANCE">Finanzas</option>
                         <option value="USERS">Usuarios</option>
+                    </select>
+                </div>
+                <div className="relative">
+                    <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <select 
+                        name="userId"
+                        className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none appearance-none"
+                        onChange={handleFilterChange}
+                        value={filters.userId || ''}
+                    >
+                        <option value="">Todos los usuarios</option>
+                        {users.map(u => (
+                            <option key={u.id} value={u.id}>
+                                {`${u.nombre} ${u.apellido || ''}`.trim() || u.username}
+                            </option>
+                        ))}
                     </select>
                 </div>
                 <div>
@@ -358,8 +458,17 @@ const AuditLogsPage: React.FC = () => {
                                             className={`hover:bg-slate-50 cursor-pointer transition-colors group ${selectedLog?.id === log.id ? 'bg-indigo-50' : ''}`}
                                         >
                                             <td className="px-6 py-4">
+<<<<<<< HEAD
                                                 <div className="text-sm font-semibold text-slate-900">{ACTION_LABELS[log.action] || log.action}</div>
                                                 <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[150px]">{log.id}</div>
+=======
+                                                <div className="text-sm font-medium text-slate-900">
+                                                    {ACTION_DICTIONARY[log.action] || log.action}
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 mt-0.5 max-w-[200px] truncate">
+                                                    {getDisplayName(log.user)} ejecutó esta acción
+                                                </div>
+>>>>>>> origin/feature-basic-v1
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium ${MODULE_COLORS[log.module] || 'bg-slate-100 text-slate-600'}`}>
@@ -368,6 +477,7 @@ const AuditLogsPage: React.FC = () => {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4">
+<<<<<<< HEAD
                                                 {(() => {
                                                     const userName = log.user?.nombre || log.user?.username || log.user?.name || 'Usuario';
                                                     return (
@@ -382,6 +492,19 @@ const AuditLogsPage: React.FC = () => {
                                                         </div>
                                                     );
                                                 })()}
+=======
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold uppercase">
+                                                        {log.user ? (log.user.nombre?.charAt(0) || log.user.username?.charAt(0) || 'U') : 'S'}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-sm text-slate-700">
+                                                            {getDisplayName(log.user)}
+                                                        </div>
+                                                        <div className="text-[11px] text-slate-400 italic uppercase">{log.user?.role || 'SISTEMA'}</div>
+                                                    </div>
+                                                </div>
+>>>>>>> origin/feature-basic-v1
                                             </td>
                                             <td className="px-6 py-4 text-xs text-slate-500 font-mono">
                                                 {format(new Date(log.createdAt), "dd MMM, HH:mm:ss", { locale: es })}
@@ -401,22 +524,95 @@ const AuditLogsPage: React.FC = () => {
                     <div className="bg-white rounded-xl p-6 h-full border border-slate-200 sticky top-6">
                         {selectedLog ? (
                             <div className="space-y-6">
-                                <div className="flex items-center justify-between">
-                                    <h2 className="text-xl font-bold text-slate-900">Detalle del Registro</h2>
-                                    <span className="text-[10px] font-mono text-slate-400">ID: {selectedLog.id}</span>
+                                <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                                    <div className={`p-3 rounded-xl ${MODULE_COLORS[selectedLog.module] || 'bg-slate-100 text-slate-600'}`}>
+                                        {MODULE_ICONS[selectedLog.module]}
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-bold text-slate-900 leading-tight">
+                                            {ACTION_DICTIONARY[selectedLog.action] || selectedLog.action}
+                                        </h2>
+                                        <p className="text-xs text-slate-500">
+                                            Módulo: {selectedLog.module}
+                                        </p>
+                                    </div>
                                 </div>
-                                
+
+                                {/* 🔗 Acciones rápidas: ir a detalle de venta */}
+                                {(selectedLog.action === 'SALE_CREATE' || selectedLog.action === 'SALE_CANCEL') && extraerTransaccionId(selectedLog) && (
+                                    <button
+                                        onClick={() => navigate(`/finance/cash-register?tx=${extraerTransaccionId(selectedLog)}`)}
+                                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl border border-indigo-200 transition-colors text-sm font-medium"
+                                    >
+                                        <Eye className="w-4 h-4" />
+                                        Ver detalle de la venta
+                                    </button>
+                                )}
+
                                 <div className="space-y-4">
-                                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                                        <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-2 font-bold">Datos Técnicos</div>
-                                        <div className="space-y-2 text-sm">
-                                            <div className="flex justify-between">
-                                                <span className="text-slate-500">IP Origen:</span>
-                                                <span className="text-slate-700 font-mono">{selectedLog.ipAddress || '—'}</span>
+                                    {/* 📝 Descripción en lenguaje natural */}
+                                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center gap-2 text-blue-800">
+                                                <Database className="w-4 h-4" />
+                                                <span className="text-sm font-semibold">Descripción</span>
                                             </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-slate-500">Dispositivo:</span>
-                                                <span className="text-slate-700 truncate ml-4 max-w-[150px]" title={selectedLog.userAgent}>{selectedLog.userAgent || 'Desktop App'}</span>
+                                        </div>
+                                        <div className="bg-white p-3 rounded-lg border border-blue-100 shadow-sm text-sm text-slate-700 max-h-[200px] overflow-y-auto custom-scrollbar">
+                                            {renderDetails(selectedLog)}
+                                        </div>
+                                    </div>
+
+                                    {/* 💰 Posición Consolidada */}
+                                    {selectedLog.posicionConsolidada && (
+                                        <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200">
+                                            <div className="flex items-center gap-2 text-emerald-800 mb-3">
+                                                <CreditCard className="w-4 h-4" />
+                                                <span className="text-sm font-semibold">Posición de Caja</span>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div className="bg-white p-2.5 rounded-lg border border-emerald-100 text-center">
+                                                    <span className="block text-[10px] text-slate-400 mb-1">Anterior</span>
+                                                    <span className="text-sm font-bold text-slate-700">
+                                                        ${selectedLog.posicionConsolidada.anterior.toLocaleString('es-CO')}
+                                                    </span>
+                                                </div>
+                                                <div className="bg-white p-2.5 rounded-lg border border-emerald-100 text-center">
+                                                    <span className="block text-[10px] text-slate-400 mb-1">Ingreso</span>
+                                                    <span className="text-sm font-bold text-emerald-600">
+                                                        +${selectedLog.posicionConsolidada.ingreso.toLocaleString('es-CO')}
+                                                    </span>
+                                                </div>
+                                                <div className="bg-white p-2.5 rounded-lg border border-emerald-100 text-center">
+                                                    <span className="block text-[10px] text-slate-400 mb-1">Total</span>
+                                                    <span className="text-sm font-bold text-emerald-700">
+                                                        ${selectedLog.posicionConsolidada.total.toLocaleString('es-CO')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] text-emerald-500 text-center mt-2 font-medium">
+                                                {selectedLog.posicionConsolidada.moneda}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* 👤 Usuario Responsable */}
+                                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <UserIcon className="w-4 h-4 text-slate-400" />
+                                            <span className="text-sm font-semibold text-slate-700">Usuario Responsable</span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-sm font-bold uppercase border border-indigo-200">
+                                                {selectedLog.user ? (selectedLog.user.nombre?.charAt(0) || selectedLog.user.username?.charAt(0) || 'U') : 'S'}
+                                            </div>
+                                            <div>
+                                                <div className="text-sm font-medium text-slate-900">
+                                                    {getDisplayName(selectedLog.user)}
+                                                </div>
+                                                <div className="text-xs text-slate-500">
+                                                    {selectedLog.user?.role ? `Rol: ${selectedLog.user.role}` : 'Sistema Automatizado'}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -425,11 +621,31 @@ const AuditLogsPage: React.FC = () => {
                                         <div className="text-[10px] uppercase tracking-wider text-indigo-700 mb-2.5 font-bold">Resumen de Cambios</div>
                                         {renderNaturalDetails(selectedLog.details, selectedLog.action)}
                                     </div>
-                                </div>
 
-                                <div className="pt-4 border-t border-slate-200">
-                                    <div className="text-xs text-slate-400 italic text-center">
-                                        Registro generado en {format(new Date(selectedLog.createdAt), "PPPP 'a las' HH:mm", { locale: es })}
+                                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                        <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-2 font-bold">Datos Técnicos y Origen</div>
+                                        <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
+                                            <div>
+                                                <span className="block text-xs text-slate-400 mb-0.5">Fecha y Hora</span>
+                                                <span className="text-slate-700 font-medium">
+                                                    {format(new Date(selectedLog.createdAt), "dd MMM yyyy, HH:mm", { locale: es })}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className="block text-xs text-slate-400 mb-0.5">IP Origen</span>
+                                                <span className="text-slate-700 font-mono text-xs">{selectedLog.ipAddress || '—'}</span>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <span className="block text-xs text-slate-400 mb-0.5">Dispositivo (User Agent)</span>
+                                                <span className="text-slate-700 text-xs break-words block max-w-full">
+                                                    {selectedLog.userAgent || 'App Local / Desconocido'}
+                                                </span>
+                                            </div>
+                                            <div className="col-span-2 mt-2 pt-2 border-t border-slate-200">
+                                                <span className="text-[10px] text-slate-400 font-mono">ID Registro: {selectedLog.id}</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                     </div>
                                 </div>
                             </div>
@@ -439,8 +655,10 @@ const AuditLogsPage: React.FC = () => {
                                     <Shield className="w-8 h-8" />
                                 </div>
                                 <div className="space-y-1">
-                                    <h3 className="text-lg font-medium text-slate-600">Selecciona un registro</h3>
-                                    <p className="text-sm text-slate-400">Haz clic en cualquier fila para ver el detalle técnico del evento.</p>
+                                    <h3 className="text-lg font-medium text-slate-600">Selecciona un evento</h3>
+                                    <p className="text-sm text-slate-400 max-w-[250px] mx-auto">
+                                        Haz clic en cualquier fila para ver la descripción completa y detalles de la acción.
+                                    </p>
                                 </div>
                             </div>
                         )}

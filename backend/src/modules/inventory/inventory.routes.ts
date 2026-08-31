@@ -35,7 +35,10 @@ router.get('/stock/product/:productId',
 /** GET  /api/inventory/stock/low-stock — Alertas de stock bajo */
 router.get('/stock/low-stock', ctrl.getLowStock);
 
-/** PUT  /api/inventory/stock — Establecer stock absoluto (solo OWNER) */
-router.put('/stock', roleGuard('OWNER'), validate(setStockSchema), ctrl.setStock);
+/** PUT  /api/inventory/stock — Establecer stock absoluto */
+router.put('/stock', roleGuard('OWNER', 'SELLER'), validate(setStockSchema), ctrl.setStock);
+
+/** GET  /api/inventory/export — Exportar inventario a Excel */
+router.get('/export', ctrl.exportInventoryExcel);
 
 export default router;

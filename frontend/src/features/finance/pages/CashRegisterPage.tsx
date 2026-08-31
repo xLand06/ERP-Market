@@ -1,17 +1,22 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     TrendingUp, TrendingDown, DollarSign, ArrowUpCircle,
-    Plus, Lock, Circle, Play, History, ChevronLeft, ChevronRight, Calendar
+    Plus, Lock, Circle, Play, History, ChevronLeft, ChevronRight, Calendar, Copy, Eye, ShoppingBag, PackageMinus, Store
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { ExpenseEntryModal } from '../components/ExpenseEntryModal';
+import { PurchaseHistoryPanel } from '../components/PurchaseHistoryPanel';
 import { CashClosureModal } from '../components/CashClosureModal';
+import { CashRegisterDetailModal } from '../components/CashRegisterDetailModal';
+import { SaleDetailModal, Sale } from '../components/SaleDetailModal';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
+import { useConfigStore } from '@/hooks/useConfigStore';
 
 function StatCard({ icon: Icon, label, value, color, bg }: {
     icon: React.ElementType; label: string; value: string; color: string; bg: string;
@@ -34,9 +39,92 @@ export default function CashRegisterPage() {
     const setSelectedBranch = useAuthStore(s => s.setSelectedBranch);
     const [entryOpen, setEntryOpen] = useState(false);
     const [closureOpen, setClosureOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
+    const [activeTab, setActiveTab] = useState<'current' | 'history' | 'egresos'>('current');
     const [historyPage, setHistoryPage] = useState(1);
     const [historyFilters, setHistoryFilters] = useState({ from: '', to: '' });
+    const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+    const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
+    const [searchTxId, setSearchTxId] = useState('');
+    const [searchLoading, setSearchLoading] = useState(false);
+    
+    const [searchParams] = useSearchParams();
+
+    // Auto-buscar transacción si viene por query param (ej: desde auditoría)
+    useEffect(() => {
+        const txParam = searchParams.get('tx');
+        if (txParam && txParam.trim()) {
+            setSearchTxId(txParam.trim());
+            // Disparamos el search inmediatamente
+            const doSearch = async () => {
+                setSearchLoading(true);
+                try {
+                    const res = await api.get(`/sales/${txParam.trim()}`);
+                    if (res.data && res.data.id) {
+                        setSelectedSaleId(res.data.id);
+                        setSearchTxId('');
+                    }
+                } catch {
+                    // Silencioso, el usuario puede buscar manualmente
+                } finally {
+                    setSearchLoading(false);
+                }
+            };
+            doSearch();
+        }
+    }, []); // Solo al montar
+    
+    const { rates } = useConfigStore();
+    const [filterMode, setFilterMode] = useState<'range' | 'month'>('range');
+    const [selectedMonth, setSelectedMonth] = useState<string>(String(new Date().getMonth() + 1).padStart(2, '0'));
+    const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()));
+
+    const MONTHS = [
+        { value: '01', label: 'Enero' },
+        { value: '02', label: 'Febrero' },
+        { value: '03', label: 'Marzo' },
+        { value: '04', label: 'Abril' },
+        { value: '05', label: 'Mayo' },
+        { value: '06', label: 'Junio' },
+        { value: '07', label: 'Julio' },
+        { value: '08', label: 'Agosto' },
+        { value: '09', label: 'Septiembre' },
+        { value: '10', label: 'Octubre' },
+        { value: '11', label: 'Noviembre' },
+        { value: '12', label: 'Diciembre' },
+    ];
+
+    const currentYear = new Date().getFullYear();
+    const YEARS = Array.from({ length: 5 }, (_, i) => String(currentYear - i));
+
+    const { data: selectedSaleDetails } = useQuery({
+        queryKey: ['saleDetail', selectedSaleId],
+        queryFn: async () => {
+            if (!selectedSaleId) return null;
+            const res = await api.get(`/sales/${selectedSaleId}`);
+            const tx = res.data;
+            const sale: Sale = {
+                id: tx.id,
+                ticketNo: tx.id.slice(-6).toUpperCase(),
+                date: tx.createdAt,
+                cashier: tx.user?.nombre || tx.user?.username || 'Sistema',
+                branch: tx.branch?.name || '-',
+                paymentMethod: tx.notes?.includes('Tarjeta') ? 'Tarjeta' : tx.notes?.includes('Transferencia') ? 'Transferencia' : tx.notes?.includes('Divisa') ? 'Divisa' : 'Efectivo',
+                items: tx.items.map((i: any) => ({
+                    name: i.product?.name || 'Producto Desconocido',
+                    qty: Number(i.quantity),
+                    unitPrice: Number(i.unitPrice),
+                })),
+                subtotal: Number(tx.total),
+                discount: 0,
+                total: Number(tx.total),
+                notes: tx.notes,
+                currency: tx.currency,
+                exchangeRate: tx.exchangeRate
+            };
+            return sale;
+        },
+        enabled: !!selectedSaleId
+    });
 
     const { data: branches = [] } = useQuery({
         queryKey: ['branches'],
@@ -68,7 +156,7 @@ export default function CashRegisterPage() {
             }
         },
         enabled: !!effectiveBranch && branches.length > 0,
-        staleTime: 0,
+        staleTime: 10_000,
     });
 
     const openMutation = useMutation({
@@ -107,12 +195,22 @@ export default function CashRegisterPage() {
 
     const historyBranchId = selectedBranch === 'all' ? undefined : effectiveBranch;
     const { data: historyData, isLoading: historyLoading, refetch: refetchHistory } = useQuery({
-        queryKey: ['cashFlowHistory', historyBranchId, historyFilters, historyPage],
+        queryKey: ['cashFlowHistory', historyBranchId, historyFilters, filterMode, selectedMonth, selectedYear, historyPage],
         queryFn: async () => {
             const params: any = { page: historyPage, limit: 10 };
             if (historyBranchId) params.branchId = historyBranchId;
-            if (historyFilters.from) params.from = historyFilters.from;
-            if (historyFilters.to) params.to = historyFilters.to;
+            
+            if (filterMode === 'range') {
+                if (historyFilters.from) params.from = historyFilters.from;
+                if (historyFilters.to) params.to = historyFilters.to;
+            } else {
+                const fromDate = `${selectedYear}-${selectedMonth}-01`;
+                const lastDay = new Date(Number(selectedYear), Number(selectedMonth), 0).getDate();
+                const toDate = `${selectedYear}-${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
+                params.from = fromDate;
+                params.to = toDate;
+            }
+
             const res = await api.get('/cash-flow/history', { params });
             return res.data.data;
         },
@@ -120,9 +218,30 @@ export default function CashRegisterPage() {
         staleTime: 30 * 1000,
     });
 
+    const { fmtCOP } = useConfigStore();
+
+    const handleSearchTx = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!searchTxId.trim()) return;
+        setSearchLoading(true);
+        try {
+            const res = await api.get(`/sales/${searchTxId.trim()}`);
+            if (res.data && res.data.id) {
+                setSelectedSaleId(res.data.id);
+                toast.success('Transacción encontrada');
+                setSearchTxId('');
+            } else {
+                toast.error('No se encontró la transacción');
+            }
+        } catch (err) {
+            toast.error('No se encontró la transacción con ese ID');
+        } finally {
+            setSearchLoading(false);
+        }
+    };
     const formatCurrency = (value: number | string | null | undefined) => {
         const num = typeof value === 'string' ? parseFloat(value) : (value || 0);
-        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD' }).format(num);
+        return fmtCOP(num);
     };
 
     const formatDate = (dateStr: string | null | undefined) => {
@@ -155,7 +274,34 @@ export default function CashRegisterPage() {
         }
 
         if (!effectiveBranch) {
-            return <div className="h-full flex items-center justify-center text-slate-500 pb-20">Por favor, seleccione una sede en la configuración.</div>;
+            return (
+                <div className="flex flex-col items-center justify-center h-full max-w-2xl mx-auto text-center gap-6 pb-20">
+                    <div className="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-full flex justify-center items-center mb-2">
+                        <Store className="w-8 h-8" />
+                    </div>
+                    <h2 className="text-2xl font-black text-slate-800">Selecciona una Sucursal</h2>
+                    <p className="text-slate-500 max-w-md">
+                        Para acceder al flujo de caja, necesitas seleccionar en qué sucursal vas a operar.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full mt-4">
+                        {branches.map((b: any) => (
+                            <button
+                                key={b.id}
+                                onClick={() => setSelectedBranch(b.id)}
+                                className="p-5 rounded-2xl border border-slate-200 bg-white hover:border-indigo-500 hover:shadow-md transition-all flex items-center gap-4 text-left group"
+                            >
+                                <div className="w-12 h-12 rounded-xl bg-slate-50 group-hover:bg-indigo-50 flex items-center justify-center shrink-0 transition-colors">
+                                    <Store className="w-6 h-6 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">{b.name}</h3>
+                                    <p className="text-xs text-slate-500 mt-1">Operar en esta sucursal</p>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            );
         }
 
         if (isLoading) {
@@ -174,13 +320,41 @@ export default function CashRegisterPage() {
                         <form onSubmit={(e) => {
                             e.preventDefault();
                             const formData = new FormData(e.currentTarget);
-                            const val = parseFloat(formData.get('openingAmount') as string);
-                            if (!isNaN(val) && val >= 0) openMutation.mutate(val);
+                            const valCop = parseFloat(formData.get('openingCop') as string) || 0;
+                            const valUsd = parseFloat(formData.get('openingUsd') as string) || 0;
+                            const valVes = parseFloat(formData.get('openingVes') as string) || 0;
+                            
+                            const usdRate = rates['USD'] || rates['COP'] || 3600;
+                            const vesRate = rates['VES'] || 5.5;
+
+                            const amountInCop = valCop + (valUsd * usdRate) + (valVes * vesRate);
+                            if (amountInCop >= 0) {
+                                openMutation.mutate(amountInCop);
+                            }
                         }}>
-                            <label className="block text-left text-sm font-bold text-slate-700 mb-2">Monto de Apertura</label>
-                            <div className="relative mb-4">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
-                                <input name="openingAmount" type="number" step="0.01" required defaultValue="0.00" min="0" className="w-full text-right h-11 pl-8 pr-4 rounded-lg border border-slate-300 font-bold text-lg" />
+                            <label className="block text-left text-sm font-bold text-slate-700 mb-2">Monto de Apertura (Físico en Caja)</label>
+                            <div className="space-y-3 mb-4">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-16 font-bold text-slate-600 text-sm">COP</span>
+                                    <div className="relative flex-1">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                        <input name="openingCop" type="number" step="1" required defaultValue="0" min="0" className="w-full text-right h-10 pl-8 pr-4 rounded-lg border border-slate-300 font-bold" />
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="w-16 font-bold text-slate-600 text-sm">USD</span>
+                                    <div className="relative flex-1">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                        <input name="openingUsd" type="number" step="0.01" required defaultValue="0.00" min="0" className="w-full text-right h-10 pl-8 pr-4 rounded-lg border border-slate-300 font-bold" />
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="w-16 font-bold text-slate-600 text-sm">VES</span>
+                                    <div className="relative flex-1">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">Bs.</span>
+                                        <input name="openingVes" type="number" step="0.01" required defaultValue="0.00" min="0" className="w-full text-right h-10 pl-8 pr-4 rounded-lg border border-slate-300 font-bold" />
+                                    </div>
+                                </div>
                             </div>
                             <Button type="submit" disabled={openMutation.isPending} className="w-full h-11 font-bold text-base">
                                 {openMutation.isPending ? 'Abriendo...' : <><Play className="w-4 h-4 mr-2" /> Abrir Caja Ahora</>}
@@ -225,6 +399,85 @@ export default function CashRegisterPage() {
                         <StatCard icon={TrendingDown} label="Gastos" value={formatCurrency(totalExpense)} color="text-red-600" bg="bg-red-50" />
                         <StatCard icon={ArrowUpCircle} label="Esperado" value={formatCurrency(expectedBalance)} color="text-indigo-600" bg="bg-indigo-50" />
                     </div>
+
+                    {/* ── Desglose de ventas por moneda ── */}
+                    {(() => {
+                        const breakdown = { COP: 0, USD: 0, VES: 0 };
+                        let salesCount = 0;
+
+                        transactions.forEach((t: any) => {
+                            if (t.type !== 'SALE' || t.status !== 'COMPLETED') return;
+                            salesCount++;
+                            const amt = Number(t.total) || 0;
+
+                            // Intentar usar paymentMethods si existe
+                            const pms = (() => {
+                                if (!t.paymentMethods) return [];
+                                if (Array.isArray(t.paymentMethods)) return t.paymentMethods;
+                                if (typeof t.paymentMethods === 'string') {
+                                    try {
+                                        return JSON.parse(t.paymentMethods);
+                                    } catch {
+                                        return [];
+                                    }
+                                }
+                                return [];
+                            })();
+
+                            if (pms.length > 0) {
+                                pms.forEach((pm: any) => {
+                                    const cur = pm.currency || 'COP';
+                                    const amount = Number(pm.amount) || 0;
+                                    if (cur === 'COP') breakdown.COP += amount;
+                                    if (cur === 'USD') breakdown.USD += amount;
+                                    if (cur === 'VES') breakdown.VES += amount;
+                                });
+                            } else {
+                                const notes = t.notes || '';
+                                const regex = /(Efectivo COP|Efectivo USD|Pago Móvil VES) \((?:\$|Bs\.)(\d+(\.\d+)?)/g;
+                                let match;
+                                let foundAny = false;
+                                while ((match = regex.exec(notes)) !== null) {
+                                    foundAny = true;
+                                    const type = match[1];
+                                    const amount = parseFloat(match[2]);
+                                    if (type.includes('COP')) breakdown.COP += amount;
+                                    if (type.includes('USD')) breakdown.USD += amount;
+                                    if (type.includes('VES')) breakdown.VES += amount;
+                                }
+                                if (!foundAny) {
+                                    const currency = t.currency || 'COP';
+                                    const rate = Number(t.exchangeRate) || 1;
+                                    if (currency === 'COP') breakdown.COP += amt;
+                                    if (currency === 'USD') breakdown.USD += amt / rate;
+                                    if (currency === 'VES') breakdown.VES += amt / rate;
+                                }
+                            }
+                        });
+
+                        return (
+                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <ShoppingBag className="w-4 h-4 text-indigo-500" />
+                                    <h3 className="font-bold text-slate-800 text-sm">Resumen de Ventas — {salesCount} transacciones</h3>
+                                </div>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 text-center">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">COP</p>
+                                        <p className="text-base font-black text-slate-800 tabular-nums">{formatCurrency(breakdown.COP)}</p>
+                                    </div>
+                                    <div className="bg-blue-50 rounded-xl p-3 border border-blue-100 text-center">
+                                        <p className="text-[10px] font-bold text-blue-400 uppercase mb-1">USD</p>
+                                        <p className="text-base font-black text-blue-800 tabular-nums">${breakdown.USD.toFixed(2)}</p>
+                                    </div>
+                                    <div className="bg-amber-50 rounded-xl p-3 border border-amber-100 text-center">
+                                        <p className="text-[10px] font-bold text-amber-400 uppercase mb-1">VES</p>
+                                        <p className="text-base font-black text-amber-800 tabular-nums">Bs. {breakdown.VES.toFixed(2)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
                         <div className="px-5 py-4 border-b border-slate-100"><h2 className="font-bold text-slate-800">Movimientos del Día</h2></div>
                         {transactions.length === 0 ? (
@@ -232,19 +485,50 @@ export default function CashRegisterPage() {
                         ) : (
                             <div className="divide-y divide-slate-100">
                                 {transactions.map((t: any) => (
-                                    <div key={t.id} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50">
+                                    <div key={t.id} className={cn("px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors group", t.type === 'SALE' && "cursor-pointer")} onClick={() => t.type === 'SALE' && setSelectedSaleId(t.id)}>
                                         <div className="flex items-center gap-3">
-                                            <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', t.type === 'SALE' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}>
+                                            <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', t.type === 'SALE' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}>
                                                 {t.type === 'SALE' ? <TrendingUp className="w-4 h-4" /> : <DollarSign className="w-4 h-4" />}
                                             </div>
                                             <div>
-                                                <p className="text-sm font-medium text-slate-800">{t.type === 'SALE' ? 'Venta' : 'Ajuste'}</p>
-                                                <p className="text-xs text-slate-400">{new Date(t.createdAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-medium text-slate-800">{t.type === 'SALE' ? 'Venta' : 'Ajuste'}</p>
+                                                    {t.type === 'SALE' && (
+                                                        <span 
+                                                            className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono hover:bg-slate-200 transition-colors flex items-center gap-1"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                navigator.clipboard.writeText(t.id);
+                                                                toast.success('Código copiado');
+                                                            }}
+                                                            title="Copiar código de venta"
+                                                        >
+                                                            #{t.id.slice(-6).toUpperCase()}
+                                                            <Copy className="w-3 h-3" />
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                                                    <Calendar className="w-3 h-3" />
+                                                    {new Date(t.createdAt).toLocaleDateString('es-VE')} {new Date(t.createdAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
+                                                </p>
+                                                {t.notes && (
+                                                    <p className="text-[10px] bg-slate-100/80 text-slate-600 px-2 py-0.5 rounded font-semibold mt-1 border border-slate-200/50 w-fit">
+                                                        {t.notes}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className={cn('text-sm font-bold', t.type === 'SALE' ? 'text-emerald-600' : 'text-amber-600')}>{t.type === 'SALE' ? '+' : ''}{formatCurrency(t.total)}</p>
-                                            <p className="text-xs text-slate-400 capitalize">{t.status.toLowerCase()}</p>
+                                        <div className="text-right flex items-center gap-4">
+                                            <div>
+                                                <p className={cn('text-sm font-bold', t.type === 'SALE' ? 'text-emerald-600' : 'text-amber-600')}>{t.type === 'SALE' ? '+' : ''}{formatCurrency(t.total)}</p>
+                                                <p className="text-[10px] text-slate-400 capitalize font-semibold mt-0.5">{t.status.toLowerCase()}</p>
+                                            </div>
+                                            {t.type === 'SALE' && (
+                                                <div className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-slate-100 rounded-md">
+                                                    <Eye className="w-4 h-4 text-slate-500" />
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
@@ -264,17 +548,63 @@ export default function CashRegisterPage() {
         return (
             <div className="flex flex-col gap-6 pb-8">
                 <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                    <div className="flex items-center gap-4 mb-4 border-b border-slate-100 pb-2">
+                        <button 
+                            onClick={() => setFilterMode('range')} 
+                            className={cn('text-xs font-semibold pb-1 border-b-2 transition-colors', filterMode === 'range' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600')}
+                        >
+                            Por Intervalo
+                        </button>
+                        <button 
+                            onClick={() => setFilterMode('month')} 
+                            className={cn('text-xs font-semibold pb-1 border-b-2 transition-colors', filterMode === 'month' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600')}
+                        >
+                            Por Mes y Año
+                        </button>
+                    </div>
                     <div className="flex flex-wrap items-end gap-4">
-                        <div>
-                            <label className="block text-xs font-medium text-slate-500 mb-1">Desde</label>
-                            <Input type="date" value={historyFilters.from} onChange={(e) => setHistoryFilters(prev => ({ ...prev, from: e.target.value }))} className="w-40" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-slate-500 mb-1">Hasta</label>
-                            <Input type="date" value={historyFilters.to} onChange={(e) => setHistoryFilters(prev => ({ ...prev, to: e.target.value }))} className="w-40" />
-                        </div>
+                        {filterMode === 'range' ? (
+                            <>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-500 mb-1">Desde</label>
+                                    <Input type="date" value={historyFilters.from} onChange={(e) => setHistoryFilters(prev => ({ ...prev, from: e.target.value }))} className="w-40" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-500 mb-1">Hasta</label>
+                                    <Input type="date" value={historyFilters.to} onChange={(e) => setHistoryFilters(prev => ({ ...prev, to: e.target.value }))} className="w-40" />
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-500 mb-1">Mes</label>
+                                    <select 
+                                        value={selectedMonth} 
+                                        onChange={(e) => setSelectedMonth(e.target.value)} 
+                                        className="w-40 h-10 px-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                    >
+                                        {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-500 mb-1">Año</label>
+                                    <select 
+                                        value={selectedYear} 
+                                        onChange={(e) => setSelectedYear(e.target.value)} 
+                                        className="w-40 h-10 px-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                    >
+                                        {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                                    </select>
+                                </div>
+                            </>
+                        )}
                         <Button variant="outline" onClick={() => { setHistoryPage(1); refetchHistory(); }}><Calendar className="w-4 h-4 mr-2" />Filtrar</Button>
-                        <Button variant="ghost" onClick={() => { setHistoryFilters({ from: '', to: '' }); setHistoryPage(1); }}>Limpiar</Button>
+                        <Button variant="ghost" onClick={() => { 
+                            setHistoryFilters({ from: '', to: '' }); 
+                            setSelectedMonth(String(new Date().getMonth() + 1).padStart(2, '0'));
+                            setSelectedYear(String(new Date().getFullYear()));
+                            setHistoryPage(1); 
+                        }}>Limpiar</Button>
                     </div>
                 </div>
 
@@ -299,7 +629,7 @@ export default function CashRegisterPage() {
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {registers.map((reg: any) => (
-                                        <tr key={reg.id} className="hover:bg-slate-50">
+                                        <tr key={reg.id} className="hover:bg-slate-50 cursor-pointer transition-colors" onClick={() => setSelectedHistoryId(reg.id)}>
                                             <td className="px-4 py-3">
                                                 <p className="text-sm font-medium text-slate-800">{formatDate(reg.openedAt)}</p>
                                                 <p className="text-xs text-slate-400">→ {formatDate(reg.closedAt)}</p>
@@ -339,19 +669,46 @@ export default function CashRegisterPage() {
     return (
         <div className="min-h-full">
             <div className="bg-white border-b border-slate-200 mb-6">
-                <div className="px-6 py-4">
-                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg w-fit">
+                <div className="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg w-fit shrink-0">
                         <button onClick={() => setActiveTab('current')} className={cn('flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors', activeTab === 'current' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
                             <Circle className="w-4 h-4" />Caja Actual
                         </button>
                         <button onClick={() => { setActiveTab('history'); setHistoryPage(1); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors', activeTab === 'history' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
                             <History className="w-4 h-4" />Historial
                         </button>
+                        <button onClick={() => setActiveTab('egresos')} className={cn('flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors', activeTab === 'egresos' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
+                            <PackageMinus className="w-4 h-4" />Egresos
+                        </button>
                     </div>
+
+                    <form onSubmit={handleSearchTx} className="flex items-center gap-2 w-full md:max-w-md">
+                        <Input 
+                            type="text" 
+                            placeholder="Buscar por ID de transacción..." 
+                            value={searchTxId}
+                            onChange={(e) => setSearchTxId(e.target.value)}
+                            className="h-10 text-sm focus-visible:ring-indigo-500 border-slate-200"
+                        />
+                        <Button 
+                            type="submit" 
+                            disabled={searchLoading || !searchTxId.trim()} 
+                            className="h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shrink-0"
+                        >
+                            {searchLoading ? 'Buscando...' : 'Buscar'}
+                        </Button>
+                    </form>
                 </div>
             </div>
             <div className="px-6">
-                {activeTab === 'current' ? renderCurrentTab() : renderHistoryTab()}
+                <CashRegisterDetailModal 
+                    id={selectedHistoryId} 
+                    open={!!selectedHistoryId} 
+                    onClose={() => setSelectedHistoryId(null)} 
+                    onSaleClick={(saleId) => setSelectedSaleId(saleId)}
+                />
+                <SaleDetailModal sale={selectedSaleDetails || null} open={!!selectedSaleId} onClose={() => setSelectedSaleId(null)} />
+                {activeTab === 'current' ? renderCurrentTab() : activeTab === 'history' ? renderHistoryTab() : <PurchaseHistoryPanel branchId={effectiveBranch} />}
             </div>
         </div>
     );

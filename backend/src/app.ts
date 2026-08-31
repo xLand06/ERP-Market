@@ -1,6 +1,8 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import crypto from 'crypto';
+import path from 'path';
 import { errorHandler, notFoundHandler } from './core/middlewares/errorHandler';
 import logger from './core/utils/logger';
 
@@ -23,13 +25,31 @@ import auditRouter from './modules/audit/audit.routes';
 import dashboardRouter from './modules/dashboard/dashboard.routes';
 import syncRouter from './modules/sync/sync.routes';
 import { startSyncWorker } from './modules/sync/sync-worker';
+import { startCashRegisterAutomation } from './modules/cashFlow/cashFlow-automation';
+import backupRouter from './modules/backup/backup.routes';
+import settingsRouter from './modules/settings/settings.routes';
+import mermaRouter from './modules/merma/merma.routes';
+import stocktakingRouter from './modules/stocktaking/stocktaking.routes';
+import batchesRouter from './modules/batches/batches.routes';
 
 const app = express();
 
-// ─── BACKGROUND SYNC (Sistema Híbrido) ─────────────────────────────────────────
-// Sync worker para sistema híbrido SQLite + Supabase
-// Intervalo: 15 minutos (900000ms)
+/**
+ * Request ID middleware - genera UUID único para cada petición
+ */
+app.use((req: Request, res: Response, next: NextFunction) => {
+    const requestId = (req.headers['x-request-id'] as string) || crypto.randomUUID();
+    res.setHeader('X-Request-ID', requestId);
+    (req as any).requestId = requestId;
+    next();
+});
+
+// ─── BACKGROUND WORKERS ────────────────────────────────────────────────────────
+// Sync worker para sistema híbrido SQLite + Supabase (15 min)
 startSyncWorker(900000);
+
+// Automation worker para apertura/cierre de cajas (60 seg)
+startCashRegisterAutomation(60000);
 
 // ─── MIDDLEWARES GLOBALES ───────────────────────────────────────────────────
 app.use(cors({
@@ -61,8 +81,10 @@ app.use(helmet({
         directives: {
             defaultSrc: ["'self'"],
             scriptSrc: ["'self'", "'unsafe-inline'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "https:"],
+            connectSrc: ["'self'", "http://127.0.0.1:3000", "http://127.0.0.1:3001", "http://localhost:3000", "http://localhost:3001"],
         },
     },
     crossOriginEmbedderPolicy: false,
@@ -87,15 +109,65 @@ app.use((req, res, next) => {
 });
 
 // ─── HEALTH CHECK ──────────────────────────────────────────────────────────
-app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'ERP-MARKET API' });
+app.get('/api/health', async (_req, res) => {
+    let dbStatus = 'connected';
+    let dbResponseTime = 0;
+    
+    try {
+        const start = Date.now();
+        const { getLocalPrisma } = await import('./config/prisma');
+        await getLocalPrisma().$queryRaw`SELECT 1`;
+        dbResponseTime = Date.now() - start;
+    } catch (err: any) {
+        dbStatus = 'error';
+        dbResponseTime = -1;
+    }
+    
+    res.json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(), 
+        service: 'ERP-MARKET API',
+        database: {
+            status: dbStatus,
+            responseTime: dbResponseTime > 0 ? `${dbResponseTime}ms` : 'N/A'
+        }
+    });
+});
+
+// ─── LOCAL DB STATS (Electron only) ─────────────────────────────────────────
+app.get('/api/electron/local-stats', async (_req, res) => {
+    try {
+        const { getLocalPrisma } = await import('./config/prisma');
+        const db = getLocalPrisma();
+        const [branchCount, productCount, transactionCount, saleCount, purchaseCount, registerCount] = await Promise.all([
+            db.branch.count(),
+            db.product.count(),
+            db.transaction.count(),
+            db.transaction.count({ where: { type: 'SALE' } }),
+            db.transaction.count({ where: { type: 'INVENTORY_IN' } }),
+            db.cashRegister.count(),
+        ]);
+        res.json({ success: true, data: { branchCount, productCount, transactionCount, saleCount, purchaseCount, registerCount } });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/electron/clear-pending', async (_req, res) => {
+    try {
+        const { getLocalPrisma } = await import('./config/prisma');
+        const result = await getLocalPrisma().transaction.deleteMany({ where: { syncStatus: 'SYNCED' } });
+        res.json({ success: true, message: `Removed ${result.count} synced transactions` });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
 // ─── API ROUTES ───────────────────────────────────────────────────────────
 app.use('/api/auth',       authRouter);
 app.use('/api/users',      usersRouter);
 app.use('/api/branches',   branchesRouter);
-app.use('/api/categories', categoriesRouter);
+app.use('/api/groups', categoriesRouter);
 app.use('/api/products',   productsRouter);
 app.use('/api/inventory',  inventoryRouter);
 app.use('/api/pos',        posRouter);
@@ -109,6 +181,32 @@ app.use('/api/search',     searchRouter);
 app.use('/api/audit',      auditRouter);
 app.use('/api/dashboard',  dashboardRouter);
 app.use('/api/sync',       syncRouter);
+app.use('/api/backup',     backupRouter);
+app.use('/api/settings',   settingsRouter);
+app.use('/api/merma',       mermaRouter);
+app.use('/api/stocktaking', stocktakingRouter);
+app.use('/api/batches',     batchesRouter);
+
+// ─── FRONTEND ESTÁTICO (modo standalone sin Electron) ─────────────────────
+// Sirve el frontend compilado desde backend/public/
+// Solo en producción: en desarrollo Vite se usa el dev server con proxy
+const frontendDist = path.join(__dirname, '../public');
+app.use(express.static(frontendDist, {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.css')) {
+            res.setHeader('Content-Type', 'text/css');
+        } else if (filePath.endsWith('.js') || filePath.endsWith('.mjs')) {
+            res.setHeader('Content-Type', 'application/javascript');
+        }
+    }
+}));
+
+// SPA fallback: cualquier ruta que no sea /api/* devuelve index.html
+// para que React Router maneje la navegación del lado del cliente
+app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(frontendDist, 'index.html'));
+});
 
 // ─── 404 HANDLER ───────────────────────────────────────────────────────────
 app.use(notFoundHandler);

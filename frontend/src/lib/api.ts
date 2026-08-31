@@ -7,8 +7,10 @@ import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { useAuthStore } from '../features/auth/store/authStore';
 import toast from 'react-hot-toast';
 
-const isElectron = typeof window !== 'undefined' && 'erpApi' in window;
-const baseURL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3000/api';
+const baseURL = import.meta.env.VITE_API_URL || 
+    (window.location.protocol === 'file:' || (window as any).erpApi?.isElectron
+        ? 'http://127.0.0.1:3001/api' 
+        : '/api');
 
 export const api = axios.create({
     baseURL,
@@ -36,7 +38,7 @@ const shouldRetry = (error: AxiosError) => {
  * Rutas donde los errores NO deben mostrar toast molesto al usuario.
  * El componente que las usa maneja el estado de error visualmente.
  */
-const SILENT_ENDPOINTS = ['/dashboard/', '/reports/', '/finance/'];
+const SILENT_ENDPOINTS = ['/dashboard/', '/reports/', '/finance/', '/inventory/stock'];
 
 const isSilent = (url?: string) =>
     url ? SILENT_ENDPOINTS.some((path) => url.includes(path)) : false;
@@ -81,7 +83,8 @@ api.interceptors.response.use(
         // 401 → cierra sesión inmediatamente
         if (error.response?.status === 401) {
             useAuthStore.getState().logout();
-            window.location.href = '/login';
+            const isElectron = window.location.protocol === 'file:' || (window as any).erpApi?.isElectron;
+            window.location.href = isElectron ? '#/login' : '/login';
             return Promise.reject(error);
         }
 
@@ -98,11 +101,17 @@ api.interceptors.response.use(
 
         // Toast de error — silenciar para endpoints del dashboard y reportes
         const url = originalRequest.url || '';
+        const data = error.response?.data as any;
+
         if (!isSilent(url)) {
-            const message = error.response?.data
-                ? (error.response.data as { error?: string }).error || error.message
-                : error.message;
-            toast.error(message, { duration: 4000 });
+            // Si hay detalles de validación, dejamos que el componente los maneje
+            // para evitar doble toast (global + local)
+            if (data?.details) {
+                console.log('[API] Validation details found, skipping global toast');
+            } else {
+                const message = data?.error || error.message;
+                toast.error(message, { duration: 4000 });
+            }
         }
 
         console.error('[API Error]', error.response?.status, originalRequest.url);

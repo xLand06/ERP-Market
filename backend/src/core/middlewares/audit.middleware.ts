@@ -32,6 +32,16 @@ export type AuditActionType =
     | 'CATEGORY_CREATE'
     | 'CATEGORY_UPDATE'
     | 'CATEGORY_DELETE'
+    | 'GROUP_CREATE'
+    | 'GROUP_UPDATE'
+    | 'GROUP_DELETE'
+    | 'GROUP_ACTIVATE'
+    | 'GROUP_DEACTIVATE'
+    | 'SUBGROUP_CREATE'
+    | 'SUBGROUP_UPDATE'
+    | 'SUBGROUP_DELETE'
+    | 'SUBGROUP_ACTIVATE'
+    | 'SUBGROUP_DEACTIVATE'
     | 'FINANCE_RATE_UPDATE'
     | 'PURCHASE_CREATE'
     | 'PURCHASE_STATUS_UPDATE'
@@ -41,7 +51,14 @@ export type AuditActionType =
     | 'SUPPLIER_DELETE'
     | 'SYSTEM_PURGE'
     | 'LOGIN'
-    | 'LOGIN_FAILED';
+    | 'LOGIN_FAILED'
+    | 'MERMA_CREATE'
+    | 'BATCH_CREATE'
+    | 'BATCH_UPDATE'
+    | 'BATCH_DELETE'
+    | 'STOCKCOUNT_CREATE'
+    | 'STOCKCOUNT_STATUS_UPDATE'
+    | 'STOCKCOUNT_APPLY';
 
 /**
  * Extrae la IP real del cliente, considerando proxies y load balancers.

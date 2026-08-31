@@ -67,10 +67,11 @@ router.get('/top-products', async (req: Request, res: Response) => {
         where: { id: { in: results.map(r => r.productId) } },
         select: { id: true, name: true, price: true },
     });
+    const productMap = new Map(products.map(p => [p.id, p]));
 
     const enriched = results.map(r => ({
         productId: r.productId,
-        productName: products.find(p => p.id === r.productId)?.name || 'Unknown',
+        productName: productMap.get(r.productId)?.name || 'Unknown',
         quantity: r._sum.quantity || 0,
         total: r._sum.subtotal || 0,
     }));
@@ -130,10 +131,11 @@ router.get('/by-branch', async (req: Request, res: Response) => {
         where: { id: { in: results.map(r => r.branchId) } },
         select: { id: true, name: true },
     });
+    const branchMap = new Map(branches.map(b => [b.id, b]));
 
     const enriched = results.map(r => ({
         branchId: r.branchId,
-        branchName: branches.find(b => b.id === r.branchId)?.name || 'Unknown',
+        branchName: branchMap.get(r.branchId)?.name || 'Unknown',
         total: r._sum.total || 0,
         count: r._count,
     }));

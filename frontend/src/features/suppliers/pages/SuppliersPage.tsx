@@ -1,19 +1,14 @@
 import { useState, useMemo } from 'react';
-import { Search, Plus, Phone, Mail, MapPin, ChevronRight, Bell, Check, Loader2, AlertCircle } from 'lucide-react';
+import { Search, Plus, Phone, Mail, MapPin, ChevronRight, Check, Loader2, AlertCircle, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { SupplierFormModal } from '../components/SupplierFormModal';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { suppliersApi, Supplier } from '@/services/suppliers.service';
+import { suppliersApi } from '@/services/suppliers.service';
 import toast from 'react-hot-toast';
 
-const STATUS_COLORS: Record<string, string> = {
-    paid:    'text-emerald-600',
-    pending: 'text-amber-600',
-    overdue: 'text-red-600',
-};
 
 export default function SuppliersPage() {
     const [selectedId, setSelectedId] = useState<string | null>(null);

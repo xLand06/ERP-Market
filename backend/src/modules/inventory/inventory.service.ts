@@ -7,22 +7,32 @@ import { prisma } from '../../config/prisma';
 import { SetStockInput, AdjustStockInput } from '../../core/validations/inventory.zod';
 
 /**
- * Obtener stock consolidado de todas las sedes
+ * Obtener stock consolidado de todas las sedes (con paginación)
  */
-export const getAllStock = async () => {
+export const getAllStock = async (page = 1, limit = 100) => {
     try {
-        return await prisma.branchInventory.findMany({
-            include: {
-                product: {
-                    include: { 
-                        category: { select: { name: true } },
-                        presentations: true
+        const [items, total] = await Promise.all([
+            prisma.branchInventory.findMany({
+                where: { branch: { isActive: true } },
+                skip: (page - 1) * limit,
+                take: limit,
+                include: {
+                    product: {
+                        include: { 
+                            subGroup: { include: { group: { select: { name: true } } } },
+                            presentations: true,
+                            barcodes: true
+                        },
                     },
+                    branch: { select: { id: true, name: true } },
                 },
-                branch: { select: { id: true, name: true } },
-            },
-            orderBy: { product: { name: 'asc' } },
-        });
+                orderBy: { product: { name: 'asc' } },
+            }),
+            prisma.branchInventory.count({
+                where: { branch: { isActive: true } }
+            }),
+        ]);
+        return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
     } catch (error) {
         console.error('[InventoryService.getAllStock] Error:', error);
         throw error;
@@ -39,8 +49,9 @@ export const getStockByBranch = async (branchId: string) => {
             include: {
                 product: {
                     include: { 
-                        category: { select: { name: true } },
-                        presentations: true
+                        subGroup: { include: { group: { select: { name: true } } } },
+                        presentations: true,
+                        barcodes: true
                     },
                 },
             },
@@ -68,6 +79,10 @@ export const getStockByProduct = async (productId: string) => {
 export const upsertStock = async (data: SetStockInput) => {
     const { productId, branchId, stock, minStock } = data;
     
+    // Validar sucursal activa
+    const branch = await prisma.branch.findUnique({ where: { id: branchId }, select: { isActive: true } });
+    if (!branch?.isActive) throw new Error('No se puede actualizar stock en una sucursal desactivada.');
+    
     return prisma.branchInventory.upsert({
         where: { productId_branchId: { productId, branchId } },
         update: { stock, minStock },
@@ -80,6 +95,10 @@ export const upsertStock = async (data: SetStockInput) => {
  */
 export const adjustStock = async (data: AdjustStockInput) => {
     const { productId, branchId, delta } = data;
+
+    // Validar sucursal activa
+    const branch = await prisma.branch.findUnique({ where: { id: branchId }, select: { isActive: true } });
+    if (!branch?.isActive) throw new Error('No se puede ajustar stock en una sucursal desactivada.');
     
     const existing = await prisma.branchInventory.findUnique({
         where: { productId_branchId: { productId, branchId } },
@@ -101,26 +120,38 @@ export const adjustStock = async (data: AdjustStockInput) => {
 
 /**
  * Obtener alertas de stock bajo (stock <= minStock)
+ * Usa raw query porque Prisma no soporta comparación entre columnas
  */
 export const getLowStockAlerts = async (branchId?: string) => {
-    const where: any = {
-        stock: { lte: prisma.branchInventory.fields.minStock as any },
-    };
-    
-    if (branchId) {
-        where.branchId = branchId;
-    }
+    const branchFilter = branchId ? `AND bi.branchId = '${branchId}'` : '';
+    const rows = await prisma.$queryRawUnsafe<Array<Record<string, any>>>(`
+        SELECT bi.*, p.id as p_id, p.name as p_name, p.barcode as p_barcode,
+               p.cost as p_cost, p.baseUnit as p_base_unit, p.price as p_price,
+               p.imageUrl as p_image_url, p.isActive as p_is_active
+        FROM branch_inventory bi
+        JOIN products p ON p.id = bi.productId
+        WHERE bi.stock <= bi.minStock
+        ${branchFilter}
+        ORDER BY bi.stock ASC
+    `);
 
-    return prisma.branchInventory.findMany({
-        where,
-        include: {
-            product: { 
-                include: { 
-                    presentations: true 
-                } 
-            },
-            branch: { select: { id: true, name: true } },
+    return rows.map((r: any) => ({
+        id: r.id,
+        stock: Number(r.stock),
+        minStock: Number(r.minStock),
+        productId: r.productId,
+        branchId: r.branchId,
+        product: {
+            id: r.p_id,
+            name: r.p_name,
+            barcode: r.p_barcode,
+            price: Number(r.p_price || 0),
+            cost: Number(r.p_cost || 0),
+            baseUnit: r.p_base_unit || 'UNIDAD',
+            imageUrl: r.p_image_url,
+            isActive: r.p_is_active,
+            presentations: [],
         },
-        orderBy: { stock: 'asc' },
-    });
+        branch: { id: r.branchId, name: '' },
+    }));
 };

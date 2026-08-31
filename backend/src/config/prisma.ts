@@ -1,9 +1,10 @@
 import '../config/env';
+import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { PrismaClient as PrismaClientLocal } from '.prisma/client-local';
-import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
 import { Pool } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { logger } from '../core/utils/logger';
 
 // =============================================================================
@@ -39,9 +40,84 @@ function tryCreateCloudClient(): PrismaClient | null {
     }
 
     try {
-        const pool = new Pool({ connectionString });
+        // ── MONKEY-PATCH DE SEGURIDAD PARA ELECTRON ──────────────────────────
+        // Interceptamos el método interno de 'pg' para asegurar que NUNCA se pase
+        // un objeto a la función addCString, lo cual causa el crash en el .exe.
+        try {
+            const pg = require('pg');
+            if (pg.Connection && pg.Connection.prototype && ! (pg.Connection.prototype as any)._isPatched) {
+                const originalStartup = pg.Connection.prototype.startup;
+                pg.Connection.prototype.startup = function(config: any) {
+                    const cleanConfig: any = {};
+                    for (const key in config) {
+                        // Solo permitir valores que se puedan convertir a string de forma segura
+                        // y que NO sean objetos (excepto si son null/undefined que pg maneja)
+                        if (config[key] !== null && config[key] !== undefined) {
+                            if (typeof config[key] !== 'object') {
+                                cleanConfig[key] = String(config[key]);
+                            }
+                            // Si es un objeto, lo ignoramos para el startup packet (como el objeto ssl)
+                        }
+                    }
+                    return originalStartup.call(this, cleanConfig);
+                };
+                (pg.Connection.prototype as any)._isPatched = true;
+                logger.info('[DB] Parche de seguridad pg.Connection aplicado');
+            }
+        } catch (patchErr: any) {
+            logger.warn('[DB] No se pudo aplicar el parche de seguridad pg', { error: patchErr });
+        }
+
+        if (connectionString) {
+            process.env.DATABASE_URL = connectionString;
+        }
+
+        // 1. Limpiar variables de entorno problemáticas (blindaje total)
+        const pgEnvVars = [
+            'PGUSER', 'PGDATABASE', 'PGPASSWORD', 'PGPORT', 'PGHOST', 
+            'PGAPPNAME', 'PGCLIENTENCODING', 'PGOPTIONS', 'USER', 'USERNAME'
+        ];
+        pgEnvVars.forEach(v => {
+            const val = process.env[v];
+            if (val !== undefined && typeof val !== 'string') {
+                delete process.env[v];
+            }
+        });
+
+        // 2. Parseo ultra-seguro para evitar ERR_INVALID_ARG_TYPE en Electron
+        const { parse: parsePgUrl } = require('pg-connection-string');
+        const parsedUrl = parsePgUrl(connectionString);
+        
+        const safeConfig: any = {
+            ssl: { rejectUnauthorized: false },
+            connectionTimeoutMillis: 5000,
+            idleTimeoutMillis: 10000,
+            max: 5,
+            // Forzar parámetros que pg usa en el startup packet para que sean strings
+            application_name: 'erp-market-desktop',
+            client_encoding: 'UTF8'
+        };
+
+        // Extraer solo propiedades escalares seguras y forzarlas a string
+        const safeKeys = ['user', 'password', 'host', 'port', 'database'];
+        for (const key of safeKeys) {
+            if (parsedUrl[key] !== undefined && parsedUrl[key] !== null) {
+                safeConfig[key] = String(parsedUrl[key]);
+            }
+        }
+
+        // Crear el pool sin pasar connectionString directamente (evita re-parseo interno)
+        const pool = new Pool(safeConfig);
+
+        // Capturar errores de conexión del pool para que no crasheen la app
+        pool.on('error', (err) => {
+            logger.warn('[DB] Pool error (no crítico)', { error: err.message });
+        });
+
+        const adapter = new PrismaPg(pool);
+
         const client = new PrismaClient({
-            adapter: new PrismaPg(pool),
+            adapter,
             log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
         });
         logger.info('[DB] Cliente cloud inicializado', {
@@ -87,12 +163,34 @@ let _prismaLocal: PrismaClient | null = null;
 
 export const getLocalPrisma = (): PrismaClient => {
     if (!_prismaLocal) {
-        const localUrl = process.env.LOCAL_DATABASE_URL || 'file:./erp-market.db';
+        // Usar la raíz del backend (donde suele estar el .db)
+        // __dirname es backend/src/config
+        const dbPath = path.resolve(__dirname, '../../erp-market.db');
+        
+        // Forzar ruta absoluta si es un path relativo de SQLite
+        let localUrl = process.env.LOCAL_DATABASE_URL || `file:${dbPath}`;
+        if (localUrl.startsWith('file:./')) {
+            const relativePath = localUrl.replace('file:./', '');
+            localUrl = `file:${path.resolve(__dirname, '../../', relativePath)}`;
+        }
+
         _prismaLocal = new PrismaClientLocal({
             adapter: new PrismaLibSql({ url: localUrl }),
             log: ['error'],
         }) as unknown as PrismaClient;
-        logger.info('[DB] Cliente local SQLite inicializado', { url: localUrl });
+
+        // Optimizar SQLite (WAL mode, synchronous = NORMAL, cache_size = 2000)
+        Promise.all([
+            _prismaLocal.$executeRawUnsafe('PRAGMA journal_mode = WAL;'),
+            _prismaLocal.$executeRawUnsafe('PRAGMA synchronous = NORMAL;'),
+            _prismaLocal.$executeRawUnsafe('PRAGMA cache_size = -2000;')
+        ]).then(() => {
+            logger.info('[DB] Optimizaciones de SQLite aplicadas (WAL, synchronous=NORMAL, cache=2MB)');
+        }).catch(err => {
+            logger.error('[DB] Error al aplicar optimizaciones de SQLite:', err);
+        });
+
+        logger.info('[DB] Cliente local SQLite inicializado', { url: localUrl, absolutePath: dbPath });
     }
     return _prismaLocal;
 };

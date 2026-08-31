@@ -5,6 +5,7 @@
 
 import { prisma } from '../../config/prisma';
 import { CreatePurchaseOrderInput, UpdatePurchaseOrderStatusInput, PurchaseOrderFiltersInput } from '../../core/validations/purchases.zod';
+import { parseDateRange } from '../../core/utils/helpers';
 
 /**
  * Listar órdenes de compra con filtros
@@ -17,12 +18,15 @@ export const getAllOrders = async (filters: PurchaseOrderFiltersInput) => {
             ...(supplierId && { supplierId }),
             ...(branchId && { branchId }),
             ...(status && { status }),
-            ...(from || to ? {
-                createdAt: {
-                    ...(from && { gte: new Date(from) }),
-                    ...(to && { lte: new Date(to) }),
-                }
-            } : {}),
+            ...(from || to ? (() => {
+                const { fromDate, toDate } = parseDateRange(from, to);
+                return {
+                    createdAt: {
+                        ...(fromDate && { gte: fromDate }),
+                        ...(toDate && { lte: toDate }),
+                    }
+                };
+            })() : {}),
         },
         orderBy: { createdAt: 'desc' },
         include: {
@@ -82,6 +86,35 @@ export const createOrder = async (data: CreatePurchaseOrderInput) => {
 };
 
 /**
+ * Parse batch info from notes field
+ * Expected format in notes: { batchCode: "...", expiryDate: "YYYY-MM-DD" }
+ * Or can be passed via item-level notes: "batch:CODE|expiry:YYYY-MM-DD"
+ */
+const parseBatchInfo = (notes: string | null | undefined): { batchCode?: string; expiryDate?: string } | null => {
+    if (!notes) return null;
+    try {
+        // Try JSON format first
+        if (notes.startsWith('{')) {
+            const parsed = JSON.parse(notes);
+            if (parsed.batchCode && parsed.expiryDate) {
+                return { batchCode: parsed.batchCode, expiryDate: parsed.expiryDate };
+            }
+        }
+        // Try legacy format: batch:CODE|expiry:YYYY-MM-DD
+        if (notes.includes('batch:') && notes.includes('expiry:')) {
+            const batchMatch = notes.match(/batch:([^|]+)/);
+            const expiryMatch = notes.match(/expiry:(\d{4}-\d{2}-\d{2})/);
+            if (batchMatch && expiryMatch) {
+                return { batchCode: batchMatch[1], expiryDate: expiryMatch[1] };
+            }
+        }
+    } catch {
+        return null;
+    }
+    return null;
+};
+
+/**
  * Actualizar estado de la orden (Gestión de Stock al RECIBIR)
  */
 export const updateOrderStatus = async (id: string, data: UpdatePurchaseOrderStatusInput) => {
@@ -110,31 +143,63 @@ export const updateOrderStatus = async (id: string, data: UpdatePurchaseOrderSta
             include: { supplier: true, items: true },
         });
 
-        // Si se recibe la mercancía, afectar stock y actualizar costos
+        // Si se recibe la mercancía, afectar stock y actualizar costos (en paralelo)
         if (status === 'RECEIVED') {
-            for (const item of currentOrder.items) {
-                // 1. Incrementar stock en la sede específica
-                await tx.branchInventory.upsert({
-                    where: {
-                        productId_branchId: {
+            await Promise.all(currentOrder.items.map(async (item) => {
+                await Promise.all([
+                    tx.branchInventory.upsert({
+                        where: {
+                            productId_branchId: {
+                                productId: item.productId,
+                                branchId: currentOrder.branchId,
+                            },
+                        },
+                        update: { stock: { increment: item.quantity } },
+                        create: {
+                            productId: item.productId,
+                            branchId: currentOrder.branchId,
+                            stock: item.quantity,
+                        },
+                    }),
+                    tx.product.update({
+                        where: { id: item.productId },
+                        data: { cost: item.unitCost },
+                    }),
+                ]);
+
+                // 3. (Opcional) Crear lote si el ítem tuviera campos de lote
+                const rawItem = currentOrder.items.find(i => i.id === item.id) as any;
+                const batchCode = rawItem?.notes ? parseBatchInfo(rawItem.notes)?.batchCode : undefined;
+                const expiryDate = rawItem?.notes ? parseBatchInfo(rawItem.notes)?.expiryDate : undefined;
+
+                if (batchCode && expiryDate) {
+                    const existingBatch = await tx.productBatch.findFirst({
+                        where: {
+                            batchCode,
                             productId: item.productId,
                             branchId: currentOrder.branchId,
                         },
-                    },
-                    update: { stock: { increment: item.quantity } },
-                    create: {
-                        productId: item.productId,
-                        branchId: currentOrder.branchId,
-                        stock: item.quantity,
-                    },
-                });
+                    });
 
-                // 2. Actualizar precio de costo en catálogo maestro
-                await tx.product.update({
-                    where: { id: item.productId },
-                    data: { cost: item.unitCost },
-                });
-            }
+                    if (existingBatch) {
+                        await tx.productBatch.update({
+                            where: { id: existingBatch.id },
+                            data: { quantity: { increment: item.quantity } },
+                        });
+                    } else {
+                        await tx.productBatch.create({
+                            data: {
+                                batchCode,
+                                productId: item.productId,
+                                branchId: currentOrder.branchId,
+                                expiryDate: new Date(expiryDate),
+                                quantity: item.quantity,
+                                costPrice: item.unitCost,
+                            },
+                        });
+                    }
+                }
+            }));
         }
 
         return updatedOrder;

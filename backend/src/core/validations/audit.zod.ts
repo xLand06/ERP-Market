@@ -10,7 +10,7 @@ import { paginationSchema } from './common.zod';
  * Filtros para listar logs de auditoría
  */
 export const auditFiltersSchema = paginationSchema.extend({
-    userId: z.string().cuid().optional(),
+    userId: z.string().optional(),
     action: z.string().max(50).optional(),
     module: z.string().max(50).optional(),
     from: z.string().datetime().optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),

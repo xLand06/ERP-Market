@@ -1,20 +1,23 @@
+import { useState, lazy, Suspense } from 'react';
 import { useKPIs, useSalesTrend, useTopProducts, useSalesByBranch, formatCurrency, formatNumber } from '../api/useDashboard';
-import { 
+import { useExpiringBatches } from '../../inventory/hooks/useBatches';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/features/auth/store/authStore';
+import {
     TrendingUp, TrendingDown, AlertTriangle, ShoppingCart,
-    DollarSign, Package, PackageOpen, Users,
+    DollarSign, Package, PackageOpen, Users, Percent, Clock
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import {
-    XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-} from 'recharts';
-import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/features/auth/store/authStore';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+
+// Lazy-loaded chart components to reduce main bundle size
+const SalesTrendChart = lazy(() => import('../components/SalesTrendChart'));
+const TopProductsChart = lazy(() => import('../components/TopProductsChart'));
+const SalesByBranchChart = lazy(() => import('../components/SalesByBranchChart'));
 
 function SkeletonCard() {
     return (
@@ -61,129 +64,110 @@ function KPICard({ title, value, subvalue, change, icon: Icon, iconBg, color }: 
     );
 }
 
-function SalesTrendChart({ data, loading }: { data: any[]; loading: boolean }) {
-    if (loading) {
-        return <div className="h-64 bg-slate-100 rounded-lg animate-pulse" />;
-    }
-
-    const chartData = data.map(d => ({
-        ...d,
-        formattedDate: new Date(d.day).toLocaleDateString('es-VE', { day: 'numeric', month: 'short' }),
-    }));
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-sm font-semibold">Tendencia de Ventas</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                    <AreaChart data={chartData}>
-                        <defs>
-                            <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
-                                <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
-                            </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                        <XAxis dataKey="formattedDate" fontSize={12} stroke="#94a3b8" />
-                        <YAxis fontSize={12} stroke="#94a3b8" tickFormatter={(v) => `$${v}`} />
-                        <Tooltip 
-                            formatter={(value: number) => [formatCurrency(value), 'Ventas']}
-                            contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
-                        />
-                        <Area type="monotone" dataKey="total" stroke="#3B82F6" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
-                    </AreaChart>
-                </ResponsiveContainer>
-            </CardContent>
-        </Card>
-    );
+interface CurrencySaleDTO {
+    currency: string;
+    totalSales: number;
+    totalProfit: number;
+    count: number;
 }
 
-function TopProductsChart({ data, loading }: { data: any[]; loading: boolean }) {
-    if (loading) {
-        return <div className="h-64 bg-slate-100 rounded-lg animate-pulse" />;
-    }
+function CurrencySalesGrid({ data }: { data: CurrencySaleDTO[] }) {
+    const [selectedCurrency, setSelectedCurrency] = useState<string>('all');
 
-    const chartData = data.map(d => ({
-        name: d.product?.name?.substring(0, 15) || 'Sin nombre',
-        ventas: d.totalQuantity,
-        revenue: d.totalRevenue,
-    })).slice(0, 5);
+    if (!data || data.length === 0) return null;
 
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-sm font-semibold">Productos Más Vendidos</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={chartData} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                        <XAxis type="number" fontSize={12} stroke="#94a3b8" />
-                        <YAxis type="category" dataKey="name" fontSize={11} width={100} stroke="#94a3b8" />
-                        <Tooltip formatter={(value: number) => [value, 'Unidades']} />
-                        <Bar dataKey="ventas" fill="#10B981" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                </ResponsiveContainer>
-            </CardContent>
-        </Card>
-    );
-}
+    const filteredData = selectedCurrency === 'all' 
+        ? data 
+        : data.filter(d => d.currency === selectedCurrency);
 
-function SalesByBranchChart({ data, loading }: { data: any[]; loading: boolean }) {
-    if (loading) {
-        return <div className="h-64 bg-slate-100 rounded-lg animate-pulse" />;
-    }
-
-    const chartData = data.map((d, i) => ({
-        name: d.branch?.name || `Sede ${i + 1}`,
-        value: d.totalSales,
-        transactions: d.transactionCount,
-    }));
+    const formatOrigCurrency = (val: number, curr: string) => {
+        if (curr === 'COP') return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
+        if (curr === 'USD') return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+        if (curr === 'VES') return `Bs. ${new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2 }).format(val)}`;
+        return `${curr} ${val.toFixed(2)}`;
+    };
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-sm font-semibold">Ventas por Sede</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <ResponsiveContainer width="100%" height={200}>
-                    <PieChart>
-                        <Pie
-                            data={chartData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={50}
-                            outerRadius={80}
-                            paddingAngle={5}
-                            dataKey="value"
-                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+        <Card className="w-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-slate-100">
+                <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-emerald-600" />
+                    Ventas por Moneda (Mes Actual)
+                </CardTitle>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setSelectedCurrency('all')}
+                        className={`text-xs px-2.5 py-1 rounded-md font-medium transition-all ${
+                            selectedCurrency === 'all' 
+                                ? 'bg-slate-900 text-white' 
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                    >
+                        Todas
+                    </button>
+                    {data.map(d => (
+                        <button
+                            key={d.currency}
+                            onClick={() => setSelectedCurrency(d.currency)}
+                            className={`text-xs px-2.5 py-1 rounded-md font-medium transition-all ${
+                                selectedCurrency === d.currency 
+                                    ? 'bg-slate-900 text-white' 
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
                         >
-                            {chartData.map((_entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                        </Pie>
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                    </PieChart>
-                </ResponsiveContainer>
-                <div className="mt-4 space-y-2">
-                    {chartData.map((d, i) => (
-                        <div key={i} className="flex items-center justify-between text-sm">
-                            <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                                <span>{d.name}</span>
-                            </div>
-                            <span className="font-medium">{formatCurrency(d.value)}</span>
-                        </div>
+                            {d.currency}
+                        </button>
                     ))}
+                </div>
+            </CardHeader>
+            <CardContent className="pt-5">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {filteredData.map(d => {
+                        const margin = d.totalSales > 0 ? (d.totalProfit / d.totalSales) * 100 : 0;
+                        return (
+                            <div 
+                                key={d.currency} 
+                                className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 flex flex-col gap-3 relative overflow-hidden shadow-sm"
+                            >
+                                <div className="absolute -right-4 -bottom-4 opacity-5 text-slate-400 font-black text-6xl select-none">
+                                    {d.currency}
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{d.currency}</span>
+                                    <Badge variant="outline" className="text-[10px] font-bold bg-white">{d.count} Ventas</Badge>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-semibold text-slate-400 block">Total Facturado</span>
+                                    <span className="text-xl font-black text-slate-800">
+                                        {formatOrigCurrency(d.totalSales, d.currency)}
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 border-t border-slate-200/60 pt-2.5">
+                                    <div>
+                                        <span className="text-[10px] font-semibold text-slate-400 block">Ganancia</span>
+                                        <span className="text-xs font-bold text-emerald-600">
+                                            {formatOrigCurrency(d.totalProfit, d.currency)}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-semibold text-slate-400 block">Margen</span>
+                                        <span className="text-xs font-bold text-blue-600 flex items-center gap-0.5">
+                                            <Percent className="w-3 h-3" /> {margin.toFixed(1)}%
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             </CardContent>
         </Card>
     );
 }
 
+
 function LowStockPanel({ count }: { count: number }) {
+    const navigate = useNavigate();
     return (
         <Card className="h-full">
             <CardHeader className="flex-row items-center justify-between pb-3 border-b border-slate-100">
@@ -199,8 +183,40 @@ function LowStockPanel({ count }: { count: number }) {
                     <p className="text-slate-600 font-medium">{count} productos con stock bajo</p>
                     <p className="text-xs text-slate-400 mt-1">Revisa el módulo de inventario</p>
                 </div>
-                <Button variant="outline" size="sm" className="w-full mt-4">
+                <Button variant="outline" size="sm" className="w-full mt-4" onClick={() => navigate('/inventory')}>
                     Ver Inventario
+                </Button>
+            </CardContent>
+        </Card>
+    );
+}
+
+function ExpiringBatchesPanel() {
+    const navigate = useNavigate();
+    const { data: expiringData } = useExpiringBatches(30);
+    const total = (expiringData?.expiring?.length || 0) + (expiringData?.expired?.length || 0);
+
+    if (total === 0) return null;
+
+    return (
+        <Card className="h-full">
+            <CardHeader className="flex-row items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    <h3 className="text-sm font-semibold text-slate-900">Lotes por Vencer</h3>
+                </div>
+                <Badge variant="warning">{total} alerta{total !== 1 ? 's' : ''}</Badge>
+            </CardHeader>
+            <CardContent className="pt-4">
+                <div className="text-center py-6">
+                    <Clock className="w-10 h-10 text-amber-500 mx-auto mb-3" />
+                    <p className="text-slate-600 font-medium">
+                        {expiringData?.expired?.length || 0} vencidos, {expiringData?.expiring?.length || 0} próximos
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">Revisa el módulo de lotes</p>
+                </div>
+                <Button variant="outline" size="sm" className="w-full mt-3" onClick={() => navigate('/inventory/batches')}>
+                    Ver Lotes
                 </Button>
             </CardContent>
         </Card>
@@ -237,14 +253,22 @@ function QuickActions() {
 }
 
 export default function DashboardPage() {
-    const navigate = useNavigate();
     const selectedBranch = useAuthStore(s => s.selectedBranch);
-    const effectiveBranch = selectedBranch === 'all' ? undefined : selectedBranch;
+    const [timeRange, setTimeRange] = useState<'today' | 'month' | 'year' | 'all'>('today');
+    
+    const effectiveBranch = (selectedBranch === 'all' || !selectedBranch) ? undefined : selectedBranch;
 
-    const { data: kpis, isLoading: kpisLoading } = useKPIs(effectiveBranch);
-    const { data: salesTrend, isLoading: trendLoading } = useSalesTrend(30, effectiveBranch);
-    const { data: topProducts, isLoading: topLoading } = useTopProducts(10, effectiveBranch);
+    const { data: kpis, isLoading: kpisLoading } = useKPIs(effectiveBranch, timeRange);
+    const { data: salesTrend, isLoading: trendLoading } = useSalesTrend(timeRange === 'today' ? 'month' : timeRange, effectiveBranch);
+    const { data: topProducts, isLoading: topLoading } = useTopProducts(10, effectiveBranch, timeRange);
     const { data: salesByBranch, isLoading: branchLoading } = useSalesByBranch();
+
+    const rangeLabels = {
+        today: 'Hoy',
+        month: 'Este Mes',
+        year: 'Este Año',
+        all: 'Todo el Tiempo'
+    };
 
     const loading = kpisLoading || trendLoading || topLoading || branchLoading;
     const today = new Date().toLocaleDateString('es-VE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -257,9 +281,29 @@ export default function DashboardPage() {
                     <h1 className="text-xl sm:text-2xl font-black text-slate-900">Dashboard Gerencial</h1>
                     <p className="text-xs text-slate-500 mt-1 capitalize">{today}</p>
                 </div>
-                <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 w-fit">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span className="text-xs font-bold text-emerald-700 uppercase">Sistema Activo</span>
+                
+                <div className="flex items-center gap-2">
+                    <div className="flex p-1 bg-slate-100 rounded-lg border border-slate-200">
+                        {(['today', 'month', 'year', 'all'] as const).map((r) => (
+                            <button
+                                key={r}
+                                onClick={() => setTimeRange(r)}
+                                className={cn(
+                                    "px-3 py-1.5 text-xs font-bold rounded-md transition-all",
+                                    timeRange === r 
+                                        ? "bg-white text-slate-900 shadow-sm" 
+                                        : "text-slate-500 hover:text-slate-700"
+                                )}
+                            >
+                                {rangeLabels[r]}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="text-xs font-bold text-emerald-700 uppercase">Sistema Activo</span>
+                    </div>
                 </div>
             </div>
 
@@ -278,19 +322,19 @@ export default function DashboardPage() {
                 ) : (
                     <>
                         <KPICard
-                            title="Ventas del Día"
+                            title={`Ventas ${rangeLabels[timeRange]}`}
                             value={formatCurrency(kpis?.sales.today.total || 0)}
                             subvalue={`${kpis?.sales.today.count || 0} transacciones`}
-                            change={8.2}
+                            change={kpis?.sales.today.change || 0}
                             icon={DollarSign}
                             iconBg="bg-emerald-50"
                             color="#10B981"
                         />
                         <KPICard
-                            title="Ventas del Mes"
+                            title="Ingresos del Mes"
                             value={formatCurrency(kpis?.sales.thisMonth.total || 0)}
                             subvalue={`${kpis?.sales.thisMonth.count || 0} transacciones`}
-                            change={12.5}
+                            change={kpis?.sales.thisMonth.change || 0}
                             icon={ShoppingCart}
                             iconBg="bg-blue-50"
                             color="#3B82F6"
@@ -299,15 +343,15 @@ export default function DashboardPage() {
                             title="Productos en Stock"
                             value={formatNumber(kpis?.inventory.totalProducts || 0)}
                             subvalue={`${kpis?.inventory.lowStockAlerts || 0} alertas`}
-                            change={-2.1}
+                            change={kpis?.inventory.change || 0}
                             icon={Package}
                             iconBg="bg-violet-50"
                             color="#8B5CF6"
                         />
                         <KPICard
-                            title="Transacciones Hoy"
+                            title={`Transacciones ${rangeLabels[timeRange]}`}
                             value={formatNumber(kpis?.transactionsToday || 0)}
-                            change={5.3}
+                            change={kpis?.transactionsTodayChange || 0}
                             icon={Users}
                             iconBg="bg-amber-50"
                             color="#F59E0B"
@@ -316,18 +360,32 @@ export default function DashboardPage() {
                 )}
             </div>
 
+            {/* Multi-currency breakdown */}
+            {!loading && kpis?.salesByCurrency && (
+                <CurrencySalesGrid data={kpis.salesByCurrency} />
+            )}
+
             {/* Charts Row 1 */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <SalesTrendChart data={salesTrend || []} loading={trendLoading} />
-                <TopProductsChart data={topProducts || []} loading={topLoading} />
+                <Suspense fallback={<div className="h-64 bg-slate-100 rounded-lg animate-pulse" />}>
+                    <SalesTrendChart data={salesTrend || []} loading={trendLoading} />
+                </Suspense>
+                <Suspense fallback={<div className="h-64 bg-slate-100 rounded-lg animate-pulse" />}>
+                    <TopProductsChart data={topProducts || []} loading={topLoading} />
+                </Suspense>
             </div>
 
             {/* Charts Row 2 */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 <div className="lg:col-span-2">
-                    <SalesByBranchChart data={salesByBranch || []} loading={branchLoading} />
+                    <Suspense fallback={<div className="h-64 bg-slate-100 rounded-lg animate-pulse" />}>
+                        <SalesByBranchChart data={salesByBranch || []} loading={branchLoading} />
+                    </Suspense>
                 </div>
-                <LowStockPanel count={kpis?.inventory.lowStockAlerts || 0} />
+                <div className="flex flex-col gap-5">
+                    <LowStockPanel count={kpis?.inventory.lowStockAlerts || 0} />
+                    <ExpiringBatchesPanel />
+                </div>
             </div>
         </div>
     );

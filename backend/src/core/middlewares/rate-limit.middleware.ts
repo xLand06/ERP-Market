@@ -5,7 +5,7 @@ const isDev = env.NODE_ENV === 'development';
 
 export const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 1000, // Forzado a 1000 para descartar problemas de entorno
+    max: isDev ? 100 : 10,
     message: {
         status: 'error',
         message: 'Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.',

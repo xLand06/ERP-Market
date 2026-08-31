@@ -24,11 +24,16 @@ export type IpcChannels =
     | 'products:delete'
     | 'products:search'
     
-    // Categories
-    | 'categories:getAll'
-    | 'categories:create'
-    | 'categories:update'
-    | 'categories:delete'
+    // Groups
+    | 'groups:getAll'
+    | 'groups:getOne'
+    | 'groups:create'
+    | 'groups:update'
+    | 'groups:delete'
+    | 'groups:subgroups:getAll'
+    | 'groups:subgroups:create'
+    | 'groups:subgroups:update'
+    | 'groups:subgroups:delete'
     
     // Branches
     | 'branches:getAll'

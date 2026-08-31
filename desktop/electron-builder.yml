@@ -1,5 +1,5 @@
 appId: com.sofimar.erp-market
-productName: ERP-Market
+productName: ALLMARKET -- AbastosSofimar
 copyright: Copyright © 2025 Abastos Sofimar
 
 directories:
@@ -12,27 +12,38 @@ files:
   - "!node_modules/electron/**"
   - "!node_modules/electron-builder/**"
   - "!node_modules/electron-vite/**"
+  - "!node_modules/ts-node/**"
 
 extraFiles:
-  # Incluye el frontend construido
-  - from: "../frontend/dist"
-    to: "frontend/dist"
-  # Incluye el backend construido con sus node_modules (Prisma, Express)
-  - from: "../backend/node_modules/.prisma"
-    to: "resources/prisma"
+  - from: "../backend/.env"
+    to: "resources/backend/.env"
+  - from: "../backend/erp-market.db"
+    to: "resources/seed/erp-market.db"
+  - from: "../backend/dist"
+    to: "resources/backend"
+    filter:
+      - "**/*"
+  - from: "../temp-backend/node_modules"
+    to: "resources/backend/node_modules"
+    filter:
+      - "**/*"
 
 win:
-  icon: resources/icon.ico
   target:
     - target: nsis
+      arch:
+        - x64
+    - target: portable
       arch:
         - x64
 
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  installerIcon: resources/icon.ico
-  uninstallerIcon: resources/icon.ico
-  installQuote: "Instalando ERP-Market — Abastos Sofimar"
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
 
-publish: null
+publish:
+  provider: github
+  owner: xLand06
+  repo: ERP-Market
