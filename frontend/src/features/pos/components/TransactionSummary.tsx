@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
-import { Check, Printer, ChevronDown, User, Hash, Phone } from 'lucide-react';
+import { useEffect } from 'react';
+import { Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useConfigStore, ThermalPrinterConfig } from '@/hooks/useConfigStore';
+import { useConfigStore } from '@/hooks/useConfigStore';
 import { ThermalReceiptTicket } from '@/components/common/ThermalReceiptTicket';
+import { printThermalReceiptReal } from '@/lib/thermalPrinter';
 import toast from 'react-hot-toast';
 
 interface TransactionSummaryProps {
@@ -38,26 +39,33 @@ export function TransactionSummary({
     paymentMethods = [],
     onDismiss,
 }: TransactionSummaryProps) {
-    const { autoPrintOnCheckout, fmtMain, printers = [], selectedPrinterId, selectedPrinterName } = useConfigStore();
+    const config = useConfigStore();
+    const { autoPrintOnCheckout, printers = [] } = config;
 
-    // Impresora seleccionada para la impresión actual (por defecto la principal)
+    // Impresora configurada como principal en /settings
     const primaryPrinter = printers.find(p => p.isPrimary) || printers[0] || null;
-    const [targetPrinterId, setTargetPrinterId] = useState<string | null>(primaryPrinter?.id || selectedPrinterId || null);
 
-    useEffect(() => {
-        if (primaryPrinter) {
-            setTargetPrinterId(primaryPrinter.id);
+    const handlePrint = async () => {
+        const res = await printThermalReceiptReal(primaryPrinter, {
+            invoiceNumber: 'FACT-000482',
+            customerName,
+            customerTaxId,
+            customerPhone,
+            businessName: config.businessName,
+            taxId: config.taxId,
+            fiscalAddress: config.fiscalAddress,
+            fiscalPhone: config.fiscalPhone,
+            items,
+            totalUSD: total,
+            totalVES: config.fromUSD(total, 'VES'),
+            totalCOP: config.fromUSD(total, 'COP'),
+            paymentMethods,
+            footerMessage: config.footerMessage,
+        });
+
+        if (res.method === 'webusb') {
+            toast.success(res.message);
         }
-    }, [primaryPrinter?.id, visible]);
-
-    const activePrinter = printers.find(p => p.id === targetPrinterId) || primaryPrinter;
-
-    const handlePrint = (printerOverride?: ThermalPrinterConfig) => {
-        const printerToUse = printerOverride || activePrinter;
-        if (printerToUse && printerToUse.connectionType === 'thermal_usb') {
-            toast.success(`Enviando ticket a ${printerToUse.name} (USB Directo)`);
-        }
-        window.print();
     };
 
     useEffect(() => {
@@ -77,27 +85,10 @@ export function TransactionSummary({
             visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}>
             <div className="bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full my-auto overflow-hidden border border-slate-700 space-y-0">
-                {/* Header Exito */}
-                <div className="bg-emerald-600 px-6 py-4 text-center text-white flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white shrink-0">
-                            <Check className="w-5 h-5" />
-                        </div>
-                        <div className="text-left">
-                            <h2 className="text-base font-black tracking-tight">
-                                {type === 'SALE' ? '¡Venta Realizada con Éxito!' : '¡Entrada Registrada!'}
-                            </h2>
-                            <p className="text-emerald-100 text-[11px] font-bold">
-                                Transacción procesada correctamente
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Vista Previa del Ticket Térmico Real (Fidelidad 100% igual a /settings) */}
-                <div className="p-4 bg-slate-950 max-h-[60vh] overflow-y-auto override-scrollbar">
+                {/* Ticket Térmico Real (Fidelidad 100% igual a /settings) */}
+                <div className="p-4 bg-slate-950 max-h-[70vh] overflow-y-auto override-scrollbar">
                     <ThermalReceiptTicket
-                        paperWidth={activePrinter?.paperWidth || '80mm'}
+                        paperWidth={primaryPrinter?.paperWidth || '80mm'}
                         customerName={customerName}
                         customerTaxId={customerTaxId}
                         customerPhone={customerPhone}
@@ -108,46 +99,27 @@ export function TransactionSummary({
                     />
                 </div>
 
-                {/* Selector de Impresora & Acciones */}
-                <div className="p-4 bg-slate-900 border-t border-slate-800 space-y-3">
-                    {type === 'SALE' && printers.length > 0 && (
-                        <div className="space-y-1">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Dispositivo de Impresión</span>
-                            <select
-                                value={targetPrinterId || ''}
-                                onChange={(e) => setTargetPrinterId(e.target.value)}
-                                className="w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-xl text-xs font-bold text-white outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-                            >
-                                {printers.map(p => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.name} {p.isPrimary ? '(Principal)' : ''} — [{p.paperWidth}]
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-
-                    <div className="flex gap-2">
-                        {type === 'SALE' && (
-                            <Button
-                                type="button"
-                                onClick={() => handlePrint()}
-                                className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer"
-                            >
-                                <Printer className="w-4 h-4" />
-                                Imprimir Factura
-                            </Button>
-                        )}
-
+                {/* Acciones Directas */}
+                <div className="p-4 bg-slate-900 border-t border-slate-800 flex gap-2">
+                    {type === 'SALE' && (
                         <Button
                             type="button"
-                            variant="outline"
-                            onClick={onDismiss}
-                            className="flex-1 h-12 border-slate-700 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-2xl text-xs cursor-pointer"
+                            onClick={handlePrint}
+                            className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer"
                         >
-                            Siguiente Venta
+                            <Printer className="w-4 h-4" />
+                            Imprimir Factura
                         </Button>
-                    </div>
+                    )}
+
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={onDismiss}
+                        className="flex-1 h-12 border-slate-700 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-2xl text-xs cursor-pointer"
+                    >
+                        Siguiente Venta
+                    </Button>
                 </div>
             </div>
         </div>
