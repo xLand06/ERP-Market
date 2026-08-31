@@ -180,7 +180,9 @@
     --sidebar-accent: #10B981;
   }
 
-  html.theme-dark body {
+  html.theme-dark body,
+  html.theme-dark main,
+  html.theme-dark [class*="h-dvh"] {
     background-color: #0D1117 !important;
     color: #F0F6FC !important;
   }
@@ -192,10 +194,10 @@
     border-color: #30363D !important;
   }
   html.theme-dark .bg-slate-50,
-  html.theme-dark .bg-slate-100,
-  html.theme-dark .bg-slate-200,
-  html.theme-dark .bg-gray-50,
-  html.theme-dark .bg-gray-100 {
+  html.theme-dark [class*="bg-slate-100"],
+  html.theme-dark [class*="bg-slate-200"],
+  html.theme-dark [class*="bg-gray-50"],
+  html.theme-dark [class*="bg-gray-100"] {
     background-color: #21262D !important;
     color: #F0F6FC !important;
   }

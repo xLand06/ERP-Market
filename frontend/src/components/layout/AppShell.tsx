@@ -90,7 +90,7 @@ export function AppShellLayout() {
     }, []);
 
     return (
-        <div className="flex h-dvh overflow-hidden bg-[#F8FAFC]">
+        <div className="flex h-dvh overflow-hidden bg-slate-100/60 text-slate-900 transition-colors duration-300">
             {!collapsed && (
                 <div
                     className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"
