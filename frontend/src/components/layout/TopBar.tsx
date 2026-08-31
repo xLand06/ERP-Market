@@ -10,7 +10,7 @@ import { CloudSyncWidget } from './CloudSyncWidget';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import {
-    Dialog, DialogContent,
+    Dialog, DialogContent, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 
 const SYMBOLS: Record<string, string> = { USD: '$', VES: 'Bs.', COP: '$' };
@@ -232,8 +232,8 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                                 <Keyboard className="w-24 h-24 rotate-12" />
                             </div>
                             
-                            <h3 className="text-2xl font-black tracking-tight mb-1">ACCESO RÁPIDO</h3>
-                            <p className="text-emerald-100 text-sm font-medium">Atajos de teclado para expertos</p>
+                            <DialogTitle className="text-2xl font-black tracking-tight mb-1 text-white">ACCESO RÁPIDO</DialogTitle>
+                            <DialogDescription className="text-emerald-100 text-sm font-medium">Atajos de teclado para expertos</DialogDescription>
                         </div>
                         
                         <div className="p-4 bg-slate-50/50">

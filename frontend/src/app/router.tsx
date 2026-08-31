@@ -69,6 +69,8 @@ export const router = createRouter([
 
             { path: 'finance',             element: wrap(FinancePage) },
             { path: 'finance/cash-register', element: wrap(CashRegisterPage) },
+            { path: 'cash-registers',      element: wrap(CashRegisterPage) },
+            { path: 'cash-register',       element: wrap(CashRegisterPage) },
             { path: 'products',            element: wrap(ProductsPage) },
             { path: 'products/categories', element: wrap(CategoriesPage) },
             { path: 'suppliers',           element: wrap(SuppliersPage) },

@@ -140,11 +140,11 @@ export function AppShellLayout() {
                     {[
                         { path: '/pos', label: 'POS', icon: ShoppingCart },
                         { path: '/products', label: 'Productos', icon: Package },
-                        { path: '/', label: 'Inicio', icon: LayoutDashboard },
-                        { path: '/cash-registers', label: 'Cajas', icon: Banknote },
+                        { path: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
+                        { path: '/finance/cash-register', label: 'Cajas', icon: Banknote },
                         { path: '/settings', label: 'Ajustes', icon: Settings },
                     ].map((navItem) => {
-                        const isActive = location.pathname === navItem.path;
+                        const isActive = location.pathname === navItem.path || (navItem.path !== '/dashboard' && location.pathname.startsWith(navItem.path));
                         const Icon = navItem.icon;
                         return (
                             <button
