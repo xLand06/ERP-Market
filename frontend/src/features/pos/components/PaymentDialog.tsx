@@ -131,22 +131,23 @@ export function PaymentDialog({
     const changeUSD = Math.max(0, changeInUSD);
     const changeVES = fromUSD(changeUSD, 'VES');
 
-    // Botones de billetes rápidos según la moneda de la primera fila de pago
-    const activeCurrency = rows[0]?.currency || 'USD';
-    const quickBills = useMemo(() => {
-        if (activeCurrency === 'USD') {
+    // Generante de billetes rápidos dinámico por moneda específica
+    const getQuickBills = (currency: string) => {
+        if (currency === 'COP') {
             return [
-                { label: 'Exacto', val: Number(totalUSD.toFixed(2)) },
-                { label: '$5', val: 5 },
-                { label: '$10', val: 10 },
-                { label: '$20', val: 20 },
-                { label: '$50', val: 50 },
-                { label: '$100', val: 100 },
+                { label: 'Exacto', val: Math.round(totalCOP) },
+                { label: '$2.000', val: 2000 },
+                { label: '$5.000', val: 5000 },
+                { label: '$10.000', val: 10000 },
+                { label: '$20.000', val: 20000 },
+                { label: '$50.000', val: 50000 },
+                { label: '$100.000', val: 100000 },
             ];
         }
-        if (activeCurrency === 'VES') {
+        if (currency === 'VES') {
             return [
                 { label: 'Exacto', val: Number(totalVES.toFixed(2)) },
+                { label: 'Bs. 20', val: 20 },
                 { label: 'Bs. 50', val: 50 },
                 { label: 'Bs. 100', val: 100 },
                 { label: 'Bs. 200', val: 200 },
@@ -154,13 +155,14 @@ export function PaymentDialog({
             ];
         }
         return [
-            { label: 'Exacto', val: totalCOP },
-            { label: '$10k', val: 10000 },
-            { label: '$20k', val: 20000 },
-            { label: '$50k', val: 50000 },
-            { label: '$100k', val: 100000 },
+            { label: 'Exacto', val: Number(totalUSD.toFixed(2)) },
+            { label: '$5', val: 5 },
+            { label: '$10', val: 10 },
+            { label: '$20', val: 20 },
+            { label: '$50', val: 50 },
+            { label: '$100', val: 100 },
         ];
-    }, [activeCurrency, totalUSD, totalVES, totalCOP]);
+    };
 
     const handleConfirm = () => {
         const payload = getPayload();
@@ -400,21 +402,19 @@ export function PaymentDialog({
                                                 />
                                             </div>
 
-                                            {i === 0 && (
-                                                <div className="flex items-center gap-2 flex-wrap pt-1">
-                                                    <span className="text-xs font-black text-slate-600 uppercase mr-1">Billetes Rápido:</span>
-                                                    {quickBills.map((b, idx) => (
-                                                        <button
-                                                            key={idx}
-                                                            type="button"
-                                                            onClick={() => updateRow(row.key, { amount: b.val })}
-                                                            className="h-10 px-4 bg-white hover:bg-indigo-50 hover:text-indigo-900 border-2 border-slate-300 hover:border-indigo-300 rounded-xl text-xs font-black text-slate-900 transition-all active:scale-95 shadow-2xs"
-                                                        >
-                                                            {b.label}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
+                                            <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                                                <span className="text-xs font-black text-slate-700 uppercase mr-1">Billetes Rápido ({row.currency}):</span>
+                                                {getQuickBills(row.currency).map((b, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        type="button"
+                                                        onClick={() => updateRow(row.key, { amount: b.val })}
+                                                        className="h-10 px-3.5 bg-white hover:bg-emerald-50 hover:text-emerald-950 border-2 border-slate-300 hover:border-emerald-500 rounded-xl text-xs font-black text-slate-950 transition-all active:scale-95 shadow-2xs cursor-pointer"
+                                                    >
+                                                        {b.label}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
