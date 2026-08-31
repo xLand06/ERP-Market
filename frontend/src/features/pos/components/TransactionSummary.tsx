@@ -3,6 +3,7 @@ import { Check, Printer, ChevronDown, User, Hash, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useConfigStore, ThermalPrinterConfig } from '@/hooks/useConfigStore';
+import { ThermalReceiptTicket } from '@/components/common/ThermalReceiptTicket';
 import toast from 'react-hot-toast';
 
 interface TransactionSummaryProps {
@@ -14,7 +15,7 @@ interface TransactionSummaryProps {
     items?: Array<{
         name: string;
         qty: number;
-        unitPrice: number;
+        unitPrice?: number;
         total: number;
     }>;
     total?: number;
@@ -72,106 +73,81 @@ export function TransactionSummary({
 
     return (
         <div className={cn(
-            'fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm transition-all duration-300',
+            'fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 transition-all duration-300 overflow-y-auto',
             visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}>
-            <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full mx-4 overflow-hidden border border-slate-200">
-                {/* Header */}
-                <div className="bg-emerald-600 px-6 py-6 text-center text-white">
-                    <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center mx-auto mb-2 text-white">
-                        <Check className="w-7 h-7" />
-                    </div>
-                    <h2 className="text-xl font-black tracking-tight">
-                        {type === 'SALE' ? '¡Venta Realizada con Éxito!' : '¡Entrada Registrada!'}
-                    </h2>
-                    <p className="text-emerald-100 text-xs mt-0.5 font-bold">
-                        Transacción procesada correctamente
-                    </p>
-                </div>
-
-                {/* Datos del Cliente */}
-                {type === 'SALE' && (
-                    <div className="px-6 py-3 bg-slate-50 border-b border-slate-200/80 space-y-1">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Datos del Cliente</span>
-                        <div className="flex items-center justify-between text-xs font-bold text-slate-900">
-                            <span className="flex items-center gap-1.5 truncate">
-                                <User className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                                {customerName}
-                            </span>
-                            <span className="text-slate-500 font-mono text-[11px] shrink-0">{customerTaxId}</span>
+            <div className="bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full my-auto overflow-hidden border border-slate-700 space-y-0">
+                {/* Header Exito */}
+                <div className="bg-emerald-600 px-6 py-4 text-center text-white flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white shrink-0">
+                            <Check className="w-5 h-5" />
                         </div>
-                        {customerPhone && (
-                            <p className="text-[11px] text-slate-500 font-medium flex items-center gap-1 pt-0.5">
-                                <Phone className="w-3 h-3 text-slate-400" /> {customerPhone}
+                        <div className="text-left">
+                            <h2 className="text-base font-black tracking-tight">
+                                {type === 'SALE' ? '¡Venta Realizada con Éxito!' : '¡Entrada Registrada!'}
+                            </h2>
+                            <p className="text-emerald-100 text-[11px] font-bold">
+                                Transacción procesada correctamente
                             </p>
-                        )}
-                    </div>
-                )}
-
-                {/* Items */}
-                {items.length > 0 && (
-                    <div className="px-6 py-3 border-b border-slate-100 max-h-40 overflow-y-auto custom-scrollbar">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">
-                            Productos ({items.length})
-                        </p>
-                        <div className="space-y-1.5 text-xs">
-                            {items.map((item, i) => (
-                                <div key={i} className="flex justify-between font-medium">
-                                    <span className="text-slate-700">{item.qty}x {item.name}</span>
-                                    <span className="font-bold text-slate-900">{fmtMain(item.total)}</span>
-                                </div>
-                            ))}
                         </div>
                     </div>
-                )}
-
-                {/* Totals */}
-                <div className="px-6 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                    <span className="text-xs font-black text-slate-500 uppercase">Monto Total</span>
-                    <span className="text-xl font-black text-slate-900 tabular-nums">
-                        {fmtMain(total)}
-                    </span>
                 </div>
 
-                {/* Selector de Impresoras (Principal por defecto o cambio directo al imprimir) */}
-                {type === 'SALE' && printers.length > 0 && (
-                    <div className="px-6 pt-3 pb-1 space-y-1">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Impresora para Factura</span>
-                        <select
-                            value={targetPrinterId || ''}
-                            onChange={(e) => setTargetPrinterId(e.target.value)}
-                            className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-                        >
-                            {printers.map(p => (
-                                <option key={p.id} value={p.id}>
-                                    {p.name} {p.isPrimary ? '(Principal)' : ''} — [{p.paperWidth}]
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                )}
+                {/* Vista Previa del Ticket Térmico Real (Fidelidad 100% igual a /settings) */}
+                <div className="p-4 bg-slate-950 max-h-[60vh] overflow-y-auto override-scrollbar">
+                    <ThermalReceiptTicket
+                        paperWidth={activePrinter?.paperWidth || '80mm'}
+                        customerName={customerName}
+                        customerTaxId={customerTaxId}
+                        customerPhone={customerPhone}
+                        items={items}
+                        totalUSD={total}
+                        paymentMethods={paymentMethods}
+                        isPreview={false}
+                    />
+                </div>
 
-                {/* Action Buttons */}
-                <div className="p-5 flex flex-col gap-2">
-                    {type === 'SALE' && (
-                        <Button
-                            type="button"
-                            onClick={() => handlePrint()}
-                            className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-xs flex items-center justify-center gap-2 shadow-md"
-                        >
-                            <Printer className="w-4 h-4" />
-                            Imprimir Factura ({activePrinter?.name || 'Principal'})
-                        </Button>
+                {/* Selector de Impresora & Acciones */}
+                <div className="p-4 bg-slate-900 border-t border-slate-800 space-y-3">
+                    {type === 'SALE' && printers.length > 0 && (
+                        <div className="space-y-1">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Dispositivo de Impresión</span>
+                            <select
+                                value={targetPrinterId || ''}
+                                onChange={(e) => setTargetPrinterId(e.target.value)}
+                                className="w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-xl text-xs font-bold text-white outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                            >
+                                {printers.map(p => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.name} {p.isPrimary ? '(Principal)' : ''} — [{p.paperWidth}]
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     )}
 
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={onDismiss}
-                        className="w-full h-11 border-slate-200 text-slate-700 font-bold rounded-2xl text-xs hover:bg-slate-100"
-                    >
-                        Continuar Siguiente Venta
-                    </Button>
+                    <div className="flex gap-2">
+                        {type === 'SALE' && (
+                            <Button
+                                type="button"
+                                onClick={() => handlePrint()}
+                                className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer"
+                            >
+                                <Printer className="w-4 h-4" />
+                                Imprimir Factura
+                            </Button>
+                        )}
+
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onDismiss}
+                            className="flex-1 h-12 border-slate-700 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-2xl text-xs cursor-pointer"
+                        >
+                            Siguiente Venta
+                        </Button>
+                    </div>
                 </div>
             </div>
         </div>
