@@ -23,9 +23,9 @@ interface TopBarProps {
 }
 
 export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
-    const { toCOP, fromCOP } = useConfigStore();
+    const { toUSD, fromUSD } = useConfigStore();
     const { user, logout } = useAuthStore();
-    const [base, setBase] = useState<Currency>('COP');
+    const [base, setBase] = useState<Currency>('USD');
     const [profileOpen, setProfileOpen] = useState(false);
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
     const [ratePopoverOpen, setRatePopoverOpen] = useState(false);
@@ -36,15 +36,53 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
         navigate('/login');
     };
 
-    const formatRate = (from: Currency, to: Currency) => {
-        // Convertimos 1 unidad de "from" a COP
-        const copAmount = toCOP(1, from);
-        // Convertimos los COP a "to"
-        const rate = fromCOP(copAmount, to);
+    const getPairInfo = (from: Currency, to: Currency) => {
+        if (from === 'USD') {
+            const val = fromUSD(1, to);
+            const formatted = to === 'COP'
+                ? val.toLocaleString('es-CO', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
+                : val.toLocaleString('es-VE', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+            return {
+                left: '$1 USD = ',
+                right: `${SYMBOLS[to]} ${formatted}`,
+            };
+        }
 
-        return rate >= 1000
-            ? rate.toLocaleString('es-VE', { maximumFractionDigits: 0 })
-            : rate.toFixed(2);
+        if (from === 'VES') {
+            if (to === 'USD') {
+                const val = toUSD(1, 'VES');
+                return {
+                    left: 'Bs. 1 VES = ',
+                    right: `$ ${val.toFixed(4)} USD`,
+                };
+            } else {
+                const val = fromUSD(toUSD(1, 'VES'), 'COP');
+                return {
+                    left: 'Bs. 1 VES = ',
+                    right: `$ ${val.toLocaleString('es-CO', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} COP`,
+                };
+            }
+        }
+
+        if (from === 'COP') {
+            if (to === 'USD') {
+                const val = fromUSD(1, 'COP');
+                return {
+                    left: '$1 USD = ',
+                    right: `$ ${val.toLocaleString('es-CO', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} COP`,
+                };
+            } else {
+                const valVES = fromUSD(1, 'VES');
+                const valCOP = fromUSD(1, 'COP');
+                const vesPer1000Cop = (valVES / valCOP) * 1000;
+                return {
+                    left: '$1,000 COP = ',
+                    right: `Bs. ${vesPer1000Cop.toFixed(2)} VES`,
+                };
+            }
+        }
+
+        return { left: '', right: '' };
     };
 
     const others = CURRENCIES.filter(c => c !== base);
@@ -102,18 +140,18 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
 
                     {/* Rates display */}
                     <div className="flex items-center">
-                        {others.map((cur, i) => (
-                            <div key={cur} className="flex items-center">
-                                {i > 0 && <div className="w-px h-3.5 bg-slate-200 mx-2" />}
-                                <span className="px-1.5 tabular-nums text-slate-500 text-xs">
-                                    <span className="text-slate-400">{SYMBOLS[cur]}1 = </span>
-                                    <span className="font-bold text-slate-900">
-                                        {SYMBOLS[base]}{formatRate(cur, base)}
+                        {others.map((cur, i) => {
+                            const pair = getPairInfo(base, cur);
+                            return (
+                                <div key={cur} className="flex items-center">
+                                    {i > 0 && <div className="w-px h-3.5 bg-slate-200 mx-2" />}
+                                    <span className="px-1.5 tabular-nums text-slate-600 text-xs font-medium">
+                                        <span className="text-slate-400">{pair.left}</span>
+                                        <span className="font-extrabold text-slate-900">{pair.right}</span>
                                     </span>
-                                    <span className="text-slate-400 text-[10px]"> {base}</span>
-                                </span>
-                            </div>
-                        ))}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -130,7 +168,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                     </button>
 
                     {ratePopoverOpen && (
-                        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-60 sm:w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 animate-slide-up">
+                        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 animate-slide-up">
                             <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2">
                                 <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Moneda Base</span>
                                 <div className="flex bg-slate-100 p-0.5 rounded-lg">
@@ -150,15 +188,16 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                                     ))}
                                 </div>
                             </div>
-                            <div className="space-y-1.5">
-                                {others.map((cur) => (
-                                    <div key={cur} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-                                        <span className="font-medium text-slate-500">{SYMBOLS[cur]} 1 {cur}</span>
-                                        <span className="font-extrabold text-slate-900">
-                                            {SYMBOLS[base]} {formatRate(cur, base)} <span className="text-slate-400 text-[10px]">{base}</span>
-                                        </span>
-                                    </div>
-                                ))}
+                            <div className="space-y-2">
+                                {others.map((cur) => {
+                                    const pair = getPairInfo(base, cur);
+                                    return (
+                                        <div key={cur} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold">
+                                            <span className="text-slate-500">{pair.left}</span>
+                                            <span className="text-slate-950 font-black">{pair.right}</span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
