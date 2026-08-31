@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
     ArrowLeftRight, ChevronDown, LogOut, Settings, User, Menu, Keyboard,
-    ShoppingCart, Package, Layers, Banknote, Store
+    ShoppingCart, Package, Layers, Banknote, Store, Bell
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
