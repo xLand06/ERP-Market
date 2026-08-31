@@ -23,4 +23,14 @@ router.get('/rates', ctrl.getRates);
  */
 router.post('/rates', roleGuard('OWNER', 'SELLER'), validate(updateExchangeRateSchema), ctrl.updateRate);
 
+/**
+ * GET /api/finance/rates/dolarapi — Obtener cotizaciones vivas de DolarApi Venezuela
+ */
+router.get('/rates/dolarapi', ctrl.getDolarApiRates);
+
+/**
+ * POST /api/finance/rates/sync-dolarapi — Sincronizar y aplicar tasa seleccionada desde DolarApi (OWNER/SELLER)
+ */
+router.post('/rates/sync-dolarapi', roleGuard('OWNER', 'SELLER'), ctrl.syncDolarApiRate);
+
 export default router;

@@ -42,3 +42,28 @@ export const updateRate = async (req: AuthRequest, res: Response) => {
         res.status(422).json({ success: false, error: error.message });
     }
 };
+
+/**
+ * Obtener cotizaciones vivas de DolarApi Venezuela
+ */
+export const getDolarApiRates = async (_req: Request, res: Response) => {
+    try {
+        const rates = await financeService.getLiveDolarApiRates();
+        res.json({ success: true, data: rates });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message || 'Error al obtener tasas de DolarApi' });
+    }
+};
+
+/**
+ * Sincronizar y aplicar tasa seleccionada desde DolarApi
+ */
+export const syncDolarApiRate = async (req: AuthRequest, res: Response) => {
+    try {
+        const { provider } = req.body;
+        const result = await financeService.syncSelectedRateFromDolarApi(provider, req.user!.id, extractIp(req));
+        res.json({ success: true, data: result });
+    } catch (error: any) {
+        res.status(422).json({ success: false, error: error.message || 'Error al sincronizar tasa de DolarApi' });
+    }
+};

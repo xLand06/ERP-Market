@@ -12,6 +12,8 @@ import { AuthRequest } from './auth.middleware';
 import { prisma } from '../../config/prisma';
 
 export type AuditActionType =
+    | 'FINANCE_RATE_UPDATE'
+    | 'FINANCE_DOLARAPI_SYNC'
     | 'PRICE_CHANGE'
     | 'PRODUCT_CREATE'
     | 'PRODUCT_UPDATE'

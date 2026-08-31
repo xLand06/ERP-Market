@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Settings2, DollarSign, Percent, Clock, Save } from 'lucide-react';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useAuthStore } from '@/features/auth/store/authStore';
+import { api } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 export function SystemSettings() {
@@ -18,6 +20,7 @@ export function SystemSettings() {
     const [localCloseTime, setLocalCloseTime] = useState(autoCloseTime || '');
     const [localPurgeDays, setLocalPurgeDays] = useState(purgeRetentionDays.toString());
     const [localLogDays, setLocalLogDays] = useState(purgeLogRetentionDays.toString());
+    const [selectedProvider, setSelectedProvider] = useState<string>('ve_dolar_oficial');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -72,14 +75,68 @@ export function SystemSettings() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     
-                    {/* SECCIÓN 1: FINANZAS */}
+                    {/* SECCIÓN 1: FINANZAS & DOLARAPI VENEZUELA */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-indigo-600 border-b border-slate-100 pb-2 mb-4">
                             <DollarSign className="w-4 h-4" />
-                            <h4 className="text-sm font-bold">Tasas e Impuestos</h4>
+                            <h4 className="text-sm font-bold">Tasas e Impuestos (DolarApi Venezuela)</h4>
                         </div>
                         
                         <div className="space-y-4">
+                            {/* Proveedor de Tasa DolarApi VE */}
+                            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                                        Proveedor de Tasa Oficial / Referencial
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            if (!selectedProvider || selectedProvider === 'manual') return;
+                                            try {
+                                                const res = await api.post('/finance/rates/sync-dolarapi', { provider: selectedProvider });
+                                                if (res.data.success) {
+                                                    toast.success(`Tasa ${res.data.data.appliedRate} VES aplicada desde DolarApi`);
+                                                    setLocalVes(res.data.data.appliedRate.toString());
+                                                    fetchSettings();
+                                                }
+                                            } catch (err: any) {
+                                                toast.error(err.response?.data?.error || 'Error al conectar con DolarApi');
+                                            }
+                                        }}
+                                        disabled={!selectedProvider || selectedProvider === 'manual'}
+                                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 transition-colors flex items-center gap-1"
+                                    >
+                                        ⚡ Obtener de DolarApi
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {[
+                                        { id: 've_dolar_oficial', label: '🇻🇪 BCV Dólar Oficial', desc: 'Tasa oficial del BCV' },
+                                        { id: 've_dolar_paralelo', label: '📈 Dólar Paralelo', desc: 'Promedio EnParaleloVzla' },
+                                        { id: 've_euro_oficial', label: '💶 BCV Euro Oficial', desc: 'Tasa Euro Oficial para USD' },
+                                        { id: 've_euro_paralelo', label: '💱 Euro Paralelo', desc: 'Euro Promedio Paralelo' },
+                                        { id: 'manual', label: '✏️ Personalizado / Manual', desc: 'Ajuste manual del dueño' },
+                                    ].map((prov) => (
+                                        <button
+                                            key={prov.id}
+                                            type="button"
+                                            onClick={() => setSelectedProvider(prov.id)}
+                                            className={cn(
+                                                "p-2.5 rounded-lg border text-left transition-all text-xs font-semibold flex flex-col gap-0.5",
+                                                selectedProvider === prov.id
+                                                    ? "bg-white border-indigo-600 text-indigo-950 shadow-xs ring-1 ring-indigo-600"
+                                                    : "bg-white/60 border-slate-200 text-slate-600 hover:bg-white"
+                                            )}
+                                        >
+                                            <span className="font-bold">{prov.label}</span>
+                                            <span className="text-[10px] text-slate-400 font-normal">{prov.desc}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="space-y-2">
                                 <label className="text-sm font-semibold text-slate-700">Tasa COP a USD (Dólares)</label>
                                 <div className="relative">
