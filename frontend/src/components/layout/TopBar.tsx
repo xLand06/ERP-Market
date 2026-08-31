@@ -58,25 +58,16 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     ];
 
     return (
-        <header className="h-14 lg:h-16 bg-white border-b border-slate-200 flex items-center justify-between px-2 sm:px-4 lg:px-6 gap-1.5 sm:gap-3 transition-all duration-300 shadow-sm relative z-30 min-w-0">
-            {/* Left – Toggle + Logo */}
-            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        <header className="h-14 lg:h-16 bg-white border-b border-slate-200 flex items-center justify-between px-3 lg:px-6 gap-3 transition-all duration-300 shadow-2xs relative z-30 min-w-0">
+            {/* Left – Sidebar Toggle */}
+            <div className="flex items-center gap-2 shrink-0">
                 <button 
                     onClick={onToggleSidebar}
-                    className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all active:scale-95 min-w-9 min-h-9 flex items-center justify-center"
+                    className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all active:scale-95 flex items-center justify-center"
                     aria-label={collapsed ? 'Abrir menú' : 'Cerrar menú'}
                 >
                     <Menu className="w-5 h-5 lg:w-6 lg:h-6" />
                 </button>
-
-                <div className="flex items-center gap-2 shrink-0">
-                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shrink-0">
-                        <Store className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-                    </div>
-                    <span className="font-black text-xs sm:text-sm text-slate-900 tracking-tight hidden md:block uppercase truncate max-w-[140px] xl:max-w-none">
-                        Abastos Sofimar
-                    </span>
-                </div>
             </div>
 
             {/* Center – Exchange Rate Widget */}
