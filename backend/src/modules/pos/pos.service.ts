@@ -52,22 +52,29 @@ export const createTransaction = async (input: CreateTransactionInput) => {
         throw new Error(`La sucursal "${branch.name}" está desactivada y no puede procesar nuevas transacciones.`);
     }
 
-    // El total siempre se calcula en COP (moneda principal)
+    // El total se calcula en la moneda de referencia de los ítems
     const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
-    // Validación multi-pago: si se envía paymentMethods, la suma debe ser igual al total
+    // Validación multi-pago: convertir cada pago a la moneda de referencia de la transacción
     if (paymentMethods && paymentMethods.length > 0) {
-        const sumaMetodos = paymentMethods.reduce((sum, pm) => {
-            // Si el método no es COP, convertir a COP usando el exchangeRate
-            const amountInCOP = pm.currency === 'COP'
-                ? pm.amount
-                : pm.amount * (pm.exchangeRate || 1);
-            return sum + amountInCOP;
+        const sumaMetodosBase = paymentMethods.reduce((sum, pm) => {
+            if (pm.currency === 'USD') return sum + pm.amount;
+            if (pm.currency === 'VES') {
+                const rate = pm.exchangeRate || 5.5;
+                return sum + (rate > 0 ? pm.amount / rate : pm.amount);
+            }
+            if (pm.currency === 'COP') {
+                const rate = pm.exchangeRate || 3600;
+                return sum + (rate > 0 ? pm.amount / rate : pm.amount);
+            }
+            return sum + pm.amount;
         }, 0);
-        // Tolerancia de 1 centavo por errores de punto flotante
-        if (Math.abs(sumaMetodos - total) > 0.01) {
+
+        // Permitir que la suma entregada sea mayor o igual al total (para permitir pago en efectivo con vuelto)
+        // Usamos una tolerancia de 0.05 para evitar bloqueos por imprecisiones de punto flotante
+        if (sumaMetodosBase < (total - 0.05)) {
             throw new Error(
-                `La suma de los métodos de pago (${sumaMetodos.toFixed(2)} COP) no coincide con el total de la transacción (${total.toFixed(2)} COP)`
+                `El monto entregado en los métodos de pago (${sumaMetodosBase.toFixed(2)}) es menor al total requerido (${total.toFixed(2)}).`
             );
         }
     }
