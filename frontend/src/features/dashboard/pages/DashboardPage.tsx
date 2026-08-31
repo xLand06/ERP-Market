@@ -127,18 +127,18 @@ function CurrencySalesGrid({ data }: { data: CurrencySaleDTO[] }) {
                         return (
                             <div 
                                 key={d.currency} 
-                                className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 flex flex-col gap-3 relative overflow-hidden shadow-sm"
+                                className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/80 flex flex-col gap-3 relative overflow-hidden shadow-2xs"
                             >
-                                <div className="absolute -right-4 -bottom-4 opacity-5 text-slate-400 font-black text-6xl select-none">
+                                <div className="absolute -right-4 -bottom-4 opacity-10 text-slate-400 font-black text-6xl select-none">
                                     {d.currency}
                                 </div>
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{d.currency}</span>
-                                    <Badge variant="outline" className="text-[10px] font-bold bg-white">{d.count} Ventas</Badge>
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{d.currency}</span>
+                                    <Badge variant="outline" className="text-[10px] font-bold bg-white text-slate-700 border-slate-200">{d.count} Ventas</Badge>
                                 </div>
                                 <div>
                                     <span className="text-[10px] font-semibold text-slate-400 block">Total Facturado</span>
-                                    <span className="text-xl font-black text-slate-800">
+                                    <span className="text-xl font-black text-slate-900">
                                         {formatOrigCurrency(d.totalSales, d.currency)}
                                     </span>
                                 </div>
@@ -151,7 +151,7 @@ function CurrencySalesGrid({ data }: { data: CurrencySaleDTO[] }) {
                                     </div>
                                     <div>
                                         <span className="text-[10px] font-semibold text-slate-400 block">Margen</span>
-                                        <span className="text-xs font-bold text-blue-600 flex items-center gap-0.5">
+                                        <span className="text-xs font-bold text-indigo-500 flex items-center gap-0.5">
                                             <Percent className="w-3 h-3" /> {margin.toFixed(1)}%
                                         </span>
                                     </div>

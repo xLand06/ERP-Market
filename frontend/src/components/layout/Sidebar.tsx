@@ -82,16 +82,16 @@ const getSidebarTheme = (theme: UITheme = 'emerald') => {
             };
         case 'dark':
             return {
-                bg: 'bg-[#0D1117] border-[#30363D]',
-                logoBg: 'bg-gradient-to-br from-emerald-500 via-teal-600 to-emerald-700',
+                bg: 'bg-[#0D1117] border-[#30363D] shadow-[0_0_25px_rgba(16,185,129,0.15)]',
+                logoBg: 'bg-gradient-to-br from-emerald-400 via-teal-500 to-emerald-600 shadow-[0_0_20px_rgba(16,185,129,0.5)]',
                 LogoIcon: Store,
                 logoTextColor: 'text-[#F0F6FC] font-black tracking-wider',
-                activeLine: 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]',
-                activeIcon: 'text-emerald-400',
+                activeLine: 'bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.9)]',
+                activeIcon: 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]',
                 hoverIcon: 'group-hover:text-emerald-400',
-                activeBg: 'bg-[#21262D] text-[#F0F6FC] ring-1 ring-emerald-500/30',
-                footerBg: 'bg-[#161B22] border-[#30363D]',
-                onlineBadge: 'bg-emerald-500',
+                activeBg: 'bg-[#21262D] text-[#F0F6FC] ring-1 ring-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]',
+                footerBg: 'bg-[#161B22] border-[#30363D] shadow-[0_0_12px_rgba(16,185,129,0.1)]',
+                onlineBadge: 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]',
             };
         case 'emerald':
         default:
