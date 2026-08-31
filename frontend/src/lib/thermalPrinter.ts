@@ -30,13 +30,26 @@ export interface TicketPrintData {
 }
 
 /**
- * Direct ESC/POS printing over WebUSB when a USB printer is paired.
- * Falls back to browser window.print() if WebUSB is not paired or unavailable.
+ * Direct ESC/POS printing pipeline inspired by Zeu Backoffice 3-layer architecture.
+ * Supports WebUSB direct binary transfers (48 chars for 80mm, 32 chars for 58mm).
+ * Seamlessly falls back to browser window.print() if WebUSB is unavailable.
  */
 export async function printThermalReceiptReal(
     printer: ThermalPrinterConfig | null,
     data: TicketPrintData
 ): Promise<{ success: boolean; method: 'webusb' | 'browser'; message: string }> {
+    const paperWidth = printer?.paperWidth || '80mm';
+    const charWidth = paperWidth === '58mm' ? 32 : 48;
+    const divider = '-'.repeat(charWidth);
+
+    const padRow = (left: string, right: string) => {
+        const avail = charWidth - right.length;
+        if (left.length > avail) {
+            return left.substring(0, avail - 1) + ' ' + right;
+        }
+        return left + ' '.repeat(avail - left.length) + right;
+    };
+
     if (printer?.connectionType === 'thermal_usb' && 'usb' in navigator) {
         try {
             const devices = await (navigator as any).usb.getDevices();
@@ -53,54 +66,69 @@ export async function printThermalReceiptReal(
                 await device.claimInterface(0);
 
                 const encoder = new TextEncoder();
-                const escInit = new Uint8Array([0x1B, 0x40]); // ESC @ (Initialize)
+                const escInit = new Uint8Array([0x1B, 0x40]); // ESC @
                 const escCenter = new Uint8Array([0x1B, 0x61, 0x01]); // Align Center
                 const escLeft = new Uint8Array([0x1B, 0x61, 0x00]); // Align Left
-                const escBoldOn = new Uint8Array([0x1B, 0x45, 0x01]); // Bold On
-                const escBoldOff = new Uint8Array([0x1B, 0x45, 0x00]); // Bold Off
-                const escCut = new Uint8Array([0x1D, 0x56, 0x00]); // Full Cut
+                const escCut = new Uint8Array([0x1D, 0x56, 0x00]); // GS V 0 (Cut)
                 const escDrawer = new Uint8Array([0x1B, 0x70, 0x00, 0x19, 0xFA]); // Open Drawer
 
-                let ticketText = '';
-                ticketText += `${data.businessName || 'ABASTOS SOFIMAR'}\n`;
-                if (data.taxId) ticketText += `RIF: ${data.taxId}\n`;
-                if (data.fiscalAddress) ticketText += `${data.fiscalAddress}\n`;
-                if (data.fiscalPhone) ticketText += `TEL: ${data.fiscalPhone}\n`;
-                ticketText += `--------------------------------\n`;
-                ticketText += `FACTURA #: ${data.invoiceNumber || 'FACT-000482'}\n`;
-                ticketText += `FECHA: ${data.date || new Date().toLocaleDateString('es-VE')}\n`;
-                if (data.customerName) ticketText += `CLIENTE: ${data.customerName}\n`;
-                if (data.customerTaxId) ticketText += `CI/RIF: ${data.customerTaxId}\n`;
-                ticketText += `--------------------------------\n`;
-                ticketText += `CANT/DESC             TOTAL USD\n`;
-                ticketText += `--------------------------------\n`;
+                let text = '';
+                // 1. ENCABEZADO
+                text += `${data.businessName || 'ABASTOS SOFIMAR'}\n`;
+                if (data.taxId) text += `RIF: ${data.taxId}\n`;
+                if (data.fiscalAddress) text += `${data.fiscalAddress}\n`;
+                if (data.fiscalPhone) text += `TEL: ${data.fiscalPhone}\n`;
+                text += `${divider}\n`;
+
+                // 2. VENTA & CLIENTE
+                text += padRow(`FACTURA #: ${data.invoiceNumber || 'FACT-000482'}`, data.date || new Date().toLocaleDateString('es-VE')) + '\n';
+                if (data.cashierName) text += `CAJERO: ${data.cashierName}\n`;
+                if (data.customerName) text += padRow(`CLIENTE: ${data.customerName}`, data.customerTaxId || '') + '\n';
+                text += `${divider}\n`;
+
+                // 3. PRODUCTOS EN TICKET
+                text += padRow('CANT / DESCRIPCION', 'TOTAL USD') + '\n';
+                text += `${divider}\n`;
 
                 data.items.forEach(item => {
-                    const lineName = item.name.padEnd(20, ' ').substring(0, 20);
-                    const lineTotal = `$${item.total.toFixed(2)}`.padStart(10, ' ');
-                    ticketText += `${item.qty}x ${lineName} ${lineTotal}\n`;
+                    const unitPriceUSD = item.unitPrice || (item.qty ? item.total / item.qty : item.total);
+                    text += padRow(`${item.qty}x ${item.name}`, `$${item.total.toFixed(2)}`) + '\n';
+                    text += `   ${item.qty} x $${unitPriceUSD.toFixed(2)} USD\n`;
                 });
 
-                ticketText += `--------------------------------\n`;
-                ticketText += `TOTAL USD: $${data.totalUSD.toFixed(2)}\n`;
-                if (data.totalVES) ticketText += `TOTAL VES: Bs. ${data.totalVES.toFixed(2)}\n`;
-                if (data.totalCOP) ticketText += `TOTAL COP: $${data.totalCOP.toLocaleString('es-CO')}\n`;
-                ticketText += `--------------------------------\n`;
-                ticketText += `${data.footerMessage || '¡Gracias por su compra!'}\n\n\n`;
+                text += `${divider}\n`;
 
-                const headerBuffer = encoder.encode(ticketText);
+                // 4. TOTALES
+                text += padRow('TOTAL USD:', `$${data.totalUSD.toFixed(2)}`) + '\n';
+                if (data.totalVES) text += padRow('TOTAL VES:', `Bs. ${data.totalVES.toFixed(2)}`) + '\n';
+                if (data.totalCOP) text += padRow('TOTAL COP:', `$${data.totalCOP.toLocaleString('es-CO')}`) + '\n';
 
-                // Build complete byte payload
-                const parts = [escInit, escCenter, headerBuffer, escCut];
-                if (printer.openCashDrawer) {
-                    parts.push(escDrawer);
+                // 5. FORMAS DE PAGO
+                if (data.paymentMethods && data.paymentMethods.length > 0) {
+                    text += `${divider}\n`;
+                    text += 'FORMAS DE PAGO:\n';
+                    data.paymentMethods.forEach(m => {
+                        const val = m.currency === 'VES' ? `Bs. ${m.amount.toFixed(2)}` : `$${m.amount.toFixed(2)}`;
+                        text += padRow(`- ${m.type.toUpperCase()} (${m.currency}):`, val) + '\n';
+                    });
+                    if (data.changeUSD && data.changeUSD > 0) {
+                        text += padRow('- CAMBIO USD:', `$${data.changeUSD.toFixed(2)}`) + '\n';
+                    }
                 }
 
-                let totalLength = parts.reduce((acc, p) => acc + p.length, 0);
-                const fullPayload = new Uint8Array(totalLength);
+                // 6. PIE DE PÁGINA
+                text += `${divider}\n`;
+                text += `${data.footerMessage || '¡Gracias por su compra! Vuelva pronto'}\n\n\n`;
+
+                const bodyBuffer = encoder.encode(text);
+                const parts = [escInit, escCenter, bodyBuffer, escCut];
+                if (printer.openCashDrawer) parts.push(escDrawer);
+
+                let totalLen = parts.reduce((acc, p) => acc + p.length, 0);
+                const payload = new Uint8Array(totalLen);
                 let offset = 0;
                 for (const part of parts) {
-                    fullPayload.set(part, offset);
+                    payload.set(part, offset);
                     offset += part.length;
                 }
 
@@ -109,7 +137,7 @@ export async function printThermalReceiptReal(
                 );
 
                 if (endpoint) {
-                    await device.transferOut(endpoint.endpointNumber, fullPayload);
+                    await device.transferOut(endpoint.endpointNumber, payload);
                     return {
                         success: true,
                         method: 'webusb',
@@ -122,7 +150,7 @@ export async function printThermalReceiptReal(
         }
     }
 
-    // Default Fallback: Trigger browser window.print()
+    // Default Fallback: Browser print dialog
     window.print();
     return {
         success: true,
