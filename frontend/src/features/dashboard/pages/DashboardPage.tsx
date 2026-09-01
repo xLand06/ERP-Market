@@ -323,41 +323,49 @@ export default function DashboardPage() {
                     </>
                 ) : (
                     <>
-                        <KPICard
-                            title={`Ventas ${rangeLabels[timeRange]}`}
-                            value={formatCurrency(kpis?.sales.today.total || 0)}
-                            subvalue={`${kpis?.sales.today.count || 0} transacciones`}
-                            change={kpis?.sales.today.change || 0}
-                            icon={DollarSign}
-                            iconBg="bg-emerald-50 dark:bg-emerald-950/50"
-                            color="#10B981"
-                        />
-                        <KPICard
-                            title="Ingresos del Mes"
-                            value={formatCurrency(kpis?.sales.thisMonth.total || 0)}
-                            subvalue={`${kpis?.sales.thisMonth.count || 0} transacciones`}
-                            change={kpis?.sales.thisMonth.change || 0}
-                            icon={ShoppingCart}
-                            iconBg="bg-blue-50 dark:bg-blue-950/50"
-                            color="#3B82F6"
-                        />
-                        <KPICard
-                            title="Productos en Stock"
-                            value={formatNumber(kpis?.inventory.totalProducts || 0)}
-                            subvalue={`${kpis?.inventory.lowStockAlerts || 0} alertas`}
-                            change={kpis?.inventory.change || 0}
-                            icon={Package}
-                            iconBg="bg-violet-50 dark:bg-violet-950/50"
-                            color="#8B5CF6"
-                        />
-                        <KPICard
-                            title={`Transacciones ${rangeLabels[timeRange]}`}
-                            value={formatNumber(kpis?.transactionsToday || 0)}
-                            change={kpis?.transactionsTodayChange || 0}
-                            icon={Users}
-                            iconBg="bg-amber-50 dark:bg-amber-950/50"
-                            color="#F59E0B"
-                        />
+                        <div className="dark:hover:shadow-[0_0_25px_rgba(16,185,129,0.25)] dark:hover:border-emerald-500/50 transition-all rounded-2xl">
+                            <KPICard
+                                title={`Ventas ${rangeLabels[timeRange]}`}
+                                value={formatCurrency(kpis?.sales.today.total || 0)}
+                                subvalue={`${kpis?.sales.today.count || 0} transacciones`}
+                                change={kpis?.sales.today.change || 0}
+                                icon={DollarSign}
+                                iconBg="bg-emerald-50 dark:bg-emerald-950/50"
+                                color="#10B981"
+                            />
+                        </div>
+                        <div className="dark:hover:shadow-[0_0_25px_rgba(59,130,246,0.25)] dark:hover:border-blue-500/50 transition-all rounded-2xl">
+                            <KPICard
+                                title="Ingresos del Mes"
+                                value={formatCurrency(kpis?.sales.thisMonth.total || 0)}
+                                subvalue={`${kpis?.sales.thisMonth.count || 0} transacciones`}
+                                change={kpis?.sales.thisMonth.change || 0}
+                                icon={ShoppingCart}
+                                iconBg="bg-blue-50 dark:bg-blue-950/50"
+                                color="#3B82F6"
+                            />
+                        </div>
+                        <div className="dark:hover:shadow-[0_0_25px_rgba(139,92,246,0.25)] dark:hover:border-violet-500/50 transition-all rounded-2xl">
+                            <KPICard
+                                title="Productos en Stock"
+                                value={formatNumber(kpis?.inventory.totalProducts || 0)}
+                                subvalue={`${kpis?.inventory.lowStockAlerts || 0} alertas`}
+                                change={kpis?.inventory.change || 0}
+                                icon={Package}
+                                iconBg="bg-violet-50 dark:bg-violet-950/50"
+                                color="#8B5CF6"
+                            />
+                        </div>
+                        <div className="dark:hover:shadow-[0_0_25px_rgba(245,158,11,0.25)] dark:hover:border-amber-500/50 transition-all rounded-2xl">
+                            <KPICard
+                                title={`Transacciones ${rangeLabels[timeRange]}`}
+                                value={formatNumber(kpis?.transactionsToday || 0)}
+                                change={kpis?.transactionsTodayChange || 0}
+                                icon={Users}
+                                iconBg="bg-amber-50 dark:bg-amber-950/50"
+                                color="#F59E0B"
+                            />
+                        </div>
                     </>
                 )}
             </div>
