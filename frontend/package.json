@@ -10,7 +10,7 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "build:apk": "vite build && cap sync android",
-        "open:android": "cap open android"
+        "open:android": "CAPACITOR_ANDROID_STUDIO_PATH=/home/adrianvergel/.local/bin/studio.sh cap open android"
     },
     "dependencies": {
         "@capacitor-community/sqlite": "^8.1.1",
