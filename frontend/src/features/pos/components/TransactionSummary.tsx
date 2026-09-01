@@ -87,9 +87,9 @@ export function TransactionSummary({
             'fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 transition-all duration-300 overflow-y-auto',
             visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}>
-            <div className="bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full my-auto overflow-hidden border border-slate-700 space-y-0">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full my-auto overflow-hidden border border-slate-200/90 dark:border-slate-800 space-y-0 text-slate-900 dark:text-slate-100">
                 {/* Ticket Térmico Real (Fidelidad 100% igual a /settings) */}
-                <div className="p-4 bg-slate-950 max-h-[70vh] overflow-y-auto override-scrollbar">
+                <div className="p-4 bg-slate-50 dark:bg-slate-950 max-h-[70vh] overflow-y-auto override-scrollbar">
                     <ThermalReceiptTicket
                         paperWidth={primaryPrinter?.paperWidth || '80mm'}
                         customerName={customerName}
@@ -103,7 +103,7 @@ export function TransactionSummary({
                 </div>
 
                 {/* Acciones Directas */}
-                <div className="p-4 bg-slate-900 border-t border-slate-800 flex gap-2">
+                <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex gap-2">
                     {type === 'SALE' && (
                         <Button
                             type="button"
@@ -119,7 +119,7 @@ export function TransactionSummary({
                         type="button"
                         variant="outline"
                         onClick={onDismiss}
-                        className="flex-1 h-12 border-slate-700 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-2xl text-xs cursor-pointer"
+                        className="flex-1 h-12 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-2xl text-xs cursor-pointer"
                     >
                         Siguiente Venta
                     </Button>

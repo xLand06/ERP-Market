@@ -33,7 +33,11 @@ export default function App() {
     useEffect(() => {
         const theme = activeTheme || 'emerald';
         document.documentElement.setAttribute('data-theme', theme);
-        document.documentElement.className = `theme-${theme}`;
+        if (theme === 'dark') {
+            document.documentElement.className = 'theme-dark dark';
+        } else {
+            document.documentElement.className = `theme-${theme}`;
+        }
     }, [activeTheme]);
 
     useEffect(() => {
