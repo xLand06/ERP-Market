@@ -43,9 +43,12 @@ export const ReportZModal: React.FC<ReportZModalProps> = ({
     const usdRate = rates['USD'] || 3600;
     const vesRate = rates['VES'] || 5.5;
 
-    const countedCopNum = parseFloat(countedCop) || 0;
-    const countedUsdNum = parseFloat(countedUsd) || 0;
-    const countedVesNum = parseFloat(countedVes) || 0;
+    const numCop = parseFloat(countedCop) || 0;
+    const numUsd = parseFloat(countedUsd) || 0;
+    const numVes = parseFloat(countedVes) || 0;
+    const countedCopNum = numCop;
+    const countedUsdNum = numUsd;
+    const countedVesNum = numVes;
 
     const totalCountedCop = countedCopNum + (countedUsdNum * usdRate) + (countedVesNum * vesRate);
     const difference = totalCountedCop - expectedBalance;
