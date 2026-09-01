@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Save, Barcode, PackageOpen, Plus, Trash2, Layers, DollarSign, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import {
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { useConfigStore } from '@/hooks/useConfigStore';
@@ -331,21 +334,19 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
         }
     };
 
-    if (!open) return null;
-
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-y-auto max-h-[95vh] border border-slate-200 flex flex-col">
+        <Dialog open={open} onOpenChange={o => !o && onClose()}>
+            <DialogContent className="sm:max-w-2xl">
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
-                    <h2 className="text-lg font-bold tracking-tight text-slate-900 flex items-center gap-2">
-                        <PackageOpen className="w-5 h-5 text-indigo-600" />
-                        {product ? 'Editar Producto' : 'Nuevo Producto'}
-                    </h2>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
+                <DialogHeader className="border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <DialogTitle className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-slate-100">
+                        <PackageOpen className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        <span>{product ? 'Editar Producto' : 'Nuevo Producto'}</span>
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
+                        Ingresa los detalles, precios y códigos de barra del producto.
+                    </DialogDescription>
+                </DialogHeader>
 
                 <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="flex-1 overflow-y-auto">
                     <div className="px-6 py-5 space-y-5">
@@ -739,7 +740,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 }

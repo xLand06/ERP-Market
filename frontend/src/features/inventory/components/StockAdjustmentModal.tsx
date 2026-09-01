@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { PackageOpen, X, Search, Check, Save, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
@@ -64,23 +67,18 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
         onClose();
     };
 
-    if (!open) return null;
-
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
-                <div className="p-6 pb-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-                    <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                        <PackageOpen className="w-5 h-5 text-indigo-600" />
-                        Ajuste por Recuento de Stock
-                    </h2>
-                    <button 
-                        onClick={onClose}
-                        className="p-2 -mr-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
+        <Dialog open={open} onOpenChange={o => !o && onClose()}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader className="border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <DialogTitle className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-slate-100">
+                        <PackageOpen className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        <span>Ajuste por Recuento de Stock</span>
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
+                        Ajusta el inventario físico mediante recuento o auditoría.
+                    </DialogDescription>
+                </DialogHeader>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                     {!selectedProduct ? (
@@ -222,7 +220,7 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
                         Guardar Recuento
                     </Button>
                 </div>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 }

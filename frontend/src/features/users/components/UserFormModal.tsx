@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save } from 'lucide-react';
+import { X, Save, UserCheck } from 'lucide-react';
+import {
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
 
@@ -184,25 +187,17 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
     };
 
     return (
-        <div 
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="modal-title"
-        >
-            <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl overflow-y-auto max-h-[90vh]">
-                <div className="flex items-center justify-between mb-6">
-                    <h2 id="modal-title" className="text-xl font-bold tracking-tight text-slate-900">
-                        {user ? 'Editar Usuario' : 'Nuevo Usuario'}
-                    </h2>
-                    <button 
-                        onClick={onClose} 
-                        className="p-2 hover:bg-slate-100 rounded-full text-slate-500 hover:text-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300"
-                        aria-label="Cerrar ventana"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
+        <Dialog open={open} onOpenChange={o => !o && onClose()}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader className="border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <DialogTitle className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-slate-100">
+                        <UserCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        <span>{user ? 'Editar Usuario' : 'Nuevo Usuario'}</span>
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
+                        Asigna datos personales, roles y sucursal de acceso.
+                    </DialogDescription>
+                </DialogHeader>
 
                 {errors['_'] && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
@@ -404,7 +399,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 }

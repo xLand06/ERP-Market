@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Loader2, Package, Info, Scale, X, Save, Search, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import {
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
 import { useProducts } from '@/features/products/hooks';
 import type { Product } from '@/features/products/types';
 import { useCreateMerma } from '../hooks';
@@ -163,21 +166,17 @@ export function MermaForm({ open, onOpenChange }: MermaFormProps) {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-y-auto max-h-[95vh] border border-slate-200 flex flex-col">
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
-                    <h2 className="text-lg font-bold tracking-tight text-slate-900 flex items-center gap-2">
-                        <Package className="w-5 h-5 text-indigo-600" />
-                        Nueva Salida por Merma
-                    </h2>
-                    <button 
-                        onClick={() => onOpenChange(false)} 
-                        className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader className="border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <DialogTitle className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-slate-100">
+                        <Package className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        <span>Nueva Salida por Merma</span>
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
+                        Registra mermas, vencimientos o desperdicios de inventario.
+                    </DialogDescription>
+                </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
                     <div className="px-6 py-5 space-y-5">
@@ -440,7 +439,7 @@ export function MermaForm({ open, onOpenChange }: MermaFormProps) {
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 }
