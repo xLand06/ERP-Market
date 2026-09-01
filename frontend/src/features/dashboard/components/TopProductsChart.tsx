@@ -33,7 +33,7 @@ export default function TopProductsChart({ data, loading }: TopProductsChartProp
                         <YAxis type="category" dataKey="name" fontSize={11} width={100} stroke="#94a3b8" />
                         <Tooltip
                             formatter={(value: number) => [value, 'Unidades']}
-                            contentStyle={{ borderRadius: '12px', border: '1px solid rgba(148, 163, 184, 0.2)', backgroundColor: '#0f172a', color: '#f8fafc', fontSize: '11px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)' }}
+                            contentStyle={{ borderRadius: '12px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#0f172a', fontSize: '11px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
                         />
                         <Bar dataKey="ventas" fill="#10B981" radius={[0, 6, 6, 0]} />
                     </BarChart>

@@ -50,7 +50,7 @@ export default function SalesTrendChart({ data, loading }: SalesTrendChartProps)
                         onClick={() => setSelectedCurrency('total')}
                         className={`text-[10px] px-2.5 py-1 rounded-md font-bold transition-all ${
                             selectedCurrency === 'total' 
-                                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 shadow-xs' 
+                                ? 'bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-950 shadow-xs' 
                                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
                         }`}
                     >
@@ -62,7 +62,7 @@ export default function SalesTrendChart({ data, loading }: SalesTrendChartProps)
                             onClick={() => setSelectedCurrency(curr)}
                             className={`text-[10px] px-2.5 py-1 rounded-md font-bold transition-all ${
                                 selectedCurrency === curr 
-                                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 shadow-xs' 
+                                    ? 'bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-950 shadow-xs' 
                                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
                             }`}
                         >
@@ -89,7 +89,7 @@ export default function SalesTrendChart({ data, loading }: SalesTrendChartProps)
                         />
                         <Tooltip 
                             formatter={(value: number) => [formatValue(value), 'Ventas']}
-                            contentStyle={{ borderRadius: '12px', border: '1px solid rgba(148, 163, 184, 0.2)', backgroundColor: 'var(--tooltip-bg, #0f172a)', color: '#f8fafc', fontSize: '11px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)' }}
+                            contentStyle={{ borderRadius: '12px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#0f172a', fontSize: '11px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
                         />
                         <Area type="monotone" dataKey={selectedCurrency} stroke="#3B82F6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSales)" />
                     </AreaChart>
