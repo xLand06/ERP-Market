@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { exportToExcel } from '@/lib/exportUtils';
 import { Search, Plus, Edit2, UserX, UserCheck, Download, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -99,6 +100,20 @@ export default function EmployeeDirectoryPage() {
         setModalOpen(true);
     };
 
+    const handleExportExcel = () => {
+        exportToExcel(
+            users,
+            [
+                { header: 'Usuario', key: 'username' },
+                { header: 'Nombre', key: (u: any) => u.nombre || '-' },
+                { header: 'Email', key: (u: any) => u.email || '-' },
+                { header: 'Rol', key: 'role' },
+                { header: 'Estado', key: (u: any) => u.isActive ? 'ACTIVO' : 'INACTIVO' },
+            ],
+            'Directorio_Empleados'
+        );
+    };
+
     return (
         <>
             <UserFormModal 
@@ -122,7 +137,7 @@ export default function EmployeeDirectoryPage() {
                         </p>
                     </div>
                     <div className="flex gap-2.5">
-                        <Button variant="outline" size="lg" className="h-10 font-bold text-slate-700">
+                        <Button onClick={handleExportExcel} variant="outline" size="lg" className="h-10 font-bold text-slate-700">
                             <Download className="w-4.5 h-4.5 mr-2" /> Exportar
                         </Button>
                         <Button onClick={handleOpenCreate} size="lg" className="h-10 font-bold shadow-sm shadow-emerald-500/20">

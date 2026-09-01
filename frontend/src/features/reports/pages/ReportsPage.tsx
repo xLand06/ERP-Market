@@ -73,9 +73,28 @@ const TOP_PRODUCTS = [
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
+import { exportToExcel } from '@/lib/exportUtils';
+
 export default function ReportsPage() {
+    const handleExportReports = () => {
+        exportToExcel(
+            [
+                { indicador: 'Ventas del Mes', valor: '$18,420', comparativa: '+12.4% vs mes anterior' },
+                { indicador: 'Órdenes Totales', valor: '342', comparativa: '+8.1% vs mes anterior' },
+                { indicador: 'Ticket Promedio', valor: '$53.86', comparativa: '+4.0% vs mes anterior' },
+                { indicador: 'Ganancia Est. (30%)', valor: '$5,526', comparativa: 'Margen saludable' },
+            ],
+            [
+                { header: 'Indicador', key: 'indicador' },
+                { header: 'Valor', key: 'valor' },
+                { header: 'Comparativa', key: 'comparativa' },
+            ],
+            'Reporte_Gerencial'
+        );
+    };
+
     return (
-        <div className="flex flex-col gap-6 max-w-350 mx-auto pb-8">
+        <div className="flex flex-col gap-6 max-w-[1400px] mx-auto pb-8">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -86,7 +105,7 @@ export default function ReportsPage() {
                         Datos del período actual · Marzo 2026
                     </p>
                 </div>
-                <Button variant="outline" size="lg" className="h-10 font-bold text-slate-700 w-fit">
+                <Button onClick={handleExportReports} variant="outline" size="lg" className="h-10 font-bold text-slate-700 w-fit">
                     <Download className="w-4.5 h-4.5 mr-2" /> Exportar todo
                 </Button>
             </div>
