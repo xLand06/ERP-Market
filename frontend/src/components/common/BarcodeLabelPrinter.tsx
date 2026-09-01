@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useConfigStore } from '@/hooks/useConfigStore';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/button'; // fallback imports
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Printer, Barcode as BarcodeIcon, Check } from 'lucide-react';
 

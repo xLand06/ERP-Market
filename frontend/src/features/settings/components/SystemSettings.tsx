@@ -213,7 +213,7 @@ export function SystemSettings() {
                                                             const applied = res.data.data.appliedRate;
                                                             toast.success(`Tasa ${applied} VES ajustada automáticamente desde DolarApi`);
                                                             setLocalVes(applied.toString());
-                                                            fetchRates();
+                                                            fetchSettings();
                                                         }
                                                     } catch (err: any) {
                                                         toast.error(err.response?.data?.error || 'Error al conectar con DolarApi');

@@ -115,6 +115,7 @@ export interface ConfigState {
 export const useConfigStore = create<ConfigState>()(
     persist(
         (set, get) => ({
+            updatedAt: null,
             rates: {
                 VES: 5.5,
                 USD: 3600,
