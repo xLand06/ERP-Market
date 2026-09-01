@@ -223,6 +223,8 @@ export default function POSPage() {
             };
 
             const res = await api.post('/pos/transactions', payload);
+            const invoiceNum = res.data?.data?.invoiceNumber || res.data?.invoiceNumber || 'FACT-000482';
+
             const saleItems = cart.map(c => ({
                 name: c.name,
                 qty: c.qty,
@@ -247,8 +249,6 @@ export default function POSPage() {
             // Impresora configurada como principal en /settings
             const config = useConfigStore.getState();
             const primaryPrinter = config.printers.find(p => p.isPrimary) || config.printers[0] || null;
-
-            await api.post('/pos/transactions', payload);
 
             toast.success('¡Venta realizada con éxito!');
             setPayOpen(false);
