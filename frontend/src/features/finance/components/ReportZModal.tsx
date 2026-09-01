@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { useConfigStore, ThermalPrinterConfig } from '@/hooks/useConfigStore';
 import { useExecuteReportZ } from '../hooks/useCashRegister';
 import { printReportZTicket, ReportAuditData } from '@/lib/thermalPrinter';
+import { ThermalAuditTicket } from '@/components/common/ThermalAuditTicket';
 import toast from 'react-hot-toast';
 
 interface ReportZModalProps {
@@ -146,6 +147,51 @@ export const ReportZModal: React.FC<ReportZModalProps> = ({
                                 <p className="text-xs leading-relaxed text-rose-800 dark:text-rose-300/90">
                                     Una vez ejecutado el Reporte Z, el estado de la caja pasará a <span className="font-bold">CERRADA</span>, se registrarán las diferencias de inventario/efectivo y se imprimirá el comprobante térmico auditado.
                                 </p>
+                            </div>
+
+                            {/* Ticket Live Preview */}
+                            <div className="bg-slate-100 dark:bg-slate-950/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                                <ThermalAuditTicket
+                                    isPreview={true}
+                                    data={{
+                                        type: 'Z',
+                                        registerId: registerId || 'REG-001',
+                                        openedAt: new Date(),
+                                        closedAt: new Date(),
+                                        openingAmount: openingBalance,
+                                        salesTotal: expectedBalance,
+                                        transactionCount: 0,
+                                        paymentBreakdown: {
+                                            efectivoCOP: numCop,
+                                            efectivoUSD: numUsd,
+                                            efectivoVES: numVes,
+                                            transferencia: 0,
+                                            tarjeta: 0,
+                                            otros: 0,
+                                        },
+                                        seniatTax: {
+                                            totalVentas: expectedBalance,
+                                            baseImponible: expectedBalance / 1.16,
+                                            iva16: expectedBalance - (expectedBalance / 1.16),
+                                            exento: 0,
+                                        },
+                                        expectedBalances: {
+                                            expectedCOP: expectedBalance,
+                                            expectedUSD: expectedBalance / usdRate,
+                                            expectedVES: expectedBalance / (usdRate / vesRate),
+                                            totalExpectedCOP: expectedBalance,
+                                        },
+                                        closingAmount: totalCountedCop,
+                                        difference: Math.abs(difference),
+                                        varianceType: isShort ? 'FALTANTE' : isOver ? 'SOBRANTE' : 'EXACTO',
+                                        physicalCounts: {
+                                            countedCOP: numCop,
+                                            countedUSD: numUsd,
+                                            countedVES: numVes,
+                                        },
+                                        notes,
+                                    }}
+                                />
                             </div>
 
                             <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-slate-800 space-y-2">

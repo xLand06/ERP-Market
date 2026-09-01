@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useConfigStore, ThermalPrinterConfig } from '@/hooks/useConfigStore';
 import { useReportX } from '../hooks/useCashRegister';
 import { printReportXTicket } from '@/lib/thermalPrinter';
+import { ThermalAuditTicket } from '@/components/common/ThermalAuditTicket';
 import toast from 'react-hot-toast';
 
 interface ReportXModalProps {
@@ -74,6 +75,10 @@ export const ReportXModal: React.FC<ReportXModalProps> = ({ open, onClose, regis
                     </div>
                 ) : (
                     <div className="py-3 space-y-5 text-sm">
+                        {/* Ticket Preview Component matching exact receipt layout */}
+                        <div className="bg-slate-100 dark:bg-slate-950/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                            <ThermalAuditTicket data={report} isPreview={true} />
+                        </div>
                         {/* Status bar */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 text-xs">
                             <div>

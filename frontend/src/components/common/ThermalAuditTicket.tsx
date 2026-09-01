@@ -1,4 +1,6 @@
 import React from 'react';
+import { useConfigStore } from '@/hooks/useConfigStore';
+import { cn } from '@/lib/utils';
 
 export interface ReportAuditData {
     type: 'X' | 'Z';
@@ -47,180 +49,216 @@ export interface ReportAuditData {
 
 interface ThermalAuditTicketProps {
     data: ReportAuditData | null;
+    paperWidth?: '80mm' | '58mm';
+    isPreview?: boolean;
 }
 
-export const ThermalAuditTicket: React.FC<ThermalAuditTicketProps> = ({ data }) => {
+export const ThermalAuditTicket: React.FC<ThermalAuditTicketProps> = ({
+    data,
+    paperWidth: overridePaperWidth,
+    isPreview = false,
+}) => {
+    const config = useConfigStore();
     if (!data) return null;
 
+    const paperWidth = overridePaperWidth || config.paperWidth || '80mm';
     const isZ = data.type === 'Z';
-    const reportTitle = isZ ? '--- REPORTE Z (CIERRE) ---' : '--- REPORTE X (PARCIAL) ---';
+    const reportTitle = isZ ? '--- REPORTE Z (CIERRE FINAL) ---' : '--- REPORTE X (ARQUEO PARCIAL) ---';
+
+    const businessName = data.businessName || config.businessName || 'ABASTOS SOFIMAR';
+    const taxId = data.taxId || config.taxId || 'J-12345678-9';
+    const fiscalAddress = config.fiscalAddress || 'Calle Principal, Local #1';
+    const fiscalPhone = config.fiscalPhone || '0414-1234567';
 
     const fmtDate = (d?: string | Date | null) => {
         if (!d) return '-';
         return new Date(d).toLocaleString('es-VE', {
-            dateStyle: 'short',
-            timeStyle: 'medium',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
         });
     };
 
-    const fmtNum = (val: number) => {
-        return val.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    };
+    const totalVES = config.fromUSD(data.salesTotal, 'VES');
+    const totalCOP = config.fromUSD(data.salesTotal, 'COP');
+    const vesRate = config.fromUSD(1, 'VES');
+    const copRate = config.fromUSD(1, 'COP');
 
     return (
-        <div className="printable-ticket-container hidden print:block bg-white text-black p-2 font-mono text-xs w-[80mm] mx-auto">
-            <div className="text-center font-bold text-sm uppercase mb-1">
-                {data.businessName || 'ABASTOS SOFIMAR'}
+        <div className={cn(
+            'bg-white text-slate-950 p-4 rounded-xl font-mono text-[11px] leading-tight space-y-2 border border-slate-300 mx-auto transition-all printable-ticket shadow-sm',
+            paperWidth === '58mm' ? 'max-w-[260px]' : 'max-w-[340px]',
+            !isPreview && 'printable-ticket-container hidden print:block print:max-w-none print:w-full print:border-none print:p-0 print:m-0 print:shadow-none'
+        )}>
+            {/* 1. ENCABEZADO COMERCIAL */}
+            <div className="text-center space-y-0.5">
+                <p className="text-xs font-black uppercase tracking-wider">{businessName}</p>
+                <p className="text-[10px] font-bold text-slate-700">RIF: {taxId}</p>
+                <p className="text-[9px] text-slate-600 font-medium">{fiscalAddress}</p>
+                {fiscalPhone && <p className="text-[9px] text-slate-600 font-medium">TEL: {fiscalPhone}</p>}
+                <p className="text-[9px] text-slate-500 font-bold uppercase pt-0.5">
+                    {data.branch?.name ? `SEDE: ${data.branch.name}` : 'SEDE PRINCIPAL'}
+                </p>
             </div>
-            {data.taxId && <div className="text-center text-[10px] uppercase">RIF: {data.taxId}</div>}
-            <div className="text-center text-[10px] uppercase">
-                {data.branch?.name ? `SEDE: ${data.branch.name}` : 'SEDE PRINCIPAL'}
-            </div>
-            <div className="text-center font-black text-sm my-2 border-y border-black py-1">
+
+            {/* TÍTULO DEL REPORTE */}
+            <div className="text-center font-black text-xs my-1 border-y border-dashed border-slate-400 py-1 uppercase tracking-wider">
                 {reportTitle}
             </div>
 
-            <div className="space-y-0.5 text-[11px] mb-2">
-                <div className="flex justify-between">
-                    <span>CAJA ID:</span>
-                    <span className="font-bold">{data.registerId.slice(-8).toUpperCase()}</span>
+            {/* DATOS DE LA APERTURA / CAJA */}
+            <div className="text-[9px] font-medium text-slate-600 space-y-0.5 border-b border-dashed border-slate-300 pb-1.5">
+                <div className="flex justify-between font-bold text-slate-900">
+                    <span>CAJA ID: #{data.registerId.slice(-8).toUpperCase()}</span>
+                    <span>{fmtDate(new Date())}</span>
                 </div>
-                <div className="flex justify-between">
-                    <span>CAJERO:</span>
-                    <span>{data.user?.nombre || data.user?.username || 'SISTEMA'}</span>
-                </div>
+                <p>CAJERO: {data.user?.nombre || data.user?.username || 'SISTEMA'}</p>
                 <div className="flex justify-between">
                     <span>APERTURA:</span>
                     <span>{fmtDate(data.openedAt)}</span>
                 </div>
                 {isZ && (
-                    <div className="flex justify-between">
+                    <div className="flex justify-between font-bold text-slate-900">
                         <span>CIERRE:</span>
                         <span>{fmtDate(data.closedAt || new Date())}</span>
                     </div>
                 )}
             </div>
 
-            <div className="border-t border-dashed border-black py-1 my-1">
-                <div className="font-bold text-center mb-1">DESGLOSE DE VENTAS</div>
-                <div className="flex justify-between">
-                    <span>Nº TRANSACCIONES:</span>
-                    <span>{data.transactionCount}</span>
+            {/* 2. DESGLOSE DE VENTAS */}
+            <div className="space-y-1 pt-1">
+                <div className="flex justify-between text-[9px] font-black text-slate-500 uppercase border-b border-slate-200 pb-0.5">
+                    <span>RESUMEN OPERATIVO</span>
+                    <span>CANT / MONTO</span>
                 </div>
-                <div className="flex justify-between font-bold">
+                <div className="flex justify-between font-medium">
+                    <span>Nº TRANSACCIONES:</span>
+                    <span className="font-bold">{data.transactionCount} ventas</span>
+                </div>
+                <div className="flex justify-between font-black text-slate-950 text-xs pt-0.5">
                     <span>TOTAL VENTAS:</span>
-                    <span>$ {fmtNum(data.salesTotal)}</span>
+                    <span className="text-emerald-700 font-extrabold">${data.salesTotal.toFixed(2)} USD</span>
                 </div>
             </div>
 
-            <div className="border-t border-dashed border-black py-1 my-1">
-                <div className="font-bold text-center mb-1">FORMAS DE PAGO</div>
+            {/* 3. RESUMEN FISCAL SENIAT (Venezuela) */}
+            <div className="border-t border-dashed border-slate-300 pt-1.5 space-y-0.5 text-right text-[10px] text-slate-700">
+                <div className="flex justify-between font-medium">
+                    <span>BASE IMPONIBLE (G 16.00%):</span>
+                    <span>${data.seniatTax.baseImponible.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-slate-950">
+                    <span>IVA (16.00%):</span>
+                    <span>${data.seniatTax.iva16.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                    <span>EXENTO (0.00%):</span>
+                    <span>${data.seniatTax.exento.toFixed(2)}</span>
+                </div>
+            </div>
+
+            <div className="border-b border-dashed border-slate-400 my-1" />
+
+            {/* 4. TOTALES MULTI-MONEDA */}
+            <div className="space-y-0.5 text-right text-[10px] font-bold text-slate-700">
+                <div className="flex justify-between">
+                    <span>TOTAL VES (Bs. {vesRate.toFixed(2)}):</span>
+                    <span>Bs. {totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between">
+                    <span>TOTAL COP (${copRate.toLocaleString('es-CO')}):</span>
+                    <span>${totalCOP.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+            </div>
+
+            {/* 5. FORMAS DE PAGO */}
+            <div className="border-t border-dashed border-slate-300 pt-1.5 text-[10px] space-y-0.5">
+                <span className="font-black text-slate-500 uppercase block text-[9px]">FORMAS DE PAGO RECAUDADAS</span>
                 <div className="flex justify-between">
                     <span>EFECTIVO COP:</span>
-                    <span>$ {fmtNum(data.paymentBreakdown.efectivoCOP)}</span>
+                    <span>${data.paymentBreakdown.efectivoCOP.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                     <span>EFECTIVO USD:</span>
-                    <span>$ {fmtNum(data.paymentBreakdown.efectivoUSD)}</span>
+                    <span>${data.paymentBreakdown.efectivoUSD.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                     <span>EFECTIVO VES:</span>
-                    <span>Bs. {fmtNum(data.paymentBreakdown.efectivoVES)}</span>
+                    <span>Bs. {data.paymentBreakdown.efectivoVES.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                    <span>TRANSFERENCIA:</span>
-                    <span>$ {fmtNum(data.paymentBreakdown.transferencia)}</span>
+                    <span>TRANSFERENCIA / PAGO MÓVIL:</span>
+                    <span>${data.paymentBreakdown.transferencia.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                    <span>TARJETA:</span>
-                    <span>$ {fmtNum(data.paymentBreakdown.tarjeta)}</span>
+                    <span>TARJETA / PUNTO:</span>
+                    <span>${data.paymentBreakdown.tarjeta.toFixed(2)}</span>
                 </div>
-                {data.paymentBreakdown.otros > 0 && (
-                    <div className="flex justify-between">
-                        <span>OTROS:</span>
-                        <span>$ {fmtNum(data.paymentBreakdown.otros)}</span>
+            </div>
+
+            {/* 6. SALDOS EN CAJA Y AUDITORÍA DE CIERRE */}
+            <div className="border-t border-dashed border-slate-400 pt-1.5 space-y-1">
+                <span className="font-black text-slate-600 uppercase block text-[9px] text-center">CONCILIACIÓN DE CAJA</span>
+                <div className="flex justify-between text-[10px]">
+                    <span>MONTO APERTURA:</span>
+                    <span>${data.openingAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-[10px]">
+                    <span>ESPERADO EN CAJA:</span>
+                    <span>${data.expectedBalances.totalExpectedCOP.toFixed(2)}</span>
+                </div>
+
+                {isZ && (
+                    <div className="border-t border-slate-300 pt-1 mt-1 space-y-0.5">
+                        {data.physicalCounts && (
+                            <div className="text-[9px] space-y-0.5 text-slate-600">
+                                <div className="flex justify-between">
+                                    <span>CONTEO FÍSICO COP:</span>
+                                    <span>${data.physicalCounts.countedCOP || 0}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>CONTEO FÍSICO USD:</span>
+                                    <span>${data.physicalCounts.countedUSD || 0}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>CONTEO FÍSICO VES:</span>
+                                    <span>Bs. {data.physicalCounts.countedVES || 0}</span>
+                                </div>
+                            </div>
+                        )}
+                        <div className="flex justify-between font-black text-slate-950 text-[11px] pt-1">
+                            <span>DECLARADO EN CIERRE:</span>
+                            <span>${(data.closingAmount || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between font-extrabold text-[11px]">
+                            <span>DIFERENCIA ({data.varianceType || 'EXACTO'}):</span>
+                            <span className={cn(
+                                data.varianceType === 'FALTANTE' ? 'text-red-600' : data.varianceType === 'SOBRANTE' ? 'text-emerald-700' : 'text-slate-800'
+                            )}>
+                                ${(Math.abs(data.difference || 0)).toFixed(2)}
+                            </span>
+                        </div>
+                        {data.notes && (
+                            <p className="text-[9px] text-slate-500 italic border-t border-slate-200 pt-1 mt-1">
+                                OBS: {data.notes}
+                            </p>
+                        )}
                     </div>
                 )}
             </div>
 
-            <div className="border-t border-dashed border-black py-1 my-1">
-                <div className="font-bold text-center mb-1">RESUMEN FISCAL SENIAT</div>
-                <div className="flex justify-between">
-                    <span>BASE IMPONIBLE (16%):</span>
-                    <span>$ {fmtNum(data.seniatTax.baseImponible)}</span>
-                </div>
-                <div className="flex justify-between">
-                    <span>IVA (16%):</span>
-                    <span>$ {fmtNum(data.seniatTax.iva16)}</span>
-                </div>
-                <div className="flex justify-between">
-                    <span>EXENTO (0%):</span>
-                    <span>$ {fmtNum(data.seniatTax.exento)}</span>
-                </div>
-                <div className="flex justify-between font-bold">
-                    <span>TOTAL AUDITADO:</span>
-                    <span>$ {fmtNum(data.seniatTax.totalVentas)}</span>
-                </div>
-            </div>
-
-            <div className="border-t border-dashed border-black py-1 my-1">
-                <div className="font-bold text-center mb-1">SALDOS EN CAJA (ESPERADOS)</div>
-                <div className="flex justify-between">
-                    <span>MONTO APERTURA:</span>
-                    <span>$ {fmtNum(data.openingAmount)}</span>
-                </div>
-                <div className="flex justify-between font-bold">
-                    <span>TOTAL ESPERADO:</span>
-                    <span>$ {fmtNum(data.expectedBalances.totalExpectedCOP)}</span>
-                </div>
-            </div>
-
-            {isZ && (
-                <div className="border-t border-black py-1 my-1 space-y-1">
-                    <div className="font-bold text-center uppercase">RESULTADO AUDITORIA CIERRE</div>
-                    {data.physicalCounts && (
-                        <>
-                            <div className="flex justify-between text-[10px]">
-                                <span>CONTEO FÍSICO COP:</span>
-                                <span>$ {fmtNum(data.physicalCounts.countedCOP || 0)}</span>
-                            </div>
-                            <div className="flex justify-between text-[10px]">
-                                <span>CONTEO FÍSICO USD:</span>
-                                <span>$ {fmtNum(data.physicalCounts.countedUSD || 0)}</span>
-                            </div>
-                            <div className="flex justify-between text-[10px]">
-                                <span>CONTEO FÍSICO VES:</span>
-                                <span>Bs. {fmtNum(data.physicalCounts.countedVES || 0)}</span>
-                            </div>
-                        </>
-                    )}
-                    <div className="flex justify-between font-bold">
-                        <span>TOTAL DECLARADO:</span>
-                        <span>$ {fmtNum(data.closingAmount || 0)}</span>
+            {/* 7. PIE Y CÓDIGO DE BARRAS DE AUDITORÍA */}
+            <div className="text-center text-[9px] text-slate-600 font-medium pt-2 border-t border-dashed border-slate-300 space-y-1">
+                <p className="font-bold">SISTEMA CONTROL ERP MARKET</p>
+                <div className="pt-1 flex flex-col items-center">
+                    <div className="h-5 w-3/4 bg-slate-900 flex items-center justify-center text-[8px] text-white tracking-widest font-mono font-bold rounded-xs">
+                        ||| | |||| || | ||| |||| | |||
                     </div>
-                    <div className="flex justify-between font-bold">
-                        <span>RESULTADO:</span>
-                        <span>{data.varianceType || 'EXACTO'}</span>
-                    </div>
-                    {(data.difference !== undefined && data.difference !== 0) && (
-                        <div className="flex justify-between font-black">
-                            <span>DIFERENCIA ({data.varianceType}):</span>
-                            <span>$ {fmtNum(Math.abs(data.difference))}</span>
-                        </div>
-                    )}
-                    {data.notes && (
-                        <div className="text-[10px] mt-1 italic border-t border-black pt-1">
-                            OBS: {data.notes}
-                        </div>
-                    )}
+                    <span className="text-[8px] text-slate-400 tracking-wider mt-0.5">*{data.registerId.slice(-12)}*</span>
                 </div>
-            )}
-
-            <div className="text-center text-[10px] mt-4 border-t border-black pt-2">
-                IMPRESO DESDE SISTEMA ERP MARKET
-            </div>
-            <div className="text-center text-[9px] text-gray-500">
-                {new Date().toLocaleString('es-VE')}
             </div>
         </div>
     );
