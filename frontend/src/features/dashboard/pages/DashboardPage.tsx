@@ -99,9 +99,9 @@ function CurrencySalesGrid({ data }: { data: CurrencySaleDTO[] }) {
                 <div className="flex gap-2">
                     <button
                         onClick={() => setSelectedCurrency('all')}
-                        className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-all ${
+                        className={`text-xs px-3 py-1 rounded-lg font-bold transition-all ${
                             selectedCurrency === 'all' 
-                                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 shadow-xs' 
+                                ? 'bg-indigo-600 text-white dark:bg-slate-100 dark:text-slate-950 shadow-xs' 
                                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
                         }`}
                     >
@@ -111,9 +111,9 @@ function CurrencySalesGrid({ data }: { data: CurrencySaleDTO[] }) {
                         <button
                             key={d.currency}
                             onClick={() => setSelectedCurrency(d.currency)}
-                            className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-all ${
+                            className={`text-xs px-3 py-1 rounded-lg font-bold transition-all ${
                                 selectedCurrency === d.currency 
-                                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 shadow-xs' 
+                                    ? 'bg-indigo-600 text-white dark:bg-slate-100 dark:text-slate-950 shadow-xs' 
                                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
                             }`}
                         >
@@ -129,14 +129,14 @@ function CurrencySalesGrid({ data }: { data: CurrencySaleDTO[] }) {
                         return (
                             <div 
                                 key={d.currency} 
-                                className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 flex flex-col gap-3 relative overflow-hidden shadow-2xs"
+                                className="p-4.5 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/90 flex flex-col gap-3 relative overflow-hidden shadow-2xs hover:border-indigo-500/40 transition-all"
                             >
-                                <div className="absolute -right-4 -bottom-4 opacity-10 dark:opacity-5 text-slate-400 dark:text-slate-600 font-black text-6xl select-none">
+                                <div className="absolute -right-4 -bottom-4 opacity-5 dark:opacity-5 text-slate-500 dark:text-slate-600 font-black text-6xl select-none">
                                     {d.currency}
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{d.currency}</span>
-                                    <Badge variant="outline" className="text-[10px] font-bold bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700">{d.count} Ventas</Badge>
+                                    <Badge variant="outline" className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700">{d.count} Ventas</Badge>
                                 </div>
                                 <div>
                                     <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 block">Total Facturado</span>

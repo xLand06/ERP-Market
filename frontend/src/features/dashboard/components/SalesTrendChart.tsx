@@ -50,7 +50,7 @@ export default function SalesTrendChart({ data, loading }: SalesTrendChartProps)
                         onClick={() => setSelectedCurrency('total')}
                         className={`text-[10px] px-2.5 py-1 rounded-md font-bold transition-all ${
                             selectedCurrency === 'total' 
-                                ? 'bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-950 shadow-xs' 
+                                ? 'bg-indigo-600 text-white dark:bg-slate-100 dark:text-slate-950 shadow-xs' 
                                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
                         }`}
                     >
@@ -62,7 +62,7 @@ export default function SalesTrendChart({ data, loading }: SalesTrendChartProps)
                             onClick={() => setSelectedCurrency(curr)}
                             className={`text-[10px] px-2.5 py-1 rounded-md font-bold transition-all ${
                                 selectedCurrency === curr 
-                                    ? 'bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-950 shadow-xs' 
+                                    ? 'bg-indigo-600 text-white dark:bg-slate-100 dark:text-slate-950 shadow-xs' 
                                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
                             }`}
                         >
