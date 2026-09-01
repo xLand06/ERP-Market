@@ -76,7 +76,7 @@ export const ReportXModal: React.FC<ReportXModalProps> = ({ open, onClose, regis
                 ) : (
                     <div className="py-3 space-y-5 text-sm">
                         {/* Ticket Preview Component matching exact receipt layout */}
-                        <div className="bg-slate-100 dark:bg-slate-950/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                        <div className="bg-slate-50 dark:bg-slate-950/40 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800">
                             <ThermalAuditTicket data={report} isPreview={true} />
                         </div>
                         {/* Status bar */}

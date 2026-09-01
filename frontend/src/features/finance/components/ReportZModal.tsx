@@ -150,7 +150,7 @@ export const ReportZModal: React.FC<ReportZModalProps> = ({
                             </div>
 
                             {/* Ticket Live Preview */}
-                            <div className="bg-slate-100 dark:bg-slate-950/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                            <div className="bg-slate-50 dark:bg-slate-950/40 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800">
                                 <ThermalAuditTicket
                                     isPreview={true}
                                     data={{
