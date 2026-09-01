@@ -67,6 +67,26 @@ export default function ProductsPage() {
         setPage(1);
     }, [search, filterGroup, filterCategory, filterStatus]);
 
+    const handleExportExcel = () => {
+        exportToExcel(
+            products,
+            [
+                { header: 'Código de Barras', key: (p: Product) => p.barcode || '-' },
+                { header: 'Nombre', key: 'name' },
+                { header: 'Marca', key: (p: Product) => p.brand || '-' },
+                { header: 'Unidad', key: (p: Product) => p.unit || 'UND' },
+                { header: 'Precio (COP)', key: 'priceCOP' },
+                { header: 'Precio (USD)', key: 'priceUSD' },
+                { header: 'IVA %', key: (p: Product) => p.taxRate ?? 16 },
+                { header: 'Stock Mínimo', key: (p: Product) => p.minStock ?? 5 },
+                { header: 'Grupo', key: (p: Product) => (p as any).group?.name || '-' },
+                { header: 'Subgrupo', key: (p: Product) => (p as any).subGroup?.name || '-' },
+                { header: 'Estado', key: (p: Product) => p.isActive ? 'ACTIVO' : 'INACTIVO' },
+            ],
+            'Catalogo_Productos'
+        );
+    };
+
     return (
         <>
             <ProductFormModal 
