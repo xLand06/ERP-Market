@@ -8,7 +8,9 @@
         "build": "vite build",
         "preview": "vite preview",
         "test": "vitest run",
-        "test:watch": "vitest"
+        "test:watch": "vitest",
+        "build:apk": "vite build && cap sync android",
+        "open:android": "cap open android"
     },
     "dependencies": {
         "@capacitor-community/sqlite": "^8.1.1",
