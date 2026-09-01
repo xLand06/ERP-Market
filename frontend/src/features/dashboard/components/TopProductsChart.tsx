@@ -22,17 +22,20 @@ export default function TopProductsChart({ data, loading }: TopProductsChartProp
 
     return (
         <Card>
-            <CardHeader>
-                <CardTitle className="text-sm font-semibold">Productos Más Vendidos</CardTitle>
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
+                <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100">Productos Más Vendidos</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
                 <ResponsiveContainer width="100%" height={250}>
                     <BarChart data={chartData} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.15)" />
                         <XAxis type="number" fontSize={12} stroke="#94a3b8" />
                         <YAxis type="category" dataKey="name" fontSize={11} width={100} stroke="#94a3b8" />
-                        <Tooltip formatter={(value: number) => [value, 'Unidades']} />
-                        <Bar dataKey="ventas" fill="#10B981" radius={[0, 4, 4, 0]} />
+                        <Tooltip
+                            formatter={(value: number) => [value, 'Unidades']}
+                            contentStyle={{ borderRadius: '12px', border: '1px solid rgba(148, 163, 184, 0.2)', backgroundColor: '#0f172a', color: '#f8fafc', fontSize: '11px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)' }}
+                        />
+                        <Bar dataKey="ventas" fill="#10B981" radius={[0, 6, 6, 0]} />
                     </BarChart>
                 </ResponsiveContainer>
             </CardContent>

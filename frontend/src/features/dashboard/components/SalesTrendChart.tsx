@@ -43,15 +43,15 @@ export default function SalesTrendChart({ data, loading }: SalesTrendChartProps)
 
     return (
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-4">
-                <CardTitle className="text-sm font-semibold">Tendencia de Ventas</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100">Tendencia de Ventas</CardTitle>
                 <div className="flex gap-1 flex-wrap">
                     <button
                         onClick={() => setSelectedCurrency('total')}
-                        className={`text-[10px] px-2 py-0.5 rounded font-bold transition-all ${
+                        className={`text-[10px] px-2.5 py-1 rounded-md font-bold transition-all ${
                             selectedCurrency === 'total' 
-                                ? 'bg-slate-900 text-white' 
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 shadow-xs' 
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
                         }`}
                     >
                         Total (COP)
@@ -60,10 +60,10 @@ export default function SalesTrendChart({ data, loading }: SalesTrendChartProps)
                         <button
                             key={curr}
                             onClick={() => setSelectedCurrency(curr)}
-                            className={`text-[10px] px-2 py-0.5 rounded font-bold transition-all ${
+                            className={`text-[10px] px-2.5 py-1 rounded-md font-bold transition-all ${
                                 selectedCurrency === curr 
-                                    ? 'bg-slate-900 text-white' 
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 shadow-xs' 
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
                             }`}
                         >
                             {curr}
@@ -71,7 +71,7 @@ export default function SalesTrendChart({ data, loading }: SalesTrendChartProps)
                     ))}
                 </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
                 <ResponsiveContainer width="100%" height={250}>
                     <AreaChart data={chartData}>
                         <defs>
@@ -80,7 +80,7 @@ export default function SalesTrendChart({ data, loading }: SalesTrendChartProps)
                                 <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
                             </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.15)" />
                         <XAxis dataKey="formattedDate" fontSize={11} stroke="#94a3b8" />
                         <YAxis 
                             fontSize={11} 
@@ -89,9 +89,9 @@ export default function SalesTrendChart({ data, loading }: SalesTrendChartProps)
                         />
                         <Tooltip 
                             formatter={(value: number) => [formatValue(value), 'Ventas']}
-                            contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '11px' }}
+                            contentStyle={{ borderRadius: '12px', border: '1px solid rgba(148, 163, 184, 0.2)', backgroundColor: 'var(--tooltip-bg, #0f172a)', color: '#f8fafc', fontSize: '11px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)' }}
                         />
-                        <Area type="monotone" dataKey={selectedCurrency} stroke="#3B82F6" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
+                        <Area type="monotone" dataKey={selectedCurrency} stroke="#3B82F6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSales)" />
                     </AreaChart>
                 </ResponsiveContainer>
             </CardContent>

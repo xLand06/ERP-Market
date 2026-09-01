@@ -24,10 +24,10 @@ export default function SalesByBranchChart({ data, loading }: SalesByBranchChart
 
     return (
         <Card>
-            <CardHeader>
-                <CardTitle className="text-sm font-semibold">Ventas por Sede</CardTitle>
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
+                <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100">Ventas por Sede</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
                 <ResponsiveContainer width="100%" height={200}>
                     <PieChart>
                         <Pie
@@ -44,17 +44,20 @@ export default function SalesByBranchChart({ data, loading }: SalesByBranchChart
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                         </Pie>
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                        <Tooltip
+                            formatter={(value: number) => formatCurrency(value)}
+                            contentStyle={{ borderRadius: '12px', border: '1px solid rgba(148, 163, 184, 0.2)', backgroundColor: '#0f172a', color: '#f8fafc', fontSize: '11px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)' }}
+                        />
                     </PieChart>
                 </ResponsiveContainer>
                 <div className="mt-4 space-y-2">
                     {chartData.map((d, i) => (
-                        <div key={i} className="flex items-center justify-between text-sm">
+                        <div key={i} className="flex items-center justify-between text-sm border-b border-slate-100 dark:border-slate-800/60 pb-1.5 last:border-none">
                             <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                                <span>{d.name}</span>
+                                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                                <span className="text-slate-700 dark:text-slate-300 font-medium">{d.name}</span>
                             </div>
-                            <span className="font-medium">{formatCurrency(d.value)}</span>
+                            <span className="font-bold tabular-nums text-slate-900 dark:text-slate-100">{formatCurrency(d.value)}</span>
                         </div>
                     ))}
                 </div>

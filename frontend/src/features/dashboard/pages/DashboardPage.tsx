@@ -41,16 +41,18 @@ interface KPIProps {
 
 function KPICard({ title, value, subvalue, change, icon: Icon, iconBg, color }: KPIProps) {
     const pos = change >= 0;
-    const badgeClass = pos ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200';
+    const badgeClass = pos
+        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-900/60'
+        : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-900/60';
     return (
-        <Card>
+        <Card className="hover:border-emerald-500/50 transition-all">
             <CardHeader className="flex-row items-start justify-between space-y-0 pb-2">
                 <div>
-                    <CardTitle className="text-sm font-medium text-slate-500">{title}</CardTitle>
-                    <p className="text-2xl font-bold text-slate-900 mt-1">{value}</p>
-                    {subvalue && <p className="text-[11px] text-slate-400 mt-0.5">{subvalue}</p>}
+                    <CardTitle className="text-sm font-bold text-slate-500 dark:text-slate-400">{title}</CardTitle>
+                    <p className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1 tabular-nums">{value}</p>
+                    {subvalue && <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{subvalue}</p>}
                 </div>
-                <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', iconBg)}>
+                <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-800', iconBg)}>
                     <Icon className="w-5 h-5" style={{ color }} />
                 </div>
             </CardHeader>
@@ -89,18 +91,18 @@ function CurrencySalesGrid({ data }: { data: CurrencySaleDTO[] }) {
 
     return (
         <Card className="w-full">
-            <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-slate-100">
-                <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                    <DollarSign className="w-4 h-4 text-emerald-600" />
+            <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-emerald-500" />
                     Ventas por Moneda (Mes Actual)
                 </CardTitle>
                 <div className="flex gap-2">
                     <button
                         onClick={() => setSelectedCurrency('all')}
-                        className={`text-xs px-2.5 py-1 rounded-md font-medium transition-all ${
+                        className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-all ${
                             selectedCurrency === 'all' 
-                                ? 'bg-slate-900 text-white' 
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 shadow-xs' 
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
                         }`}
                     >
                         Todas
@@ -109,10 +111,10 @@ function CurrencySalesGrid({ data }: { data: CurrencySaleDTO[] }) {
                         <button
                             key={d.currency}
                             onClick={() => setSelectedCurrency(d.currency)}
-                            className={`text-xs px-2.5 py-1 rounded-md font-medium transition-all ${
+                            className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-all ${
                                 selectedCurrency === d.currency 
-                                    ? 'bg-slate-900 text-white' 
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 shadow-xs' 
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
                             }`}
                         >
                             {d.currency}
@@ -127,31 +129,31 @@ function CurrencySalesGrid({ data }: { data: CurrencySaleDTO[] }) {
                         return (
                             <div 
                                 key={d.currency} 
-                                className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/80 flex flex-col gap-3 relative overflow-hidden shadow-2xs"
+                                className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 flex flex-col gap-3 relative overflow-hidden shadow-2xs"
                             >
-                                <div className="absolute -right-4 -bottom-4 opacity-10 text-slate-400 font-black text-6xl select-none">
+                                <div className="absolute -right-4 -bottom-4 opacity-10 dark:opacity-5 text-slate-400 dark:text-slate-600 font-black text-6xl select-none">
                                     {d.currency}
                                 </div>
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{d.currency}</span>
-                                    <Badge variant="outline" className="text-[10px] font-bold bg-white text-slate-700 border-slate-200">{d.count} Ventas</Badge>
+                                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{d.currency}</span>
+                                    <Badge variant="outline" className="text-[10px] font-bold bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700">{d.count} Ventas</Badge>
                                 </div>
                                 <div>
-                                    <span className="text-[10px] font-semibold text-slate-400 block">Total Facturado</span>
-                                    <span className="text-xl font-black text-slate-900">
+                                    <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 block">Total Facturado</span>
+                                    <span className="text-xl font-black text-slate-900 dark:text-slate-100 tabular-nums">
                                         {formatOrigCurrency(d.totalSales, d.currency)}
                                     </span>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2 border-t border-slate-200/60 pt-2.5">
+                                <div className="grid grid-cols-2 gap-2 border-t border-slate-200/60 dark:border-slate-800 pt-2.5">
                                     <div>
-                                        <span className="text-[10px] font-semibold text-slate-400 block">Ganancia</span>
-                                        <span className="text-xs font-bold text-emerald-600">
+                                        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 block">Ganancia</span>
+                                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
                                             {formatOrigCurrency(d.totalProfit, d.currency)}
                                         </span>
                                     </div>
                                     <div>
-                                        <span className="text-[10px] font-semibold text-slate-400 block">Margen</span>
-                                        <span className="text-xs font-bold text-indigo-500 flex items-center gap-0.5">
+                                        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 block">Margen</span>
+                                        <span className="text-xs font-bold text-indigo-500 dark:text-indigo-400 flex items-center gap-0.5 tabular-nums">
                                             <Percent className="w-3 h-3" /> {margin.toFixed(1)}%
                                         </span>
                                     </div>
@@ -170,20 +172,20 @@ function LowStockPanel({ count }: { count: number }) {
     const navigate = useNavigate();
     return (
         <Card className="h-full">
-            <CardHeader className="flex-row items-center justify-between pb-3 border-b border-slate-100">
+            <CardHeader className="flex-row items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                    <h3 className="text-sm font-semibold text-slate-900">Alertas de Stock</h3>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Alertas de Stock</h3>
                 </div>
                 <Badge variant="destructive">{count} críticos</Badge>
             </CardHeader>
             <CardContent className="pt-4">
                 <div className="text-center py-8">
                     <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
-                    <p className="text-slate-600 font-medium">{count} productos con stock bajo</p>
-                    <p className="text-xs text-slate-400 mt-1">Revisa el módulo de inventario</p>
+                    <p className="text-slate-700 dark:text-slate-200 font-medium">{count} productos con stock bajo</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Revisa el módulo de inventario</p>
                 </div>
-                <Button variant="outline" size="sm" className="w-full mt-4" onClick={() => navigate('/inventory')}>
+                <Button variant="outline" size="sm" className="w-full mt-4 dark:border-slate-700 dark:hover:bg-slate-800 dark:text-slate-200" onClick={() => navigate('/inventory')}>
                     Ver Inventario
                 </Button>
             </CardContent>
@@ -200,22 +202,22 @@ function ExpiringBatchesPanel() {
 
     return (
         <Card className="h-full">
-            <CardHeader className="flex-row items-center justify-between pb-3 border-b border-slate-100">
+            <CardHeader className="flex-row items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                    <h3 className="text-sm font-semibold text-slate-900">Lotes por Vencer</h3>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Lotes por Vencer</h3>
                 </div>
                 <Badge variant="warning">{total} alerta{total !== 1 ? 's' : ''}</Badge>
             </CardHeader>
             <CardContent className="pt-4">
                 <div className="text-center py-6">
                     <Clock className="w-10 h-10 text-amber-500 mx-auto mb-3" />
-                    <p className="text-slate-600 font-medium">
+                    <p className="text-slate-700 dark:text-slate-200 font-medium">
                         {expiringData?.expired?.length || 0} vencidos, {expiringData?.expiring?.length || 0} próximos
                     </p>
-                    <p className="text-xs text-slate-400 mt-1">Revisa el módulo de lotes</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Revisa el módulo de lotes</p>
                 </div>
-                <Button variant="outline" size="sm" className="w-full mt-3" onClick={() => navigate('/inventory/batches')}>
+                <Button variant="outline" size="sm" className="w-full mt-3 dark:border-slate-700 dark:hover:bg-slate-800 dark:text-slate-200" onClick={() => navigate('/inventory/batches')}>
                     Ver Lotes
                 </Button>
             </CardContent>
@@ -226,10 +228,10 @@ function ExpiringBatchesPanel() {
 function QuickActions() {
     const navigate = useNavigate();
     const actions = [
-        { label: 'Nueva Venta', icon: ShoppingCart, color: 'text-emerald-600', bg: 'bg-emerald-50', href: '/pos' },
-        { label: 'Inventario', icon: PackageOpen, color: 'text-blue-600', bg: 'bg-blue-50', href: '/inventory' },
-        { label: 'Caja', icon: DollarSign, color: 'text-amber-600', bg: 'bg-amber-50', href: '/finance' },
-        { label: 'Productos', icon: Package, color: 'text-violet-600', bg: 'bg-violet-50', href: '/products' },
+        { label: 'Nueva Venta', icon: ShoppingCart, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-900/40', href: '/pos' },
+        { label: 'Inventario', icon: PackageOpen, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/40 border-blue-100 dark:border-blue-900/40', href: '/inventory' },
+        { label: 'Caja', icon: DollarSign, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40 border-amber-100 dark:border-amber-900/40', href: '/finance' },
+        { label: 'Productos', icon: Package, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-950/40 border-violet-100 dark:border-violet-900/40', href: '/products' },
     ];
     return (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -238,14 +240,14 @@ function QuickActions() {
                     key={a.label}
                     onClick={() => navigate(a.href)}
                     className={cn(
-                        'flex flex-col items-center gap-2 p-4 rounded-xl border transition-all hover:-translate-y-0.5 hover:shadow-md',
-                        a.bg, 'border-transparent'
+                        'flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer',
+                        a.bg
                     )}
                 >
-                    <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center bg-white')}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-2xs">
                         <a.icon className={cn('w-5 h-5', a.color)} />
                     </div>
-                    <span className="text-xs font-bold text-slate-700">{a.label}</span>
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{a.label}</span>
                 </button>
             ))}
         </div>
@@ -278,21 +280,21 @@ export default function DashboardPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-xl sm:text-2xl font-black text-slate-900">Dashboard Gerencial</h1>
-                    <p className="text-xs text-slate-500 mt-1 capitalize">{today}</p>
+                    <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">Dashboard Gerencial</h1>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 capitalize">{today}</p>
                 </div>
                 
                 <div className="flex items-center gap-2">
-                    <div className="flex p-1 bg-slate-100 rounded-lg border border-slate-200">
+                    <div className="flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700">
                         {(['today', 'month', 'year', 'all'] as const).map((r) => (
                             <button
                                 key={r}
                                 onClick={() => setTimeRange(r)}
                                 className={cn(
-                                    "px-3 py-1.5 text-xs font-bold rounded-md transition-all",
+                                    "px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer",
                                     timeRange === r 
-                                        ? "bg-white text-slate-900 shadow-sm" 
-                                        : "text-slate-500 hover:text-slate-700"
+                                        ? "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 shadow-xs" 
+                                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                                 )}
                             >
                                 {rangeLabels[r]}
@@ -300,9 +302,9 @@ export default function DashboardPage() {
                         ))}
                     </div>
 
-                    <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
+                    <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 rounded-xl px-3 py-1.5">
                         <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                        <span className="text-xs font-bold text-emerald-700 uppercase">Sistema Activo</span>
+                        <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-tight">Sistema Activo</span>
                     </div>
                 </div>
             </div>
@@ -327,7 +329,7 @@ export default function DashboardPage() {
                             subvalue={`${kpis?.sales.today.count || 0} transacciones`}
                             change={kpis?.sales.today.change || 0}
                             icon={DollarSign}
-                            iconBg="bg-emerald-50"
+                            iconBg="bg-emerald-50 dark:bg-emerald-950/50"
                             color="#10B981"
                         />
                         <KPICard
@@ -336,7 +338,7 @@ export default function DashboardPage() {
                             subvalue={`${kpis?.sales.thisMonth.count || 0} transacciones`}
                             change={kpis?.sales.thisMonth.change || 0}
                             icon={ShoppingCart}
-                            iconBg="bg-blue-50"
+                            iconBg="bg-blue-50 dark:bg-blue-950/50"
                             color="#3B82F6"
                         />
                         <KPICard
@@ -345,7 +347,7 @@ export default function DashboardPage() {
                             subvalue={`${kpis?.inventory.lowStockAlerts || 0} alertas`}
                             change={kpis?.inventory.change || 0}
                             icon={Package}
-                            iconBg="bg-violet-50"
+                            iconBg="bg-violet-50 dark:bg-violet-950/50"
                             color="#8B5CF6"
                         />
                         <KPICard
@@ -353,7 +355,7 @@ export default function DashboardPage() {
                             value={formatNumber(kpis?.transactionsToday || 0)}
                             change={kpis?.transactionsTodayChange || 0}
                             icon={Users}
-                            iconBg="bg-amber-50"
+                            iconBg="bg-amber-50 dark:bg-amber-950/50"
                             color="#F59E0B"
                         />
                     </>
