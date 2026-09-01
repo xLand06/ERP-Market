@@ -45,7 +45,7 @@ export const ReportXModal: React.FC<ReportXModalProps> = ({ open, onClose, regis
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100">
+            <DialogContent className="sm:max-w-xl">
                 <DialogHeader className="border-b border-slate-100 dark:border-slate-800 pb-3">
                     <DialogTitle className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-lg">

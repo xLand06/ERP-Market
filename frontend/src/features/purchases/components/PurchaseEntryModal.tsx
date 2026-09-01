@@ -119,7 +119,7 @@ export function PurchaseEntryModal({ open, onClose, onSave }: PurchaseEntryModal
 
     return (
         <Dialog open={open} onOpenChange={open => !open && handleClose()}>
-            <DialogContent className="sm:max-w-150 max-h-[90vh] flex flex-col overflow-hidden">
+            <DialogContent className="sm:max-w-xl">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">

@@ -123,7 +123,7 @@ export const ReportZModal: React.FC<ReportZModalProps> = ({
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && handleResetAndClose()}>
-            <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100">
+            <DialogContent className="sm:max-w-xl">
                 {step === 'confirm' ? (
                     <>
                         <DialogHeader className="border-b border-slate-100 dark:border-slate-800 pb-3">

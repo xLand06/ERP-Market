@@ -109,7 +109,7 @@ export function SupplierFormModal({ open, onClose, onSuccess, initial, mode = 'c
 
     return (
         <Dialog open={open} onOpenChange={o => !o && handleClose()}>
-            <DialogContent className="sm:max-w-137.5 max-h-[90vh] flex flex-col overflow-hidden">
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">

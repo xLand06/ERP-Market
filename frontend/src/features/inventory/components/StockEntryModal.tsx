@@ -213,7 +213,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
 
     return (
         <Dialog open={open} onOpenChange={o => !o && onClose()}>
-            <DialogContent className="sm:max-w-2xl max-h-[92dvh] flex flex-col overflow-hidden p-0">
+            <DialogContent className="sm:max-w-2xl">
                 {/* Header */}
                 <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100 shrink-0">
                     <DialogTitle className="flex items-center gap-2.5 text-lg font-black">
