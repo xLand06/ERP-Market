@@ -281,12 +281,17 @@ export const useConfigStore = create<ConfigState>()(
                     const currentTheme = get().activeTheme;
                     const res = await api.get('/settings');
                     if (res.data.success) {
+                        const themeToApply = currentTheme || res.data.data.activeTheme || 'emerald';
                         set({
                             ...res.data.data,
-                            activeTheme: res.data.data.activeTheme || currentTheme || 'emerald',
+                            activeTheme: themeToApply,
                             iva: res.data.data.ivaPercent ?? res.data.data.iva ?? 16,
                             mainCurrency: res.data.data.mainCurrency || 'USD',
                         });
+                        if (typeof document !== 'undefined') {
+                            document.documentElement.setAttribute('data-theme', themeToApply);
+                            document.documentElement.className = themeToApply === 'dark' ? 'theme-dark dark' : `theme-${themeToApply}`;
+                        }
                     }
                 } catch (error) {
                     console.error('Error fetching settings:', error);
@@ -373,11 +378,16 @@ export const useConfigStore = create<ConfigState>()(
             },
 
             activeTheme: 'emerald',
-            setTheme: (theme) => {
+            setTheme: async (theme) => {
                 set({ activeTheme: theme });
                 if (typeof document !== 'undefined') {
                     document.documentElement.setAttribute('data-theme', theme);
-                    document.documentElement.className = `theme-${theme}`;
+                    document.documentElement.className = theme === 'dark' ? 'theme-dark dark' : `theme-${theme}`;
+                }
+                try {
+                    await api.post('/settings', { activeTheme: theme });
+                } catch (error) {
+                    console.error('Error persisting theme to backend:', error);
                 }
             },
 
