@@ -567,7 +567,7 @@ const AuditLogsPage: React.FC = () => {
 
                                     <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100">
                                         <div className="text-[10px] uppercase tracking-wider text-indigo-700 mb-2.5 font-bold">Resumen de Cambios</div>
-                                        {renderNaturalDetails(selectedLog.details, selectedLog.action)}
+                                        {renderDetails(selectedLog)}
                                     </div>
 
                                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
