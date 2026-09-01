@@ -258,7 +258,12 @@ export default function POSPage() {
 
             // Intentar imprimir el ticket térmico de forma asíncrona sin bloquear la venta realizada
             try {
-                await printThermalReceiptReal(primaryPrinter, {
+                let toastId: string | undefined;
+                if (primaryPrinter) {
+                    toastId = toast.loading(`Imprimiendo factura en ${primaryPrinter.name}...`);
+                }
+
+                const res = await printThermalReceiptReal(primaryPrinter, {
                     invoiceNumber: invoiceNum,
                     customerName: 'Consumidor Final',
                     customerTaxId: 'V-00000000-0',
@@ -273,6 +278,14 @@ export default function POSPage() {
                     paymentMethods: formattedPayMethods,
                     footerMessage: config.footerMessage,
                 });
+
+                if (toastId) {
+                    if (res.method === 'webusb' || res.method === 'browser') {
+                        toast.success(res.message, { id: toastId });
+                    } else {
+                        toast.dismiss(toastId);
+                    }
+                }
             } catch (printErr) {
                 console.warn('Aviso: No se completó el envío a la impresora:', printErr);
             }

@@ -46,6 +46,7 @@ export function TransactionSummary({
     const primaryPrinter = printers.find(p => p.isPrimary) || printers[0] || null;
 
     const handlePrint = async () => {
+        const toastId = toast.loading('Imprimiendo factura...');
         const res = await printThermalReceiptReal(primaryPrinter, {
             invoiceNumber: 'FACT-000482',
             customerName,
@@ -63,8 +64,10 @@ export function TransactionSummary({
             footerMessage: config.footerMessage,
         });
 
-        if (res.method === 'webusb') {
-            toast.success(res.message);
+        if (res.method === 'webusb' || res.method === 'browser') {
+            toast.success(res.message, { id: toastId });
+        } else {
+            toast.dismiss(toastId);
         }
     };
 
