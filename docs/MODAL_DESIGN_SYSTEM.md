@@ -30,10 +30,10 @@ All modal components MUST support both **Light Mode** and **Dark Mode** seamless
 
 ### A. Backdrop & Dialog Container
 - **Backdrop Overlay**: `bg-slate-950/65 backdrop-blur-md animate-in fade-in-0 duration-200`
-- **Dialog Container**:
+- **Dialog Container & Safety Margins (Evitar modales "al ras")**:
   - Light Mode: `bg-white border-slate-200 shadow-2xl text-slate-900`
   - Dark Mode: `dark:bg-slate-900 dark:border-slate-800 dark:text-slate-100`
-  - Shape & Sizing: `rounded-2xl border max-h-[90vh] flex flex-col overflow-hidden`
+  - Shape & Safety Margins: `w-[calc(100vw-2rem)] sm:w-full max-h-[calc(100dvh-3.5rem)] rounded-2xl border flex flex-col overflow-hidden my-auto` (Garantiza siempre mínimo 1rem / 16px de margen respirable respecto a los bordes de la pantalla en móviles, tablets y monitores).
 
 ### B. Header Component
 - **Container**: `p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 shrink-0`
