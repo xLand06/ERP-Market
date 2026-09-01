@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
     TrendingUp, TrendingDown, DollarSign, ArrowUpCircle,
-    Plus, Lock, Circle, Play, History, ChevronLeft, ChevronRight, Calendar, Copy, Eye, ShoppingBag, PackageMinus, Store
+    Plus, Lock, Circle, Play, History, ChevronLeft, ChevronRight, Calendar, Copy, Eye, ShoppingBag, PackageMinus, Store, Receipt
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,11 +12,15 @@ import { ExpenseEntryModal } from '../components/ExpenseEntryModal';
 import { PurchaseHistoryPanel } from '../components/PurchaseHistoryPanel';
 import { CashClosureModal } from '../components/CashClosureModal';
 import { CashRegisterDetailModal } from '../components/CashRegisterDetailModal';
+import { ReportXModal } from '../components/ReportXModal';
+import { ReportZModal } from '../components/ReportZModal';
+import { ThermalAuditTicket, ReportAuditData } from '@/components/common/ThermalAuditTicket';
 import { SaleDetailModal, Sale } from '../components/SaleDetailModal';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
 import { useConfigStore } from '@/hooks/useConfigStore';
+
 
 function StatCard({ icon: Icon, label, value, color, bg }: {
     icon: React.ElementType; label: string; value: string; color: string; bg: string;
@@ -39,7 +43,11 @@ export default function CashRegisterPage() {
     const setSelectedBranch = useAuthStore(s => s.setSelectedBranch);
     const [entryOpen, setEntryOpen] = useState(false);
     const [closureOpen, setClosureOpen] = useState(false);
+    const [reportXOpen, setReportXOpen] = useState(false);
+    const [reportZOpen, setReportZOpen] = useState(false);
+    const [activePrintTicket, setActivePrintTicket] = useState<ReportAuditData | null>(null);
     const [activeTab, setActiveTab] = useState<'current' | 'history' | 'egresos'>('current');
+
     const [historyPage, setHistoryPage] = useState(1);
     const [historyFilters, setHistoryFilters] = useState({ from: '', to: '' });
     const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
@@ -382,17 +390,27 @@ export default function CashRegisterPage() {
             <>
                 <ExpenseEntryModal open={entryOpen} onClose={() => setEntryOpen(false)} onSave={(data) => addMovementMutation.mutate(data)} />
                 <CashClosureModal open={closureOpen} onClose={() => setClosureOpen(false)} openingBalance={openingAmount} expectedBalance={expectedBalance} onConfirm={(d) => { closeMutation.mutate(d); setClosureOpen(false); }} />
+                <ReportXModal open={reportXOpen} onClose={() => setReportXOpen(false)} registerId={openRegister?.id || null} />
+                <ReportZModal open={reportZOpen} onClose={() => setReportZOpen(false)} registerId={openRegister?.id || null} openingBalance={openingAmount} expectedBalance={expectedBalance} onCloseSuccess={(data) => { setActivePrintTicket(data); refetch(); }} />
+                <ThermalAuditTicket data={activePrintTicket} />
+
                 <div className="flex flex-col gap-6 max-w-350 mx-auto pb-8">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
                             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Flujo de Caja</h1>
                             <p className="text-xs text-slate-400 mt-1 font-medium">Turno del {new Date(openRegister.openedAt).toLocaleDateString('es-VE', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                         </div>
-                        <div className="flex gap-2.5">
+                        <div className="flex flex-wrap gap-2.5">
                             <Button variant="outline" onClick={() => setEntryOpen(true)}><Plus className="w-4 h-4 mr-2" />Movimiento</Button>
-                            <Button variant="default" className="bg-amber-600 hover:bg-amber-700" onClick={() => setClosureOpen(true)}><Circle className="w-4 h-4 mr-2" />Cerrar Caja</Button>
+                            <Button variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/50 font-semibold" onClick={() => setReportXOpen(true)}>
+                                <Receipt className="w-4 h-4 mr-2 text-indigo-600 dark:text-indigo-400" />Reporte X
+                            </Button>
+                            <Button variant="default" className="bg-rose-600 hover:bg-rose-700 font-bold text-white shadow-sm shadow-rose-500/20" onClick={() => setReportZOpen(true)}>
+                                <Lock className="w-4 h-4 mr-2" />Cierre Reporte Z
+                            </Button>
                         </div>
                     </div>
+
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                         <StatCard icon={DollarSign} label="Apertura" value={formatCurrency(openingAmount)} color="text-emerald-600" bg="bg-emerald-50" />
                         <StatCard icon={TrendingUp} label="Ingresos" value={formatCurrency(totalIncome)} color="text-blue-600" bg="bg-blue-50" />

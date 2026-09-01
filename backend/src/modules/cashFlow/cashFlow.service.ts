@@ -172,3 +172,206 @@ export const getDailySalesSummary = async (branchId: string, date?: string) => {
         transactions,
     };
 };
+
+export interface DrawerCountPayload {
+    countedCOP?: number;
+    countedUSD?: number;
+    countedVES?: number;
+    usdRate?: number;
+    vesRate?: number;
+}
+
+export interface ReportZExecutePayload {
+    physicalCounts?: DrawerCountPayload;
+    closingAmount: number;
+    notes?: string;
+}
+
+export const getReportX = async (registerId: string) => {
+    const cashRegister = await prisma.cashRegister.findUnique({
+        where: { id: registerId },
+        include: {
+            user: { select: { id: true, nombre: true, username: true } },
+            branch: { select: { id: true, name: true } },
+            transactions: {
+                where: { status: 'COMPLETED' },
+                select: {
+                    id: true,
+                    type: true,
+                    total: true,
+                    currency: true,
+                    exchangeRate: true,
+                    paymentMethods: true,
+                    notes: true,
+                    createdAt: true,
+                },
+            },
+        },
+    });
+
+    if (!cashRegister) {
+        throw new Error('Caja no encontrada.');
+    }
+
+    const salesTransactions = cashRegister.transactions.filter((tx) => tx.type === 'SALE');
+
+    let efectivoCOP = 0;
+    let efectivoUSD = 0;
+    let efectivoVES = 0;
+    let transferencia = 0;
+    let tarjeta = 0;
+    let otros = 0;
+    let salesTotal = 0;
+
+    for (const tx of salesTransactions) {
+        const totalVal = Number(tx.total) || 0;
+        salesTotal += totalVal;
+
+        let parsedMethods: any[] | null = null;
+        if (tx.paymentMethods) {
+            if (typeof tx.paymentMethods === 'string') {
+                try {
+                    parsedMethods = JSON.parse(tx.paymentMethods);
+                } catch {
+                    parsedMethods = null;
+                }
+            } else if (Array.isArray(tx.paymentMethods)) {
+                parsedMethods = tx.paymentMethods;
+            }
+        }
+
+        if (parsedMethods && Array.isArray(parsedMethods) && parsedMethods.length > 0) {
+            for (const m of parsedMethods) {
+                const amt = Number(m.amount) || 0;
+                const cur = String(m.currency || 'COP').toUpperCase();
+                const pType = String(m.type || 'cash').toLowerCase();
+
+                if (pType === 'cash' || pType === 'usd' || pType === 'efectivo') {
+                    if (cur === 'USD') efectivoUSD += amt;
+                    else if (cur === 'VES') efectivoVES += amt;
+                    else efectivoCOP += amt;
+                } else if (pType === 'transfer' || pType === 'transferencia') {
+                    transferencia += amt;
+                } else if (pType === 'card' || pType === 'tarjeta') {
+                    tarjeta += amt;
+                } else {
+                    otros += amt;
+                }
+            }
+        } else {
+            const cur = String(tx.currency || 'COP').toUpperCase();
+            const notesLower = (tx.notes || '').toLowerCase();
+            const isCard = notesLower.includes('tarjeta');
+            const isTransfer = notesLower.includes('transferencia');
+            const rate = Number(tx.exchangeRate) || 1;
+
+            if (isCard) {
+                tarjeta += totalVal;
+            } else if (isTransfer) {
+                transferencia += totalVal;
+            } else {
+                if (cur === 'USD') {
+                    const amtUSD = rate > 1 ? totalVal / rate : totalVal;
+                    efectivoUSD += amtUSD;
+                } else if (cur === 'VES') {
+                    const amtVES = rate > 0 && rate < 1000 ? totalVal / rate : totalVal;
+                    efectivoVES += amtVES;
+                } else {
+                    efectivoCOP += totalVal;
+                }
+            }
+        }
+    }
+
+    const openingCOP = Number(cashRegister.openingAmount) || 0;
+    const baseImponible = Number((salesTotal / 1.16).toFixed(2));
+    const iva16 = Number((salesTotal - baseImponible).toFixed(2));
+    const exento = 0;
+
+    const expectedCOP = openingCOP + efectivoCOP;
+    const expectedUSD = efectivoUSD;
+    const expectedVES = efectivoVES;
+    const totalExpectedCOP = openingCOP + salesTotal;
+
+    return {
+        registerId: cashRegister.id,
+        status: cashRegister.status,
+        openedAt: cashRegister.openedAt,
+        closedAt: cashRegister.closedAt,
+        user: cashRegister.user,
+        branch: cashRegister.branch,
+        openingAmount: openingCOP,
+        salesTotal: Number(salesTotal.toFixed(2)),
+        transactionCount: salesTransactions.length,
+        paymentBreakdown: {
+            efectivoCOP: Number(efectivoCOP.toFixed(2)),
+            efectivoUSD: Number(efectivoUSD.toFixed(2)),
+            efectivoVES: Number(efectivoVES.toFixed(2)),
+            transferencia: Number(transferencia.toFixed(2)),
+            tarjeta: Number(tarjeta.toFixed(2)),
+            otros: Number(otros.toFixed(2)),
+        },
+        seniatTax: {
+            totalVentas: Number(salesTotal.toFixed(2)),
+            baseImponible,
+            iva16,
+            exento,
+        },
+        expectedBalances: {
+            expectedCOP: Number(expectedCOP.toFixed(2)),
+            expectedUSD: Number(expectedUSD.toFixed(2)),
+            expectedVES: Number(expectedVES.toFixed(2)),
+            totalExpectedCOP: Number(totalExpectedCOP.toFixed(2)),
+        },
+    };
+};
+
+export const executeReportZ = async (registerId: string, payload: ReportZExecutePayload) => {
+    const cashRegister = await prisma.cashRegister.findUnique({
+        where: { id: registerId },
+        select: { id: true, status: true },
+    });
+
+    if (!cashRegister) {
+        throw new Error('Caja no encontrada.');
+    }
+    if (cashRegister.status === 'CLOSED') {
+        throw new Error('Esta caja ya se encuentra cerrada.');
+    }
+
+    const reportX = await getReportX(registerId);
+    const expectedAmount = reportX.expectedBalances.totalExpectedCOP;
+    const closingAmount = Number(payload.closingAmount) || 0;
+    const difference = Number((closingAmount - expectedAmount).toFixed(2));
+
+    const sobrante = difference > 0 ? difference : 0;
+    const faltante = difference < 0 ? Math.abs(difference) : 0;
+    const varianceType = difference > 0 ? 'SOBRANTE' : difference < 0 ? 'FALTANTE' : 'EXACTO';
+
+    const updatedRegister = await prisma.cashRegister.update({
+        where: { id: registerId },
+        data: {
+            status: 'CLOSED',
+            closedAt: new Date(),
+            closingAmount,
+            expectedAmount,
+            difference,
+            syncStatus: 'PENDING',
+            ...(payload.notes ? { notes: payload.notes } : {}),
+        },
+    });
+
+    return {
+        ...reportX,
+        status: 'CLOSED' as const,
+        closedAt: updatedRegister.closedAt,
+        closingAmount,
+        expectedAmount,
+        difference,
+        varianceType,
+        sobrante,
+        faltante,
+        physicalCounts: payload.physicalCounts || null,
+        notes: updatedRegister.notes,
+    };
+};

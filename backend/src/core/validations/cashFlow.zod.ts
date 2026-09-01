@@ -33,8 +33,30 @@ export const cashRegisterFiltersSchema = paginationSchema.extend({
 });
 
 /**
+ * Esquema para conteos físicos por moneda (Reporte Z)
+ */
+export const drawerCountSchema = z.object({
+    countedCOP: z.preprocess((val) => (val === '' || val === null || val === undefined) ? 0 : Number(val), z.number().min(0).default(0)),
+    countedUSD: z.preprocess((val) => (val === '' || val === null || val === undefined) ? 0 : Number(val), z.number().min(0).default(0)),
+    countedVES: z.preprocess((val) => (val === '' || val === null || val === undefined) ? 0 : Number(val), z.number().min(0).default(0)),
+    usdRate: z.preprocess((val) => (val === '' || val === null || val === undefined) ? undefined : Number(val), z.number().positive().optional()),
+    vesRate: z.preprocess((val) => (val === '' || val === null || val === undefined) ? undefined : Number(val), z.number().positive().optional()),
+}).optional();
+
+/**
+ * Esquema para ejecutar Reporte Z (Cierre definitivo de caja)
+ */
+export const executeReportZSchema = z.object({
+    physicalCounts: drawerCountSchema,
+    closingAmount: z.preprocess((val) => Number(val), z.number().min(0, 'El monto de cierre no puede ser negativo').max(99999999.99)),
+    notes: z.string().max(500).optional().or(z.literal('')),
+});
+
+/**
  * Tipos inferidos
  */
 export type OpenCashRegisterInput = z.infer<typeof openCashRegisterSchema>;
 export type CloseCashRegisterInput = z.infer<typeof closeCashRegisterSchema>;
+export type ExecuteReportZInput = z.infer<typeof executeReportZSchema>;
 export type CashRegisterFiltersInput = z.infer<typeof cashRegisterFiltersSchema>;
+

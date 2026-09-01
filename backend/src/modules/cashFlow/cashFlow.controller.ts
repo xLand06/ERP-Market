@@ -134,3 +134,51 @@ export const getDailySummary = async (req: Request, res: Response): Promise<void
         res.status(500).json({ success: false, error: error.message });
     }
 };
+
+/**
+ * Obtener Reporte X (Lectura parcial sin modificar estado)
+ */
+export const getReportX = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const { id } = validatedData(req, 'params');
+        const report = await cashFlowService.getReportX(id);
+        res.json({ success: true, data: report });
+    } catch (error: any) {
+        res.status(422).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Ejecutar Reporte Z (Cierre definitivo de caja con auditoría)
+ */
+export const executeReportZ = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const { id } = validatedData(req, 'params');
+        const body = validatedData(req, 'body');
+
+        const reportZ = await cashFlowService.executeReportZ(id, body);
+
+        await logAudit({
+            action: 'CASH_CLOSE',
+            module: 'cashFlow',
+            details: {
+                cajaId: id,
+                reportType: 'Z',
+                montoApertura: reportZ.openingAmount,
+                montoCierre: reportZ.closingAmount,
+                montoEsperado: reportZ.expectedAmount,
+                diferencia: reportZ.difference,
+                varianceType: reportZ.varianceType,
+                ventasTotales: reportZ.salesTotal,
+            },
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
+        });
+
+
+        res.json({ success: true, data: reportZ });
+    } catch (error: any) {
+        res.status(422).json({ success: false, error: error.message });
+    }
+};
+
