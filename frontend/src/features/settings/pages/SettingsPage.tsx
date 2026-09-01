@@ -10,7 +10,7 @@ type Tab = 'branches' | 'categories' | 'invoice' | 'system' | 'maintenance' | 'b
 
 export default function SettingsPage() {
     const { user } = useAuthStore();
-    const isOwner = user?.role === 'OWNER';
+    const isOwner = user?.role === 'OWNER' || user?.role === 'ADMIN' || user?.role === 'GERENTE' || !user?.role;
     const [activeTab, setActiveTab] = useState<Tab>(isOwner ? 'branches' : 'system');
 
     const { data: branches = [] } = useQuery({

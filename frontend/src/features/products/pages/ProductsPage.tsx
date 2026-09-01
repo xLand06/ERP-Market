@@ -10,6 +10,7 @@ import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { useProducts, useGroups, useSubgroups, useToggleProductStatus } from '../hooks';
+import { exportToExcel } from '@/lib/exportUtils';
 
 export default function ProductsPage() {
     const [search, setSearch] = useState('');
@@ -88,8 +89,8 @@ export default function ProductsPage() {
                         </p>
                     </div>
                     <div className="flex gap-2.5">
-                        <Button variant="outline" size="lg" className="h-10 font-bold text-slate-700">
-                            <Download className="w-4.5 h-4.5 mr-2" /> Exportar
+                        <Button onClick={handleExportExcel} variant="outline" size="lg" className="h-10 font-bold text-slate-700">
+                            <Download className="w-4.5 h-4.5 mr-2" /> Exportar Excel
                         </Button>
                         {isOwner && (
                             <Button onClick={handleOpenCreate} size="lg" className="h-10 font-bold shadow-sm shadow-indigo-500/20 bg-indigo-600 hover:bg-indigo-700 text-white">
