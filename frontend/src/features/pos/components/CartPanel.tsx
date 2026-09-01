@@ -1,9 +1,27 @@
 import React from 'react';
-import { Package, X, CreditCard, DollarSign } from 'lucide-react';
+import {
+    Package, X, CreditCard, DollarSign,
+    Coffee, Croissant, CupSoda, Wine, Beef, Apple, Sparkles, Cookie, ShoppingBag
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import type { CartItem, Product } from '../types';
+
+function getCartCategoryIcon(categoryName?: string, productName?: string) {
+    const text = `${categoryName || ''} ${productName || ''}`.toLowerCase();
+
+    if (text.includes('café') || text.includes('cafe') || text.includes('taza') || text.includes('cappuccino') || text.includes('latte')) return { Icon: Coffee, style: 'bg-amber-100 text-amber-600' };
+    if (text.includes('pan') || text.includes('croissant') || text.includes('pastel') || text.includes('reposter')) return { Icon: Croissant, style: 'bg-yellow-100 text-yellow-700' };
+    if (text.includes('jugo') || text.includes('refresco') || text.includes('gaseosa') || text.includes('agua') || text.includes('bebida')) return { Icon: CupSoda, style: 'bg-cyan-100 text-cyan-600' };
+    if (text.includes('licor') || text.includes('cerveza') || text.includes('vino') || text.includes('ron')) return { Icon: Wine, style: 'bg-purple-100 text-purple-600' };
+    if (text.includes('carne') || text.includes('pollo') || text.includes('res') || text.includes('cerdo') || text.includes('jamón') || text.includes('queso')) return { Icon: Beef, style: 'bg-rose-100 text-rose-600' };
+    if (text.includes('fruta') || text.includes('verdura') || text.includes('manzana') || text.includes('víveres') || text.includes('arroz')) return { Icon: Apple, style: 'bg-emerald-100 text-emerald-600' };
+    if (text.includes('jabón') || text.includes('limpieza') || text.includes('aseo')) return { Icon: Sparkles, style: 'bg-blue-100 text-blue-600' };
+    if (text.includes('snack') || text.includes('dulce') || text.includes('chocolate')) return { Icon: Cookie, style: 'bg-orange-100 text-orange-600' };
+
+    return { Icon: ShoppingBag, style: 'bg-indigo-100 text-indigo-600' };
+}
 
 interface CartPanelProps {
     items: CartItem[];
@@ -32,12 +50,13 @@ const CartItemRow = React.memo(function CartItemRow({
     onRemoveItem: (productId: string, presentationId: string | undefined) => void;
 }) {
     const { fmtUSD } = useConfigStore();
+    const { Icon, style } = getCartCategoryIcon(product?.category?.name, item.name);
 
     return (
         <div className="flex flex-col border-b px-5 py-4 gap-2">
             <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded bg-slate-50 flex items-center justify-center shrink-0">
-                    <Package className="w-4 h-4 text-slate-300" />
+                <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-2xs", style)}>
+                    <Icon className="w-4 h-4" />
                 </div>
                 <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold truncate">{item.name}</p>

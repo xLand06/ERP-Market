@@ -1,5 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import { Search, Barcode, Package, Loader2, Camera } from 'lucide-react';
+import {
+    Search, Barcode, Package, Loader2, Camera,
+    Coffee, Croissant, CupSoda, Wine, Beef, Apple, Sparkles, Cookie, ShoppingBag, Store
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,10 +21,71 @@ interface ProductSearchProps {
     onProductNotFound?: (barcode: string) => void;
 }
 
+/**
+ * Retorna el ícono y la paleta de color dinámica para cada producto/categoría.
+ */
+function getProductCategoryIcon(categoryName?: string, productName?: string) {
+    const text = `${categoryName || ''} ${productName || ''}`.toLowerCase();
+
+    if (text.includes('café') || text.includes('cafe') || text.includes('taza') || text.includes('cappuccino') || text.includes('latte') || text.includes('tinto') || text.includes('expresso')) {
+        return {
+            Icon: Coffee,
+            badgeStyle: 'bg-amber-500/15 text-amber-500 border border-amber-500/30 group-hover:bg-amber-500 group-hover:text-white',
+        };
+    }
+    if (text.includes('pan') || text.includes('bakery') || text.includes('croissant') || text.includes('pastel') || text.includes('reposter') || text.includes('torta') || text.includes('galleta')) {
+        return {
+            Icon: Croissant,
+            badgeStyle: 'bg-yellow-500/15 text-yellow-600 border border-yellow-500/30 group-hover:bg-yellow-500 group-hover:text-white',
+        };
+    }
+    if (text.includes('jugo') || text.includes('refresco') || text.includes('gaseosa') || text.includes('agua') || text.includes('bebida') || text.includes('soda') || text.includes('coca') || text.includes('pepsi')) {
+        return {
+            Icon: CupSoda,
+            badgeStyle: 'bg-cyan-500/15 text-cyan-500 border border-cyan-500/30 group-hover:bg-cyan-500 group-hover:text-white',
+        };
+    }
+    if (text.includes('licor') || text.includes('cerveza') || text.includes('vino') || text.includes('ron') || text.includes('whisky') || text.includes('vodka') || text.includes('coctel')) {
+        return {
+            Icon: Wine,
+            badgeStyle: 'bg-purple-500/15 text-purple-400 border border-purple-500/30 group-hover:bg-purple-500 group-hover:text-white',
+        };
+    }
+    if (text.includes('carne') || text.includes('pollo') || text.includes('res') || text.includes('cerdo') || text.includes('jamón') || text.includes('jamon') || text.includes('queso') || text.includes('embutido') || text.includes('charcuter')) {
+        return {
+            Icon: Beef,
+            badgeStyle: 'bg-rose-500/15 text-rose-500 border border-rose-500/30 group-hover:bg-rose-500 group-hover:text-white',
+        };
+    }
+    if (text.includes('fruta') || text.includes('verdura') || text.includes('manzana') || text.includes('víveres') || text.includes('viveres') || text.includes('arroz') || text.includes('grano') || text.includes('aceite')) {
+        return {
+            Icon: Apple,
+            badgeStyle: 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 group-hover:bg-emerald-500 group-hover:text-white',
+        };
+    }
+    if (text.includes('jabón') || text.includes('jabon') || text.includes('limpieza') || text.includes('aseo') || text.includes('detergente') || text.includes('shampoo') || text.includes('cloro')) {
+        return {
+            Icon: Sparkles,
+            badgeStyle: 'bg-blue-500/15 text-blue-500 border border-blue-500/30 group-hover:bg-blue-500 group-hover:text-white',
+        };
+    }
+    if (text.includes('snack') || text.includes('dulce') || text.includes('chocolate') || text.includes('golosina') || text.includes('doritos') || text.includes('papita')) {
+        return {
+            Icon: Cookie,
+            badgeStyle: 'bg-orange-500/15 text-orange-500 border border-orange-500/30 group-hover:bg-orange-500 group-hover:text-white',
+        };
+    }
+
+    return {
+        Icon: ShoppingBag,
+        badgeStyle: 'bg-indigo-500/15 text-indigo-500 border border-indigo-500/30 group-hover:bg-indigo-500 group-hover:text-white',
+    };
+}
+
 function StockBadge({ stock, unit }: { stock: number; unit: string }) {
     const v = stock < 5 ? 'destructive' : stock < 12 ? 'warning' : 'success';
     const label = `${stock.toFixed(unit === 'UNIDAD' ? 0 : 2)} ${unit}`;
-    return <Badge variant={v}>{label}</Badge>;
+    return <Badge variant={v} className="text-[10px] px-1.5 py-0.5">{label}</Badge>;
 }
 
 interface ProductCardProps {
@@ -37,8 +101,9 @@ const ProductCard = React.memo(function ProductCard({
     onAdd,
     onShowPresentations,
 }: ProductCardProps) {
-    const { fmtCOP, fromCOP } = useConfigStore();
+    const { fmtCOP } = useConfigStore();
     const [flash, setFlash] = useState(false);
+    const { Icon, badgeStyle } = getProductCategoryIcon(product.category?.name, product.name);
 
     const handle = useCallback(() => {
         if (product.stock === 0) return;
@@ -57,25 +122,36 @@ const ProductCard = React.memo(function ProductCard({
             onClick={handle}
             disabled={product.stock === 0}
             className={cn(
-                'flex flex-col gap-2 p-3 rounded-xl border text-left transition-all duration-200 group relative h-full min-h-[150px] w-full',
-                'hover:border-emerald-400 hover:shadow-md hover:-translate-y-1 active:scale-[0.98]',
-                flash ? 'border-emerald-500 bg-emerald-50 shadow-inner' : 'border-slate-200 bg-white',
+                'flex flex-col justify-between gap-2.5 p-3.5 rounded-2xl border text-left transition-all duration-200 group relative h-full min-h-[145px] sm:min-h-[160px] w-full cursor-pointer',
+                'hover:border-emerald-400 hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]',
+                flash ? 'border-emerald-500 bg-emerald-50/80 shadow-inner' : 'border-slate-200/90 bg-white',
                 product.stock === 0 && 'opacity-40 cursor-not-allowed hover:border-slate-200 hover:shadow-none hover:translate-y-0'
             )}
         >
-            <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center shrink-0 group-hover:bg-white transition-colors">
-                <Package className="w-5 h-5 text-slate-400 group-hover:text-emerald-500 transition-all group-hover:scale-110" />
+            <div className="flex items-center justify-between gap-2 w-full">
+                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 shadow-2xs group-hover:scale-105", badgeStyle)}>
+                    <Icon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+                </div>
+                {product.category?.name && (
+                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 truncate max-w-[80px] bg-slate-100 px-1.5 py-0.5 rounded-md">
+                        {product.category.name}
+                    </span>
+                )}
             </div>
-            <div className="flex flex-col flex-1 min-w-0 w-full">
-                <p className="text-[12px] font-bold text-slate-800 line-clamp-2 leading-tight mb-2 h-8">{product.name}</p>
-                <div className="mt-auto pt-2 border-t border-slate-50 space-y-2">
-                    <p className="text-sm font-black text-slate-900 tabular-nums leading-none">
+
+            <div className="flex flex-col flex-1 min-w-0 w-full justify-between">
+                <p className="text-xs font-black text-slate-900 line-clamp-2 leading-tight mb-2 group-hover:text-emerald-600 transition-colors">
+                    {product.name}
+                </p>
+
+                <div className="pt-2 border-t border-slate-100 space-y-2">
+                    <p className="text-sm sm:text-base font-black text-slate-950 tabular-nums leading-none">
                         {fmtCOP(isSaleMode ? product.price : product.cost)}
                         {!isSaleMode && <span className="text-[10px] text-slate-400 font-normal ml-1">Costo</span>}
                     </p>
-                    <div className="flex items-center justify-between gap-1.5">
+                    <div className="flex items-center justify-between gap-1.5 flex-wrap">
                         {product.presentations.length > 0 ? (
-                            <span className="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-bold whitespace-nowrap">
+                            <span className="text-[9px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-md font-extrabold whitespace-nowrap">
                                 {product.presentations.length} pres.
                             </span>
                         ) : <div />}
@@ -244,8 +320,8 @@ export function ProductSearch({
                 ))}
             </div>
 
-            {/* Product grid */}
-            <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 content-start">
+            {/* Product grid — Responsive para Teléfonos y Tablets Horizontales */}
+            <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5 sm:gap-3.5 content-start pb-4">
                 {isSearching ? (
                     <div className="col-span-full h-32 flex items-center justify-center">
                         <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
