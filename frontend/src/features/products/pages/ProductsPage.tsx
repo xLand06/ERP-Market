@@ -26,6 +26,26 @@ export default function ProductsPage() {
     const user = useAuthStore(s => s.user);
     const isOwner = user?.role === 'OWNER';
 
+    const handleExportExcel = () => {
+        exportToExcel(
+            products,
+            [
+                { header: 'Código de Barras', key: (p: Product) => p.barcode || '-' },
+                { header: 'Nombre', key: 'name' },
+                { header: 'Marca', key: (p: Product) => p.brand || '-' },
+                { header: 'Unidad', key: (p: Product) => p.unit || 'UND' },
+                { header: 'Precio (COP)', key: 'priceCOP' },
+                { header: 'Precio (USD)', key: 'priceUSD' },
+                { header: 'IVA %', key: (p: Product) => p.taxRate ?? 16 },
+                { header: 'Stock Mínimo', key: (p: Product) => p.minStock ?? 5 },
+                { header: 'Grupo', key: (p: Product) => (p as any).group?.name || '-' },
+                { header: 'Subgrupo', key: (p: Product) => (p as any).subGroup?.name || '-' },
+                { header: 'Estado', key: (p: Product) => p.isActive ? 'ACTIVO' : 'INACTIVO' },
+            ],
+            'Catalogo_Productos'
+        );
+    };
+
     useBarcodeScanner((barcode) => {
         setSearch(barcode);
     });
@@ -67,26 +87,6 @@ export default function ProductsPage() {
         setPage(1);
     }, [search, filterGroup, filterCategory, filterStatus]);
 
-    const handleExportExcel = () => {
-        exportToExcel(
-            products,
-            [
-                { header: 'Código de Barras', key: (p: Product) => p.barcode || '-' },
-                { header: 'Nombre', key: 'name' },
-                { header: 'Marca', key: (p: Product) => p.brand || '-' },
-                { header: 'Unidad', key: (p: Product) => p.unit || 'UND' },
-                { header: 'Precio (COP)', key: 'priceCOP' },
-                { header: 'Precio (USD)', key: 'priceUSD' },
-                { header: 'IVA %', key: (p: Product) => p.taxRate ?? 16 },
-                { header: 'Stock Mínimo', key: (p: Product) => p.minStock ?? 5 },
-                { header: 'Grupo', key: (p: Product) => (p as any).group?.name || '-' },
-                { header: 'Subgrupo', key: (p: Product) => (p as any).subGroup?.name || '-' },
-                { header: 'Estado', key: (p: Product) => p.isActive ? 'ACTIVO' : 'INACTIVO' },
-            ],
-            'Catalogo_Productos'
-        );
-    };
-
     return (
         <>
             <ProductFormModal 
@@ -109,7 +109,7 @@ export default function ProductsPage() {
                         </p>
                     </div>
                     <div className="flex gap-2.5">
-                        <Button onClick={handleExportExcel} variant="outline" size="lg" className="h-10 font-bold text-slate-700">
+                        <Button onClick={() => handleExportExcel()} variant="outline" size="lg" className="h-10 font-bold text-slate-700">
                             <Download className="w-4.5 h-4.5 mr-2" /> Exportar Excel
                         </Button>
                         {isOwner && (
