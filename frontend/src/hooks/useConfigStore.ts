@@ -278,10 +278,12 @@ export const useConfigStore = create<ConfigState>()(
 
             fetchSettings: async () => {
                 try {
+                    const currentTheme = get().activeTheme;
                     const res = await api.get('/settings');
                     if (res.data.success) {
                         set({
                             ...res.data.data,
+                            activeTheme: res.data.data.activeTheme || currentTheme || 'emerald',
                             iva: res.data.data.ivaPercent ?? res.data.data.iva ?? 16,
                             mainCurrency: res.data.data.mainCurrency || 'USD',
                         });

@@ -156,15 +156,15 @@ export function ThermalReceiptTicket({
                 )}
             </div>
 
-            {/* 4. SUBTOTAL E IVA */}
+            {/* 4. BASE IMPONIBLE E IVA (Normativa SENIAT Venezuela) */}
             {showIvaBreakdown && computedTotalUSD > 0 && (
                 <div className="border-t border-dashed border-slate-300 pt-1.5 space-y-0.5 text-right text-[10px] text-slate-700">
-                    <div className="flex justify-between">
-                        <span>SUBTOTAL GRAVABLE:</span>
+                    <div className="flex justify-between font-medium">
+                        <span>BASE IMPONIBLE (G 16.00%):</span>
                         <span>${gravableUSD.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between font-bold text-slate-900">
-                        <span>IVA (16%):</span>
+                    <div className="flex justify-between font-bold text-slate-950">
+                        <span>IVA (16.00%):</span>
                         <span>${ivaUSD.toFixed(2)}</span>
                     </div>
                 </div>

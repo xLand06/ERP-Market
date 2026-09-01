@@ -95,6 +95,13 @@ export async function printThermalReceiptReal(
 
                 text += `${divider}\n`;
 
+                const gravableUSD = data.totalUSD / 1.16;
+                const ivaUSD = data.totalUSD - gravableUSD;
+
+                text += padRow('BASE IMPONIBLE (G 16%):', `$${gravableUSD.toFixed(2)}`) + '\n';
+                text += padRow('IVA (16.00%):', `$${ivaUSD.toFixed(2)}`) + '\n';
+                text += `${divider}\n`;
+
                 text += padRow('TOTAL USD:', `$${data.totalUSD.toFixed(2)}`) + '\n';
                 if (data.totalVES) text += padRow('TOTAL VES:', `Bs. ${data.totalVES.toFixed(2)}`) + '\n';
                 if (data.totalCOP) text += padRow('TOTAL COP:', `$${data.totalCOP.toLocaleString('es-CO')}`) + '\n';
