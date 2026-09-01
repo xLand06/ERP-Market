@@ -231,8 +231,8 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                         onClick={() => setProfileOpen(!profileOpen)}
                         className="flex items-center gap-1.5 py-1 px-1 sm:px-2 rounded-xl hover:bg-slate-100 transition-all active:scale-95"
                     >
-                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center shadow-md shrink-0">
-                            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-xs shrink-0">
+                            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-700 dark:text-slate-200" />
                         </div>
                         <div className="hidden lg:block text-left">
                             <p className="text-xs font-bold text-slate-900 leading-none">{user?.nombre || 'Usuario'}</p>

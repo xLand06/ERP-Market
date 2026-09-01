@@ -43,46 +43,53 @@ const getSidebarTheme = (theme: UITheme = 'emerald') => {
     switch (theme) {
         case 'indigo':
             return {
-                bg: 'bg-[#090D16] border-slate-800/80',
+                bg: 'bg-white border-r border-slate-200/90 shadow-2xs',
+                headerBorder: 'border-slate-100',
                 logoBg: 'bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-700',
                 LogoIcon: Store,
-                logoTextColor: 'text-white font-black tracking-wider',
-                activeLine: 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.6)]',
-                activeIcon: 'text-indigo-400',
-                hoverIcon: 'group-hover:text-indigo-400',
-                activeBg: 'bg-indigo-950/70 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] ring-1 ring-indigo-500/30',
-                footerBg: 'bg-indigo-950/40 border-indigo-900/40',
+                logoTextColor: 'text-slate-900 font-black tracking-wider',
+                activeLine: 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]',
+                activeIcon: 'text-indigo-600',
+                hoverIcon: 'group-hover:text-indigo-600',
+                activeBg: 'bg-indigo-50 text-indigo-950 font-bold border border-indigo-200/80 shadow-2xs',
+                inactiveText: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/80',
+                footerBg: 'bg-slate-50/80 border-t border-slate-200/80',
                 onlineBadge: 'bg-indigo-500',
             };
         case 'amber':
             return {
-                bg: 'bg-[#1C1917] border-stone-800/80',
+                bg: 'bg-white border-r border-slate-200/90 shadow-2xs',
+                headerBorder: 'border-slate-100',
                 logoBg: 'bg-gradient-to-br from-amber-500 via-amber-600 to-orange-700',
                 LogoIcon: Coffee,
-                logoTextColor: 'text-amber-100 font-black tracking-wider',
-                activeLine: 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.6)]',
-                activeIcon: 'text-amber-400',
-                hoverIcon: 'group-hover:text-amber-400',
-                activeBg: 'bg-stone-800/90 text-amber-100 shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] ring-1 ring-amber-500/30',
-                footerBg: 'bg-stone-800/60 border-stone-700/50',
+                logoTextColor: 'text-stone-900 font-black tracking-wider',
+                activeLine: 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]',
+                activeIcon: 'text-amber-600',
+                hoverIcon: 'group-hover:text-amber-600',
+                activeBg: 'bg-amber-50 text-amber-950 font-bold border border-amber-200/80 shadow-2xs',
+                inactiveText: 'text-stone-500 hover:text-stone-900 hover:bg-stone-100/80',
+                footerBg: 'bg-stone-50/80 border-t border-stone-200/80',
                 onlineBadge: 'bg-amber-500',
             };
         case 'rose':
             return {
-                bg: 'bg-[#18181B] border-zinc-800/80',
+                bg: 'bg-white border-r border-slate-200/90 shadow-2xs',
+                headerBorder: 'border-slate-100',
                 logoBg: 'bg-gradient-to-br from-rose-500 via-rose-600 to-pink-700',
                 LogoIcon: ShoppingBag,
-                logoTextColor: 'text-white font-black tracking-wider',
-                activeLine: 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)]',
-                activeIcon: 'text-rose-400',
-                hoverIcon: 'group-hover:text-rose-400',
-                activeBg: 'bg-zinc-800/90 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] ring-1 ring-rose-500/30',
-                footerBg: 'bg-zinc-800/60 border-zinc-700/50',
+                logoTextColor: 'text-slate-900 font-black tracking-wider',
+                activeLine: 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]',
+                activeIcon: 'text-rose-600',
+                hoverIcon: 'group-hover:text-rose-600',
+                activeBg: 'bg-rose-50 text-rose-950 font-bold border border-rose-200/80 shadow-2xs',
+                inactiveText: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/80',
+                footerBg: 'bg-slate-50/80 border-t border-slate-200/80',
                 onlineBadge: 'bg-rose-500',
             };
         case 'dark':
             return {
-                bg: 'bg-[#0D1117] border-[#30363D] shadow-[0_0_25px_rgba(16,185,129,0.15)]',
+                bg: 'bg-[#0D1117] border-r border-[#30363D] shadow-[0_0_25px_rgba(16,185,129,0.15)]',
+                headerBorder: 'border-[#30363D]',
                 logoBg: 'bg-gradient-to-br from-emerald-400 via-teal-500 to-emerald-600 shadow-[0_0_20px_rgba(16,185,129,0.5)]',
                 LogoIcon: Store,
                 logoTextColor: 'text-[#F0F6FC] font-black tracking-wider',
@@ -90,21 +97,24 @@ const getSidebarTheme = (theme: UITheme = 'emerald') => {
                 activeIcon: 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]',
                 hoverIcon: 'group-hover:text-emerald-400',
                 activeBg: 'bg-[#21262D] text-[#F0F6FC] ring-1 ring-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]',
-                footerBg: 'bg-[#161B22] border-[#30363D] shadow-[0_0_12px_rgba(16,185,129,0.1)]',
+                inactiveText: 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40',
+                footerBg: 'bg-[#161B22] border-t border-[#30363D] shadow-[0_0_12px_rgba(16,185,129,0.1)]',
                 onlineBadge: 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]',
             };
         case 'emerald':
         default:
             return {
-                bg: 'bg-slate-900 border-slate-800',
+                bg: 'bg-white border-r border-slate-200/90 shadow-2xs',
+                headerBorder: 'border-slate-100',
                 logoBg: 'bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700',
                 LogoIcon: Store,
-                logoTextColor: 'text-white font-black tracking-wider',
-                activeLine: 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]',
-                activeIcon: 'text-emerald-400',
-                hoverIcon: 'group-hover:text-emerald-400',
-                activeBg: 'bg-slate-800/80 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ring-1 ring-white/5',
-                footerBg: 'bg-slate-800/50 border-slate-700/50',
+                logoTextColor: 'text-slate-900 font-black tracking-wider',
+                activeLine: 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]',
+                activeIcon: 'text-emerald-600',
+                hoverIcon: 'group-hover:text-emerald-600',
+                activeBg: 'bg-emerald-50 text-emerald-950 font-bold border border-emerald-200/80 shadow-2xs',
+                inactiveText: 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/80',
+                footerBg: 'bg-slate-50/80 border-t border-slate-200/80',
                 onlineBadge: 'bg-emerald-500',
             };
     }
@@ -121,7 +131,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
     return (
         <div className={cn("flex flex-col h-full w-full border-r z-10 transition-all duration-300 relative", themeStyles.bg)}>
             {/* Branding Header */}
-            <div className="h-16 flex items-center justify-between px-3 lg:px-4 border-b border-slate-800/60 mb-4 overflow-hidden shrink-0">
+            <div className={cn("h-16 flex items-center justify-between px-3 lg:px-4 border-b mb-4 overflow-hidden shrink-0", themeStyles.headerBorder)}>
                 <div className="flex items-center gap-3">
                     <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shadow-md shrink-0 transition-all duration-300", themeStyles.logoBg)}>
                         <LogoIcon className="w-5 h-5 text-white" />
@@ -187,7 +197,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                                     collapsed ? "px-0 justify-center h-11 lg:h-10 min-h-11" : "px-3",
                                     isActive
                                         ? themeStyles.activeBg
-                                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                                        : themeStyles.inactiveText
                                 )
                             }
                         >
