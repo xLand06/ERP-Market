@@ -115,6 +115,30 @@ describe('DataTable', () => {
         expect(screen.getAllByRole('button', { name: /Editar/ })).toHaveLength(2);
     });
 
+    it('applies rowClassName to rows on desktop', () => {
+        const rowClassName = (p: Product) => (p.status === 'Inactivo' ? 'opacity-60 bg-slate-50' : '');
+        render(<DataTable columns={columns} rows={products} rowKey={rowKey} rowClassName={rowClassName} />);
+
+        const rows = screen.getAllByRole('row');
+        const inactiveRow = rows.find(r => r.textContent?.includes('Papas Lay'));
+        const activeRow = rows.find(r => r.textContent?.includes('Cerveza Andina'));
+        expect(inactiveRow?.className).toContain('opacity-60');
+        expect(inactiveRow?.className).toContain('bg-slate-50');
+        expect(activeRow?.className).not.toContain('opacity-60');
+    });
+
+    it('applies rowClassName to card items below md', () => {
+        mockMatchMedia(true);
+        const rowClassName = (p: Product) => (p.status === 'Inactivo' ? 'opacity-60 bg-slate-50' : '');
+        const { container } = render(
+            <DataTable columns={columns} rows={products} rowKey={rowKey} rowClassName={rowClassName} />
+        );
+
+        const cards = Array.from(container.querySelectorAll('li > div'));
+        expect(cards[1].className).toContain('opacity-60');
+        expect(cards[0].className).not.toContain('opacity-60');
+    });
+
     it('shows the empty state when there are no rows', () => {
         render(
             <DataTable

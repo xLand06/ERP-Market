@@ -3,15 +3,30 @@ import { Plus, Search, Edit2, PackageX, PackageCheck, AlertCircle, Download, Pac
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DataTable, type Column } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { ProductFormModal } from '../components/ProductFormModal';
-import type { Product } from '../types';
+import type { Product, Category, Group } from '../types';
 import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { useProducts, useGroups, useSubgroups, useToggleProductStatus } from '../hooks';
 import { exportToExcel } from '@/lib/exportUtils';
+
+/** All barcode codes of a product: main barcode + alternate barcodes + presentation barcodes. */
+function collectBarcodeCodes(prod: Product): string[] {
+    return Array.from(new Set([
+        ...(prod.barcode ? [prod.barcode] : []),
+        ...(prod.barcodes ? prod.barcodes.map(b => b.code) : []),
+        ...(prod.presentations ? prod.presentations.map(pr => pr.barcode).filter(Boolean) as string[] : []),
+    ]));
+}
+
+function getGroupLabel(prod: Product, subgroups: Category[], groups: Group[]): string {
+    const sg = subgroups.find(s => s.id === prod.subGroupId);
+    const g = groups.find(gr => gr.id === sg?.groupId);
+    return g ? `${g.name} / ${sg?.name || 'N/A'}` : (sg?.name || 'N/A');
+}
 
 export default function ProductsPage() {
     const [search, setSearch] = useState('');
@@ -87,6 +102,155 @@ export default function ProductsPage() {
     useEffect(() => {
         setPage(1);
     }, [search, filterGroup, filterCategory, filterStatus]);
+
+    const columns: Column<Product>[] = [
+        {
+            key: 'icon',
+            header: '',
+            cell: () => (
+                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center border border-slate-200 shrink-0">
+                    <PackageSearch className="w-4 h-4 text-slate-400" />
+                </div>
+            ),
+            headerClassName: 'w-8',
+            className: 'pr-0',
+        },
+        {
+            key: 'product',
+            header: 'Producto',
+            cell: prod => (
+                <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-800">{prod.name}</p>
+                    <p className="text-xs text-slate-400 truncate max-w-[200px]" title={prod.description}>
+                        {prod.description || 'Sin descripción'}
+                    </p>
+                </div>
+            ),
+            showCard: true,
+        },
+        {
+            key: 'group',
+            header: 'Grupo / Subgrupo',
+            cell: prod => (
+                <span className="text-xs font-medium bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md">
+                    {getGroupLabel(prod, subgroups, groups)}
+                </span>
+            ),
+            hideBelow: 'md',
+        },
+        {
+            key: 'barcode',
+            header: 'C. Barras',
+            cell: prod => {
+                const codes = collectBarcodeCodes(prod);
+                if (codes.length === 0) {
+                    return (
+                        <span className="text-xs font-mono bg-slate-50 text-slate-400 px-2 py-1 rounded w-fit border border-dashed border-slate-200">
+                            —
+                        </span>
+                    );
+                }
+                return (
+                    <div className="flex flex-col gap-1">
+                        <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded w-fit">
+                            {codes[0]}
+                        </span>
+                        {codes.length > 1 && (
+                            <span className="text-[10px] text-slate-400 font-medium">
+                                +{codes.length - 1} código{codes.length - 1 > 1 ? 's' : ''} más
+                            </span>
+                        )}
+                    </div>
+                );
+            },
+            hideBelow: 'md',
+            showCard: true,
+        },
+        {
+            key: 'cost',
+            header: 'Costo',
+            cell: prod => (
+                <span className="text-sm font-medium text-slate-500">
+                    {prod.cost ? fmtCOP(Number(prod.cost)) : '—'}
+                </span>
+            ),
+            className: 'text-right',
+            headerClassName: 'text-right',
+            hideBelow: 'md',
+        },
+        {
+            key: 'price',
+            header: 'Precio Venta',
+            cell: prod => (
+                <span className="text-sm font-bold text-emerald-600">
+                    {fmtCOP(Number(prod.price || 0))}
+                </span>
+            ),
+            className: 'text-right',
+            headerClassName: 'text-right',
+            showCard: true,
+        },
+        {
+            key: 'merma',
+            header: 'Merma',
+            cell: prod => (
+                prod.expectedSpoilagePercent ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md">
+                        <Percent className="w-3 h-3" />
+                        {prod.expectedSpoilagePercent}%
+                    </span>
+                ) : (
+                    <span className="text-xs text-slate-300">—</span>
+                )
+            ),
+            className: 'text-center',
+            headerClassName: 'text-center',
+            showCard: true,
+        },
+        {
+            key: 'status',
+            header: 'Estado',
+            cell: prod => (
+                <Badge variant={prod.isActive ? 'success' : 'default'} className="px-2 font-semibold">
+                    {prod.isActive ? 'Activo' : 'Inactivo'}
+                </Badge>
+            ),
+            className: 'text-center',
+            headerClassName: 'text-center',
+            showCard: true,
+        },
+    ];
+
+    const renderActions = (prod: Product) => (
+        <>
+            <Button
+                variant="ghost"
+                size="row-icon"
+                onClick={() => handleOpenEdit(prod)}
+                className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                aria-label={`Editar producto ${prod.name}`}
+            >
+                <Edit2 className="w-4 h-4" />
+            </Button>
+            <Button
+                variant="ghost"
+                size="row-icon"
+                onClick={() => toggleStatusMutation.mutate({ id: prod.id, isActive: !prod.isActive })}
+                className={cn(
+                    'rounded-lg',
+                    prod.isActive
+                        ? 'text-slate-400 hover:text-red-500 hover:bg-red-50'
+                        : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
+                )}
+                aria-label={prod.isActive ? `Inactivar ${prod.name}` : `Activar ${prod.name}`}
+                disabled={toggleStatusMutation.isPending}
+            >
+                {prod.isActive
+                    ? <PackageX className="w-4 h-4" />
+                    : <PackageCheck className="w-4 h-4" />}
+            </Button>
+        </>
+    );
 
     return (
         <>
@@ -189,178 +353,19 @@ export default function ProductsPage() {
                 )}
 
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full erp-table min-w-[640px]" aria-label="Catálogo de Productos">
-                            <thead>
-                                <tr>
-                                    <th className="w-8"></th>
-                                    <th>Producto</th>
-                                    <th className="hidden md:table-cell">Grupo / Subgrupo</th>
-                                    <th className="hidden md:table-cell">C. Barras</th>
-                                    <th className="hidden md:table-cell text-right">Costo</th>
-                                    <th className="text-right">Precio Venta</th>
-                                    <th className="text-center">Merma</th>
-                                    <th className="text-center">Estado</th>
-                                    {isOwner && <th className="w-24 text-right">Acciones</th>}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {isLoading ? (
-                                    Array.from({ length: 6 }).map((_, i) => (
-                                        <tr key={`sk-${i}`}>
-                                            <td className="pr-0">
-                                                <Skeleton className="w-8 h-8 rounded-lg" />
-                                            </td>
-                                            <td className="space-y-1.5">
-                                                <Skeleton className="h-4 w-40" />
-                                                <Skeleton className="h-3 w-24" />
-                                            </td>
-                                            <td className="hidden md:table-cell">
-                                                <Skeleton className="h-5 w-28 rounded-md" />
-                                            </td>
-                                            <td className="hidden md:table-cell">
-                                                <Skeleton className="h-4 w-20" />
-                                            </td>
-                                            <td className="hidden md:table-cell text-right">
-                                                <Skeleton className="h-4 w-16 ml-auto" />
-                                            </td>
-                                            <td className="text-right">
-                                                <Skeleton className="h-4 w-20 ml-auto" />
-                                            </td>
-                                            <td className="text-center">
-                                                <Skeleton className="h-4 w-8 mx-auto" />
-                                            </td>
-                                            <td className="text-center">
-                                                <Skeleton className="h-5 w-16 mx-auto rounded-md" />
-                                            </td>
-                                            {isOwner && (
-                                                <td className="text-right">
-                                                    <Skeleton className="h-6 w-14 ml-auto" />
-                                                </td>
-                                            )}
-                                        </tr>
-                                    ))
-                                ) : products.map((prod: Product) => (
-                                    <tr key={prod.id} className={cn(!prod.isActive && 'opacity-60 bg-slate-50')}>
-                                        <td className="pr-0">
-                                            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center border border-slate-200 shrink-0">
-                                                <PackageSearch className="w-4 h-4 text-slate-400" />
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <p className="text-sm font-bold text-slate-800">{prod.name}</p>
-                                            <p className="text-xs text-slate-400 truncate max-w-[200px]" title={prod.description}>
-                                                {prod.description || 'Sin descripción'}
-                                            </p>
-                                        </td>
-                                        <td className="hidden md:table-cell">
-                                            <span className="text-xs font-medium bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md">
-                                                {(() => {
-                                                    const sg = subgroups.find((s: any) => s.id === prod.subGroupId);
-                                                    const g = groups.find((gr: any) => gr.id === sg?.groupId);
-                                                    return g ? `${g.name} / ${sg?.name || 'N/A'}` : (sg?.name || 'N/A');
-                                                })()}
-                                            </span>
-                                        </td>
-                                        <td className="hidden md:table-cell">
-                                            {(() => {
-                                                const codes = Array.from(new Set([
-                                                    ...(prod.barcode ? [prod.barcode] : []),
-                                                    ...(prod.barcodes ? prod.barcodes.map(b => b.code) : []),
-                                                    ...(prod.presentations ? prod.presentations.map(pr => pr.barcode).filter(Boolean) as string[] : [])
-                                                ]));
-                                                if (codes.length === 0) {
-                                                    return (
-                                                        <span className="text-xs font-mono bg-slate-50 text-slate-400 px-2 py-1 rounded w-fit border border-dashed border-slate-200">
-                                                            —
-                                                        </span>
-                                                    );
-                                                }
-                                                return (
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded w-fit">
-                                                            {codes[0]}
-                                                        </span>
-                                                        {codes.length > 1 && (
-                                                            <span className="text-[10px] text-slate-400 font-medium">
-                                                                +{codes.length - 1} código{codes.length - 1 > 1 ? 's' : ''} más
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })()}
-                                        </td>
-                                        <td className="hidden md:table-cell text-right">
-                                            <span className="text-sm font-medium text-slate-500">
-                                                {prod.cost ? fmtCOP(Number(prod.cost)) : '—'}
-                                            </span>
-                                        </td>
-                                        <td className="text-right">
-                                            <span className="text-sm font-bold text-emerald-600">
-                                                {fmtCOP(Number(prod.price || 0))}
-                                            </span>
-                                        </td>
-                                        <td className="text-center">
-                                            {prod.expectedSpoilagePercent ? (
-                                                <span className="inline-flex items-center gap-1 text-xs font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md">
-                                                    <Percent className="w-3 h-3" />
-                                                    {prod.expectedSpoilagePercent}%
-                                                </span>
-                                            ) : (
-                                                <span className="text-xs text-slate-300">—</span>
-                                            )}
-                                        </td>
-                                        <td className="text-center">
-                                            <Badge variant={prod.isActive ? 'success' : 'default'} className="px-2 font-semibold">
-                                                {prod.isActive ? 'Activo' : 'Inactivo'}
-                                            </Badge>
-                                        </td>
-                                        {isOwner && (
-                                            <td className="text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="row-icon"
-                                                        onClick={() => handleOpenEdit(prod)}
-                                                        className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
-                                                        aria-label={`Editar producto ${prod.name}`}
-                                                    >
-                                                        <Edit2 className="w-4 h-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="row-icon"
-                                                        onClick={() => toggleStatusMutation.mutate({ id: prod.id, isActive: !prod.isActive })}
-                                                        className={cn(
-                                                            'rounded-lg',
-                                                            prod.isActive
-                                                                ? 'text-slate-400 hover:text-red-500 hover:bg-red-50'
-                                                                : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
-                                                        )}
-                                                        aria-label={prod.isActive ? `Inactivar ${prod.name}` : `Activar ${prod.name}`}
-                                                        disabled={toggleStatusMutation.isPending}
-                                                    >
-                                                        {prod.isActive
-                                                            ? <PackageX className="w-4 h-4" />
-                                                            : <PackageCheck className="w-4 h-4" />}
-                                                    </Button>
-                                                </div>
-                                            </td>
-                                        )}
-                                    </tr>
-                                ))}
-                                {!isLoading && products.length === 0 && !isError && (
-                                    <tr>
-                                        <td colSpan={9} className="text-center py-12">
-                                            <PackageX className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                                            <p className="text-base font-semibold text-slate-700">No se encontraron productos</p>
-                                            <p className="text-sm text-slate-500 mt-1">Ajusta los filtros o crea un nuevo registro.</p>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                    <DataTable
+                        columns={columns}
+                        rows={products}
+                        rowKey={prod => prod.id}
+                        isLoading={isLoading}
+                        rowClassName={prod => (prod.isActive ? '' : 'opacity-60 bg-slate-50')}
+                        empty={{
+                            icon: <PackageX className="w-8 h-8 text-slate-200" />,
+                            title: 'No se encontraron productos',
+                            description: 'Ajusta los filtros o crea un nuevo registro.',
+                        }}
+                        actions={isOwner ? renderActions : undefined}
+                    />
 
                     <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50 mt-auto">
                         <p className="text-xs text-slate-500">

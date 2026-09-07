@@ -42,6 +42,8 @@ export interface DataTableProps<T> {
     /** Renders per-row actions: last table column (text-right) and a bottom row on each card. */
     actions?: (row: T) => React.ReactNode;
     onRowClick?: (row: T) => void;
+    /** Extra classes applied to each row (`<tr>` on desktop, card wrapper on mobile). */
+    rowClassName?: (row: T) => string;
     /** Min width of the `<table>` on desktop. Default min-w-[640px]. */
     minWidth?: string;
     pagination?: DataTablePagination;
@@ -112,6 +114,7 @@ export function DataTable<T>({
     empty,
     actions,
     onRowClick,
+    rowClassName,
     minWidth = 'min-w-[640px]',
     pagination,
     className,
@@ -170,7 +173,8 @@ export function DataTable<T>({
                                 key={rowKey(row)}
                                 className={cn(
                                     'group transition-all',
-                                    onRowClick ? 'cursor-pointer' : 'cursor-default'
+                                    onRowClick ? 'cursor-pointer' : 'cursor-default',
+                                    rowClassName?.(row)
                                 )}
                                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                             >
@@ -219,7 +223,8 @@ export function DataTable<T>({
                         <div
                             className={cn(
                                 'p-4 flex flex-col gap-3',
-                                onRowClick && 'cursor-pointer active:bg-slate-100'
+                                onRowClick && 'cursor-pointer active:bg-slate-100',
+                                rowClassName?.(row)
                             )}
                             onClick={onRowClick ? () => onRowClick(row) : undefined}
                         >
