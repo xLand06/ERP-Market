@@ -498,6 +498,11 @@
            hover:bg-slate-100 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2;
   }
 
+  /* Touch targets: raw buttons not using the Button component (44px mobile, 36px desktop density) */
+  .touch-target {
+    @apply min-h-11 min-w-11 md:min-h-9 md:min-w-9 inline-flex items-center justify-center;
+  }
+
   .btn-destructive {
     @apply h-11 px-4 rounded-lg bg-red-500 text-white font-semibold text-sm
            hover:bg-red-600 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2;
