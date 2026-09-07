@@ -65,6 +65,13 @@ COPY --from=build --chown=node:node /app/prisma ./prisma
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --from=build --chown=node:node /app/public ./public
 
+# The image ships an unprivileged `node` user (uid 1000). /app must be
+# node-owned: when a fresh named volume is mounted at /app, Docker copies the
+# directory root from the image, and a root:root 755 root makes the runtime
+# unable to create erp-market.db (the hybrid local SQLite writer) — the API
+# then crash-loops in db push with "unable to open database file".
+RUN mkdir -p /app && chown node:node /app
+
 # Boot entrypoint (inline so the kit stays a single deploy/ tree):
 #   1. wait for Postgres (TCP, up to 60s)
 #   2. `prisma db push` on the CLOUD schema — idempotent; retried 3x so a
