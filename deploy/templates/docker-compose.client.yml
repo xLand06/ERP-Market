@@ -73,20 +73,16 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3000"
-      # The backend is offline-first: its main writer is the local SQLite
-      # (erp-market.db under /app) and a sync worker pushes to Postgres every
-      # ~15 min. The /app volume below keeps that SQLite file durable across
-      # container restarts so no in-flight writes are lost.
+      # Server mode: Postgres is the authority — the backend reads/writes it
+      # directly via the DEPLOY_MODE-aware prisma Proxy. No local SQLite, no
+      # sync worker to itself, no /app volume persistence needed.
+      DEPLOY_MODE: "server"
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public&connection_limit=5
       DIRECT_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public
       JWT_SECRET: ${JWT_SECRET}
-      USE_LOCAL_DB: "false"
       # CORS allowlist (backend/src/app.ts): browser access to this client's
       # URL must be permitted or the web UI is blocked cross-origin.
       FRONTEND_URL: ${CLIENT_URL}
-    volumes:
-      # Persist the hybrid local SQLite file (see comment above).
-      - erp-appdata-${CLIENT_SLUG}:/app
     depends_on:
       db:
         condition: service_healthy
@@ -108,4 +104,3 @@ networks:
 
 volumes:
   erp-db-${CLIENT_SLUG}:
-  erp-appdata-${CLIENT_SLUG}:

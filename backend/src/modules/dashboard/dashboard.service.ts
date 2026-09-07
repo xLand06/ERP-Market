@@ -3,25 +3,20 @@
 // Gráficas de rendimiento y métricas clave
 // ============================
 
-import { prisma, getCloudPrisma } from '../../config/prisma';
+import { prisma } from '../../config/prisma';
+import { DEPLOY_MODE } from '../../config/env';
 import type { KPIsDTO, SalesTrendDTO, TopProductDTO, SalesByBranchDTO } from '../../core/types/dto';
 import { parseDateRange } from '../../core/utils/helpers';
 
 /**
  * Selecciona el cliente Prisma adecuado:
- * - En modo Electron/offline → siempre SQLite local (sin importar el rol)
- * - En modo Cloud → OWNER usa cloud, SELLER usa local/cloud según config
+ * - Modo device (desktop/mobile) → siempre SQLite local (offline-first)
+ * - Modo server → prisma YA resuelve a Postgres a través del Proxy
+ *   (el OWNER también obtiene Postgres; ya no hace falta getCloudPrisma)
  */
 export const getPreferredClient = (role?: string): any => {
-    // En Electron, NUNCA intentar conectar a la nube desde el dashboard
-    const isElectron = process.env.ELECTRON === 'true' || process.env.USE_LOCAL_DB === 'true';
-    if (isElectron) return prisma; // siempre SQLite local
-
-    if (role === 'OWNER') {
-        const cloud = getCloudPrisma();
-        return cloud ?? prisma; // fallback a local si cloud no está disponible
-    }
-    return prisma;
+    if (DEPLOY_MODE === 'desktop' || DEPLOY_MODE === 'mobile') return prisma; // siempre SQLite local
+    return prisma; // server mode: prisma = Postgres
 };
 
 /** Helper para calcular porcentaje de cambio */
@@ -64,7 +59,8 @@ export const getDashboardKPIs = async (client: any, branchId?: string, range: 't
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
-    const isSQLite = (client as any)._activeProvider === 'sqlite' || process.env.ELECTRON === 'true';
+    const isDeviceMode = DEPLOY_MODE === 'desktop' || DEPLOY_MODE === 'mobile';
+    const isSQLite = (client as any)._activeProvider === 'sqlite' || isDeviceMode;
 
     const [
         salesCurrent,

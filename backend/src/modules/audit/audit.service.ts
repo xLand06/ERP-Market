@@ -4,6 +4,7 @@
 // ============================
 
 import { prisma } from '../../config/prisma';
+import { DEPLOY_MODE } from '../../config/env';
 import { Prisma } from '@prisma/client';
 import { parseDateRange } from '../../core/utils/helpers';
 import { generarDescripcion, extraerPosicionConsolidada } from './audit.language';
@@ -77,7 +78,7 @@ export const getAuditLogById = async (id: string) => {
 };
 
 export const getAuditStats = async () => {
-    const isSQLite = process.env.ELECTRON === 'true';
+    const isSQLite = DEPLOY_MODE === 'desktop' || DEPLOY_MODE === 'mobile';
 
     const [total, byModule, byAction, recentActivity] = await Promise.all([
         (prisma as any).auditLog.count(),

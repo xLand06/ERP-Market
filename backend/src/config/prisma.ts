@@ -1,4 +1,5 @@
 import '../config/env';
+import { DEPLOY_MODE } from './env';
 import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { PrismaClient as PrismaClientLocal } from '.prisma/client-local';
@@ -195,14 +196,27 @@ export const getLocalPrisma = (): PrismaClient => {
     return _prismaLocal;
 };
 
-// ── Export Principal (SIEMPRE SQLite para sistema híbrido) ────────────────────
-// El sistema híbrido escribe SIEMPRE a SQLite local.
-// Supabase (getCloudPrisma) solo se usa para operaciones de sync.
+// ── Export Principal (ruta según DEPLOY_MODE) ────────────────────────────────
+// server   → PostgreSQL es la autoridad (getCloudPrisma). Sin Postgres = fatal.
+// desktop/ → SQLite local es la autoridad; Postgres solo se usa para sync.
+// mobile
 export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
     get(_target, prop: string) {
-        // SIEMPRE usar SQLite como base de datos principal
-        // para sistema híbrido offline-first
-        const db: PrismaClient = getLocalPrisma();
+        let db: PrismaClient;
+
+        if (DEPLOY_MODE === 'server') {
+            const cloud = getCloudPrisma();
+            if (!cloud) {
+                throw new Error(
+                    '[DB] FATAL: DEPLOY_MODE=server pero DATABASE_URL no está configurada. ' +
+                    'El servidor requiere una conexión PostgreSQL.'
+                );
+            }
+            db = cloud;
+        } else {
+            db = getLocalPrisma();
+        }
+
         const value = (db as any)[prop];
         return typeof value === 'function' ? value.bind(db) : value;
     },

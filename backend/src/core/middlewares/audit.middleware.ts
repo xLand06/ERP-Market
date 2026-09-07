@@ -10,6 +10,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from './auth.middleware';
 import { prisma } from '../../config/prisma';
+import { DEPLOY_MODE } from '../../config/env';
 
 export type AuditActionType =
     | 'FINANCE_RATE_UPDATE'
@@ -79,7 +80,7 @@ export const extractIp = (req: AuthRequest): string => {
  * - SQLite Schema (Local): expects String since sqlite driver fallback serializes to string.
  */
 const normalizeDetails = (details: object) => {
-    const useLocal = process.env.USE_LOCAL_DB === 'true' || process.env.ELECTRON === 'true';
+    const useLocal = DEPLOY_MODE === 'desktop' || DEPLOY_MODE === 'mobile';
     return useLocal ? JSON.stringify(details) : details;
 };
 

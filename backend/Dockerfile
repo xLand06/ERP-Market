@@ -54,6 +54,7 @@ RUN npm run build
 FROM node:20-bookworm-slim AS runtime
 
 ENV NODE_ENV=production
+ENV DEPLOY_MODE=server
 WORKDIR /app
 
 # The node image already ships an unprivileged `node` user (uid 1000).
@@ -118,14 +119,19 @@ if [ "$pushed" != "1" ]; then
     exit 1
 fi
 
-# The backend is hybrid: its main writer is the LOCAL SQLite file, and
-# /api/health + settings routes query it at boot — create its schema too.
-# --schema is safe here: prisma.config.ts detects schema.local.prisma in argv
-# and resolves the local file url itself.
-echo "[entrypoint] applying local SQLite schema..."
-if ! ./node_modules/.bin/prisma db push --schema=prisma/schema.local.prisma; then
-    echo "[entrypoint] FATAL: local SQLite schema sync failed" >&2
-    exit 1
+# The local SQLite schema is a DEVICE-only concern: desktop/mobile use SQLite
+# as their local authority, but in server mode the container should never
+# create /app/erp-market.db (Postgres IS the authority). DEPLOY_MODE defaults
+# to server so plain docker runs stay cloud-only.
+echo "[entrypoint] DEPLOY_MODE=${DEPLOY_MODE:-server}"
+if [ "${DEPLOY_MODE:-server}" != "server" ]; then
+    echo "[entrypoint] applying local SQLite schema..."
+    if ! ./node_modules/.bin/prisma db push --schema=prisma/schema.local.prisma; then
+        echo "[entrypoint] FATAL: local SQLite schema sync failed" >&2
+        exit 1
+    fi
+else
+    echo "[entrypoint] server mode — skipping SQLite schema"
 fi
 
 echo "[entrypoint] starting API: node dist/server.js"

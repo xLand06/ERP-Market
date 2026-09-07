@@ -1,4 +1,5 @@
 import { getLocalPrisma } from '../../config/prisma';
+import { DEPLOY_MODE } from '../../config/env';
 import { getLastSuccessfulSync } from './sync-worker';
 
 /**
@@ -55,7 +56,7 @@ export async function getSyncStatus() {
             totalPending: pendingTransactions + pendingRegisters,
         },
         config: {
-            useLocalDb: process.env.USE_LOCAL_DB === 'true',
+            deployMode: DEPLOY_MODE,
             syncIntervalMs: 15 * 60_000,
         },
     };

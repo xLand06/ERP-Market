@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import crypto from 'crypto';
 import path from 'path';
 import { errorHandler, notFoundHandler } from './core/middlewares/errorHandler';
+import { DEPLOY_MODE } from './config/env';
 import logger from './core/utils/logger';
 
 // ─── MÓDULOS ACTIVOS (Plan Base) ───────────────────────────────────────────
@@ -112,21 +113,29 @@ app.use((req, res, next) => {
 app.get('/api/health', async (_req, res) => {
     let dbStatus = 'connected';
     let dbResponseTime = 0;
-    
+
     try {
         const start = Date.now();
-        const { getLocalPrisma } = await import('./config/prisma');
-        await getLocalPrisma().$queryRaw`SELECT 1`;
+        if (DEPLOY_MODE === 'server') {
+            const { getCloudPrisma } = await import('./config/prisma');
+            const cloud = getCloudPrisma();
+            if (!cloud) throw new Error('Cloud DB not available');
+            await cloud.$queryRaw`SELECT 1`;
+        } else {
+            const { getLocalPrisma } = await import('./config/prisma');
+            await getLocalPrisma().$queryRaw`SELECT 1`;
+        }
         dbResponseTime = Date.now() - start;
     } catch (err: any) {
         dbStatus = 'error';
         dbResponseTime = -1;
     }
-    
-    res.json({ 
-        status: 'ok', 
-        timestamp: new Date().toISOString(), 
+
+    res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
         service: 'ERP-MARKET API',
+        deployMode: DEPLOY_MODE,
         database: {
             status: dbStatus,
             responseTime: dbResponseTime > 0 ? `${dbResponseTime}ms` : 'N/A'
@@ -135,7 +144,14 @@ app.get('/api/health', async (_req, res) => {
 });
 
 // ─── LOCAL DB STATS (Electron only) ─────────────────────────────────────────
+// En server mode estos endpoints NO existen: son exclusivos del backend
+// embebido de Electron (127.0.0.1:3001) y abrir SQLite en el VPS crearía
+// una base local inexistente, exactamente lo que DEPLOY_MODE=server elimina.
 app.get('/api/electron/local-stats', async (_req, res) => {
+    if (DEPLOY_MODE === 'server') {
+        res.status(404).json({ success: false, error: 'Endpoint only available in device mode' });
+        return;
+    }
     try {
         const { getLocalPrisma } = await import('./config/prisma');
         const db = getLocalPrisma();
@@ -154,6 +170,10 @@ app.get('/api/electron/local-stats', async (_req, res) => {
 });
 
 app.post('/api/electron/clear-pending', async (_req, res) => {
+    if (DEPLOY_MODE === 'server') {
+        res.status(404).json({ success: false, error: 'Endpoint only available in device mode' });
+        return;
+    }
     try {
         const { getLocalPrisma } = await import('./config/prisma');
         const result = await getLocalPrisma().transaction.deleteMany({ where: { syncStatus: 'SYNCED' } });
