@@ -1,0 +1,1 @@
+import{j as s,g as t}from"./index-BP-WhTCL.js";function n({className:e,...a}){return s.jsx("div",{className:t("skeleton rounded-lg bg-slate-200 dark:bg-slate-800",e),"aria-hidden":"true",...a})}n.displayName="Skeleton";export{n as S};
