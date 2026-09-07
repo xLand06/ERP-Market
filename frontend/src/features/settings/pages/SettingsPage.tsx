@@ -9,6 +9,7 @@ import { useAuthStore } from '@/features/auth/store/authStore';
 type Tab = 'branches' | 'categories' | 'invoice' | 'system' | 'maintenance' | 'backup';
 
 export default function SettingsPage() {
+    const user = useAuthStore(s => s.user);
     const userRole = (user?.role as string) || '';
     const isOwner = userRole === 'OWNER' || userRole === 'ADMIN' || userRole === 'GERENTE' || !userRole;
     const [activeTab, setActiveTab] = useState<Tab>(isOwner ? 'branches' : 'system');
