@@ -135,8 +135,8 @@ export function AppShellLayout() {
                     <Outlet />
                 </main>
 
-                {/* Mobile / Compact Tablet Bottom Navigation Bar (< sm/md) */}
-                <nav aria-label="Navegación móvil" className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex items-center justify-around py-2 px-2 sm:hidden text-white shadow-2xl">
+                {/* Mobile / Tablet Bottom Navigation Bar (visible < lg) */}
+                <nav aria-label="Navegación móvil" className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex items-center justify-around pt-2 px-2 pb-safe lg:hidden text-white shadow-2xl">
                     {[
                         { path: '/pos', label: 'POS', icon: ShoppingCart },
                         { path: '/products', label: 'Productos', icon: Package },
