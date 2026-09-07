@@ -1,0 +1,51 @@
+# =============================================================================
+# ERP-Market multi-tenant kit — OPERATOR infrastructure.
+#
+# Single service: the central Caddy reverse proxy. Caddy is the ONLY host
+# entrypoint (80/443); every client stack lives on the shared `erp_proxy`
+# bridge network and is reached by container DNS name, so clients publish
+# NO host ports.
+#
+# Start it once on the VPS:
+#   cp deploy/.env.example deploy/.env   # set CADDY_EMAIL
+#   docker compose -f deploy/docker-compose.yml up -d
+#
+# Client stacks are provisioned by deploy/scripts/add-client.sh and join the
+# `erp_proxy` network declared below.
+# =============================================================================
+
+name: erp-deploy
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    environment:
+      CADDY_EMAIL: ${CADDY_EMAIL:-}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/sites:/etc/caddy/sites:ro
+      - caddy_data:/data        # Let's Encrypt certificates + ACME state
+      - caddy_config:/config    # Caddy runtime config
+    networks:
+      - default
+      - erp_proxy
+
+networks:
+  default:
+  # Shared, name-pinned bridge that every client stack joins as an external
+  # network (see deploy/templates/docker-compose.client.yml). Caddy resolves
+  # api-<slug> by container name on this network.
+  erp_proxy:
+    name: erp_proxy
+
+volumes:
+  caddy_data:
+    name: caddy_data
+  caddy_config:
+    name: caddy_config

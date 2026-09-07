@@ -1,0 +1,28 @@
+# Build-context hygiene for backend/Dockerfile (build context = backend/).
+# Keeps the context small and — critically — keeps secrets and local data OUT
+# of the image: backend/.env and backend/erp-market.db* are never copied.
+
+node_modules
+dist
+temp-backend
+backups
+scratch
+.atl
+
+# Secrets and local env
+.env
+.env.*
+!.env.example
+
+# Local databases (desktop/offline artifacts)
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+npm-debug.log*
+
+# VCS
+.git
+.gitignore
