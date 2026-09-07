@@ -3,11 +3,11 @@ import { Search, Plus, Download, Eye, Package, TrendingUp, Clock, AlertCircle } 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DataTable, type Column } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { PurchaseEntryModal } from '../components/PurchaseEntryModal';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { purchasesApi } from '@/services/purchases.service';
+import { purchasesApi, type PurchaseOrder } from '@/services/purchases.service';
 import { useAuthStore } from '../../auth/store/authStore';
 import toast from 'react-hot-toast';
 
@@ -34,6 +34,17 @@ function KPISummary({ icon: Icon, label, value, sub, color }: {
         </div>
     );
 }
+
+const orderIdCell = (row: PurchaseOrder) => (
+    <span className="text-xs font-mono text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded">
+        #{row.id.slice(-6).toUpperCase()}
+    </span>
+);
+
+const statusCell = (row: PurchaseOrder) => {
+    const config = STATUS_CONFIG[row.status] || { label: row.status, variant: 'default' as const };
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+};
 
 export default function PurchasesPage() {
     const [search, setSearch] = useState('');
@@ -88,77 +99,94 @@ export default function PurchasesPage() {
         }
     });
 
-    if (isLoading) {
-        return (
-            <div className="flex flex-col gap-6 max-w-350 mx-auto pb-8">
-                {/* Page Header Skeleton */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="space-y-2">
-                        <Skeleton className="h-8 w-56" />
-                        <Skeleton className="h-4 w-40" />
-                    </div>
-                    <div className="flex gap-2.5">
-                        <Skeleton className="h-10 w-28" />
-                        <Skeleton className="h-10 w-36" />
-                    </div>
-                </div>
+    const renderActions = (row: PurchaseOrder) => (
+        <>
+            <Button
+                variant="ghost"
+                size="row-icon"
+                className="text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                aria-label={`Ver detalle de ${row.supplier.name}`}
+            >
+                <Eye className="w-4 h-4" />
+            </Button>
+            {row.status !== 'RECEIVED' && row.status !== 'CANCELLED' && (
+                <Button
+                    variant="default"
+                    className="text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700"
+                    onClick={() => {
+                        if (confirm('¿Confirmar recepción de mercancía? El stock se actualizará automáticamente.')) {
+                            receiveMutation.mutate(row.id);
+                        }
+                    }}
+                    disabled={receiveMutation.isPending}
+                >
+                    Recibir
+                </Button>
+            )}
+        </>
+    );
 
-                {/* KPI Cards Skeleton */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {Array.from({ length: 3 }).map((_, i) => (
-                        <div key={`kpi-sk-${i}`} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-start gap-4">
-                            <Skeleton className="w-10 h-10 rounded-xl shrink-0" />
-                            <div className="flex-1 space-y-2">
-                                <Skeleton className="h-3 w-24" />
-                                <Skeleton className="h-6 w-28" />
-                                <Skeleton className="h-3 w-32" />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Table Skeleton */}
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="flex items-center gap-3 p-4 border-b border-slate-100">
-                        <Skeleton className="h-10 flex-1" />
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full erp-table" aria-label="Tabla de compras (cargando)">
-                            <thead>
-                                <tr>
-                                    <th>Fecha</th>
-                                    <th>Proveedor</th>
-                                    <th>ID Orden</th>
-                                    <th className="text-center">Ítems</th>
-                                    <th className="text-right tabular-nums">Total</th>
-                                    <th>Sucursal</th>
-                                    <th>Estado</th>
-                                    <th className="w-32">Acc.</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {Array.from({ length: 5 }).map((_, i) => (
-                                    <tr key={`sk-${i}`}>
-                                        <td><Skeleton className="h-4 w-20" /></td>
-                                        <td><Skeleton className="h-4 w-36" /></td>
-                                        <td><Skeleton className="h-4 w-16" /></td>
-                                        <td className="text-center"><Skeleton className="h-4 w-6 mx-auto" /></td>
-                                        <td className="text-right"><Skeleton className="h-4 w-20 ml-auto" /></td>
-                                        <td><Skeleton className="h-5 w-24 rounded-full" /></td>
-                                        <td><Skeleton className="h-5 w-20" /></td>
-                                        <td><Skeleton className="h-7 w-16" /></td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-                        <Skeleton className="h-4 w-32" />
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    const columns: Column<PurchaseOrder>[] = [
+        {
+            key: 'fecha',
+            header: 'Fecha',
+            cell: row => (
+                <span className="text-sm text-slate-500 tabular-nums whitespace-nowrap">
+                    {new Date(row.createdAt).toLocaleDateString('es-VE')}
+                </span>
+            ),
+            hideBelow: 'md',
+        },
+        {
+            key: 'proveedor',
+            header: 'Proveedor',
+            cell: row => <p className="text-sm font-semibold text-slate-800">{row.supplier.name}</p>,
+            showCard: true,
+            className: 'min-w-0',
+        },
+        {
+            key: 'orden',
+            header: 'ID Orden',
+            cell: orderIdCell,
+            showCard: true,
+            className: 'min-w-0',
+        },
+        {
+            key: 'items',
+            header: 'Ítems',
+            cell: row => <span className="text-sm tabular-nums text-slate-600">{row.items.length}</span>,
+            className: 'text-center',
+            headerClassName: 'text-center',
+            hideBelow: 'md',
+            showCard: true,
+        },
+        {
+            key: 'total',
+            header: 'Total',
+            cell: row => (
+                <span className="text-sm font-bold tabular-nums text-slate-900">${row.total.toFixed(2)}</span>
+            ),
+            className: 'text-right',
+            headerClassName: 'text-right tabular-nums',
+            showCard: true,
+        },
+        {
+            key: 'sucursal',
+            header: 'Sucursal',
+            cell: row => (
+                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                    {row.branch.name}
+                </span>
+            ),
+            hideBelow: 'md',
+        },
+        {
+            key: 'estado',
+            header: 'Estado',
+            cell: statusCell,
+            showCard: true,
+        },
+    ];
 
     return (
         <>
@@ -243,88 +271,18 @@ export default function PurchasesPage() {
                         </div>
                     )}
 
-                    {/* Table */}
-                    <div className="overflow-x-auto">
-                        <table className="w-full erp-table" aria-label="Tabla de compras">
-                            <thead>
-                                <tr>
-                                    <th>Fecha</th>
-                                    <th>Proveedor</th>
-                                    <th>ID Orden</th>
-                                    <th className="text-center">Ítems</th>
-                                    <th className="text-right tabular-nums">Total</th>
-                                    <th>Sucursal</th>
-                                    <th>Estado</th>
-                                    <th className="w-32">Acc.</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filtered.map(row => {
-                                    const config = STATUS_CONFIG[row.status] || { label: row.status, variant: 'default' };
-                                    return (
-                                        <tr key={row.id}>
-                                            <td className="text-sm text-slate-500 tabular-nums whitespace-nowrap">
-                                                {new Date(row.createdAt).toLocaleDateString('es-VE')}
-                                            </td>
-                                            <td>
-                                                <p className="text-sm font-semibold text-slate-800">{row.supplier.name}</p>
-                                            </td>
-                                            <td>
-                                                <span className="text-xs font-mono text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded">
-                                                    #{row.id.slice(-6).toUpperCase()}
-                                                </span>
-                                            </td>
-                                            <td className="text-center text-sm tabular-nums text-slate-600">
-                                                {row.items.length}
-                                            </td>
-                                            <td className="text-right text-sm font-bold tabular-nums text-slate-900">
-                                                ${row.total.toFixed(2)}
-                                            </td>
-                                            <td>
-                                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                                                    {row.branch.name}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <Badge variant={config.variant}>{config.label}</Badge>
-                                            </td>
-                                            <td>
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        className="p-1.5 touch-target rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                                        aria-label={`Ver detalle`}
-                                                    >
-                                                        <Eye className="w-4 h-4" />
-                                                    </button>
-                                                    {row.status !== 'RECEIVED' && row.status !== 'CANCELLED' && (
-                                                        <Button 
-                                                            variant="default" 
-                                                            className="text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700"
-                                                            onClick={() => {
-                                                                if (confirm('¿Confirmar recepción de mercancía? El stock se actualizará automáticamente.')) {
-                                                                    receiveMutation.mutate(row.id);
-                                                                }
-                                                            }}
-                                                            disabled={receiveMutation.isPending}
-                                                        >
-                                                            Recibir
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                                {filtered.length === 0 && !isLoading && (
-                                    <tr>
-                                        <td colSpan={8} className="text-center py-10 text-sm text-slate-400">
-                                            No hay compras registradas.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                    {/* Table (card view < md) */}
+                    <DataTable
+                        columns={columns}
+                        rows={filtered}
+                        rowKey={row => row.id}
+                        isLoading={isLoading}
+                        empty={{
+                            icon: <Package className="w-8 h-8 text-slate-200" />,
+                            title: 'No hay compras registradas',
+                        }}
+                        actions={renderActions}
+                    />
 
                     {/* Footer */}
                     <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
