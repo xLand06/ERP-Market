@@ -156,7 +156,7 @@ export function ExpenseEntryModal({ open, onClose, onSave }: ExpenseEntryModalPr
                         {errors.category && <p className="text-xs text-red-500 mt-1">{errors.category}</p>}
                     </Field>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Field label="Monto ($)" id="amount" error={errors.amount}>
                             <Input
                                 id="amount"

@@ -334,7 +334,7 @@ export function BatchFormModal({ open, onClose, onSave, mode, initialData, isSav
                         )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {/* Cantidad */}
                         <div className="flex flex-col gap-1.5">
                             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">

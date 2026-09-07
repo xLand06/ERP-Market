@@ -248,7 +248,7 @@ function PrinterFormModal({
                         <label className="text-xs font-black text-slate-900 block uppercase tracking-wider">
                             1. Tipo de Conexión
                         </label>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {[
                                 { type: 'thermal_usb', label: 'USB (WebUSB Directo)', icon: Usb, desc: 'Impresora por cable USB POS' },
                                 { type: 'thermal_network', label: 'Red / IP (ESC/POS)', icon: Wifi, desc: 'Ethernet o Wi-Fi Local (Puerto 9100)' },
@@ -391,7 +391,7 @@ function PrinterFormModal({
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                                 <label className="text-xs font-black text-slate-950 block mb-1">Ancho del Papel</label>
                                 <select

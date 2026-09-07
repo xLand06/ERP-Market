@@ -46,11 +46,11 @@ const calcTotal = (lines: LineItem[]) =>
     lines.reduce((sum, l) => sum + (parseFloat(l.quantity) || 0) * (parseFloat(l.unitCost) || 0), 0);
 
 // ─── Field component ──────────────────────────────────────────────────────────
-function Field({ label, id, children, required }: {
-    label: string; id: string; children: React.ReactNode; required?: boolean;
+function Field({ label, id, children, required, className }: {
+    label: string; id: string; children: React.ReactNode; required?: boolean; className?: string;
 }) {
     return (
-        <div className="flex flex-col gap-1.5">
+        <div className={cn('flex flex-col gap-1.5', className)}>
             <label htmlFor={id} className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
                 {label}{required && <span className="text-red-500 ml-0.5">*</span>}
             </label>
@@ -135,8 +135,8 @@ export function PurchaseEntryModal({ open, onClose, onSave }: PurchaseEntryModal
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
                     {/* Header Fields */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <Field label="Proveedor" id="supplier" required>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Field label="Proveedor" id="supplier" required className="sm:col-span-2">
                             <Input
                                 id="supplier"
                                 placeholder="Nombre del proveedor"
@@ -205,7 +205,7 @@ export function PurchaseEntryModal({ open, onClose, onSave }: PurchaseEntryModal
                                         aria-invalid={!!errors[`line_${idx}_product`]}
                                     />
                                 </div>
-                                <div className="col-span-4 sm:col-span-2">
+                                <div className="col-span-6 sm:col-span-2">
                                     <Input
                                         placeholder="Cant."
                                         type="number"
@@ -216,7 +216,7 @@ export function PurchaseEntryModal({ open, onClose, onSave }: PurchaseEntryModal
                                         aria-label={`Cantidad línea ${idx + 1}`}
                                     />
                                 </div>
-                                <div className="col-span-4 sm:col-span-2">
+                                <div className="col-span-6 sm:col-span-2">
                                     <Input
                                         placeholder="Costo"
                                         type="number"
@@ -228,7 +228,7 @@ export function PurchaseEntryModal({ open, onClose, onSave }: PurchaseEntryModal
                                         aria-label={`Costo unitario línea ${idx + 1}`}
                                     />
                                 </div>
-                                <div className="col-span-4 sm:col-span-2">
+                                <div className="col-span-6 sm:col-span-2">
                                     <Input
                                         placeholder="Lote"
                                         value={line.lot}
@@ -237,7 +237,7 @@ export function PurchaseEntryModal({ open, onClose, onSave }: PurchaseEntryModal
                                         aria-label={`Lote línea ${idx + 1}`}
                                     />
                                 </div>
-                                <div className="col-span-8 sm:col-span-2">
+                                <div className="col-span-6 sm:col-span-2">
                                     <Input
                                         type="date"
                                         value={line.expiresAt}

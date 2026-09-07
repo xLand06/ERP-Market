@@ -239,7 +239,7 @@ export function PaymentDialog({
                         {/* Accesos para Dividir Pago - Tamaño Mayor y Alto Contraste */}
                         <div className="space-y-2">
                             <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">Dividir Cuenta (Pago Mixto)</span>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <button
                                     type="button"
                                     onClick={() => splitEvenly(2)}

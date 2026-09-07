@@ -445,7 +445,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                     )}
 
                     {/* Reference fields */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">
                                 Nº Factura / Referencia
@@ -460,7 +460,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                                 />
                             </div>
                         </div>
-                        <div>
+                        <div className="sm:col-span-2">
                             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">
                                 Notas
                             </label>
