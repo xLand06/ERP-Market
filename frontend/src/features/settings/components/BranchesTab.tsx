@@ -68,8 +68,8 @@ export function BranchesTab() {
                         <thead>
                             <tr>
                                 <th>Nombre</th>
-                                <th>Dirección</th>
-                                <th>Teléfono</th>
+                                <th className="hidden md:table-cell">Dirección</th>
+                                <th className="hidden md:table-cell">Teléfono</th>
                                 <th className="text-center">Estado</th>
                                 <th className="w-24">Acciones</th>
                             </tr>
@@ -85,8 +85,8 @@ export function BranchesTab() {
                                         {branch.name}
                                         {!branch.isActive && <span className="ml-2 text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded uppercase">Inactiva</span>}
                                     </td>
-                                    <td className="text-slate-500">{branch.address || '—'}</td>
-                                    <td className="text-slate-500">{branch.phone || '—'}</td>
+                                    <td className="hidden md:table-cell text-slate-500">{branch.address || '—'}</td>
+                                    <td className="hidden md:table-cell text-slate-500">{branch.phone || '—'}</td>
                                     <td className="text-center">
                                         <span className={cn(
                                             "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",

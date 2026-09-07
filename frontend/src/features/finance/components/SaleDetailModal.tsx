@@ -104,7 +104,7 @@ export function SaleDetailModal({ sale, open, onClose }: SaleDetailModalProps) {
                                 <tr className="bg-slate-50 border-b border-slate-200">
                                     <th className="text-left py-2.5 px-4 text-xs font-bold uppercase tracking-wide text-slate-400">Producto</th>
                                     <th className="text-center py-2.5 px-3 text-xs font-bold uppercase tracking-wide text-slate-400">Cant.</th>
-                                    <th className="text-right py-2.5 px-4 text-xs font-bold uppercase tracking-wide text-slate-400">P/U</th>
+                                    <th className="hidden md:table-cell text-right py-2.5 px-4 text-xs font-bold uppercase tracking-wide text-slate-400">P/U</th>
                                     <th className="text-right py-2.5 px-4 text-xs font-bold uppercase tracking-wide text-slate-400">Total</th>
                                 </tr>
                             </thead>
@@ -113,7 +113,7 @@ export function SaleDetailModal({ sale, open, onClose }: SaleDetailModalProps) {
                                     <tr key={i} className="border-b border-slate-100 last:border-0">
                                         <td className="py-2.5 px-4 text-sm text-slate-800">{item.name}</td>
                                         <td className="py-2.5 px-3 text-center text-sm tabular-nums text-slate-500">{item.qty}</td>
-                                        <td className="py-2.5 px-4 text-right text-sm tabular-nums text-slate-600">{fmtCOP(item.unitPrice)}</td>
+                                        <td className="hidden md:table-cell py-2.5 px-4 text-right text-sm tabular-nums text-slate-600">{fmtCOP(item.unitPrice)}</td>
                                         <td className="py-2.5 px-4 text-right text-sm tabular-nums font-semibold text-slate-900">
                                             {fmtCOP(item.qty * item.unitPrice)}
                                         </td>

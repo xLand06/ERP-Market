@@ -636,27 +636,27 @@ export default function CashRegisterPage() {
                             <table className="w-full">
                                 <thead className="bg-slate-50 border-b border-slate-200">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Fecha</th>
+                                        <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Fecha</th>
                                         <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Sede</th>
                                         <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Usuario</th>
-                                        <th className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Apertura</th>
-                                        <th className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Cierre</th>
-                                        <th className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Esperado</th>
+                                        <th className="hidden md:table-cell px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Apertura</th>
+                                        <th className="hidden md:table-cell px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Cierre</th>
+                                        <th className="hidden md:table-cell px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Esperado</th>
                                         <th className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Diferencia</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {registers.map((reg: any) => (
                                         <tr key={reg.id} className="hover:bg-slate-50 cursor-pointer transition-colors" onClick={() => setSelectedHistoryId(reg.id)}>
-                                            <td className="px-4 py-3">
+                                            <td className="hidden md:table-cell px-4 py-3">
                                                 <p className="text-sm font-medium text-slate-800">{formatDate(reg.openedAt)}</p>
                                                 <p className="text-xs text-slate-400">→ {formatDate(reg.closedAt)}</p>
                                             </td>
                                             <td className="px-4 py-3 text-sm text-slate-600">{reg.branch?.name || '-'}</td>
                                             <td className="px-4 py-3 text-sm text-slate-600">{reg.user?.nombre || reg.user?.username || '-'}</td>
-                                            <td className="px-4 py-3 text-sm text-right font-medium text-slate-800">{formatCurrency(reg.openingAmount)}</td>
-                                            <td className="px-4 py-3 text-sm text-right font-medium text-slate-800">{formatCurrency(reg.closingAmount)}</td>
-                                            <td className="px-4 py-3 text-sm text-right text-slate-600">{formatCurrency(reg.expectedAmount)}</td>
+                                            <td className="hidden md:table-cell px-4 py-3 text-sm text-right font-medium text-slate-800">{formatCurrency(reg.openingAmount)}</td>
+                                            <td className="hidden md:table-cell px-4 py-3 text-sm text-right font-medium text-slate-800">{formatCurrency(reg.closingAmount)}</td>
+                                            <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-slate-600">{formatCurrency(reg.expectedAmount)}</td>
                                             <td className="px-4 py-3 text-sm text-right">
                                                 <span className={cn('font-bold', Number(reg.difference) > 0 ? 'text-emerald-600' : Number(reg.difference) < 0 ? 'text-red-600' : 'text-slate-600')}>
                                                     {Number(reg.difference) > 0 ? '+' : ''}{formatCurrency(reg.difference)}

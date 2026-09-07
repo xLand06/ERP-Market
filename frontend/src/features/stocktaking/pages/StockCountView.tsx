@@ -265,7 +265,7 @@ export default function StockCountView() {
                         <thead>
                             <tr>
                                 <th>Producto</th>
-                                <th className="text-right">Stock Esperado</th>
+                                <th className="hidden md:table-cell text-right">Stock Esperado</th>
                                 <th className="text-center w-40">Conteo Real</th>
                                 <th className="text-right">Diferencia</th>
                             </tr>
@@ -281,11 +281,11 @@ export default function StockCountView() {
                                             <div className="flex flex-col gap-0.5">
                                                 <span className="text-sm font-semibold text-slate-800">{item.productName}</span>
                                                 {item.barcode && (
-                                                    <span className="text-xs text-slate-400 font-mono">{item.barcode}</span>
+                                                    <span className="hidden md:block text-xs text-slate-400 font-mono">{item.barcode}</span>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="text-right text-sm tabular-nums text-slate-600">
+                                        <td className="hidden md:table-cell text-right text-sm tabular-nums text-slate-600">
                                             {item.expectedStock}
                                         </td>
                                         <td className="text-center">

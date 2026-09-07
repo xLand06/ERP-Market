@@ -84,11 +84,11 @@ export default function StocktakingPage() {
                             <table className="w-full erp-table" aria-label="Tabla de conteos">
                                 <thead>
                                     <tr>
-                                        <th>Fecha</th>
+                                        <th className="hidden md:table-cell">Fecha</th>
                                         <th>Sucursal</th>
                                         <th>Estado</th>
                                         <th className="text-center">Productos</th>
-                                        <th>Notas</th>
+                                        <th className="hidden md:table-cell">Notas</th>
                                         <th className="w-24">Acc.</th>
                                     </tr>
                                 </thead>
@@ -97,7 +97,7 @@ export default function StocktakingPage() {
                                         const config = STATUS_CONFIG[row.status] || STATUS_CONFIG.DRAFT;
                                         return (
                                             <tr key={row.id}>
-                                                <td className="text-sm text-slate-500 tabular-nums whitespace-nowrap">
+                                                <td className="hidden md:table-cell text-sm text-slate-500 tabular-nums whitespace-nowrap">
                                                     {new Date(row.createdAt).toLocaleDateString('es-VE')}
                                                 </td>
                                                 <td>
@@ -111,7 +111,7 @@ export default function StocktakingPage() {
                                                 <td className="text-center text-sm tabular-nums text-slate-600">
                                                     {row.items?.length ?? 0}
                                                 </td>
-                                                <td className="text-sm text-slate-500 max-w-[200px] truncate">
+                                                <td className="hidden md:table-cell text-sm text-slate-500 max-w-[200px] truncate">
                                                     {row.notes || '—'}
                                                 </td>
                                                 <td>

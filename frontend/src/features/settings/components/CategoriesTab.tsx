@@ -96,8 +96,8 @@ export function CategoriesTab() {
                         <thead>
                             <tr>
                                 <th>Grupo</th>
-                                <th>Descripción</th>
-                                <th>Subgrupos</th>
+                                <th className="hidden md:table-cell">Descripción</th>
+                                <th className="hidden md:table-cell">Subgrupos</th>
                                 <th className="text-center">Estado</th>
                                 <th className="w-32">Acciones</th>
                             </tr>
@@ -118,8 +118,8 @@ export function CategoriesTab() {
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="text-slate-500 text-sm">{group.description || '—'}</td>
-                                        <td>
+                                        <td className="hidden md:table-cell text-slate-500 text-sm">{group.description || '—'}</td>
+                                        <td className="hidden md:table-cell">
                                             <div className="flex flex-wrap gap-1.5">
                                                 {groupSubGroups.map(sg => (
                                                     <div key={sg.id} className={cn(

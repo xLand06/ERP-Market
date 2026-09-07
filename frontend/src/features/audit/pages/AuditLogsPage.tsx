@@ -402,8 +402,8 @@ const AuditLogsPage: React.FC = () => {
                                     <th className="px-6 py-4 text-left font-semibold">Evento</th>
                                     <th className="px-6 py-4 text-left font-semibold">Módulo</th>
                                     <th className="px-6 py-4 text-left font-semibold">Usuario</th>
-                                    <th className="px-6 py-4 text-left font-semibold">Fecha</th>
-                                    <th className="px-6 py-4 text-center font-semibold">Info</th>
+                                    <th className="hidden md:table-cell px-6 py-4 text-left font-semibold">Fecha</th>
+                                    <th className="hidden md:table-cell px-6 py-4 text-center font-semibold">Info</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -450,14 +450,14 @@ const AuditLogsPage: React.FC = () => {
                                                         <div className="text-sm text-slate-700">
                                                             {getDisplayName(log.user)}
                                                         </div>
-                                                        <div className="text-[11px] text-slate-400 italic uppercase">{log.user?.role || 'SISTEMA'}</div>
+                                                        <div className="hidden md:block text-[11px] text-slate-400 italic uppercase">{log.user?.role || 'SISTEMA'}</div>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-xs text-slate-500 font-mono">
+                                            <td className="hidden md:table-cell px-6 py-4 text-xs text-slate-500 font-mono">
                                                 {format(new Date(log.createdAt), "dd MMM, HH:mm:ss", { locale: es })}
                                             </td>
-                                            <td className="px-6 py-4 text-center">
+                                            <td className="hidden md:table-cell px-6 py-4 text-center">
                                                 <ExternalLink className="w-4 h-4 text-slate-400 transition-colors" />
                                             </td>
                                         </tr>
