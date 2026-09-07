@@ -190,14 +190,14 @@ export default function ProductsPage() {
 
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className="w-full erp-table min-w-[800px]" aria-label="Catálogo de Productos">
+                        <table className="w-full erp-table min-w-[640px]" aria-label="Catálogo de Productos">
                             <thead>
                                 <tr>
                                     <th className="w-8"></th>
                                     <th>Producto</th>
-                                    <th>Grupo / Subgrupo</th>
-                                    <th>C. Barras</th>
-                                    <th className="text-right">Costo</th>
+                                    <th className="hidden md:table-cell">Grupo / Subgrupo</th>
+                                    <th className="hidden md:table-cell">C. Barras</th>
+                                    <th className="hidden md:table-cell text-right">Costo</th>
                                     <th className="text-right">Precio Venta</th>
                                     <th className="text-center">Merma</th>
                                     <th className="text-center">Estado</th>
@@ -215,13 +215,13 @@ export default function ProductsPage() {
                                                 <Skeleton className="h-4 w-40" />
                                                 <Skeleton className="h-3 w-24" />
                                             </td>
-                                            <td>
+                                            <td className="hidden md:table-cell">
                                                 <Skeleton className="h-5 w-28 rounded-md" />
                                             </td>
-                                            <td>
+                                            <td className="hidden md:table-cell">
                                                 <Skeleton className="h-4 w-20" />
                                             </td>
-                                            <td className="text-right">
+                                            <td className="hidden md:table-cell text-right">
                                                 <Skeleton className="h-4 w-16 ml-auto" />
                                             </td>
                                             <td className="text-right">
@@ -253,7 +253,7 @@ export default function ProductsPage() {
                                                 {prod.description || 'Sin descripción'}
                                             </p>
                                         </td>
-                                        <td>
+                                        <td className="hidden md:table-cell">
                                             <span className="text-xs font-medium bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md">
                                                 {(() => {
                                                     const sg = subgroups.find((s: any) => s.id === prod.subGroupId);
@@ -262,7 +262,7 @@ export default function ProductsPage() {
                                                 })()}
                                             </span>
                                         </td>
-                                        <td>
+                                        <td className="hidden md:table-cell">
                                             {(() => {
                                                 const codes = Array.from(new Set([
                                                     ...(prod.barcode ? [prod.barcode] : []),
@@ -290,7 +290,7 @@ export default function ProductsPage() {
                                                 );
                                             })()}
                                         </td>
-                                        <td className="text-right">
+                                        <td className="hidden md:table-cell text-right">
                                             <span className="text-sm font-medium text-slate-500">
                                                 {prod.cost ? fmtCOP(Number(prod.cost)) : '—'}
                                             </span>
@@ -318,17 +318,21 @@ export default function ProductsPage() {
                                         {isOwner && (
                                             <td className="text-right">
                                                 <div className="flex items-center justify-end gap-1">
-                                                    <button
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="row-icon"
                                                         onClick={() => handleOpenEdit(prod)}
-                                                        className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                                        className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
                                                         aria-label={`Editar producto ${prod.name}`}
                                                     >
                                                         <Edit2 className="w-4 h-4" />
-                                                    </button>
-                                                    <button
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="row-icon"
                                                         onClick={() => toggleStatusMutation.mutate({ id: prod.id, isActive: !prod.isActive })}
                                                         className={cn(
-                                                            'p-1.5 rounded-lg transition-colors',
+                                                            'rounded-lg',
                                                             prod.isActive
                                                                 ? 'text-slate-400 hover:text-red-500 hover:bg-red-50'
                                                                 : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
@@ -339,7 +343,7 @@ export default function ProductsPage() {
                                                         {prod.isActive
                                                             ? <PackageX className="w-4 h-4" />
                                                             : <PackageCheck className="w-4 h-4" />}
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             </td>
                                         )}
@@ -366,7 +370,7 @@ export default function ProductsPage() {
                             <select 
                                 value={limit} 
                                 onChange={e => { setLimit(Number(e.target.value)); setPage(1); }} 
-                                className="h-8 rounded-lg border border-slate-200 px-2 text-xs text-slate-600 bg-white"
+                                className="h-11 rounded-lg border border-slate-200 px-2 text-xs text-slate-600 bg-white"
                             >
                                 <option value={10}>10</option>
                                 <option value={25}>25</option>
@@ -376,10 +380,9 @@ export default function ProductsPage() {
                             <div className="flex items-center gap-1">
                                 <Button 
                                     variant="outline" 
-                                    size="sm" 
                                     disabled={page === 1} 
                                     onClick={() => setPage(p => p - 1)}
-                                    className="h-8 px-2 text-xs"
+                                    className="px-2 text-xs"
                                 >
                                     Anterior
                                 </Button>
@@ -388,10 +391,9 @@ export default function ProductsPage() {
                                 </span>
                                 <Button 
                                     variant="outline" 
-                                    size="sm" 
                                     disabled={page >= (data?.meta?.totalPages || 1)} 
                                     onClick={() => setPage(p => p + 1)}
-                                    className="h-8 px-2 text-xs"
+                                    className="px-2 text-xs"
                                 >
                                     Siguiente
                                 </Button>
