@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
-import { PackagePlus, Calendar, ChevronLeft, ChevronRight, TrendingDown, RefreshCw, Search, Package, X, Printer } from 'lucide-react';
+import { PackagePlus, Calendar, TrendingDown, RefreshCw, Search, X, Printer } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
+import { DataTable, type Column } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
@@ -13,10 +14,51 @@ type Period = 'day' | 'week' | 'month';
 const CURRENCY_FLAGS: Record<string, string> = { COP: 'COP', USD: 'USD', VES: 'VES' };
 const CURRENCY_SYMBOLS: Record<string, string> = { COP: '$', USD: '$', VES: 'Bs.' };
 
+interface HistoryRow {
+    id: string;
+    createdAt: string;
+    invoiceNumber?: string;
+    currency?: string;
+    exchangeRate?: number | string;
+    total?: number | string;
+    user?: { nombre?: string; username?: string };
+    items?: Array<{ id: string; product?: { name?: string }; quantity: number | string }>;
+}
+
 interface PurchaseHistoryPanelProps {
     /** Optional branch override */
     branchId?: string | null;
 }
+
+const formatOriginalCost = (tx: HistoryRow) => {
+    const cur: string = tx.currency || 'COP';
+    const sym = CURRENCY_SYMBOLS[cur] || '$';
+    const flag = CURRENCY_FLAGS[cur] || '';
+    const rate = Number(tx.exchangeRate || 1);
+    const totalCOP = Number(tx.total || 0);
+    // Reverse engineer the original currency total
+    let originalTotal = totalCOP;
+    if (cur === 'USD' && rate > 0) originalTotal = totalCOP / rate;
+    else if (cur === 'VES' && rate > 0) originalTotal = totalCOP * rate;
+    return `${flag} ${sym}${originalTotal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`;
+};
+
+const itemsCell = (tx: HistoryRow) => {
+    const items = tx.items || [];
+    return (
+        <div className="space-y-0.5">
+            {items.slice(0, 2).map((item) => (
+                <p key={item.id} className="text-xs text-slate-600">
+                    <span className="font-semibold">{item.product?.name || '—'}</span>
+                    <span className="text-slate-400 ml-1">×{Number(item.quantity)}</span>
+                </p>
+            ))}
+            {items.length > 2 && (
+                <p className="text-[10px] text-slate-400">+{items.length - 2} más</p>
+            )}
+        </div>
+    );
+};
 
 export function PurchaseHistoryPanel({ branchId: propBranch }: PurchaseHistoryPanelProps) {
     const { fmtCOP } = useConfigStore();
@@ -118,20 +160,76 @@ export function PurchaseHistoryPanel({ branchId: propBranch }: PurchaseHistoryPa
     const formatDate = (d: string) =>
         new Date(d).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-    const formatOriginalCost = (tx: any) => {
-        const cur: string = tx.currency || 'COP';
-        const sym = CURRENCY_SYMBOLS[cur] || '$';
-        const flag = CURRENCY_FLAGS[cur] || '';
-        const rate = Number(tx.exchangeRate || 1);
-        const totalCOP = Number(tx.total || 0);
-        // Reverse engineer the original currency total
-        let originalTotal = totalCOP;
-        if (cur === 'USD' && rate > 0) originalTotal = totalCOP / rate;
-        else if (cur === 'VES' && rate > 0) originalTotal = totalCOP * rate;
-        return `${flag} ${sym}${originalTotal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`;
-    };
-
     const periodLabels: Record<Period, string> = { day: 'Hoy', week: 'Esta Semana', month: 'Este Mes' };
+
+    const totalCell = (tx: HistoryRow) => (
+        <span className="text-sm font-black text-slate-900 tabular-nums">{fmtCOP(Number(tx.total))}</span>
+    );
+
+    const monedaCell = (tx: HistoryRow) => (
+        <>
+            <span className={cn(
+                'text-sm font-bold',
+                tx.currency === 'USD' ? 'text-emerald-600' : tx.currency === 'VES' ? 'text-orange-600' : 'text-slate-700'
+            )}>
+                {formatOriginalCost(tx)}
+            </span>
+            {tx.currency !== 'COP' && tx.exchangeRate && (
+                <p className="text-[10px] text-slate-400">Tasa: {Number(tx.exchangeRate).toLocaleString()}</p>
+            )}
+        </>
+    );
+
+    const columns: Column<HistoryRow>[] = [
+        {
+            key: 'fecha',
+            header: 'Fecha',
+            cell: tx => <p className="text-sm text-slate-700 font-medium">{formatDate(tx.createdAt)}</p>,
+            showCard: true,
+            className: 'min-w-0',
+        },
+        {
+            key: 'factura',
+            header: 'Factura/Ref',
+            cell: tx => tx.invoiceNumber ? (
+                <span className="text-xs font-mono bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-slate-600">
+                    {tx.invoiceNumber}
+                </span>
+            ) : (
+                <span className="text-xs text-slate-300">—</span>
+            ),
+            hideBelow: 'md',
+        },
+        {
+            key: 'productos',
+            header: 'Productos',
+            cell: itemsCell,
+            showCard: true,
+            className: 'min-w-0',
+        },
+        {
+            key: 'registrado',
+            header: 'Registrado por',
+            cell: tx => <span className="text-sm text-slate-600">{tx.user?.nombre || tx.user?.username || '—'}</span>,
+            hideBelow: 'lg',
+        },
+        {
+            key: 'moneda',
+            header: 'Moneda Original',
+            cell: monedaCell,
+            className: 'text-right',
+            headerClassName: 'text-right',
+            hideBelow: 'md',
+        },
+        {
+            key: 'total',
+            header: 'Total COP',
+            cell: totalCell,
+            className: 'text-right',
+            headerClassName: 'text-right tabular-nums',
+            showCard: true,
+        },
+    ];
 
     return (
         <div className="space-y-5">
@@ -258,100 +356,27 @@ export function PurchaseHistoryPanel({ branchId: propBranch }: PurchaseHistoryPa
                 Mostrando desde <span className="font-bold text-slate-600">{from}</span> hasta <span className="font-bold text-slate-600">{to}</span>
             </div>
 
-            {/* Table */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                {isLoading ? (
-                    <div className="p-10 text-center text-slate-400 text-sm">Cargando egresos...</div>
-                ) : transactions.length === 0 ? (
-                    <div className="p-10 text-center text-slate-400">
-                        <PackagePlus className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                        <p className="text-sm">No hay entradas de mercancía en este período</p>
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-slate-50 border-b border-slate-200">
-                                <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Fecha</th>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Factura/Ref</th>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Productos</th>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Registrado por</th>
-                                    <th className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Moneda Original</th>
-                                    <th className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Total COP</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {transactions.map((tx: any) => (
-                                    <tr 
-                                        key={tx.id} 
-                                        className="hover:bg-slate-50 transition-colors cursor-pointer"
-                                        onClick={() => setSelectedTx(tx)}
-                                    >
-                                        <td className="px-4 py-3">
-                                            <p className="text-sm text-slate-700 font-medium">{formatDate(tx.createdAt)}</p>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {tx.invoiceNumber ? (
-                                                <span className="text-xs font-mono bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-slate-600">
-                                                    {tx.invoiceNumber}
-                                                </span>
-                                            ) : (
-                                                <span className="text-xs text-slate-300">—</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="space-y-0.5">
-                                                {(tx.items || []).slice(0, 2).map((item: any) => (
-                                                    <p key={item.id} className="text-xs text-slate-600">
-                                                        <span className="font-semibold">{item.product?.name || '—'}</span>
-                                                        <span className="text-slate-400 ml-1">×{Number(item.quantity)}</span>
-                                                    </p>
-                                                ))}
-                                                {(tx.items || []).length > 2 && (
-                                                    <p className="text-[10px] text-slate-400">+{tx.items.length - 2} más</p>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-slate-600">
-                                            {tx.user?.nombre || tx.user?.username || '—'}
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <span className={cn(
-                                                'text-sm font-bold',
-                                                tx.currency === 'USD' ? 'text-emerald-600' : tx.currency === 'VES' ? 'text-orange-600' : 'text-slate-700'
-                                            )}>
-                                                {formatOriginalCost(tx)}
-                                            </span>
-                                            {tx.currency !== 'COP' && tx.exchangeRate && (
-                                                <p className="text-[10px] text-slate-400">Tasa: {Number(tx.exchangeRate).toLocaleString()}</p>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <span className="text-sm font-black text-slate-900 tabular-nums">{fmtCOP(Number(tx.total))}</span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+            {/* Table (card view < md) */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[300px]">
+                <DataTable
+                    columns={columns}
+                    rows={transactions}
+                    rowKey={tx => tx.id}
+                    isLoading={isLoading}
+                    onRowClick={tx => setSelectedTx(tx)}
+                    rowClassName={() => 'hover:bg-slate-50'}
+                    empty={{
+                        icon: <PackagePlus className="w-8 h-8 text-slate-200" />,
+                        title: 'No hay entradas de mercancía en este período',
+                    }}
+                    pagination={{
+                        page,
+                        totalPages,
+                        total,
+                        onPageChange: setPage,
+                    }}
+                />
             </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-                <div className="flex items-center justify-between">
-                    <p className="text-sm text-slate-500">Total: {total} registros</p>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="icon" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
-                            <ChevronLeft className="w-4 h-4" />
-                        </Button>
-                        <span className="text-sm text-slate-600">Página {page} de {totalPages}</span>
-                        <Button variant="outline" size="icon" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-                            <ChevronRight className="w-4 h-4" />
-                        </Button>
-                    </div>
-                </div>
-            )}
 
             {/* Modal de Detalles */}
             <Dialog open={!!selectedTx} onOpenChange={(open) => !open && setSelectedTx(null)}>
