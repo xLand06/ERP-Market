@@ -507,7 +507,7 @@ export default function InventoryPage() {
                             id={pageSizeId} 
                             value={pageSize}
                             onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                            className="h-8 rounded-lg border border-slate-200 px-2 text-xs text-slate-600 bg-white"
+                            className="h-11 rounded-lg border border-slate-200 px-2 text-xs text-slate-600 bg-white"
                         >
                             <option value={10}>10</option>
                             <option value={25}>25</option>
@@ -517,10 +517,9 @@ export default function InventoryPage() {
                         <div className="flex items-center gap-1">
                             <Button 
                                 variant="outline" 
-                                size="sm" 
                                 disabled={currentPage === 1} 
                                 onClick={() => setCurrentPage(p => p - 1)}
-                                className="h-8 px-2 text-xs"
+                                className="px-2 text-xs"
                             >
                                 Anterior
                             </Button>
@@ -529,10 +528,9 @@ export default function InventoryPage() {
                             </span>
                             <Button 
                                 variant="outline" 
-                                size="sm" 
                                 disabled={currentPage >= totalPages} 
                                 onClick={() => setCurrentPage(p => p + 1)}
-                                className="h-8 px-2 text-xs"
+                                className="px-2 text-xs"
                             >
                                 Siguiente
                             </Button>

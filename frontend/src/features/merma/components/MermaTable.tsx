@@ -168,8 +168,8 @@ export function MermaTable({ mermas, isLoading, meta, onPageChange }: MermaTable
                     <div className="flex items-center gap-2">
                         <Button
                             variant="outline"
-                            size="sm"
-                            className="h-9 w-9 p-0 rounded-xl border-slate-200 hover:bg-slate-50"
+                            size="icon"
+                            className="rounded-xl border-slate-200 hover:bg-slate-50"
                             disabled={meta.page <= 1}
                             onClick={() => onPageChange?.(meta.page - 1)}
                         >
@@ -180,8 +180,8 @@ export function MermaTable({ mermas, isLoading, meta, onPageChange }: MermaTable
                         </div>
                         <Button
                             variant="outline"
-                            size="sm"
-                            className="h-9 w-9 p-0 rounded-xl border-slate-200 hover:bg-slate-50"
+                            size="icon"
+                            className="rounded-xl border-slate-200 hover:bg-slate-50"
                             disabled={meta.page >= meta.totalPages}
                             onClick={() => onPageChange?.(meta.page + 1)}
                         >

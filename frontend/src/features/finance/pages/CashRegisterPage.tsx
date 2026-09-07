@@ -674,9 +674,9 @@ export default function CashRegisterPage() {
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-slate-500">Total: {total} registros</p>
                         <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" disabled={historyPage === 1} onClick={() => setHistoryPage(p => p - 1)}><ChevronLeft className="w-4 h-4" /></Button>
+                            <Button variant="outline" size="icon" disabled={historyPage === 1} onClick={() => setHistoryPage(p => p - 1)}><ChevronLeft className="w-4 h-4" /></Button>
                             <span className="text-sm text-slate-600">Página {historyPage} de {totalPages}</span>
-                            <Button variant="outline" size="sm" disabled={historyPage >= totalPages} onClick={() => setHistoryPage(p => p + 1)}><ChevronRight className="w-4 h-4" /></Button>
+                            <Button variant="outline" size="icon" disabled={historyPage >= totalPages} onClick={() => setHistoryPage(p => p + 1)}><ChevronRight className="w-4 h-4" /></Button>
                         </div>
                     </div>
                 )}

@@ -462,7 +462,7 @@ export default function POSPage() {
 
                     {/* Stock Entry Quick Action */}
                     {!isSaleMode && (
-                        <Button size="sm" variant="outline" className="h-8 text-xs font-bold text-indigo-600 border-indigo-200" onClick={handleStockEntry}>
+                        <Button variant="outline" className="text-xs font-bold text-indigo-600 border-indigo-200" onClick={handleStockEntry}>
                             + Nueva Carga
                         </Button>
                     )}
@@ -520,9 +520,8 @@ export default function POSPage() {
                         </div>
                     </div>
                     <Button
-                        size="sm"
                         onClick={() => setMobileTab('cart')}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs px-4 h-10 rounded-xl flex items-center gap-1.5"
+                        className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs px-4 rounded-xl flex items-center gap-1.5"
                     >
                         <ShoppingCart className="w-4 h-4" /> Ver Ticket
                     </Button>

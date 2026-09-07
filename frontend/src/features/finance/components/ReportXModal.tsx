@@ -75,7 +75,7 @@ export const ReportXModal: React.FC<ReportXModalProps> = ({ open, onClose, regis
                 ) : isError || !report ? (
                     <div className="py-12 text-center space-y-3">
                         <p className="text-sm font-semibold text-red-500">No se pudo cargar la información del Reporte X.</p>
-                        <Button variant="outline" size="sm" onClick={() => refetch()}>Reintentar</Button>
+                        <Button variant="outline" onClick={() => refetch()}>Reintentar</Button>
                     </div>
                 ) : (
                     <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">

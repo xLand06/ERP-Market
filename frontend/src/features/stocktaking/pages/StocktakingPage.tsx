@@ -118,7 +118,7 @@ export default function StocktakingPage() {
                                                     <div className="flex gap-2">
                                                         <Link
                                                             to={`/inventory/stocktaking/${row.id}`}
-                                                            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors inline-flex items-center"
+                                                            className="p-1.5 touch-target rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors inline-flex items-center"
                                                             aria-label="Ver detalle del conteo"
                                                         >
                                                             <Eye className="w-4 h-4" />
@@ -137,7 +137,6 @@ export default function StocktakingPage() {
                                                     {isOwner && (
                                                         <Button
                                                             variant="outline"
-                                                            size="sm"
                                                             onClick={() => setModalOpen(true)}
                                                         >
                                                             Crear el primero

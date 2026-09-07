@@ -234,7 +234,7 @@ function BackupExportSection() {
                                 <div className="flex items-center gap-1">
                                     <button
                                         onClick={() => handleDownload(b.filename)}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-lg hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 transition-all"
+                                        className="touch-target flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-lg hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 transition-all"
                                         title="Descargar backup"
                                     >
                                         <Download className="w-3.5 h-3.5" /> Descargar
@@ -260,7 +260,7 @@ function BackupExportSection() {
                                                 toast.error(err?.response?.data?.error || 'Error al restaurar', { id: toastId });
                                             }
                                         }}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-amber-600 text-xs font-bold rounded-lg hover:bg-amber-50 hover:border-amber-300 transition-all"
+                                        className="touch-target flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-amber-600 text-xs font-bold rounded-lg hover:bg-amber-50 hover:border-amber-300 transition-all"
                                         title="Restaurar backup"
                                     >
                                         <RefreshCw className="w-3.5 h-3.5" /> Restaurar
@@ -271,7 +271,7 @@ function BackupExportSection() {
                                                 deleteMutation.mutate(b.filename);
                                             }
                                         }}
-                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        className="p-1.5 touch-target text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                         title="Eliminar backup"
                                     >
                                         <Trash2 className="w-3.5 h-3.5" />

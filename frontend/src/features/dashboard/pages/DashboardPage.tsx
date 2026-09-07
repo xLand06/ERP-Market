@@ -185,7 +185,7 @@ function LowStockPanel({ count }: { count: number }) {
                     <p className="text-slate-700 dark:text-slate-200 font-medium">{count} productos con stock bajo</p>
                     <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Revisa el módulo de inventario</p>
                 </div>
-                <Button variant="outline" size="sm" className="w-full mt-4 dark:border-slate-700 dark:hover:bg-slate-800 dark:text-slate-200" onClick={() => navigate('/inventory')}>
+                <Button variant="outline" className="w-full mt-4 dark:border-slate-700 dark:hover:bg-slate-800 dark:text-slate-200" onClick={() => navigate('/inventory')}>
                     Ver Inventario
                 </Button>
             </CardContent>
@@ -217,7 +217,7 @@ function ExpiringBatchesPanel() {
                     </p>
                     <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Revisa el módulo de lotes</p>
                 </div>
-                <Button variant="outline" size="sm" className="w-full mt-3 dark:border-slate-700 dark:hover:bg-slate-800 dark:text-slate-200" onClick={() => navigate('/inventory/batches')}>
+                <Button variant="outline" className="w-full mt-3 dark:border-slate-700 dark:hover:bg-slate-800 dark:text-slate-200" onClick={() => navigate('/inventory/batches')}>
                     Ver Lotes
                 </Button>
             </CardContent>

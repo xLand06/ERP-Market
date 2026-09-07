@@ -81,13 +81,13 @@ const CartItemRow = React.memo(function CartItemRow({
                 </div>
                 <button
                     onClick={() => onRemoveItem(item.id, item.presentationId)}
-                    className="text-slate-300 hover:text-red-500"
+                    className="touch-target text-slate-300 hover:text-red-500"
                 >
                     <X className="w-4 h-4" />
                 </button>
             </div>
             <div className="flex items-center justify-between pl-11">
-                <div className="flex items-center border rounded-lg h-8 overflow-hidden">
+                <div className="flex items-center border rounded-lg h-11 overflow-hidden">
                     <button
                         onClick={() => onUpdateQty(item.id, item.presentationId, Math.max(0, item.qty - 1))}
                         className="px-2 bg-slate-50 hover:bg-slate-100 text-slate-600 border-r"

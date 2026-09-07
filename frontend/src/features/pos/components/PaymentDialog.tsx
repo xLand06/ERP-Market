@@ -298,9 +298,8 @@ export function PaymentDialog({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    size="sm"
                                     onClick={addRow}
-                                    className="h-9 border-2 border-indigo-300 text-indigo-950 hover:bg-indigo-100 font-black text-xs rounded-xl gap-1.5 shadow-2xs"
+                                    className="border-2 border-indigo-300 text-indigo-950 hover:bg-indigo-100 font-black text-xs rounded-xl gap-1.5 shadow-2xs"
                                 >
                                     <Plus className="w-4 h-4 text-indigo-700" /> Agregar Método
                                 </Button>
@@ -320,7 +319,7 @@ export function PaymentDialog({
                                                 <button
                                                     type="button"
                                                     onClick={() => removeRow(row.key)}
-                                                    className="text-xs font-black text-red-600 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 border border-red-200"
+                                                    className="touch-target text-xs font-black text-red-600 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 border border-red-200"
                                                 >
                                                     <Trash2 className="w-4 h-4" /> Eliminar
                                                 </button>

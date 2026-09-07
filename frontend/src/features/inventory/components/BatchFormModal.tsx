@@ -173,13 +173,12 @@ export function BatchFormModal({ open, onClose, onSave, mode, initialData, isSav
                                     <Button 
                                         type="button"
                                         variant="ghost" 
-                                        size="sm" 
                                         onClick={() => {
                                             setForm(prev => ({ ...prev, productId: '' }));
                                             setProductSearch('');
                                             setIsSearchingProducts(true);
                                         }}
-                                        className="h-8 text-xs font-bold text-slate-500 hover:text-red-600 hover:bg-red-50/50 px-2.5 rounded-lg transition-colors border border-transparent hover:border-red-100"
+                                        className="text-xs font-bold text-slate-500 hover:text-red-600 hover:bg-red-50/50 px-2.5 rounded-lg transition-colors border border-transparent hover:border-red-100"
                                     >
                                         Cambiar
                                     </Button>

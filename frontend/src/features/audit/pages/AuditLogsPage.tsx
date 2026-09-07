@@ -621,7 +621,7 @@ const AuditLogsPage: React.FC = () => {
                     <button 
                         disabled={filters.page === 1}
                         onClick={() => setFilters(prev => ({ ...prev, page: (prev.page! - 1) }))}
-                        className="p-1.5 hover:bg-slate-200 disabled:opacity-30 rounded-lg transition-colors border border-slate-200"
+                        className="p-1.5 touch-target hover:bg-slate-200 disabled:opacity-30 rounded-lg transition-colors border border-slate-200"
                     >
                         <ChevronLeft className="w-4 h-4" />
                     </button>
@@ -631,7 +631,7 @@ const AuditLogsPage: React.FC = () => {
                     <button 
                         disabled={logs.length < filters.limit!}
                         onClick={() => setFilters(prev => ({ ...prev, page: (prev.page! + 1) }))}
-                        className="p-1.5 hover:bg-slate-200 disabled:opacity-30 rounded-lg transition-colors border border-slate-200"
+                        className="p-1.5 touch-target hover:bg-slate-200 disabled:opacity-30 rounded-lg transition-colors border border-slate-200"
                     >
                         <ChevronRight className="w-4 h-4" />
                     </button>

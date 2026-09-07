@@ -704,7 +704,7 @@ export function InvoiceSettings() {
                                                         config.setPrimaryPrinter(p.id);
                                                         toast.success(`"${p.name}" es ahora la impresora principal`);
                                                     }}
-                                                    className="text-emerald-700 font-extrabold hover:underline flex items-center gap-1"
+                                                    className="touch-target text-emerald-700 font-extrabold hover:underline flex items-center gap-1"
                                                 >
                                                     <Star className="w-3.5 h-3.5 text-emerald-600" /> Marcar como Principal
                                                 </button>
@@ -717,10 +717,9 @@ export function InvoiceSettings() {
                                             <Button
                                                 type="button"
                                                 variant="outline"
-                                                size="sm"
                                                 onClick={() => handleTestPrintPrinter(p)}
                                                 disabled={testingPrinterId === p.id}
-                                                className="h-7 text-[11px] font-bold border-slate-300 gap-1"
+                                                className="text-[11px] font-bold border-slate-300 gap-1"
                                             >
                                                 {testingPrinterId === p.id ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 text-emerald-600" />}
                                                 Probar Ticket Real

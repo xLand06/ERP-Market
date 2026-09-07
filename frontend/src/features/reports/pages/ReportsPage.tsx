@@ -169,7 +169,7 @@ export default function ReportsPage() {
                         <h2 className="text-sm font-bold text-slate-900">Productos Más Vendidos</h2>
                         <p className="text-xs text-slate-400 mt-0.5">Ranking por unidades · Marzo 2026</p>
                     </div>
-                    <Button variant="ghost" size="sm" className="text-xs text-slate-500 font-bold">
+                    <Button variant="ghost" className="touch-target text-xs text-slate-500 font-bold">
                         Ver todos <ArrowRight className="w-3.5 h-3.5 ml-1" />
                     </Button>
                 </div>

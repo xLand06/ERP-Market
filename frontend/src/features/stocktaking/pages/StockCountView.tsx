@@ -157,7 +157,7 @@ export default function StockCountView() {
             <div className="flex flex-col items-center gap-4 py-20 text-slate-400">
                 <XCircle className="w-12 h-12" />
                 <p className="text-sm font-medium">Conteo no encontrado</p>
-                <Button variant="outline" size="sm" onClick={() => navigate('/inventory/stocktaking')}>
+                <Button variant="outline" onClick={() => navigate('/inventory/stocktaking')}>
                     Volver a la lista
                 </Button>
             </div>
@@ -174,7 +174,7 @@ export default function StockCountView() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="sm" onClick={() => navigate('/inventory/stocktaking')} className="text-slate-500">
+                    <Button variant="ghost" onClick={() => navigate('/inventory/stocktaking')} className="text-slate-500">
                         <ChevronLeft className="w-4 h-4" />
                     </Button>
                     <div>

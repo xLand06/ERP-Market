@@ -88,7 +88,7 @@ export default function FinancePage() {
                             <p className="text-xs text-slate-400 mt-0.5">{AP_ITEMS.length} facturas pendientes</p>
                         </div>
                         <Link to="/suppliers">
-                            <Button variant="ghost" size="sm" className="text-xs text-slate-500 font-bold">
+                            <Button variant="ghost" className="touch-target text-xs text-slate-500 font-bold">
                                 Ver todas <ArrowRight className="w-3.5 h-3.5 ml-1" />
                             </Button>
                         </Link>
@@ -134,7 +134,7 @@ export default function FinancePage() {
                             <p className="text-xs text-slate-400 mt-0.5">Ingresos vs Egresos · Última semana</p>
                         </div>
                         <Link to="/finance/cash-register">
-                            <Button variant="ghost" size="sm" className="text-xs text-slate-500 font-bold">
+                            <Button variant="ghost" className="touch-target text-xs text-slate-500 font-bold">
                                 Ver caja <ArrowRight className="w-3.5 h-3.5 ml-1" />
                             </Button>
                         </Link>

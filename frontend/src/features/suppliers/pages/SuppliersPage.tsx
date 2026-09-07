@@ -85,7 +85,7 @@ export default function SuppliersPage() {
                     <h1 className="text-xl font-bold text-slate-900 tracking-tight">Control de Proveedores</h1>
                     <p className="text-xs text-slate-400 mt-1">{suppliers.filter(s => s.isActive).length} proveedores activos</p>
                 </div>
-                <Button size="sm" onClick={handleOpenCreate} className="bg-indigo-600 hover:bg-indigo-700">
+                <Button onClick={handleOpenCreate} className="bg-indigo-600 hover:bg-indigo-700">
                     <Plus className="w-4 h-4 mr-2" /> Agregar Proveedor
                 </Button>
             </div>
@@ -151,11 +151,10 @@ export default function SuppliersPage() {
                                     <Badge variant={selected.isActive ? 'success' : 'default'}>
                                         {selected.isActive ? 'Activo' : 'Inactivo'}
                                     </Badge>
-                                    <Button variant="outline" size="sm" onClick={handleOpenEdit}>Editar</Button>
+                                    <Button variant="outline" onClick={handleOpenEdit}>Editar</Button>
                                     {selected.isActive && (
                                         <Button 
                                             variant="ghost" 
-                                            size="sm" 
                                             className="text-red-500 hover:bg-red-50"
                                             onClick={() => {
                                                 if (confirm('¿Deseas desactivar este proveedor?')) {

@@ -146,15 +146,14 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
                                 <Button 
                                     type="button" 
                                     variant="ghost" 
-                                    size="sm" 
                                     onClick={() => setSelectedProduct(null)}
-                                    className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100/50 h-8"
+                                    className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100/50"
                                 >
                                     Cambiar
                                 </Button>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Cantidad Física Real *</label>
                                     <Input

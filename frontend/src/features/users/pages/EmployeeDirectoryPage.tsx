@@ -238,17 +238,20 @@ export default function EmployeeDirectoryPage() {
                                         </td>
                                         <td>
                                             <div className="flex items-center gap-1">
-                                                <button
+                                                <Button
+                                                    variant="ghost"
+                                                    size="row-icon"
                                                     onClick={() => handleOpenEdit(emp)}
-                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+                                                    className="text-slate-400 hover:text-purple-600 hover:bg-purple-50"
                                                     aria-label={`Editar información de ${emp.nombre}`}
                                                 >
                                                     <Edit2 className="w-4 h-4" />
-                                                </button>
-                                                <button
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="row-icon"
                                                     onClick={() => toggleStatusMutation.mutate({ id: emp.id, isActive: !emp.isActive })}
                                                     className={cn(
-                                                        'p-1.5 rounded-lg transition-colors',
                                                         emp.isActive
                                                             ? 'text-slate-400 hover:text-red-500 hover:bg-red-50'
                                                             : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
@@ -259,7 +262,7 @@ export default function EmployeeDirectoryPage() {
                                                     {emp.isActive
                                                         ? <UserX className="w-4 h-4" />
                                                         : <UserCheck className="w-4 h-4" />}
-                                                </button>
+                                                </Button>
                                             </div>
                                         </td>
                                     </tr>

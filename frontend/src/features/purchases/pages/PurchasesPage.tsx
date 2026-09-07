@@ -291,16 +291,15 @@ export default function PurchasesPage() {
                                             <td>
                                                 <div className="flex gap-2">
                                                     <button
-                                                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                                        className="p-1.5 touch-target rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                                                         aria-label={`Ver detalle`}
                                                     >
                                                         <Eye className="w-4 h-4" />
                                                     </button>
                                                     {row.status !== 'RECEIVED' && row.status !== 'CANCELLED' && (
                                                         <Button 
-                                                            size="sm" 
                                                             variant="default" 
-                                                            className="h-7 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700"
+                                                            className="text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700"
                                                             onClick={() => {
                                                                 if (confirm('¿Confirmar recepción de mercancía? El stock se actualizará automáticamente.')) {
                                                                     receiveMutation.mutate(row.id);
