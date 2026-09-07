@@ -528,6 +528,15 @@
   .erp-table tr:hover td {
     @apply bg-slate-50/70;
   }
+
+  /* Safe-area insets (Capacitor APK; env() is 0 on web/desktop, so no visual change there) */
+  .pt-safe {
+    padding-top: max(env(safe-area-inset-top), 0px);
+  }
+
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
 }
 
 /* ─── PRINT MEDIA STYLES ─────────────────────────────────────────────── */

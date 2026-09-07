@@ -110,6 +110,7 @@ export default function App() {
             <RouterProvider router={router} />
             <Toaster
                 position="top-right"
+                containerStyle={{ paddingTop: 'max(env(safe-area-inset-top), 0px)' }}
                 toastOptions={{
                     duration: 4000,
                     style: {
