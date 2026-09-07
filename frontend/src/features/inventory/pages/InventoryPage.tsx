@@ -1,9 +1,9 @@
 import { useState, useId, useMemo, useEffect } from 'react';
-import { Search, Plus, Download, Pencil, Check, X, Package, Loader2, ClipboardList } from 'lucide-react';
+import { Search, Plus, Download, Pencil, Check, X, Package, Loader2, ClipboardList, PackageX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DataTable, type Column } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { ProductFormModal } from '@/features/products/components/ProductFormModal';
@@ -14,15 +14,24 @@ import { useAuthStore } from '@/features/auth/store/authStore';
 import { useInventory, useUpdatePrice, useUpdateStock } from '../hooks';
 import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
 import type { InventoryProduct } from '../types';
+import { getStockLevel, getStockBadgeVariant } from '../types';
 import { api } from '@/lib/api';
 
-const stockLevel = (stock: number, min: number): 'normal' | 'warning' | 'critical' =>
-    stock <= min * 0.15 ? 'critical' : stock <= min * 0.6 ? 'warning' : 'normal';
-
-const getBadgeVariant = (level: 'normal' | 'warning' | 'critical') =>
-    level === 'critical' ? 'destructive' : level === 'warning' ? 'warning' : 'success';
-
 const STATUS_LABELS: Record<string, string> = { normal:'Normal', warning:'Alerta', critical:'Crítico' };
+
+/** All barcode codes of a product: main code + alternate barcodes + presentation barcodes. */
+function collectProductCodes(p: InventoryProduct): string[] {
+    return Array.from(new Set([
+        ...(p.code ? [p.code] : []),
+        ...(p.barcodes ? p.barcodes.map(b => b.code) : []),
+        ...(p.presentations ? p.presentations.map(pr => pr.barcode).filter(Boolean) as string[] : []),
+    ]));
+}
+
+const stockStatusCell = (p: InventoryProduct) => {
+    const level = getStockLevel(p.stock, p.minStock);
+    return <Badge variant={getStockBadgeVariant(level)}>{STATUS_LABELS[level]}</Badge>;
+};
 
 const handleExport = async (branchId: string | null, branchName?: string) => {
     try {
@@ -61,7 +70,6 @@ export default function InventoryPage() {
 
     const searchId    = useId();
     const pageSizeId  = useId();
-    const tableId     = useId();
 
     const selectedBranch = useAuthStore(s => s.selectedBranch);
     const user = useAuthStore(s => s.user);
@@ -161,6 +169,192 @@ export default function InventoryPage() {
             setEditingId(null);
         }
     };
+
+    const renderActions = (p: InventoryProduct) => (
+        <Button
+            variant="ghost"
+            size="row-icon"
+            onClick={() => setEditTarget(p)}
+            className="text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+            aria-label={`Detalle de ${p.name}`}
+        >
+            <Pencil className="w-4 h-4" />
+        </Button>
+    );
+
+    const columns: Column<InventoryProduct>[] = [
+        {
+            key: 'select',
+            header: (
+                <input
+                    type="checkbox"
+                    className="rounded border-slate-300"
+                    checked={allSelected}
+                    ref={el => { if (el) el.indeterminate = someSelected; }}
+                    onChange={toggleAll}
+                    aria-label="Seleccionar todos los productos visibles"
+                />
+            ),
+            cell: p => (
+                <input
+                    type="checkbox"
+                    className="rounded border-slate-300"
+                    checked={selected.has(p.id)}
+                    onChange={() => toggleSelect(p.id)}
+                    aria-label={`Seleccionar ${p.name}`}
+                />
+            ),
+            className: 'text-center',
+            headerClassName: 'w-10 text-center',
+        },
+        {
+            key: 'icon',
+            header: 'Foto',
+            cell: () => (
+                <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400">
+                    <Package className="w-4.5 h-4.5" />
+                </div>
+            ),
+            headerClassName: 'w-12',
+            className: 'pr-0',
+        },
+        {
+            key: 'code',
+            header: 'Código',
+            cell: p => {
+                const codes = collectProductCodes(p);
+                if (codes.length === 0) {
+                    return (
+                        <span className="text-xs font-mono bg-slate-50 text-slate-400 px-2 py-0.5 rounded border border-dashed border-slate-200">
+                            —
+                        </span>
+                    );
+                }
+                return (
+                    <div className="flex flex-col gap-1">
+                        <span className="text-xs font-mono bg-slate-50 border border-slate-200 text-slate-600 px-2 py-0.5 rounded w-fit">
+                            {codes[0]}
+                        </span>
+                        {codes.length > 1 && (
+                            <span className="text-[10px] text-slate-400 font-medium">
+                                +{codes.length - 1} código{codes.length - 1 > 1 ? 's' : ''} más
+                            </span>
+                        )}
+                    </div>
+                );
+            },
+            hideBelow: 'md',
+        },
+        {
+            key: 'product',
+            header: 'Producto',
+            cell: p => <p className="text-sm font-semibold text-slate-800">{p.name}</p>,
+            showCard: true,
+            className: 'min-w-0',
+        },
+        {
+            key: 'category',
+            header: 'Categoría',
+            cell: p => <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{p.category}</span>,
+            hideBelow: 'md',
+        },
+        {
+            key: 'cost',
+            header: 'P. Costo',
+            cell: p => <span className="text-sm tabular-nums text-slate-600">${p.cost.toFixed(2)}</span>,
+            className: 'text-right',
+            headerClassName: 'text-right tabular-nums',
+            hideBelow: 'md',
+        },
+        {
+            key: 'price',
+            header: 'P. Venta',
+            cell: p => {
+                const isEditing = editingId === p.id;
+                const editInputId = `edit-price-${p.id}`;
+                if (isEditing) {
+                    return (
+                        <div className="flex items-center gap-1 justify-end">
+                            <Input
+                                id={editInputId}
+                                value={editPrice}
+                                type="number"
+                                step="0.01"
+                                onChange={e => setEditPrice(e.target.value)}
+                                className="w-20 h-8 text-xs text-right border-blue-400 ring-2 ring-blue-200"
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') confirmEdit(p);
+                                    if (e.key === 'Escape') setEditingId(null);
+                                }}
+                                autoFocus
+                            />
+                            {updatePriceMutation.isPending && updatePriceMutation.variables?.id === p.id ? (
+                                <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin ml-1" />
+                            ) : (
+                                <>
+                                    <button onClick={() => confirmEdit(p)} className="text-emerald-500 hover:text-emerald-700">
+                                        <Check className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button onClick={() => setEditingId(null)} className="text-slate-400 hover:text-slate-600">
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    );
+                }
+                return (
+                    <div className="flex items-center justify-end gap-1 group">
+                        <span className="tabular-nums text-sm font-medium text-slate-900">${p.price.toFixed(2)}</span>
+                        <button onClick={() => startEdit(p)} className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-slate-400 hover:text-blue-500 transition-all">
+                            <Pencil className="w-3 h-3" />
+                        </button>
+                    </div>
+                );
+            },
+            className: 'text-right',
+            headerClassName: 'text-right',
+        },
+        {
+            key: 'stock',
+            header: 'Stock',
+            cell: p => {
+                const level = getStockLevel(p.stock, p.minStock);
+                return (
+                    <div className="flex flex-col items-center">
+                        <span className={cn('text-sm font-bold tabular-nums', level === 'critical' ? 'text-red-600' : level === 'warning' ? 'text-amber-600' : 'text-slate-700')}>
+                            {p.baseUnit === 'UNIDAD' ? p.stock : p.stock.toFixed(2)}
+                        </span>
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{p.baseUnit}</span>
+                    </div>
+                );
+            },
+            className: 'text-center',
+            headerClassName: 'text-center',
+            showCard: true,
+        },
+        {
+            key: 'min',
+            header: 'Mín.',
+            cell: p => (
+                <div className="flex flex-col items-center">
+                    <span className="text-sm text-slate-400 tabular-nums">
+                        {p.baseUnit === 'UNIDAD' ? p.minStock : p.minStock.toFixed(2)}
+                    </span>
+                </div>
+            ),
+            className: 'text-center',
+            headerClassName: 'text-center',
+        },
+        {
+            key: 'status',
+            header: 'Estado',
+            cell: stockStatusCell,
+            className: 'text-center',
+            headerClassName: 'text-center',
+            showCard: true,
+        },
+    ];
 
     if (!selectedBranch) {
         return (
@@ -311,192 +505,26 @@ export default function InventoryPage() {
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[400px] relative">
-                <div className="overflow-x-auto">
-                    <table id={tableId} className="w-full erp-table" aria-label="Inventario de productos">
-                        <thead>
-                            <tr>
-                                <th className="w-10 text-center" scope="col">
-                                    <input
-                                        type="checkbox"
-                                        className="rounded border-slate-300"
-                                        checked={allSelected}
-                                        ref={el => { if (el) el.indeterminate = someSelected; }}
-                                        onChange={toggleAll}
-                                        aria-label="Seleccionar todos los productos visibles"
-                                    />
-                                </th>
-                                <th scope="col" className="w-12">Foto</th>
-                                <th scope="col">Código</th>
-                                <th scope="col">Producto</th>
-                                <th scope="col">Categoría</th>
-                                <th scope="col" className="tabular-nums text-right">P. Costo</th>
-                                <th scope="col" className="tabular-nums text-right">P. Venta</th>
-                                <th scope="col" className="text-center">Stock</th>
-                                <th scope="col" className="text-center">Mín.</th>
-                                <th scope="col">Estado</th>
-                                {isOwner && <th scope="col" className="w-20">Acciones</th>}
-                                </tr>
-                                </thead>
-                        <tbody>
-                            {isLoading ? (
-                                Array.from({ length: 6 }).map((_, i) => (
-                                    <tr key={`sk-${i}`}>
-                                        <td className="text-center">
-                                            <Skeleton className="h-4 w-4 mx-auto" />
-                                        </td>
-                                        <td>
-                                            <Skeleton className="w-9 h-9 rounded-lg" />
-                                        </td>
-                                        <td>
-                                            <Skeleton className="h-4 w-24" />
-                                        </td>
-                                        <td>
-                                            <Skeleton className="h-4 w-40" />
-                                        </td>
-                                        <td>
-                                            <Skeleton className="h-5 w-20 rounded-full" />
-                                        </td>
-                                        <td className="text-right">
-                                            <Skeleton className="h-4 w-16 ml-auto" />
-                                        </td>
-                                        <td className="text-right">
-                                            <Skeleton className="h-4 w-16 ml-auto" />
-                                        </td>
-                                        <td className="text-center">
-                                            <Skeleton className="h-4 w-10 mx-auto" />
-                                        </td>
-                                        <td className="text-center">
-                                            <Skeleton className="h-4 w-10 mx-auto" />
-                                        </td>
-                                        <td>
-                                            <Skeleton className="h-5 w-20" />
-                                        </td>
-                                        {isOwner && (
-                                            <td>
-                                                <Skeleton className="h-6 w-10" />
-                                            </td>
-                                        )}
-                                    </tr>
-                                ))
-                            ) : paginated.map(p => {
-                                const level = stockLevel(p.stock, p.minStock);
-                                const isEditing = editingId === p.id;
-                                const editInputId = `edit-price-${p.id}`;
-                                return (
-                                    <tr key={p.id} className={cn(selected.has(p.id) && 'bg-emerald-50/40')}>
-                                        <td className="text-center">
-                                            <input
-                                                type="checkbox"
-                                                checked={selected.has(p.id)}
-                                                onChange={() => toggleSelect(p.id)}
-                                                className="rounded border-slate-300"
-                                            />
-                                        </td>
-                                        <td>
-                                            <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400">
-                                                <Package className="w-4.5 h-4.5" />
-                                            </div>
-                                        </td>
-                                        <td>
-                                            {(() => {
-                                                const codes = Array.from(new Set([
-                                                    ...(p.code ? [p.code] : []),
-                                                    ...(p.barcodes ? p.barcodes.map(b => b.code) : []),
-                                                    ...(p.presentations ? p.presentations.map(pr => pr.barcode).filter(Boolean) as string[] : [])
-                                                ]));
-                                                if (codes.length === 0) {
-                                                    return (
-                                                        <span className="text-xs font-mono bg-slate-50 text-slate-400 px-2 py-0.5 rounded border border-dashed border-slate-200">
-                                                            —
-                                                        </span>
-                                                    );
-                                                }
-                                                return (
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-xs font-mono bg-slate-50 border border-slate-200 text-slate-600 px-2 py-0.5 rounded w-fit">
-                                                            {codes[0]}
-                                                        </span>
-                                                        {codes.length > 1 && (
-                                                            <span className="text-[10px] text-slate-400 font-medium">
-                                                                +{codes.length - 1} código{codes.length - 1 > 1 ? 's' : ''} más
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })()}
-                                        </td>
-                                        <td><p className="text-sm font-semibold text-slate-800">{p.name}</p></td>
-                                        <td><span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{p.category}</span></td>
-                                        <td className="text-right tabular-nums text-sm text-slate-600">${p.cost.toFixed(2)}</td>
-                                        <td className="text-right">
-                                            {isEditing ? (
-                                                <div className="flex items-center gap-1 justify-end">
-                                                    <Input
-                                                        id={editInputId}
-                                                        value={editPrice}
-                                                        type="number"
-                                                        step="0.01"
-                                                        onChange={e => setEditPrice(e.target.value)}
-                                                        className="w-20 h-8 text-xs text-right border-blue-400 ring-2 ring-blue-200"
-                                                        onKeyDown={e => {
-                                                            if (e.key === 'Enter') confirmEdit(p);
-                                                            if (e.key === 'Escape') setEditingId(null);
-                                                        }}
-                                                        autoFocus
-                                                    />
-                                                    {updatePriceMutation.isPending && updatePriceMutation.variables?.id === p.id ? (
-                                                        <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin ml-1" />
-                                                    ) : (
-                                                        <>
-                                                            <button onClick={() => confirmEdit(p)} className="text-emerald-500 hover:text-emerald-700">
-                                                                <Check className="w-3.5 h-3.5" />
-                                                            </button>
-                                                            <button onClick={() => setEditingId(null)} className="text-slate-400 hover:text-slate-600">
-                                                                <X className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center justify-end gap-1 group">
-                                                    <span className="tabular-nums text-sm font-medium text-slate-900">${p.price.toFixed(2)}</span>
-                                                    <button onClick={() => startEdit(p)} className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-slate-400 hover:text-blue-500 transition-all">
-                                                        <Pencil className="w-3 h-3" />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="text-center">
-                                            <div className="flex flex-col items-center">
-                                                <span className={cn('text-sm font-bold tabular-nums', level === 'critical' ? 'text-red-600' : level === 'warning' ? 'text-amber-600' : 'text-slate-700')}>
-                                                    {p.baseUnit === 'UNIDAD' ? p.stock : p.stock.toFixed(2)}
-                                                </span>
-                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{p.baseUnit}</span>
-                                            </div>
-                                        </td>
-                                        <td className="text-center">
-                                            <div className="flex flex-col items-center">
-                                                <span className="text-sm text-slate-400 tabular-nums">
-                                                    {p.baseUnit === 'UNIDAD' ? p.minStock : p.minStock.toFixed(2)}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <Badge variant={getBadgeVariant(level)}>{STATUS_LABELS[level]}</Badge>
-                                        </td>
-                                        <td>
-                                            <button onClick={() => setEditTarget(p)} className="text-xs text-blue-600 hover:underline">Detalle</button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-
-                            {!isLoading && filtered.length === 0 && (
-                                <tr><td colSpan={11} className="text-center py-12 text-sm text-slate-400">No se encontraron productos.</td></tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                <DataTable
+                    columns={columns}
+                    rows={paginated}
+                    rowKey={p => p.id}
+                    isLoading={isLoading}
+                    rowClassName={p => {
+                        const level = getStockLevel(p.stock, p.minStock);
+                        return cn(
+                            selected.has(p.id) && 'bg-emerald-50/40',
+                            level === 'critical' && 'bg-red-50/40',
+                            level === 'warning' && 'bg-amber-50/40',
+                        );
+                    }}
+                    empty={{
+                        icon: <PackageX className="w-8 h-8 text-slate-200" />,
+                        title: 'No se encontraron productos',
+                        description: 'Ajusta los filtros o la búsqueda para ver resultados.',
+                    }}
+                    actions={isOwner ? renderActions : undefined}
+                />
 
                 <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50 mt-auto">
                     <p className="text-xs text-slate-500">
