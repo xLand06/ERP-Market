@@ -1,22 +1,23 @@
 import { useState } from 'react';
 import { exportToExcel } from '@/lib/exportUtils';
-import { Search, Plus, Edit2, UserX, UserCheck, Download, AlertCircle } from 'lucide-react';
+import { Search, Plus, Edit2, UserX, UserCheck, Download, AlertCircle, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { DataTable, type Column } from '@/components/ui/table';
 import { UserFormModal, Branch, User } from '../components/UserFormModal';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
 
 const ROLE_LABELS: Record<string, string> = {
-    OWNER: 'Administrador', 
+    OWNER: 'Administrador',
     SELLER: 'Vendedor',
 };
 
 const ROLE_BADGES: Record<string, 'default' | 'success' | 'warning' | 'destructive'> = {
-    OWNER: 'destructive', 
+    OWNER: 'destructive',
     SELLER: 'success',
 };
 
@@ -34,7 +35,7 @@ function Avatar({ name }: { name: string }) {
 export default function EmployeeDirectoryPage() {
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
-    
+
     // Modal State
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -81,12 +82,12 @@ export default function EmployeeDirectoryPage() {
             (e.apellido || '').toLowerCase().includes(searchText) ||
             (e.username || '').toLowerCase().includes(searchText) ||
             (e.email || '').toLowerCase().includes(searchText);
-            
-        const matchStatus = 
+
+        const matchStatus =
             filterStatus === 'all' ? true :
             filterStatus === 'active' ? e.isActive === true :
             e.isActive === false;
-            
+
         return matchSearch && matchStatus;
     });
 
@@ -114,9 +115,107 @@ export default function EmployeeDirectoryPage() {
         );
     };
 
+    const columns: Column<User>[] = [
+        {
+            key: 'employee',
+            header: 'Empleado',
+            cell: emp => (
+                <div className="flex items-center gap-3 min-w-0">
+                    <Avatar name={emp.nombre} />
+                    <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 truncate">{emp.nombre} {emp.apellido}</p>
+                        <p className="text-xs text-slate-400 font-medium truncate">
+                            C.I: {emp.cedula || 'Sin CI'}{emp.telefono ? ` · Tlf: ${emp.telefono}` : ''}
+                        </p>
+                    </div>
+                </div>
+            ),
+            headerClassName: 'sm:w-87.5',
+            showCard: true,
+        },
+        {
+            key: 'username',
+            header: 'Usuario',
+            cell: emp => (
+                <span className="text-sm font-medium text-slate-600">{emp.username}</span>
+            ),
+            showCard: true,
+        },
+        {
+            key: 'email',
+            header: 'Email',
+            cell: emp => (
+                <span className="block text-xs text-slate-500 truncate max-w-[220px]" title={emp.email || ''}>
+                    {emp.email || 'Sin email'}
+                </span>
+            ),
+            hideBelow: 'md',
+        },
+        {
+            key: 'role',
+            header: 'Rol',
+            cell: emp => (
+                <Badge variant={ROLE_BADGES[emp.role] || 'default'}>
+                    {ROLE_LABELS[emp.role] || emp.role}
+                </Badge>
+            ),
+            showCard: true,
+        },
+        {
+            key: 'branch',
+            header: 'Sucursal',
+            cell: emp => (
+                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                    {branches.find(b => b.id === emp.branchId)?.name || 'Sin asignar'}
+                </span>
+            ),
+            showCard: true,
+        },
+        {
+            key: 'status',
+            header: 'Estado',
+            cell: emp => (
+                <Badge variant={emp.isActive ? 'success' : 'default'}>
+                    {emp.isActive ? 'Activo' : 'Inactivo'}
+                </Badge>
+            ),
+            showCard: true,
+        },
+    ];
+
+    const renderActions = (emp: User) => (
+        <>
+            <Button
+                variant="ghost"
+                size="row-icon"
+                onClick={() => handleOpenEdit(emp)}
+                className="text-slate-400 hover:text-purple-600 hover:bg-purple-50"
+                aria-label={`Editar información de ${emp.nombre}`}
+            >
+                <Edit2 className="w-4 h-4" />
+            </Button>
+            <Button
+                variant="ghost"
+                size="row-icon"
+                onClick={() => toggleStatusMutation.mutate({ id: emp.id, isActive: !emp.isActive })}
+                className={cn(
+                    emp.isActive
+                        ? 'text-slate-400 hover:text-red-500 hover:bg-red-50'
+                        : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
+                )}
+                aria-label={emp.isActive ? `Desactivar ${emp.nombre}` : `Activar ${emp.nombre}`}
+                disabled={toggleStatusMutation.isPending}
+            >
+                {emp.isActive
+                    ? <UserX className="w-4 h-4" />
+                    : <UserCheck className="w-4 h-4" />}
+            </Button>
+        </>
+    );
+
     return (
         <>
-            <UserFormModal 
+            <UserFormModal
                 open={modalOpen}
                 onClose={() => setModalOpen(false)}
                 user={selectedUser}
@@ -185,98 +284,19 @@ export default function EmployeeDirectoryPage() {
 
                 {/* Table */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full erp-table" aria-label="Directorio de empleados">
-                            <thead>
-                                <tr>
-                                    <th className="sm:w-87.5">Empleado</th>
-                                    <th>Usuario</th>
-                                    <th>Rol</th>
-                                    <th>Sucursal</th>
-                                    <th>Estado</th>
-                                    <th className="w-24">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {isLoading ? (
-                                    <tr>
-                                        <td colSpan={6} className="text-center py-10 text-sm text-slate-400">
-                                            Cargando empleados...
-                                        </td>
-                                    </tr>
-                                ) : filtered.map(emp => (
-                                    <tr key={emp.id} className={cn(!emp.isActive && 'opacity-60 bg-slate-50')}>
-                                        <td>
-                                            <div className="flex items-center gap-3">
-                                                <Avatar name={emp.nombre} />
-                                                <div>
-                                                    <p className="text-sm font-semibold text-slate-800">{emp.nombre} {emp.apellido}</p>
-                                                    <p className="text-xs text-slate-400 font-medium">
-                                                        C.I: {emp.cedula || 'Sin CI'} {emp.telefono ? `· Tlf: ${emp.telefono}` : ''}
-                                                    </p>
-                                                    <p className="text-[10px] text-slate-400">{emp.email || 'Sin email'}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span className="text-sm font-medium text-slate-600">{emp.username}</span>
-                                        </td>
-                                        <td>
-                                            <Badge variant={ROLE_BADGES[emp.role] || 'default'}>
-                                                {ROLE_LABELS[emp.role] || emp.role}
-                                            </Badge>
-                                        </td>
-                                        <td>
-                                            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                                                {branches.find(b => b.id === emp.branchId)?.name || 'Sin asignar'}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <Badge variant={emp.isActive ? 'success' : 'default'}>
-                                                {emp.isActive ? 'Activo' : 'Inactivo'}
-                                            </Badge>
-                                        </td>
-                                        <td>
-                                            <div className="flex items-center gap-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="row-icon"
-                                                    onClick={() => handleOpenEdit(emp)}
-                                                    className="text-slate-400 hover:text-purple-600 hover:bg-purple-50"
-                                                    aria-label={`Editar información de ${emp.nombre}`}
-                                                >
-                                                    <Edit2 className="w-4 h-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="row-icon"
-                                                    onClick={() => toggleStatusMutation.mutate({ id: emp.id, isActive: !emp.isActive })}
-                                                    className={cn(
-                                                        emp.isActive
-                                                            ? 'text-slate-400 hover:text-red-500 hover:bg-red-50'
-                                                            : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
-                                                    )}
-                                                    aria-label={emp.isActive ? `Desactivar ${emp.nombre}` : `Activar ${emp.nombre}`}
-                                                    disabled={toggleStatusMutation.isPending}
-                                                >
-                                                    {emp.isActive
-                                                        ? <UserX className="w-4 h-4" />
-                                                        : <UserCheck className="w-4 h-4" />}
-                                                </Button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {!isLoading && filtered.length === 0 && !isError && (
-                                    <tr>
-                                        <td colSpan={6} className="text-center py-10 text-sm text-slate-400">
-                                            No hay empleados que coincidan con la búsqueda.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                    <DataTable
+                        columns={columns}
+                        rows={filtered}
+                        rowKey={emp => emp.id}
+                        isLoading={isLoading}
+                        rowClassName={emp => (emp.isActive ? '' : 'opacity-60 bg-slate-50')}
+                        empty={isError ? undefined : {
+                            icon: <Users className="w-8 h-8 text-slate-200" />,
+                            title: 'No se encontraron empleados',
+                            description: 'Ajusta la búsqueda o los filtros.',
+                        }}
+                        actions={renderActions}
+                    />
                 </div>
             </div>
         </>
