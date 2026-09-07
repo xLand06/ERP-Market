@@ -92,7 +92,29 @@ export function useUpdateStock() {
             });
             return res.data;
         },
-        onSuccess: () => {
+        onMutate: async ({ product, quantity, minStock, branchId }) => {
+            const queryKey = ['inventory', branchId];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<InventoryItem[]>(queryKey);
+            queryClient.setQueryData<InventoryItem[]>(queryKey, (old) => {
+                if (!old) return old;
+                return old.map(item => {
+                    if (item.product.id !== product.id) return item;
+                    return {
+                        ...item,
+                        stock: Number(quantity),
+                        minStock: minStock !== undefined ? Number(minStock) : item.minStock,
+                    };
+                });
+            });
+            return { previous, queryKey };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.previous && context.queryKey) {
+                queryClient.setQueryData(context.queryKey, context.previous);
+            }
+        },
+        onSettled: (_data, _err, _vars) => {
             queryClient.invalidateQueries({ queryKey: ['inventory'] });
         },
     });
@@ -106,7 +128,33 @@ export function useUpdatePrice() {
             const res = await api.put(`/products/${id}`, { price });
             return res.data;
         },
-        onSuccess: () => {
+        onMutate: async ({ id, price }) => {
+            // Price mutation targets the products endpoint but reads land on
+            // inventory caches (per-branch). Optimistically update every
+            // ['inventory', *] cache that contains this product.
+            await queryClient.cancelQueries({ queryKey: ['inventory'] });
+            const snapshots: { queryKey: readonly unknown[]; previous: InventoryItem[] | undefined }[] = [];
+
+            queryClient.getQueryCache().getAll().forEach(query => {
+                if (!Array.isArray(query.queryKey) || query.queryKey[0] !== 'inventory') return;
+                const previous = query.state.data as InventoryItem[] | undefined;
+                snapshots.push({ queryKey: query.queryKey, previous });
+                queryClient.setQueryData<InventoryItem[]>(query.queryKey, (old) => {
+                    if (!old) return old;
+                    return old.map(item =>
+                        item.product.id === id ? { ...item, product: { ...item.product, price } } : item
+                    );
+                });
+            });
+
+            return { snapshots };
+        },
+        onError: (_err, _vars, context) => {
+            context?.snapshots.forEach(({ queryKey, previous }) => {
+                queryClient.setQueryData(queryKey, previous);
+            });
+        },
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['inventory'] });
         },
     });

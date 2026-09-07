@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Search, Plus, Download, Eye, Package, TrendingUp, Clock, Loader2, AlertCircle } from 'lucide-react';
+import { Search, Plus, Download, Eye, Package, TrendingUp, Clock, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { PurchaseEntryModal } from '../components/PurchaseEntryModal';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -89,8 +90,72 @@ export default function PurchasesPage() {
 
     if (isLoading) {
         return (
-            <div className="h-full flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+            <div className="flex flex-col gap-6 max-w-350 mx-auto pb-8">
+                {/* Page Header Skeleton */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-2">
+                        <Skeleton className="h-8 w-56" />
+                        <Skeleton className="h-4 w-40" />
+                    </div>
+                    <div className="flex gap-2.5">
+                        <Skeleton className="h-10 w-28" />
+                        <Skeleton className="h-10 w-36" />
+                    </div>
+                </div>
+
+                {/* KPI Cards Skeleton */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                        <div key={`kpi-sk-${i}`} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-start gap-4">
+                            <Skeleton className="w-10 h-10 rounded-xl shrink-0" />
+                            <div className="flex-1 space-y-2">
+                                <Skeleton className="h-3 w-24" />
+                                <Skeleton className="h-6 w-28" />
+                                <Skeleton className="h-3 w-32" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Table Skeleton */}
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="flex items-center gap-3 p-4 border-b border-slate-100">
+                        <Skeleton className="h-10 flex-1" />
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full erp-table" aria-label="Tabla de compras (cargando)">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Proveedor</th>
+                                    <th>ID Orden</th>
+                                    <th className="text-center">Ítems</th>
+                                    <th className="text-right tabular-nums">Total</th>
+                                    <th>Sucursal</th>
+                                    <th>Estado</th>
+                                    <th className="w-32">Acc.</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                    <tr key={`sk-${i}`}>
+                                        <td><Skeleton className="h-4 w-20" /></td>
+                                        <td><Skeleton className="h-4 w-36" /></td>
+                                        <td><Skeleton className="h-4 w-16" /></td>
+                                        <td className="text-center"><Skeleton className="h-4 w-6 mx-auto" /></td>
+                                        <td className="text-right"><Skeleton className="h-4 w-20 ml-auto" /></td>
+                                        <td><Skeleton className="h-5 w-24 rounded-full" /></td>
+                                        <td><Skeleton className="h-5 w-20" /></td>
+                                        <td><Skeleton className="h-7 w-16" /></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+                        <Skeleton className="h-4 w-32" />
+                    </div>
+                </div>
             </div>
         );
     }

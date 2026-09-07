@@ -3,6 +3,7 @@ import { Plus, Search, Edit2, PackageX, PackageCheck, AlertCircle, Download, Pac
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ProductFormModal } from '../components/ProductFormModal';
 import type { Product } from '../types';
@@ -205,11 +206,40 @@ export default function ProductsPage() {
                             </thead>
                             <tbody>
                                 {isLoading ? (
-                                    <tr>
-                                        <td colSpan={9} className="text-center py-10 text-sm text-slate-400">
-                                            Cargando productos...
-                                        </td>
-                                    </tr>
+                                    Array.from({ length: 6 }).map((_, i) => (
+                                        <tr key={`sk-${i}`}>
+                                            <td className="pr-0">
+                                                <Skeleton className="w-8 h-8 rounded-lg" />
+                                            </td>
+                                            <td className="space-y-1.5">
+                                                <Skeleton className="h-4 w-40" />
+                                                <Skeleton className="h-3 w-24" />
+                                            </td>
+                                            <td>
+                                                <Skeleton className="h-5 w-28 rounded-md" />
+                                            </td>
+                                            <td>
+                                                <Skeleton className="h-4 w-20" />
+                                            </td>
+                                            <td className="text-right">
+                                                <Skeleton className="h-4 w-16 ml-auto" />
+                                            </td>
+                                            <td className="text-right">
+                                                <Skeleton className="h-4 w-20 ml-auto" />
+                                            </td>
+                                            <td className="text-center">
+                                                <Skeleton className="h-4 w-8 mx-auto" />
+                                            </td>
+                                            <td className="text-center">
+                                                <Skeleton className="h-5 w-16 mx-auto rounded-md" />
+                                            </td>
+                                            {isOwner && (
+                                                <td className="text-right">
+                                                    <Skeleton className="h-6 w-14 ml-auto" />
+                                                </td>
+                                            )}
+                                        </tr>
+                                    ))
                                 ) : products.map((prod: Product) => (
                                     <tr key={prod.id} className={cn(!prod.isActive && 'opacity-60 bg-slate-50')}>
                                         <td className="pr-0">

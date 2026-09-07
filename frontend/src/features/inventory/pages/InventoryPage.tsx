@@ -3,6 +3,7 @@ import { Search, Plus, Download, Pencil, Check, X, Package, Loader2, ClipboardLi
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { ProductFormModal } from '@/features/products/components/ProductFormModal';
@@ -310,11 +311,6 @@ export default function InventoryPage() {
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[400px] relative">
-                {isLoading && (
-                    <div className="absolute inset-0 z-10 bg-white/50 backdrop-blur-[2px] flex items-center justify-center">
-                        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
-                    </div>
-                )}
                 <div className="overflow-x-auto">
                     <table id={tableId} className="w-full erp-table" aria-label="Inventario de productos">
                         <thead>
@@ -342,7 +338,47 @@ export default function InventoryPage() {
                                 </tr>
                                 </thead>
                         <tbody>
-                            {!isLoading && paginated.map(p => {
+                            {isLoading ? (
+                                Array.from({ length: 6 }).map((_, i) => (
+                                    <tr key={`sk-${i}`}>
+                                        <td className="text-center">
+                                            <Skeleton className="h-4 w-4 mx-auto" />
+                                        </td>
+                                        <td>
+                                            <Skeleton className="w-9 h-9 rounded-lg" />
+                                        </td>
+                                        <td>
+                                            <Skeleton className="h-4 w-24" />
+                                        </td>
+                                        <td>
+                                            <Skeleton className="h-4 w-40" />
+                                        </td>
+                                        <td>
+                                            <Skeleton className="h-5 w-20 rounded-full" />
+                                        </td>
+                                        <td className="text-right">
+                                            <Skeleton className="h-4 w-16 ml-auto" />
+                                        </td>
+                                        <td className="text-right">
+                                            <Skeleton className="h-4 w-16 ml-auto" />
+                                        </td>
+                                        <td className="text-center">
+                                            <Skeleton className="h-4 w-10 mx-auto" />
+                                        </td>
+                                        <td className="text-center">
+                                            <Skeleton className="h-4 w-10 mx-auto" />
+                                        </td>
+                                        <td>
+                                            <Skeleton className="h-5 w-20" />
+                                        </td>
+                                        {isOwner && (
+                                            <td>
+                                                <Skeleton className="h-6 w-10" />
+                                            </td>
+                                        )}
+                                    </tr>
+                                ))
+                            ) : paginated.map(p => {
                                 const level = stockLevel(p.stock, p.minStock);
                                 const isEditing = editingId === p.id;
                                 const editInputId = `edit-price-${p.id}`;

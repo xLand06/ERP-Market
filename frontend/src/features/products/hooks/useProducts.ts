@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
 import type { Product, ProductListParams, CreateProductPayload, UpdateProductPayload } from '../types';
@@ -24,6 +24,7 @@ export function useProducts(params: ProductListParams) {
         queryKey,
         queryFn,
         retry: false,
+        placeholderData: keepPreviousData,
     });
 }
 
@@ -108,12 +109,42 @@ export function useToggleProductStatus() {
             const res = await api.put(`/products/${id}`, { isActive });
             return res.data;
         },
+        onMutate: async ({ id, isActive }) => {
+            await queryClient.cancelQueries({ queryKey: ['products'] });
+
+            const snapshots: { queryKey: readonly unknown[]; previous: unknown }[] = [];
+            queryClient.getQueryCache().getAll().forEach(query => {
+                const key = query.queryKey;
+                if (!Array.isArray(key) || key[0] !== 'products') return;
+                const state = query.state.data as { data?: Product[] } | undefined;
+                // Only mutate list-shaped caches (with a .data array)
+                if (!state || !Array.isArray(state.data)) return;
+                snapshots.push({ queryKey: key, previous: state });
+                queryClient.setQueryData(key, (old: unknown) => {
+                    const list = old as { data?: Product[]; meta?: unknown } | undefined;
+                    if (!list?.data) return old;
+                    return {
+                        ...list,
+                        data: list.data.map(p => p.id === id ? { ...p, isActive } : p),
+                    };
+                });
+            });
+
+            return { snapshots };
+        },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['products'] });
             toast.success('Estado del producto actualizado');
         },
-        onError: () => {
+        onError: (_err, _vars, context) => {
+            if (context?.snapshots) {
+                context.snapshots.forEach(({ queryKey, previous }) => {
+                    queryClient.setQueryData(queryKey, previous);
+                });
+            }
             toast.error('Error al actualizar producto. Verifica la conexión.');
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['products'] });
         },
     });
 }

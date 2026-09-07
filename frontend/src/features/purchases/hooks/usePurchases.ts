@@ -36,12 +36,38 @@ export function useUpdatePurchaseStatus() {
         mutationFn: async ({ id, status }: { id: string; status: string }) => {
             return purchasesApi.updateStatus(id, { status });
         },
+        onMutate: async ({ id, status }) => {
+            await queryClient.cancelQueries({ queryKey: ['purchases'] });
+
+            const snapshots: { queryKey: readonly unknown[]; previous: unknown }[] = [];
+            queryClient.getQueryCache().getAll().forEach(query => {
+                const key = query.queryKey;
+                if (!Array.isArray(key) || key[0] !== 'purchases') return;
+                const state = query.state.data;
+                if (!Array.isArray(state)) return;
+                snapshots.push({ queryKey: key, previous: state });
+                queryClient.setQueryData(key, (old: unknown) => {
+                    const list = old as Array<{ id: string; status: string }> | undefined;
+                    if (!list) return old;
+                    return list.map(o => o.id === id ? { ...o, status } : o);
+                });
+            });
+
+            return { snapshots };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.snapshots) {
+                context.snapshots.forEach(({ queryKey, previous }) => {
+                    queryClient.setQueryData(queryKey, previous);
+                });
+            }
+            toast.error('Error al actualizar estado');
+        },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['purchases'] });
             toast.success('Estado actualizado');
         },
-        onError: () => {
-            toast.error('Error al actualizar estado');
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['purchases'] });
         },
     });
 }

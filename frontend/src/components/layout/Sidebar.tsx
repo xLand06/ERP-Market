@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { useConfigStore, UITheme } from '@/hooks/useConfigStore';
+import { api } from '@/lib/api';
+import { dashboardApi } from '@/services';
+import { purchasesApi } from '@/services/purchases.service';
+import { suppliersApi } from '@/services/suppliers.service';
 import {
     LayoutDashboard, Package, ShoppingCart,
     Coins, Users, Truck, BarChart2, ShieldCheck, Store, PanelLeftClose, PanelLeftOpen, X,
@@ -121,12 +126,85 @@ const getSidebarTheme = (theme: UITheme = 'emerald') => {
 };
 
 export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: SidebarProps) {
-    const { user } = useAuthStore();
+    const { user, selectedBranch } = useAuthStore();
     const { activeTheme } = useConfigStore();
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+    const queryClient = useQueryClient();
 
     const themeStyles = getSidebarTheme(activeTheme);
     const LogoIcon = themeStyles.LogoIcon;
+
+    // Effective branch used by feature hooks (null/undefined → all-branches queries)
+    const effectiveBranch = selectedBranch && selectedBranch !== 'all' ? selectedBranch : undefined;
+
+    // Prefetch data for a route on hover/focus so navigation feels instant.
+    // Query keys and queryFn shapes MUST match the feature hooks that read them.
+    const prefetchFor = (path: string) => {
+        switch (path) {
+            case '/inventory': {
+                const queryKey = ['inventory', effectiveBranch || ''] as const;
+                void queryClient.prefetchQuery({
+                    queryKey,
+                    queryFn: () =>
+                        api.get(effectiveBranch ? `/inventory/stock/branch/${effectiveBranch}` : '/inventory/stock')
+                            .then(r => r.data.data),
+                    staleTime: 60_000,
+                }).catch(() => {});
+                break;
+            }
+            case '/products': {
+                // Same shape as useProducts: [search, subGroupId, groupId, isActive, page, limit]
+                void queryClient.prefetchQuery({
+                    queryKey: ['products', undefined, undefined, undefined, undefined, 1, 25],
+                    queryFn: () => api.get('/products', { params: { page: 1, limit: 25 } }).then(r => r.data),
+                    staleTime: 60_000,
+                }).catch(() => {});
+                break;
+            }
+            case '/dashboard': {
+                void queryClient.prefetchQuery({
+                    queryKey: ['dashboard', 'kpis', effectiveBranch, 'today'],
+                    queryFn: () => dashboardApi.getKPIs({ branchId: effectiveBranch, range: 'today' }),
+                    staleTime: 60_000,
+                }).catch(() => {});
+                break;
+            }
+            case '/purchases': {
+                void queryClient.prefetchQuery({
+                    queryKey: ['purchases', effectiveBranch],
+                    queryFn: () => purchasesApi.getOrders({ branchId: effectiveBranch }),
+                    staleTime: 60_000,
+                }).catch(() => {});
+                break;
+            }
+            case '/pos': {
+                // Branches + branch inventory (same keys the POS page reads)
+                void queryClient.prefetchQuery({
+                    queryKey: ['branches'],
+                    queryFn: () => api.get('/branches').then(r => r.data.data),
+                    staleTime: 60_000,
+                }).catch(() => {});
+                if (effectiveBranch) {
+                    void queryClient.prefetchQuery({
+                        queryKey: ['inventory', effectiveBranch],
+                        queryFn: () => api.get(`/inventory/stock/branch/${effectiveBranch}`).then(r => r.data.data),
+                        staleTime: 60_000,
+                    }).catch(() => {});
+                }
+                break;
+            }
+            case '/suppliers': {
+                void queryClient.prefetchQuery({
+                    queryKey: ['suppliers', undefined],
+                    queryFn: () => suppliersApi.getSuppliers(undefined),
+                    staleTime: 60_000,
+                }).catch(() => {});
+                break;
+            }
+            default:
+                break;
+        }
+    };
 
     return (
         <div className={cn("flex flex-col h-full w-full border-r z-10 transition-all duration-300 relative", themeStyles.bg)}>
@@ -189,8 +267,9 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                             key={item.path}
                             to={item.path}
                             title={collapsed && !hoveredItem ? item.name : undefined}
-                            onMouseEnter={() => setHoveredItem(item.path)}
+                            onMouseEnter={() => { setHoveredItem(item.path); prefetchFor(item.path); }}
                             onMouseLeave={() => setHoveredItem(null)}
+                            onFocus={() => prefetchFor(item.path)}
                             className={({ isActive }) =>
                                 cn(
                                     "group flex items-center gap-3 py-2.5 lg:py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 relative overflow-hidden",

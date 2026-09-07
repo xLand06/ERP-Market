@@ -6,6 +6,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -117,7 +118,7 @@ export default function POSPage() {
         onOpened: () => { refetchRegister(); queryClient.invalidateQueries({ queryKey: ['openRegister'] }); },
     });
 
-    const { inventory, refetch, isOnline } = useInventory(effectiveBranch || '');
+    const { inventory, isLoading, refetch, isOnline } = useInventory(effectiveBranch || '');
 
     const products = useMemo<Product[]>(() => {
         if (!inventory || !Array.isArray(inventory)) return [];
@@ -468,12 +469,20 @@ export default function POSPage() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto min-h-0">
-                    <ProductSearch
-                        inventory={inventoryItems}
-                        isSaleMode={isSaleMode}
-                        onAddToCart={addToCart}
-                        onShowPresentations={(prod) => setActiveProductForPres(prod)}
-                    />
+                    {isLoading ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5 sm:gap-3.5 content-start pb-4" aria-hidden="true">
+                            {Array.from({ length: 12 }).map((_, i) => (
+                                <Skeleton key={`pos-sk-${i}`} className="h-[145px] sm:h-[160px] w-full rounded-2xl" />
+                            ))}
+                        </div>
+                    ) : (
+                        <ProductSearch
+                            inventory={inventoryItems}
+                            isSaleMode={isSaleMode}
+                            onAddToCart={addToCart}
+                            onShowPresentations={(prod) => setActiveProductForPres(prod)}
+                        />
+                    )}
                 </div>
             </div>
 
