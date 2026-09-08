@@ -6,8 +6,24 @@ import { getSyncStatus } from './status.service';
 import { authMiddleware, AuthRequest } from '../../core/middlewares/auth.middleware';
 import { roleGuard } from '../../core/middlewares/roleGuard';
 import { logAudit, extractIp } from '../../core/middlewares/audit.middleware';
+import { DEPLOY_MODE } from '../../config/env';
 
 const router = Router();
+
+// En DEPLOY_MODE=server el backend ES la nube: no hay SQLite local ni sync.
+// Estos endpoints solo aplican a dispositivos (Electron/móvil), pero el web UI
+// los consulta en login, así que responden con estado benigno en vez de 404.
+const SERVER_MODE_INITIAL_STATUS = {
+    success: true,
+    data: {
+        needsInitialSync: false,
+        hasCloudData: true,
+        isOnline: true,
+        lastSyncAt: null,
+        isSyncing: false,
+        stage: 'ready',
+    },
+};
 
 // ─── Rutas PÚBLICAS (sin autenticación) ──────────────────────────────────────
 // /initial-status debe ser pública porque se llama ANTES de que existan
@@ -16,6 +32,7 @@ const router = Router();
 // Endpoint para detectar primer inicio y estado del sync inicial
 router.get('/initial-status', async (_req, res) => {
     try {
+        if (DEPLOY_MODE === 'server') { res.json(SERVER_MODE_INITIAL_STATUS); return; }
         const localPrisma = getLocalPrisma();
         const lastSync = getLastSuccessfulSync();
         const isOnline = await checkCloudConnection();
@@ -70,6 +87,7 @@ router.get('/initial-status', async (_req, res) => {
 // runSyncCycle tiene su propio mutex (isSyncing), múltiples llamadas son seguras
 router.post('/trigger', async (_req, res) => {
     try {
+        if (DEPLOY_MODE === 'server') { res.json({ success: true, message: 'Sync not applicable in server mode' }); return; }
         runSyncCycle();
         res.json({ success: true, message: 'Sync cycle triggered' });
     } catch (error: any) {
@@ -83,6 +101,23 @@ router.use(authMiddleware);
 // Endpoint status de sync
 router.get('/status', async (_req, res) => {
     try {
+        if (DEPLOY_MODE === 'server') {
+            res.json({
+                success: true,
+                data: {
+                    lastSyncAt: null,
+                    database: { products: 0, groups: 0, subGroups: 0, users: 0, branches: 0 },
+                    sync: {
+                        transactions: { pending: 0, synced: 0, failed: 0 },
+                        cashRegisters: { pending: 0, synced: 0 },
+                        totalPending: 0,
+                    },
+                    config: { deployMode: 'server', syncIntervalMs: 0 },
+                    isOnline: true,
+                },
+            });
+            return;
+        }
         const isOnline = await checkCloudConnection();
         const status = await getSyncStatus();
         res.json({ 

@@ -6,6 +6,19 @@ import { getLastSuccessfulSync } from './sync-worker';
  * Obtiene el estado de sincronización actual.
  */
 export async function getSyncStatus() {
+    // En server mode no existe SQLite local: el estado de sync no aplica.
+    if (DEPLOY_MODE === 'server') {
+        return {
+            lastSyncAt: null,
+            database: { products: 0, groups: 0, subGroups: 0, users: 0, branches: 0 },
+            sync: {
+                transactions: { pending: 0, synced: 0, failed: 0 },
+                cashRegisters: { pending: 0, synced: 0 },
+                totalPending: 0,
+            },
+            config: { deployMode: DEPLOY_MODE, syncIntervalMs: 15 * 60_000 },
+        };
+    }
     const localPrisma = getLocalPrisma();
 
     const [

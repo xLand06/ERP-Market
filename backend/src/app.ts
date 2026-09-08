@@ -46,8 +46,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // ─── BACKGROUND WORKERS ────────────────────────────────────────────────────────
-// Sync worker para sistema híbrido SQLite + Supabase (15 min)
-startSyncWorker(900000);
+// El sync worker es exclusivo de dispositivos (SQLite local + nube). En
+// DEPLOY_MODE=server el backend ES la nube: no hay nada que sincronizar y la
+// base local no existe, así que el worker no debe arrancar.
+if (DEPLOY_MODE !== 'server') {
+    startSyncWorker(900000);
+}
 
 // Automation worker para apertura/cierre de cajas (60 seg)
 startCashRegisterAutomation(60000);
