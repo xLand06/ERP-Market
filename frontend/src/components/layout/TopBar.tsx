@@ -97,7 +97,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     ];
 
     return (
-        <header className="pt-safe h-14 lg:h-16 bg-white border-b border-slate-200 flex items-center justify-between px-3 lg:px-6 gap-3 transition-all duration-300 shadow-2xs relative z-30 min-w-0">
+        <header className="pt-safe h-14 lg:h-16 bg-white border-b border-slate-200 flex items-center justify-between px-2 sm:px-3 lg:px-6 gap-2 sm:gap-3 transition-all duration-300 shadow-2xs relative z-30 min-w-0">
             {/* Left – Sidebar Toggle */}
             <div className="flex items-center gap-2 shrink-0">
                 <button 
@@ -160,7 +160,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                 <div className="relative lg:hidden">
                     <button
                         onClick={() => setRatePopoverOpen(!ratePopoverOpen)}
-                        className="flex items-center gap-1 px-2 py-1 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-all active:scale-95"
+                        className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-1 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-all active:scale-95"
                         title="Ver tasas de cambio"
                     >
                         <ArrowLeftRight className="w-3.5 h-3.5 text-indigo-600" />
@@ -207,7 +207,9 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
 
             {/* Right – BranchSelector + Shortcuts + Profile */}
             <div className="flex items-center gap-1 sm:gap-2 lg:gap-3 shrink-0">
-                <CloudSyncWidget />
+                <div className="hidden sm:block">
+                    <CloudSyncWidget />
+                </div>
                 <BranchSelector />
 
                 <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-100/80 p-0.5 sm:p-1 rounded-xl border border-slate-200/50">
@@ -215,10 +217,10 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                     <div className="relative">
                         <button 
                             onClick={() => setThemePopoverOpen(!themePopoverOpen)}
-                            className="w-7 h-7 sm:w-8 sm:h-8 lg:w-9 lg:h-9 flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 cursor-pointer"
+                            className="w-6 h-6 sm:w-8 sm:h-8 lg:w-9 lg:h-9 flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 cursor-pointer"
                             title="Cambiar Tema de Interfaz"
                         >
-                            <Palette className="w-4 h-4" />
+                            <Palette className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </button>
 
                         {themePopoverOpen && (
@@ -263,16 +265,16 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
 
                     <button 
                         onClick={() => setShortcutsOpen(true)}
-                        className="hidden sm:flex w-7 h-7 sm:w-8 sm:h-8 lg:w-9 lg:h-9 items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95" 
+                        className="hidden sm:flex w-8 h-8 lg:w-9 lg:h-9 items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95" 
                         title="Atajos de teclado (K)"
                     >
                         <Keyboard className="w-4 h-4" />
                     </button>
                     <button 
-                        className="relative w-7 h-7 sm:w-8 sm:h-8 lg:w-9 lg:h-9 flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95"
+                        className="relative w-6 h-6 sm:w-8 sm:h-8 lg:w-9 lg:h-9 flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95"
                         aria-label="Notificaciones"
                     >
-                        <Bell className="w-4 h-4" />
+                        <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full border border-white" />
                     </button>
                 </div>
@@ -282,7 +284,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                         onClick={() => setProfileOpen(!profileOpen)}
                         className="flex items-center gap-1.5 py-1 px-1 sm:px-2 rounded-xl hover:bg-slate-100 transition-all active:scale-95"
                     >
-                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-xs shrink-0">
+                        <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-xs shrink-0">
                             <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-700 dark:text-slate-200" />
                         </div>
                         <div className="hidden lg:block text-left">
