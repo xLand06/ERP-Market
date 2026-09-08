@@ -126,7 +126,7 @@ export const ReportZModal: React.FC<ReportZModalProps> = ({
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && handleResetAndClose()}>
-            <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] p-0 bg-slate-50 dark:bg-slate-900 backdrop-blur-xl rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col">
+            <DialogContent className="w-[calc(100vw-1.5rem)] sm:w-[95vw] max-w-4xl max-h-[90vh] p-0 bg-slate-50 dark:bg-slate-900 backdrop-blur-xl rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col">
                 {step === 'confirm' ? (
                     <>
                         <div className="pl-6 pr-14 py-4 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-4 shrink-0">
@@ -147,7 +147,7 @@ export const ReportZModal: React.FC<ReportZModalProps> = ({
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Left Column: Confirmation Details & Totals */}
                             <div className="space-y-4 text-xs">
                                 <div className="p-4 bg-rose-50/80 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-2xl space-y-2 text-rose-900 dark:text-rose-200 shadow-2xs">
@@ -268,7 +268,7 @@ export const ReportZModal: React.FC<ReportZModalProps> = ({
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Left Column: Physical Counts & Inputs */}
                             <div className="space-y-4">
                                 <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
@@ -276,7 +276,7 @@ export const ReportZModal: React.FC<ReportZModalProps> = ({
                                 </span>
 
                                 {/* Balance Cards */}
-                                <div className="grid grid-cols-3 gap-3">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                     <div className="bg-white dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
                                         <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mb-0.5">APERTURA</p>
                                         <p className="text-sm font-black tabular-nums text-slate-800 dark:text-slate-200">{fmtCOP(openingBalance)}</p>

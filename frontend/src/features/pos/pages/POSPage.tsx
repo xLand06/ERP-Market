@@ -352,10 +352,10 @@ export default function POSPage() {
 
                 <Dialog open={openCashOpen} onOpenChange={(o) => !o && setOpenCashOpen(false)}>
                     <DialogContent className="max-w-md p-0 overflow-hidden border-none shadow-2xl bg-slate-50/50">
-                        <div className="bg-white p-8 space-y-6">
+                        <div className="bg-white p-4 sm:p-8 space-y-6 overflow-y-auto">
                             <DialogHeader className="text-left">
-                                <DialogTitle className="text-xl font-bold text-slate-800">Abrir Turno de Caja</DialogTitle>
-                                <DialogDescription className="text-slate-500 text-sm mt-1">
+                                <DialogTitle className="text-base sm:text-xl font-bold text-slate-800">Abrir Turno de Caja</DialogTitle>
+                                <DialogDescription className="text-slate-500 text-xs sm:text-sm mt-1">
                                     Ingresa el monto de apertura (efectivo físico en caja) para iniciar.
                                 </DialogDescription>
                             </DialogHeader>
@@ -365,30 +365,30 @@ export default function POSPage() {
                                     { id: 'usd', label: 'USD', symbol: '$', val: openUsdVal, set: setOpenUsdVal, step: '0.01' },
                                     { id: 'ves', label: 'VES', symbol: 'Bs.', val: openVesVal, set: setOpenVesVal, step: '0.01' },
                                 ] as const).map((f) => (
-                                    <div key={f.id} className="flex items-center gap-3">
-                                        <span className="w-16 font-bold text-slate-600 text-sm shrink-0">{f.label}</span>
-                                        <div className="relative flex-1">
+                                    <div key={f.id} className="flex items-center gap-2 sm:gap-3">
+                                        <span className="w-12 sm:w-16 font-bold text-slate-600 text-xs sm:text-sm shrink-0">{f.label}</span>
+                                        <div className="relative flex-1 min-w-0">
                                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">{f.symbol}</span>
                                             <input type="number" step={f.step} min="0" value={f.val}
                                                 onChange={e => f.set(e.target.value)}
-                                                className="w-full text-right h-11 pl-10 pr-4 rounded-lg border border-slate-200 bg-white font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm" />
+                                                className="w-full text-right h-11 pl-9 sm:pl-10 pr-3 sm:pr-4 rounded-lg border border-slate-200 bg-white font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm" />
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                            <div className="p-4 bg-slate-900 rounded-xl text-white">
+                            <div className="p-3 sm:p-4 bg-slate-900 rounded-xl text-white">
                                 <div className="flex justify-between items-center mb-1">
-                                    <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Total Estimado (COP)</span>
+                                    <span className="text-[10px] sm:text-xs text-slate-400 font-medium uppercase tracking-wider">Total Estimado (COP)</span>
                                     <Badge variant="outline" className="text-[9px] border-slate-700 text-slate-500 uppercase">Base</Badge>
                                 </div>
-                                <p className="text-2xl font-black tabular-nums">
+                                <p className="text-lg sm:text-2xl font-black tabular-nums">
                                     {fmtCOP((parseFloat(openCopVal) || 0) + ((parseFloat(openUsdVal) || 0) * usdRate) + ((parseFloat(openVesVal) || 0) * vesRate))}
                                 </p>
                             </div>
-                            <div className="flex gap-3 pt-2">
-                                <Button variant="ghost" className="flex-1 h-11 rounded-lg font-bold text-slate-500"
+                            <div className="flex gap-2 sm:gap-3 pt-2">
+                                <Button variant="ghost" className="flex-1 h-11 rounded-lg font-bold text-slate-500 text-xs sm:text-sm"
                                     onClick={() => setOpenCashOpen(false)}>Cancelar</Button>
-                                <Button className="flex-[2] h-11 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md shadow-emerald-100"
+                                <Button className="flex-[2] h-11 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md shadow-emerald-100 text-xs sm:text-sm"
                                     disabled={openMutation.isPending}
                                     onClick={() => {
                                         const cop = parseFloat(openCopVal) || 0;

@@ -98,7 +98,7 @@ function PriceField({
                             onChange(val === '' ? '' : Math.max(0, Math.round(Number(val))));
                         }
                     }}
-                    className={`w-full pl-14 pr-4 py-2.5 border rounded-xl focus:ring-2 outline-none text-sm font-bold tabular-nums ${colorClass}`}
+                    className={`w-full pl-10 sm:pl-14 pr-3 sm:pr-4 py-2.5 border rounded-xl focus:ring-2 outline-none text-sm font-bold tabular-nums ${colorClass}`}
                     required={required}
                     placeholder="0"
                 />
@@ -349,7 +349,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="flex-1 overflow-y-auto">
-                    <div className="px-6 py-5 space-y-5">
+                    <div className="px-4 sm:px-6 py-5 space-y-5">
                         {/* Nombre y categoría */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="md:col-span-2">
@@ -541,9 +541,9 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                             : 'border-slate-200 focus:border-indigo-300 focus:ring-indigo-200';
 
                                         return (
-                                            <div key={idx} className="grid grid-cols-12 gap-2 items-start">
+                                            <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
                                                 {/* Code input */}
-                                                <div className="col-span-6">
+                                                <div className="sm:col-span-6">
                                                     <input
                                                         type="text"
                                                         value={b.code}
@@ -573,7 +573,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                 </div>
 
                                                 {/* Label select */}
-                                                <div className="col-span-5">
+                                                <div className="sm:col-span-5">
                                                     <select
                                                         value={b.label || ''}
                                                         onChange={(e) => handleLabelChange(idx, e.target.value)}
@@ -601,7 +601,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                     )}
                                                 </div>
 
-                                                <div className="col-span-1 flex justify-center pt-2">
+                                                <div className="sm:col-span-1 flex justify-center pt-2">
                                                     <button
                                                         type="button"
                                                         onClick={() => removeBarcode(idx)}
@@ -642,8 +642,8 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                 <div className="space-y-3">
                                     {presentations.map((p, idx) => (
                                         <div key={idx} className="p-3 bg-white border border-slate-200 rounded-xl shadow-sm relative group hover:border-indigo-200 transition-all">
-                                            <div className="grid grid-cols-12 gap-2 mb-2">
-                                                <div className="col-span-5">
+                                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 mb-2">
+                                                <div className="sm:col-span-5">
                                                     <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Nombre</label>
                                                     <input
                                                         type="text"
@@ -654,7 +654,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                         required
                                                     />
                                                 </div>
-                                                <div className="col-span-2">
+                                                <div className="sm:col-span-2">
                                                     <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Multiplic.</label>
                                                     <input
                                                         type="number"
@@ -666,7 +666,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                         required
                                                     />
                                                 </div>
-                                                <div className="col-span-4">
+                                                <div className="sm:col-span-4">
                                                     <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Barras (opcional)</label>
                                                     <input
                                                         type="text"
@@ -676,7 +676,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                         placeholder="Código de barras"
                                                     />
                                                 </div>
-                                                <div className="col-span-1 flex items-end justify-center">
+                                                <div className="sm:col-span-1 flex items-end justify-center">
                                                     <button
                                                         type="button"
                                                         onClick={() => removePresentation(idx)}
@@ -722,7 +722,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                     </div>
 
                     {/* Footer */}
-                    <div className="flex gap-3 px-6 py-4 border-t border-slate-100 sticky bottom-0 bg-white">
+                    <div className="flex gap-3 px-4 sm:px-6 py-4 border-t border-slate-100 sticky bottom-0 bg-white">
                         <button
                             type="button"
                             onClick={onClose}

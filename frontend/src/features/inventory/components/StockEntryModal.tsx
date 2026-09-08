@@ -227,7 +227,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-5">
                     {/* Currency + Rate */}
                     <div className="bg-indigo-50 rounded-xl p-4 space-y-3">
                         <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Moneda de Compra</p>
@@ -326,7 +326,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                             {items.map((item, idx) => (
                                 <div key={item.productId} className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
                                     {/* Main row */}
-                                    <div className="grid grid-cols-[1fr_100px_130px_auto_32px] gap-2 items-center px-3 py-2.5">
+                                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_100px_130px_auto_32px] gap-2 items-center px-3 py-2.5">
                                         <div className="min-w-0">
                                             <p className="text-sm font-semibold text-slate-800 truncate">{item.productName}</p>
                                             <p className="text-[10px] text-slate-400">

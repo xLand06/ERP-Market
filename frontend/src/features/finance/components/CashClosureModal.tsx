@@ -140,9 +140,9 @@ export function CashClosureModal({
                             </DialogDescription>
                         </DialogHeader>
 
-                <div className="px-6 py-4 space-y-5">
+                <div className="px-4 sm:px-6 py-4 space-y-5">
                     {/* Summary Grid */}
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {[
                             { label: 'Apertura', value: openingBalance, color: 'text-slate-700' },
                             { label: 'Esperado', value: expectedBalance, color: 'text-blue-700' },

@@ -108,7 +108,7 @@ export function CashRegisterDetailModal({ id, open, onClose, onSaleClick }: Prop
 
     return (
         <Dialog open={open} onOpenChange={o => !o && onClose()}>
-            <DialogContent className="sm:max-w-5xl lg:max-w-6xl max-h-[90vh] overflow-y-auto custom-scrollbar p-8 sm:p-10">
+            <DialogContent className="sm:max-w-5xl lg:max-w-6xl max-h-[90vh] overflow-y-auto custom-scrollbar p-4 sm:p-8 lg:p-10">
                 <DialogHeader className="pb-4 border-b border-slate-100 mb-6">
                     <DialogTitle className="text-xl font-bold flex items-center gap-2">
                         <DatabaseIcon /> Detalle del Turno de Caja

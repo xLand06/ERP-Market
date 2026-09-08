@@ -80,7 +80,7 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
                     {!selectedProduct ? (
                         <div className="space-y-4">
                             <div>
@@ -205,7 +205,7 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
                     )}
                 </div>
 
-                <div className="p-6 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl flex gap-3 shrink-0">
+                <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl flex gap-3 shrink-0">
                     <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
                         Cancelar
                     </Button>

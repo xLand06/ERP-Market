@@ -45,7 +45,7 @@ export const ReportXModal: React.FC<ReportXModalProps> = ({ open, onClose, regis
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] p-0 bg-slate-50 dark:bg-slate-900 backdrop-blur-xl rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col">
+            <DialogContent className="w-[calc(100vw-1.5rem)] sm:w-[95vw] max-w-4xl max-h-[90vh] p-0 bg-slate-50 dark:bg-slate-900 backdrop-blur-xl rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col">
                 <div className="pl-6 pr-14 py-4 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-4 shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center border border-indigo-100 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 shrink-0">
@@ -78,7 +78,7 @@ export const ReportXModal: React.FC<ReportXModalProps> = ({ open, onClose, regis
                         <Button variant="outline" onClick={() => refetch()}>Reintentar</Button>
                     </div>
                 ) : (
-                    <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Left Column: Ticket Live Preview */}
                         <div className="space-y-2">
                             <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
@@ -96,7 +96,7 @@ export const ReportXModal: React.FC<ReportXModalProps> = ({ open, onClose, regis
                             </span>
 
                             {/* Status bar */}
-                            <div className="grid grid-cols-3 gap-3 bg-white dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs shadow-2xs">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-white dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs shadow-2xs">
                                 <div>
                                     <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase block">CAJERO</span>
                                     <span className="font-bold text-slate-800 dark:text-slate-200 truncate block">{report.user?.nombre || report.user?.username || 'SISTEMA'}</span>

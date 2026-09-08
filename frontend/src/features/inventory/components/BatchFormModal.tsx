@@ -134,7 +134,7 @@ export function BatchFormModal({ open, onClose, onSave, mode, initialData, isSav
     return (
         <Dialog open={open} onOpenChange={open => !open && handleClose()}>
             <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-2xl border border-slate-100 shadow-xl">
-                <DialogHeader className="p-6 bg-gradient-to-r from-slate-50/80 via-blue-50/20 to-indigo-50/40 border-b border-slate-100 animate-in fade-in duration-300">
+                <DialogHeader className="p-4 sm:p-6 bg-gradient-to-r from-slate-50/80 via-blue-50/20 to-indigo-50/40 border-b border-slate-100 animate-in fade-in duration-300">
                     <DialogTitle className="flex items-center gap-3 text-slate-800 text-lg font-black tracking-tight">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center border border-blue-400/20 shadow-md shadow-blue-500/15">
                             <Package className="w-5 h-5 text-white" />
@@ -146,7 +146,7 @@ export function BatchFormModal({ open, onClose, onSave, mode, initialData, isSav
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="p-6 space-y-4">
+                <div className="p-4 sm:p-6 space-y-4">
                     {/* Producto — solo al crear */}
                     {mode === 'create' ? (
                         <div ref={searchContainerRef} className="flex flex-col gap-1.5 relative">
@@ -395,7 +395,7 @@ export function BatchFormModal({ open, onClose, onSave, mode, initialData, isSav
                     </div>
                 </div>
 
-                <DialogFooter className="p-6 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl flex gap-3 justify-end shrink-0">
+                <DialogFooter className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl flex gap-3 justify-end shrink-0">
                     <Button 
                         type="button"
                         variant="outline" 

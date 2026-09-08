@@ -36,8 +36,8 @@ export function BarcodeLabelPrinter({ open, onClose, product }: BarcodeLabelPrin
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <DialogContent className="sm:max-w-xl p-0 overflow-hidden">
+                <div className="p-4 sm:p-6 space-y-5">
                     <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold">
@@ -92,7 +92,7 @@ export function BarcodeLabelPrinter({ open, onClose, product }: BarcodeLabelPrin
                             <div className={cn(
                                 "bg-white text-slate-900 p-3 rounded-xl border-2 border-slate-900 shadow-md font-sans flex flex-col justify-between select-none text-center",
                                 labelSize === 'standard' && "w-[200px] h-[120px]",
-                                labelSize === 'gondola' && "w-[280px] h-[150px]",
+                                labelSize === 'gondola' && "w-full max-w-[280px] h-[150px]",
                                 labelSize === 'small' && "w-[160px] h-[95px]"
                             )}>
                                 <div>
@@ -133,7 +133,7 @@ export function BarcodeLabelPrinter({ open, onClose, product }: BarcodeLabelPrin
                         </Button>
                     </div>
                 </div>
-            </div>
+            </DialogContent>
         </Dialog>
     );
 }
