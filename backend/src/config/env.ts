@@ -22,7 +22,23 @@ if (rawJwtSecret === 'changeme' && process.env.NODE_ENV === 'production') {
     );
 }
 
+export type DeployMode = 'server' | 'desktop' | 'mobile';
+
+// Resolución de DEPLOY_MODE:
+//   1. Valor explícito de DEPLOY_MODE gana (server | desktop | mobile)
+//   2. ELECTRON=true sin valor explícito → desktop (retrocompatibilidad desktop)
+//   3. Sin valor y sin Electron → server (el VPS es el caso común)
+const rawDeployMode = process.env.DEPLOY_MODE?.toLowerCase();
+const isElectronEnv = process.env.ELECTRON === 'true';
+export const DEPLOY_MODE: DeployMode =
+    rawDeployMode === 'server' || rawDeployMode === 'desktop' || rawDeployMode === 'mobile'
+        ? rawDeployMode
+        : isElectronEnv
+            ? 'desktop'
+            : 'server';
+
 export const env = {
+    DEPLOY_MODE,
     PORT: process.env.PORT || '3000',
     DATABASE_URL: process.env.DATABASE_URL || '',
     DIRECT_URL: process.env.DIRECT_URL || '',
