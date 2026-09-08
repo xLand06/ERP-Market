@@ -313,9 +313,12 @@ async function main() {
     console.log('✅ Usuarios');
 
     // =======================
-    // 4. CATEGORÍAS
+    // 4. GRUPOS Y SUBGRUPOS
     // =======================
-    const categoryMap: Record<string, string> = {};
+    // El schema actual usa Group/SubGroup (antes Category). Se crea un grupo
+    // por categoría del catálogo y un subgrupo "General" dentro de cada uno,
+    // espejando el patrón del seed local (seed.local.ts).
+    const subGroupMap: Record<string, string> = {};
     const categoriesData = [
         { name: 'Bebidas', description: 'Bebidas frías y calientes' },
         { name: 'Abarrotes', description: 'Artículos de cocina y despensa' },
@@ -325,15 +328,20 @@ async function main() {
     ];
 
     for (const cat of categoriesData) {
-        const existing = await prisma.category.findUnique({ where: { name: cat.name } });
-        if (existing) {
-            categoryMap[cat.name] = existing.id;
-        } else {
-            const created = await prisma.category.create({ data: cat });
-            categoryMap[cat.name] = created.id;
-        }
+        const group = await prisma.group.upsert({
+            where: { name: cat.name },
+            update: { description: cat.description },
+            create: { name: cat.name, description: cat.description },
+        });
+
+        const subGroup = await prisma.subGroup.upsert({
+            where: { name_groupId: { name: 'General', groupId: group.id } },
+            update: {},
+            create: { name: 'General', groupId: group.id, description: cat.description },
+        });
+        subGroupMap[cat.name] = subGroup.id;
     }
-    console.log('✅ Categorías');
+    console.log('✅ Grupos y subgrupos');
 
     // =======================
     // 5. PRODUCTOS CON PRESENTACIONES
@@ -342,7 +350,7 @@ async function main() {
     let presCount = 0;
 
     for (const p of PRODUCTS) {
-        const categoryId = categoryMap[p.categoryName];
+        const subGroupId = subGroupMap[p.categoryName];
 
         let product = await prisma.product.findUnique({ where: { barcode: p.barcode } });
         if (!product) {
@@ -352,7 +360,7 @@ async function main() {
                     barcode: p.barcode,
                     price: p.price,
                     cost: p.cost,
-                    categoryId,
+                    subGroupId,
                 },
             });
         } else {
@@ -365,7 +373,7 @@ async function main() {
 
         // Crear presentaciones
         for (const pres of p.presentations) {
-            const calculatedPrice = product.price! * pres.multiplier * (1 - pres.discountPercent / 100);
+            const calculatedPrice = Number(product.price) * pres.multiplier * (1 - pres.discountPercent / 100);
 
             const existingPres = await prisma.productPresentation.findUnique({ where: { barcode: pres.barcode } });
             if (!existingPres) {
@@ -436,12 +444,12 @@ async function main() {
     // =======================
     const totalProducts = await prisma.product.count();
     const totalPres = await prisma.productPresentation.count();
-    const catCount = await prisma.category.count();
+    const catCount = await prisma.group.count();
 
     console.log('\n═══════════════════════════════════════');
     console.log('📊 RESUMEN DEL SEED');
     console.log('═══════════════════════════════════════');
-    console.log(`   📂 Categorías:    ${catCount}`);
+    console.log(`   📂 Grupos:       ${catCount}`);
     console.log(`   📦 Productos:     ${totalProducts}`);
     console.log(`   🏷️ Presentaciones: ${totalPres}`);
     console.log(`   🏪 Sedes:        2`);
