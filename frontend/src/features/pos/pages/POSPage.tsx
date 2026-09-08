@@ -36,6 +36,7 @@ export default function POSPage() {
     const [activeProductForPres, setActiveProductForPres] = useState<Product | null>(null);
     const [stockEntryOpen, setStockEntryOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [mobileTab, setMobileTab] = useState<'catalog' | 'cart'>('catalog');
     const [summary, setSummary] = useState<{
         visible: boolean;
         customerName?: string;
@@ -404,9 +405,6 @@ export default function POSPage() {
             </div>
         );
     }
-
-    // Estado para vista móvil/tablet (Catálogo vs Ticket)
-    const [mobileTab, setMobileTab] = useState<'catalog' | 'cart'>('catalog');
 
     // ── Main POS Layout ──────────────────────────────────────────────
     return (
