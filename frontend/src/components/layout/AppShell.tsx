@@ -131,7 +131,7 @@ export function AppShellLayout() {
                     <TopBar onToggleSidebar={() => setCollapsed(!collapsed)} collapsed={collapsed} />
                 </div>
 
-                <main className="flex-1 overflow-y-auto mt-14 lg:mt-16 p-2 sm:p-4 lg:p-6 xl:p-8 pb-20 sm:pb-24 lg:pb-6">
+                <main className="flex-1 overflow-y-auto mt-14 lg:mt-16 p-2 sm:p-4 lg:p-6 xl:p-8 pb-20 lg:pb-6">
                     <Outlet />
                 </main>
 

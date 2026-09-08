@@ -380,7 +380,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                                             }}
                                             title={item.hasBatch ? 'Quitar lote' : 'Agregar lote y vencimiento'}
                                             className={cn(
-                                                'h-9 px-2.5 rounded-lg border text-xs font-bold flex items-center gap-1 transition-all whitespace-nowrap',
+                                                'touch-target h-9 px-2.5 rounded-lg border text-xs font-bold flex items-center gap-1 transition-all whitespace-nowrap',
                                                 item.hasBatch
                                                     ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
                                                     : 'bg-white text-slate-400 border-slate-200 hover:border-amber-400 hover:text-amber-600'
@@ -391,7 +391,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                                         </button>
                                         <button
                                             onClick={() => removeItem(idx)}
-                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                            className="touch-target w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </button>

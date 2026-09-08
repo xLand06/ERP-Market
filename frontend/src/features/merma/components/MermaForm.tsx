@@ -259,7 +259,7 @@ export function MermaForm({ open, onOpenChange }: MermaFormProps) {
                                     <button
                                         type="button"
                                         onClick={clearProduct}
-                                        className="p-1.5 hover:bg-slate-200/60 rounded-lg text-slate-400 hover:text-slate-600 transition-colors shrink-0"
+                                        className="touch-target p-1.5 hover:bg-slate-200/60 rounded-lg text-slate-400 hover:text-slate-600 transition-colors shrink-0"
                                         aria-label="Cambiar producto"
                                     >
                                         <X className="w-4 h-4" />

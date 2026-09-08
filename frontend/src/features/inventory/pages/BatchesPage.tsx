@@ -205,9 +205,9 @@ export default function BatchesPage() {
                                     <tr>
                                         <th>Producto</th>
                                         <th>Código de Lote</th>
-                                        <th>Vencimiento</th>
+                                        <th className="hidden md:table-cell">Vencimiento</th>
                                         <th className="text-right">Cantidad</th>
-                                        <th className="text-right">Costo</th>
+                                        <th className="hidden md:table-cell text-right">Costo</th>
                                         <th>Estado</th>
                                         {isOwner && <th className="w-24">Acc.</th>}
                                     </tr>
@@ -228,13 +228,13 @@ export default function BatchesPage() {
                                                         {batch.batchCode}
                                                     </span>
                                                 </td>
-                                                <td className="text-sm tabular-nums text-slate-600 whitespace-nowrap">
+                                                <td className="hidden md:table-cell text-sm tabular-nums text-slate-600 whitespace-nowrap">
                                                     {formatDate(batch.expiryDate)}
                                                 </td>
                                                 <td className="text-right text-sm tabular-nums font-medium text-slate-800">
                                                     {batch.quantity}
                                                 </td>
-                                                <td className="text-right text-sm tabular-nums text-slate-600">
+                                                <td className="hidden md:table-cell text-right text-sm tabular-nums text-slate-600">
                                                     {batch.costPrice ? formatCurrency(batch.costPrice) : '—'}
                                                 </td>
                                                 <td>
