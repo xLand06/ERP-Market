@@ -1,7 +1,16 @@
 # =============================================================================
 # ERP-Market backend — production image for the multi-tenant deployment kit.
 #
-# Multi-stage build on Debian bookworm (NOT alpine):
+# BUILT FROM THE REPO ROOT (build context = <repo>, `docker compose up -d
+# --build` inside a rendered deploy/clients/<slug>/ directory). This image now
+# builds the web frontend itself in a multi-stage build:
+#
+#   - web-build : pnpm install (frontend workspace only) + `vite build` -> a
+#                 FRESH frontend bundle from source (no pre-built commit).
+#   - build     : backend deps + Prisma generate + tsc (the old single stage).
+#   - runtime   : slim, prisma-cli-enabled server that serves the fresh bundle.
+#
+# All three stages run on Debian bookworm (NOT alpine):
 #   - @prisma/adapter-pg, @libsql/client and better-sqlite3 ship prebuilt
 #     glibc binaries; musl (alpine) makes them painful.
 #   - Prisma engines are published for debian-openssl-3.0.x (bookworm).
@@ -15,7 +24,35 @@
 # migration tooling per client.
 # =============================================================================
 
-# ── Stage 1: dependencies + build ─────────────────────────────────────────────
+# ── Stage 1: web frontend build ──────────────────────────────────────────────
+FROM node:20-bookworm-slim AS web-build
+
+WORKDIR /repo
+
+# Enable pnpm. Corepack ships with the node image; if that ever proves
+# unreliable, fall back to `npm i -g pnpm`.
+# pnpm@10 is pinned for stability — it reads lockfileVersion 9.0 natively.
+RUN corepack enable \
+    && corepack prepare pnpm@10 --activate
+
+# Copy workspace manifests first (for Docker layer caching: deps change less
+# often than source). The .dockerignore at the repo root strips node_modules,
+# dist, secrets and rendered client stacks from the context before this COPY.
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY frontend/package.json ./frontend/
+
+# Install ONLY the frontend workspace. No python/g++ needed for vite; pnpm
+# still downloads esbuild's prebuilt binary on install.
+RUN pnpm install --frozen-lockfile --filter './frontend'
+
+# Now copy the full frontend source and build. The vite.config.ts has no
+# outDir override, so the bundle lands in frontend/dist by default. This is
+# a FROM-SOURCE build — cache layers are keyed to the actual source, so every
+# UI change is rebuilt.
+COPY frontend/ ./frontend/
+RUN pnpm --filter './frontend' build
+
+# ── Stage 2: backend dependencies + build ────────────────────────────────────
 FROM node:20-bookworm-slim AS build
 
 # Native build toolchain as insurance for prebuilt-binary fallbacks.
@@ -26,12 +63,16 @@ RUN apt-get update \
 
 WORKDIR /app
 
+# In the old single-stage layout the build context WAS backend/, so `COPY . .`
+# copied the backend. With the repo root as context we must copy backend/ into
+# the (root-mounted) working tree explicitly. Manifests first for layer caching.
+COPY backend/package.json backend/prisma.config.ts ./
+COPY backend/ ./
+
 # backend/ has no package-lock.json (the repo manages deps with pnpm through
 # the root workspace), so a plain `npm install` is the correct install.
 # node_modules, dist, .env, local DB files and scratch dirs are excluded by
-# backend/.dockerignore.
-COPY . .
-
+# the root .dockerignore.
 # --ignore-scripts is REQUIRED: backend/package.json postinstall runs
 # `pnpm run db:setup:local`, and pnpm is not installed in this image.
 # The Prisma generates below are run explicitly and download the engines.
@@ -50,7 +91,7 @@ RUN npx prisma generate \
 # Compile TypeScript -> dist/ (tsconfig outDir = ./dist, rootDir = ./src)
 RUN npm run build
 
-# ── Stage 2: slim runtime ────────────────────────────────────────────────────
+# ── Stage 3: slim runtime ────────────────────────────────────────────────────
 FROM node:20-bookworm-slim AS runtime
 
 ENV NODE_ENV=production
@@ -64,7 +105,9 @@ COPY --from=build --chown=node:node /app/package.json /app/prisma.config.ts ./
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/prisma ./prisma
 COPY --from=build --chown=node:node /app/dist ./dist
-COPY --from=build --chown=node:node /app/public ./public
+# The API serves the web UI from path.join(__dirname, '../public') — same
+# location as before, but now FROM the fresh bundle built by web-build.
+COPY --from=web-build --chown=node:node /repo/frontend/dist ./public
 
 # The image ships an unprivileged `node` user (uid 1000). /app must be
 # node-owned: when a fresh named volume is mounted at /app, Docker copies the

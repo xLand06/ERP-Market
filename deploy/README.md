@@ -80,8 +80,9 @@ deploy/
    ./deploy/scripts/add-client.sh test
    ```
 
-   The script builds the API image (npm install + Prisma generate + tsc —
-   takes a few minutes the first time), starts `db-test` + `api-test`, writes
+   The script builds the API image (pnpm install + vite build for the web
+   frontend, plus npm install + Prisma generate + tsc for the API — takes a
+   few minutes the first time), starts `db-test` + `api-test`, writes
    the Caddy site, reloads the proxy and verifies
    `https://test.<vps-ip>.sslip.io/api/health` returns 200.
 

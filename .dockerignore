@@ -1,0 +1,49 @@
+# -----------------------------------------------------------------------------
+# Root build-context hygiene.
+#
+# The multi-tenant deploy images build with the REPO ROOT as the build context
+# (see backend/Dockerfile). This file keeps that context small and — critically
+# — keeps secrets, local databases and rendered client stacks OUT of the image.
+# -----------------------------------------------------------------------------
+
+# VCS
+.git
+
+# Dependencies (resolved inside the image)
+**/node_modules
+
+# Secrets and local env (keep .env.example)
+**/.env
+**/.env.*
+!.env.example
+
+# Local databases (desktop/offline artifacts)
+**/*.db
+**/*.db-*
+
+# Rendered per-client deploy stacks + backups (never baked in)
+deploy/clients
+deploy/backups
+
+# Docs / planning artifacts
+openspec
+.atl
+docs
+
+# Extraneous local files
+err.txt
+*.zip
+
+# Frontend build/deps output — a stale local build must NEVER shadow the fresh
+# bundle the web-build stage produces. frontend/ src itself is still copied.
+frontend/dist
+frontend/android
+
+# Backend local artifacts (desktop/offline databases, scratch output)
+backend/dist
+backend/temp-backend
+backend/backups
+backend/scratch
+
+# Desktop (electron) residuals
+desktop/node_modules
