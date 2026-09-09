@@ -135,11 +135,18 @@ app.get('/api/health', async (_req, res) => {
         dbResponseTime = -1;
     }
 
+    const mem = process.memoryUsage();
     res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
         service: 'ERP-MARKET API',
         deployMode: DEPLOY_MODE,
+        uptime: `${Math.floor(process.uptime())}s`,
+        memory: {
+            heapUsed: `${Math.round(mem.heapUsed / 1024 / 1024)}MB`,
+            heapTotal: `${Math.round(mem.heapTotal / 1024 / 1024)}MB`,
+            rss: `${Math.round(mem.rss / 1024 / 1024)}MB`,
+        },
         database: {
             status: dbStatus,
             responseTime: dbResponseTime > 0 ? `${dbResponseTime}ms` : 'N/A'
@@ -217,6 +224,16 @@ app.use('/api/batches',     batchesRouter);
 const frontendDist = path.join(__dirname, '../public');
 app.use(express.static(frontendDist, {
     setHeaders: (res, filePath) => {
+        // Archivos hasheados por Vite (index-ABC123.js) → cache indefinido
+        // porque el hash cambia en cada build
+        if (filePath.includes('/assets/') && /\.[a-f0-9]{8,}\.(js|css)$/.test(filePath)) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+        // Otros assets estáticos (imágenes, fonts) → cache 1 hora
+        else if (/\.(png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot)$/.test(filePath)) {
+            res.setHeader('Cache-Control', 'public, max-age=3600');
+        }
+        // MIME types explícitos
         if (filePath.endsWith('.css')) {
             res.setHeader('Content-Type', 'text/css');
         } else if (filePath.endsWith('.js') || filePath.endsWith('.mjs')) {

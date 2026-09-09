@@ -6,13 +6,39 @@
 import { prisma } from '../../config/prisma';
 import { UpdateExchangeRateInput } from '../../core/validations/finance.zod';
 
+// ── In-memory cache para tasas de cambio ─────────────────────────
+// Las tasas cambian poco (1-2 veces al día). Un cache de 5 min
+// elimina ~95% de las queries a PostgreSQL en uso normal.
+const RATE_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+const rateCache = new Map<string, { data: any; expires: number }>();
+
+function getCachedRates() {
+    const cached = rateCache.get('all');
+    if (cached && Date.now() < cached.expires) return cached.data;
+    return null;
+}
+
+function setCachedRates(data: any) {
+    rateCache.set('all', { data, expires: Date.now() + RATE_CACHE_TTL });
+}
+
+function invalidateRateCache() {
+    rateCache.clear();
+}
+
 /**
- * Obtener todas las tasas de cambio
+ * Obtener todas las tasas de cambio (con cache en memoria)
  */
 export const getExchangeRates = async () => {
-    return prisma.exchangeRate.findMany({
+    const cached = getCachedRates();
+    if (cached) return cached;
+
+    const rates = await prisma.exchangeRate.findMany({
         orderBy: { code: 'asc' },
     });
+
+    setCachedRates(rates);
+    return rates;
 };
 
 /**
@@ -21,11 +47,16 @@ export const getExchangeRates = async () => {
 export const updateExchangeRate = async (data: UpdateExchangeRateInput) => {
     const { code, rate } = data;
     
-    return prisma.exchangeRate.upsert({
+    const result = await prisma.exchangeRate.upsert({
         where: { code },
         update: { rate },
         create: { code, rate },
     });
+
+    // Invalidar cache para que el próximo GET traiga datos frescos
+    invalidateRateCache();
+
+    return result;
 };
 
 /**
@@ -76,6 +107,8 @@ export const syncSelectedRateFromDolarApi = async (provider: string, userId: str
 
     // Actualizar tasa VES en la base de datos
     const updatedRate = await updateExchangeRate({ code: 'VES', rate: rateToApply });
+
+    // updateExchangeRate ya invalida el cache internamente
 
     const { logAudit } = await import('../../core/middlewares/audit.middleware');
     await logAudit({

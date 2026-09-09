@@ -357,6 +357,7 @@ model CashRegister {
   @@index([userId])
   @@index([status])
   @@index([syncStatus])
+  @@index([branchId, status])
   @@map("cash_registers")
 }
 
