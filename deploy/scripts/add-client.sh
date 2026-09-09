@@ -41,6 +41,7 @@ COMPOSE_OP_FILE="$DEPLOY_DIR/docker-compose.yml"
 
 SLUG="${1:-}"
 DOMAIN_ARG="${2:-}"
+ADMIN_EMAIL="${3:-}"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -50,7 +51,7 @@ command -v envsubst >/dev/null 2>&1 || fail "envsubst not found (Debian/Ubuntu: 
 command -v openssl >/dev/null 2>&1 || fail "openssl not found"
 command -v curl >/dev/null 2>&1 || fail "curl not found"
 
-[[ -n "$SLUG" ]] || fail "usage: add-client.sh <slug> [domain]"
+[[ -n "$SLUG" ]] || fail "usage: add-client.sh <slug> [domain] [admin-email]"
 [[ "$SLUG" =~ ^[a-z0-9-]{3,32}$ ]] || fail "slug must be 3-32 chars of lowercase alnum + hyphens: '$SLUG'"
 [[ "$SLUG" != -* && "$SLUG" != *- ]] || fail "slug must not start or end with '-'"
 
@@ -106,6 +107,12 @@ DB_USER="erp"
 DB_PASSWORD="$(openssl rand -hex 24)"
 JWT_SECRET="$(openssl rand -hex 24)"
 
+# ── Admin credentials (temp password for first login) ───────────────────────
+ADMIN_PASSWORD="$(openssl rand -base64 12 | tr -d '=+/' | head -c 16)"
+if [[ -z "$ADMIN_EMAIL" ]]; then
+    ADMIN_EMAIL="admin@${SLUG}.local"
+fi
+
 # ── Cleanup: only while rendering / starting. Once the stack is up, leave it
 #    in place for debugging instead of auto-deleting it.
 cleanup() {
@@ -150,6 +157,8 @@ DB_NAME=$DB_NAME
 DB_USER=$DB_USER
 DB_PASSWORD=$DB_PASSWORD
 JWT_SECRET=$JWT_SECRET
+ADMIN_EMAIL=$ADMIN_EMAIL
+ADMIN_PASSWORD=$ADMIN_PASSWORD
 EOF
     umask 022
 
@@ -227,6 +236,17 @@ echo "api-$SLUG /api/health OK (after ${API_ELAPSED}s)"
 
 echo "smoke check OK — db healthy, /api/health returned 200 (inside stack)"
 
+# ── Seed admin user (idempotent) ────────────────────────────────────────────
+echo "seeding admin user for '$SLUG'..."
+if docker exec "api-$SLUG" sh -c \
+    "ADMIN_EMAIL='$ADMIN_EMAIL' ADMIN_PASSWORD='$ADMIN_PASSWORD' npx ts-node src/scripts/seed-admin.ts" \
+    2>&1; then
+    echo "admin user seeded: $ADMIN_EMAIL"
+else
+    echo "WARNING: admin seed failed (non-fatal — you can re-run manually)" >&2
+    echo "  docker exec api-$SLUG sh -c \"ADMIN_EMAIL='$ADMIN_EMAIL' ADMIN_PASSWORD='$ADMIN_PASSWORD' npx ts-node src/scripts/seed-admin.ts\"" >&2
+fi
+
 # ── Caddy site file (idempotent overwrite) ──────────────────────────────────
 SITE_FILE="$SITES_DIR/$SLUG.caddy"
 cat > "$SITE_FILE" <<EOF
@@ -265,6 +285,10 @@ fi
     printf "│  Slug     : %-58s │\n" "$SLUG"
     printf "│  URL      : %-58s │\n" "$CLIENT_URL"
     printf "│  VPS IP   : %-58s │\n" "${VPS_IP:-custom domain (no sslip.io)}"
+    echo "│                                                                    │"
+    echo "│  Admin credentials (first login):                                │"
+    printf "│  Email    : %-58s │\n" "$ADMIN_EMAIL"
+    printf "│  Password : %-58s │\n" "$ADMIN_PASSWORD"
     echo "│                                                                    │"
     echo "│  Build the Android APK for this client:                           │"
     printf "│    ./deploy/scripts/build-apk.sh %-39s │\n" "$SLUG"
