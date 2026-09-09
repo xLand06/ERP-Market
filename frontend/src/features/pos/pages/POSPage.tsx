@@ -91,7 +91,9 @@ export default function POSPage() {
             }
         },
         enabled: !!effectiveBranch,
-        staleTime: 10_000,
+        staleTime: 30_000,
+        gcTime: 5 * 60_000,
+        retry: 1,
     });
 
     const usdRate = rates['USD'] || rates['COP'] || 3600;
@@ -305,12 +307,52 @@ export default function POSPage() {
         setStockEntryOpen(true);
     };
 
-    // ── Loading State: wait for register + inventory before rendering POS ──
+    // ── Loading State: skeleton that mirrors POS layout ──────────────
     if (registerLoading || (effectiveBranch && isLoading)) {
         return (
-            <div className="flex flex-col items-center justify-center h-full gap-4 pb-20">
-                <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-                <p className="text-sm text-slate-500 font-medium">Cargando datos de la caja...</p>
+            <div className="flex flex-col lg:flex-row gap-4 h-full lg:h-[calc(100dvh-112px)] overflow-hidden pb-16 lg:pb-0">
+                {/* Left panel skeleton */}
+                <div className="flex-[6] flex flex-col gap-3 bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-2xs overflow-hidden">
+                    {/* Mode toggle + search skeleton */}
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                        <Skeleton className="h-8 w-40 rounded-xl" />
+                        <Skeleton className="h-8 w-32 rounded-lg" />
+                    </div>
+                    {/* Product grid skeleton */}
+                    <div className="flex-1 overflow-y-auto min-h-0">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5 sm:gap-3.5 content-start pb-4" aria-hidden="true">
+                            {Array.from({ length: 12 }).map((_, i) => (
+                                <Skeleton key={`pos-sk-${i}`} className="h-[145px] sm:h-[160px] w-full rounded-2xl" />
+                            ))}
+                        </div>
+                    </div>
+                </div>
+                {/* Right panel skeleton (cart) */}
+                <div className="flex-[4] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden h-full min-h-[380px] lg:min-h-0">
+                    <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                        <Skeleton className="h-5 w-24" />
+                        <Skeleton className="h-5 w-8 rounded-full" />
+                    </div>
+                    <div className="flex-1 p-4 space-y-3">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                            <div key={`cart-sk-${i}`} className="flex items-center gap-3">
+                                <Skeleton className="w-10 h-10 rounded-lg shrink-0" />
+                                <div className="flex-1 space-y-2">
+                                    <Skeleton className="h-4 w-3/4" />
+                                    <Skeleton className="h-3 w-1/2" />
+                                </div>
+                                <Skeleton className="h-6 w-16" />
+                            </div>
+                        ))}
+                    </div>
+                    <div className="p-4 border-t border-slate-100 space-y-3">
+                        <div className="flex justify-between">
+                            <Skeleton className="h-4 w-20" />
+                            <Skeleton className="h-5 w-28" />
+                        </div>
+                        <Skeleton className="h-11 w-full rounded-xl" />
+                    </div>
+                </div>
             </div>
         );
     }
