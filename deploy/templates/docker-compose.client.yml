@@ -47,6 +47,21 @@ services:
       - ssl_cert_file=/run/secrets/server.crt
       - -c
       - ssl_key_file=/run/secrets/server.key
+      # ── RAM tuning (CX23 4GB: fit ~20 clients) ────────────────────
+      # shared_buffers=32MB: default 128MB is too much per client × N.
+      # work_mem=4MB: sort/hash ops per connection, keep low.
+      # max_connections=20: backend pool is capped at 5 (DATABASE_URL
+      # connection_limit=5), so 20 leaves headroom for healthchecks.
+      - -c
+      - shared_buffers=32MB
+      - -c
+      - effective_cache_size=96MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=32MB
+      - -c
+      - max_connections=20
     volumes:
       - erp-db-${CLIENT_SLUG}:/var/lib/postgresql/data
       - ./tls:/run/secrets:ro
