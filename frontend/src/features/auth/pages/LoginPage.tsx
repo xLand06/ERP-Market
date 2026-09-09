@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Eye, EyeOff, Lock, User, Loader2, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, Loader2, Cloud, CloudOff, RefreshCw, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLoginForm, useLogin } from '@/features/auth/hooks';
@@ -245,6 +245,16 @@ export default function LoginPage() {
                         Última sincronización: {new Date(lastSync).toLocaleString('es-VE')}
                     </p>
                 )}
+
+                {/* ── APK Download ─────────────────────────────────────────── */}
+                <a
+                    href="/apk/app.apk"
+                    download
+                    className="mt-3 flex items-center justify-center gap-2 text-xs font-medium text-slate-500 hover:text-emerald-400 transition-colors py-2"
+                >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    Descargar APK para Android
+                </a>
 
                 <p className="text-center text-xs text-slate-600 mt-4">
                     ERP-Market v2.0 · Gestión Supermercados

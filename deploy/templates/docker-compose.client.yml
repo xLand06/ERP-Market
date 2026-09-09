@@ -111,6 +111,11 @@ services:
     networks:
       - default
       - erp_proxy
+    # APK download: el cliente puede descargar su APK desde /apk/app.apk
+    # en el login. El directorio se crea en add-client.sh y se llena
+    # después de compilar el APK con build-apk.sh + gradle.
+    volumes:
+      - ./apk:/app/public/apk:ro
 
 networks:
   default:

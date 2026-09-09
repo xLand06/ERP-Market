@@ -174,7 +174,7 @@ EOF
 fi
 
 # ── Idempotent resources (always) ────────────────────────────────────────────
-mkdir -p "$CLIENT_DIR/tls"
+mkdir -p "$CLIENT_DIR/tls" "$CLIENT_DIR/apk"
 
 # ── Shared network (idempotent; also safe when deploy/ was never started) ────
 if ! docker network inspect erp_proxy >/dev/null 2>&1; then

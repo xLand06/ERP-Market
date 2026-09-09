@@ -72,11 +72,20 @@ echo "building frontend with VITE_API_URL=$API_URL"
 echo "web bundle synced into $FRONTEND_DIR/android"
 if [[ -x "$FRONTEND_DIR/android/gradlew" ]]; then
     echo
-    echo "NEXT (manual — requires Android SDK, Java 17+):"
-    echo "  cd $FRONTEND_DIR/android && ./gradlew assembleDebug"
-    echo "APK output: $FRONTEND_DIR/android/app/build/outputs/apk/debug/app-debug.apk"
-    echo "Install on the phone: adb install <apk> (or copy the file)."
+    echo "Compilando APK con gradle..."
+    ( cd "$FRONTEND_DIR/android" && ./gradlew assembleDebug )
+    APK_SRC="$FRONTEND_DIR/android/app/build/outputs/apk/debug/app-debug.apk"
+    APK_DEST="$DEPLOY_DIR/clients/$SLUG/apk/app.apk"
+    if [[ -f "$APK_SRC" ]]; then
+        mkdir -p "$DEPLOY_DIR/clients/$SLUG/apk"
+        cp "$APK_SRC" "$APK_DEST"
+        echo "APK copiado a: $APK_DEST"
+        echo "Descarga disponible en: https://$CLIENT_DOMAIN/apk/app.apk"
+    else
+        echo "WARNING: APK no encontrado en $APK_SRC" >&2
+    fi
 else
     echo
     echo "NEXT (manual): open $FRONTEND_DIR/android in Android Studio and build the debug APK."
+    echo "After building, copy the APK to: $DEPLOY_DIR/clients/$SLUG/apk/app.apk"
 fi
