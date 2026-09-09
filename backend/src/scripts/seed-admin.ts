@@ -43,7 +43,7 @@ async function main() {
     console.log(`[seed-admin] Sucursal: ${branch.name} (${branch.id})`);
 
     // 2. Usuario admin (idempotente por email)
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findFirst({ where: { email } });
     if (existing) {
         console.log(`[seed-admin] Admin ya existe: ${existing.username} (${email}) — skip`);
         return;
