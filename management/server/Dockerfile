@@ -34,8 +34,8 @@ RUN npm ci --ignore-scripts 2>/dev/null || npm install
 
 COPY server/ .
 
-# Generar cliente Prisma
-RUN npx prisma generate
+# Generar cliente Prisma (usar binario local, no npx que descarga última versión)
+RUN ./node_modules/.bin/prisma generate
 
 # Compilar TypeScript
 RUN npm run build
