@@ -1,0 +1,74 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+    ACTIVE
+    SUSPENDED
+    DELETED
+}
+
+enum PaymentStatus {
+    PENDING
+    PAID
+    OVERDUE
+    FAILED
+    REFUNDED
+}
+
+model Tenant {
+    id            String       @id @default(uuid())
+    slug          String       @unique
+    domain        String       @unique
+    url           String
+    status        TenantStatus @default(ACTIVE)
+    plan          String       @default("free")
+    adminEmail    String?
+    adminPassword String?
+    dbPassword    String?
+    jwtSecret     String?
+    createdAt     DateTime     @default(now())
+    updatedAt     DateTime     @updatedAt
+    payments      Payment[]
+    healthChecks  HealthCheck[]
+    auditLogs     AuditLog[]
+}
+
+model Payment {
+    id          String        @id @default(uuid())
+    tenantId    String
+    tenant      Tenant        @relation(fields: [tenantId], references: [id])
+    amountCents Int
+    currency    String        @default("USD")
+    status      PaymentStatus @default(PENDING)
+    provider    String?
+    externalId  String?
+    notes       String?
+    createdAt   DateTime      @default(now())
+}
+
+model HealthCheck {
+    id          String   @id @default(uuid())
+    tenantId    String
+    tenant      Tenant   @relation(fields: [tenantId], references: [id])
+    apiHealthy  Boolean
+    dbHealthy   Boolean
+    containerUp Boolean
+    memoryMb    Int?
+    checkedAt   DateTime @default(now())
+}
+
+model AuditLog {
+    id        String   @id @default(uuid())
+    actor     String
+    action    String
+    tenantId  String?
+    tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+    details   Json?
+    createdAt DateTime @default(now())
+}

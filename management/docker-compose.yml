@@ -1,0 +1,55 @@
+name: management
+
+services:
+  mgmt-api:
+    build: ./server
+    container_name: mgmt-api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      DATABASE_URL: postgresql://mgmt:${MGMT_DB_PASSWORD}@mgmt-db:5432/mgmt
+      JWT_SECRET: ${JWT_SECRET}
+      DOCKER_SOCKET: /var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      mgmt-db:
+        condition: service_healthy
+    networks:
+      - erp_proxy
+      - mgmt-net
+
+  mgmt-db:
+    image: postgres:16-alpine
+    container_name: mgmt-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mgmt
+      POSTGRES_PASSWORD: ${MGMT_DB_PASSWORD}
+      POSTGRES_DB: mgmt
+    command:
+      - postgres
+      - -c
+      - shared_buffers=32MB
+      - -c
+      - max_connections=20
+    volumes:
+      - mgmt-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mgmt"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mgmt-net
+
+networks:
+  erp_proxy:
+    external: true
+  mgmt-net:
+
+volumes:
+  mgmt-db-data:
