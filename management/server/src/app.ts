@@ -1,17 +1,22 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import { env } from './config/env';
 import { prisma } from './config/prisma';
 import authRoutes from './modules/auth/auth.routes';
 import tenantsRoutes from './modules/tenants/tenants.routes';
+import paymentsRoutes from './modules/payments/payments.routes';
+import auditRoutes from './modules/audit/audit.routes';
+import healthRoutes from './modules/health/health.routes';
+import { startHealthCron, startAuditRetention } from './services/health-cron';
 
 const app = express();
 
 // Middleware global
 app.use(cors({
     origin: env.NODE_ENV === 'production'
-        ? ['https://admin.erpmarket.com']
-        : ['http://localhost:5173', 'http://localhost:3000'],
+        ? ['https://admin.erpmarket.com', 'https://mgmt.erpmarket.com']
+        : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'],
     credentials: true,
 }));
 app.use(express.json());
@@ -34,11 +39,24 @@ app.get('/api/health', async (_req, res) => {
     }
 });
 
-// Rutas
+// Rutas API
 app.use('/api/auth', authRoutes);
 app.use('/api/tenants', tenantsRoutes);
-// app.use('/api/payments', paymentsRoutes);   // Batch 2
-// app.use('/api/audit', auditRoutes);         // Batch 2
+app.use('/api/payments', paymentsRoutes);
+app.use('/api/audit', auditRoutes);
+app.use('/api/health', healthRoutes);
+
+// Servir frontend estático (production build)
+const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
+app.use(express.static(frontendDist));
+
+// SPA fallback — rutas no-API sirven index.html
+app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+        return next();
+    }
+    res.sendFile(path.join(frontendDist, 'index.html'));
+});
 
 // Middleware de errores
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -50,6 +68,10 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 app.listen(env.PORT, () => {
     console.log(`[mgmt-server] Escuchando en puerto ${env.PORT}`);
     console.log(`[mgmt-server] Entorno: ${env.NODE_ENV}`);
+
+    // Iniciar crons solo en producción o desarrollo (no en tests)
+    startHealthCron();
+    startAuditRetention();
 });
 
 export default app;

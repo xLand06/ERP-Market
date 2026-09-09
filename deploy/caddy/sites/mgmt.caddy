@@ -1,0 +1,17 @@
+# =============================================================================
+# Management Server — Caddy site
+#
+# This file is imported by the main Caddyfile via `import sites/*.caddy`.
+# It proxies mgmt.erpmarket.com to the management API container.
+#
+# The mgmt-api container serves both the API and the frontend static files.
+# =============================================================================
+
+mgmt.erpmarket.com {
+    reverse_proxy mgmt-api:3001
+}
+
+# sslip.io fallback (for VPS without DNS config):
+# mgmt.203.0.113.10.sslip.io {
+#     reverse_proxy mgmt-api:3001
+# }
