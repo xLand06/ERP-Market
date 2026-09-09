@@ -205,6 +205,9 @@ export default function POSPage() {
         type: PaymentMethodType; amount: number; currency: Currency; exchangeRate?: number;
     }>) => {
         if (!selectedBranch) { toast.error('No hay una sede seleccionada'); return; }
+        if (!effectiveBranch) { toast.error('Seleccioná una sucursal antes de vender'); return; }
+        if (!openRegister) { toast.error('No hay una caja abierta. Abrí una caja antes de vender.'); return; }
+        if (cart.length === 0) { toast.error('El carrito está vacío'); return; }
 
         setIsSubmitting(true);
         try {
@@ -301,6 +304,16 @@ export default function POSPage() {
     const handleStockEntry = async () => {
         setStockEntryOpen(true);
     };
+
+    // ── Loading State: wait for register + inventory before rendering POS ──
+    if (registerLoading || (effectiveBranch && isLoading)) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full gap-4 pb-20">
+                <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+                <p className="text-sm text-slate-500 font-medium">Cargando datos de la caja...</p>
+            </div>
+        );
+    }
 
     // ── Branch Selection Screen ──────────────────────────────────────
     if (!selectedBranch || selectedBranch === 'all') {
