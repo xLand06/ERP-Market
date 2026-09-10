@@ -1,6 +1,6 @@
 import { prisma } from '../../config/prisma';
 import {
-    provisionTenant,
+    startProvisioningInBackground,
     suspendTenant as dockerSuspend,
     resumeTenant as dockerResume,
     deleteTenant as dockerDelete,
@@ -45,8 +45,9 @@ export async function getTenantBySlug(slug: string) {
 }
 
 /**
- * Crea un tenant completo ejecutando add-client.sh via Docker.
- * Genera secretos, crea contenedores, espera health, semilla admin, configura Caddy.
+ * Crea un tenant iniciando el provisioning en background.
+ * Devuelve inmediatamente con el estado inicial PROVISIONING;
+ * el tenant pasa a ACTIVE (o ERROR) cuando el provisioning termina.
  */
 export async function createTenant(input: CreateTenantInput) {
     const provisionInput: ProvisionInput = {
@@ -58,7 +59,12 @@ export async function createTenant(input: CreateTenantInput) {
         adminPassword: input.adminPassword,
     };
 
-    return provisionTenant(provisionInput);
+    await startProvisioningInBackground(provisionInput);
+
+    return {
+        slug: input.slug,
+        status: 'PROVISIONING',
+    };
 }
 
 /**

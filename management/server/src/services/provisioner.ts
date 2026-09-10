@@ -372,6 +372,118 @@ export async function provisionWithLogs(
     return result;
 }
 
+// ── Background provisioning ──────────────────────────────────────────────────
+
+/** Limite de lineas de log retenidas en memoria por tenant */
+const MAX_LOG_LINES = 500;
+
+/**
+ * Estado de provisioning en memoria (se pierde al reiniciar el server).
+ * Se usa para mostrar el progreso en vivo en el listado y la consola.
+ */
+export const provisioningState = new Map<string, {
+    status: 'PROVISIONING' | 'ACTIVE' | 'ERROR';
+    logs: string[];
+    startedAt: number;
+    finishedAt?: number;
+}>();
+
+/**
+ * Devuelve el estado de provisioning en memoria de un tenant, o null si no
+ * hay provisioning activo/registrado para ese slug.
+ */
+export function getProvisioningState(slug: string) {
+    return provisioningState.get(slug) || null;
+}
+
+/**
+ * Inicia el provisioning en background:
+ * 1. Crea/actualiza el tenant con status PROVISIONING (upsert por slug)
+ * 2. Inicializa el estado en memoria
+ * 3. Ejecuta provisionWithLogs fire-and-forget, acumulando logs en memoria
+ * 4. Al terminar, actualiza el tenant a ACTIVE (o ERROR si falla)
+ *
+ * Devuelve inmediatamente — NO espera a que termine el provisioning.
+ */
+export async function startProvisioningInBackground(input: ProvisionInput): Promise<void> {
+    const { slug, domain, plan } = input;
+    const tenantDomain = domain || `${slug}.89.167.46.144.sslip.io`;
+
+    // 1. Crear/actualizar el tenant con status PROVISIONING
+    await prisma.tenant.upsert({
+        where: { slug },
+        update: {
+            status: 'PROVISIONING',
+            plan: plan || 'free',
+        },
+        create: {
+            slug,
+            domain: tenantDomain,
+            url: `https://${tenantDomain}`,
+            status: 'PROVISIONING',
+            plan: plan || 'free',
+        },
+    });
+
+    // 2. Inicializar estado en memoria
+    const state: {
+        status: 'PROVISIONING' | 'ACTIVE' | 'ERROR';
+        logs: string[];
+        startedAt: number;
+        finishedAt?: number;
+    } = {
+        status: 'PROVISIONING',
+        logs: [],
+        startedAt: Date.now(),
+    };
+    provisioningState.set(slug, state);
+
+    const appendLog = (line: string) => {
+        state.logs.push(line);
+        if (state.logs.length > MAX_LOG_LINES) {
+            state.logs.shift();
+        }
+    };
+
+    // 3. Ejecutar provisioning fire-and-forget (sin await)
+    provisionWithLogs(
+        slug,
+        domain || '',
+        plan || 'free',
+        input.adminEmail || `admin@${slug}.local`,
+        input.adminUser || 'admin',
+        input.adminPassword || '',
+        appendLog,
+    )
+        .then(async (result) => {
+            // 4. Exito: marcar ACTIVE
+            await prisma.tenant.update({
+                where: { slug },
+                data: { status: 'ACTIVE' },
+            });
+            state.status = 'ACTIVE';
+            state.finishedAt = Date.now();
+            appendLog(`Provisioning completado para ${slug} (id: ${result.tenantId})`);
+            console.log(`[provisioner] Background provisioning completado: ${slug}`);
+        })
+        .catch(async (err: any) => {
+            // 5. Error: marcar ERROR y guardar el mensaje en los logs
+            const message = err?.message || 'Error desconocido durante provisioning';
+            console.error(`[provisioner] Background provisioning fallo para ${slug}:`, message);
+            try {
+                await prisma.tenant.update({
+                    where: { slug },
+                    data: { status: 'ERROR' },
+                });
+            } catch (updateErr) {
+                console.error(`[provisioner] No se pudo marcar ${slug} como ERROR en DB:`, updateErr);
+            }
+            state.status = 'ERROR';
+            state.finishedAt = Date.now();
+            appendLog(`Error: ${message}`);
+        });
+}
+
 /**
  * Obtiene las ultimas lineas de log de un contenedor Docker.
  * Util para la consola de tenant detail.
