@@ -262,6 +262,9 @@ export default function Dashboard() {
                         <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
                             Uptime: {vpsStats.uptime}
                         </p>
+                        <p style={{ margin: '0.5rem 0 0', fontSize: '0.7rem', color: '#94a3b8' }}>
+                            Incluye infraestructura (mgmt-api, mgmt-db, caddy)
+                        </p>
                     </div>
                 </div>
             )}

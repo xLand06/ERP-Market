@@ -67,10 +67,10 @@ export default function Login({ onLogin }: LoginProps) {
                 boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
             }}>
                 <h1 style={{ margin: '0 0 0.5rem', fontSize: '1.5rem', fontWeight: 700, color: '#1e293b' }}>
-                    ERP Market
+                    ALLCODE
                 </h1>
                 <p style={{ margin: '0 0 1.5rem', color: '#64748b', fontSize: '0.9rem' }}>
-                    Panel de Gestion
+                    ALL MARKET · Panel de Gestión
                 </p>
 
                 {error && (

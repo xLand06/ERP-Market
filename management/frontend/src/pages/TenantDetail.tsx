@@ -37,6 +37,7 @@ interface TenantDetail {
     url: string;
     status: string;
     plan: string;
+    product?: string;
     adminEmail: string | null;
     createdAt: string;
     payments: { id: string; amountCents: number; status: string; createdAt: string }[];
@@ -70,6 +71,17 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
     SUSPENDED: { bg: '#fffbeb', text: '#92400e' },
     DELETED: { bg: '#f1f5f9', text: '#64748b' },
 };
+
+// Nombres completos de producto para mostrar en el header
+const PRODUCT_NAMES: Record<string, string> = {
+    market: 'ALL MARKET',
+    repair: 'ALL REPAIR',
+};
+
+function getProductName(product?: string): string {
+    if (!product) return 'ALL MARKET';
+    return PRODUCT_NAMES[product] || product;
+}
 
 /* ── Componente principal ───────────────────────────────────────────────── */
 
@@ -299,7 +311,23 @@ export default function TenantDetailPage() {
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div>
-                    <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>{tenant.slug}</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>{tenant.slug}</h2>
+                        <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '2px 8px',
+                            borderRadius: 10,
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            letterSpacing: '0.04em',
+                            background: '#f1f5f9',
+                            color: '#475569',
+                            border: '1px solid #e2e8f0',
+                        }}>
+                            {getProductName(tenant.product)}
+                        </span>
+                    </div>
                     <span style={{ color: '#64748b', fontSize: '0.85rem' }}>{tenant.domain}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>

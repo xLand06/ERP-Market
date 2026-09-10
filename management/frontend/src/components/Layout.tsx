@@ -64,10 +64,21 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             }}>
                 <div style={{ padding: '0 1.5rem', marginBottom: '2rem' }}>
                     <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
-                        ERP Market
+                        ALLCODE
                     </h2>
-                    <span style={{ fontSize: '0.75rem', opacity: 0.5, color: '#94a3b8' }}>
-                        Panel de Gestion
+                    <span style={{
+                        display: 'inline-block',
+                        marginTop: 6,
+                        padding: '2px 8px',
+                        borderRadius: 10,
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        letterSpacing: '0.04em',
+                        color: '#a7f3d0',
+                        background: 'rgba(5,150,105,0.18)',
+                        border: '1px solid rgba(5,150,105,0.35)',
+                    }}>
+                        ALL MARKET
                     </span>
                 </div>
 

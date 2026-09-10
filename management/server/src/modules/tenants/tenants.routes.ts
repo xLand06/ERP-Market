@@ -20,6 +20,7 @@ const createTenantSchema = z.object({
     domain: z.string().min(1).optional().or(z.literal('')).transform(v => v || undefined),
     url: z.string().url().optional(),
     plan: z.string().optional(),
+    product: z.string().optional(),
     adminEmail: z.string().email().optional().or(z.literal('')).transform(v => v || undefined),
     adminUser: z.string().min(1).optional().or(z.literal('')).transform(v => v || undefined),
     adminPassword: z.string().min(8).optional(),
