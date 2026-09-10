@@ -3,7 +3,7 @@
 # No toca las bases de datos (volumenes persistentes).
 set -Eeuo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CLIENTS_DIR="$ROOT/deploy/clients"
 
 echo "═══════════════════════════════════════════════════════════"
