@@ -45,8 +45,8 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Dependencias del sistema
-RUN apk add --no-cache openssl
+# Dependencias del sistema + Docker CLI para provisioning de tenants
+RUN apk add --no-cache openssl bash docker-cli docker-cli-compose curl gettext
 
 # Copiar dependencias de producción del server
 COPY server/package.json server/package-lock.json* ./

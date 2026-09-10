@@ -73,74 +73,30 @@ async function runAddClientScript(
     adminEmail: string,
     adminPassword: string,
 ): Promise<string> {
+    const { execSync } = await import('child_process');
+
     // add-client.sh: add-client.sh <slug> [domain] [admin-email] [admin-user] [admin-password]
-    const args = [`'${slug}'`];
-    if (domain) args.push(`'${domain}'`);
-    if (adminEmail) args.push(`'${adminEmail}'`);
-    args.push("'admin'"); // admin user
-    if (adminPassword) args.push(`'${adminPassword}'`);
+    const args = [slug];
+    if (domain) args.push(domain);
+    if (adminEmail) args.push(adminEmail);
+    args.push('admin'); // admin user
+    if (adminPassword) args.push(adminPassword);
 
-    const scriptCmd = `cd /repo && ./deploy/scripts/add-client.sh ${args.join(' ')}`;
-
-    // Instalar dependencias + ejecutar script
-    const setupCmd = [
-        'apk add --no-cache bash docker-cli docker-cli-compose openssl curl gettext >/dev/null 2>&1',
-        scriptCmd,
-    ].join(' && ');
-
-    const containerName = `provision-${slug}-${Date.now()}`;
-
-    const container = await docker.createContainer({
-        Image: 'alpine:latest',
-        Cmd: ['sh', '-c', setupCmd],
-        name: containerName,
-        HostConfig: {
-            Binds: [
-                `${HOST_DEPLOY_DIR}:/repo`,
-                '/var/run/docker.sock:/var/run/docker.sock',
-            ],
-            NetworkMode: 'host',
-        },
-    });
-
-    await container.start();
-
-    // Timeout de 10 minutos (el script tiene sus propios timeouts internos)
-    const TIMEOUT_MS = 10 * 60 * 1000;
-    const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`Provisioning timeout after ${TIMEOUT_MS / 1000}s`)), TIMEOUT_MS),
-    );
+    const cmd = `cd ${HOST_DEPLOY_DIR}/.. && ./deploy/scripts/add-client.sh ${args.join(' ')}`;
+    console.log(`[provisioner] Ejecutando: ${cmd}`);
 
     try {
-        const result: any = await Promise.race([
-            container.wait().then((r: any) => r),
-            timeoutPromise,
-        ]);
-
-        // Obtener logs del contenedor
-        const logData = await new Promise<Buffer>((resolve, reject) => {
-            container.logs({ stdout: true, stderr: true }, (err: any, data: Buffer | undefined) => {
-                if (err) reject(err);
-                else resolve(data ?? Buffer.alloc(0));
-            });
+        const output = execSync(cmd, {
+            encoding: 'utf-8',
+            timeout: 10 * 60 * 1000, // 10 minutos
+            maxBuffer: 10 * 1024 * 1024, // 10MB
+            env: { ...process.env, PATH: process.env.PATH },
         });
-
-        const output = logData.toString('utf-8');
-        const exitCode = result?.StatusCode ?? 0;
-
-        if (exitCode !== 0) {
-            throw new Error(`add-client.sh fallo (exit ${exitCode}):\n${output}`);
-        }
-
         return output;
-    } finally {
-        // Limpiar contenedor efimero
-        try {
-            await container.remove({ force: true });
-        } catch {
-            // Ya fue eliminado
-        }
+    } catch (err: any) {
+        throw new Error(`add-client.sh fallo (exit ${err.status}):\n${err.stdout || ''}${err.stderr || ''}`);
     }
+}
 }
 
 // ── Docker helpers ───────────────────────────────────────────────────────────
