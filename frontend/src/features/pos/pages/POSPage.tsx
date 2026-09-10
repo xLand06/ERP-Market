@@ -205,7 +205,7 @@ export default function POSPage() {
     // ── Handle Payment Confirm ───────────────────────────────────────
     const handlePayment = async (paymentMethods: Array<{
         type: PaymentMethodType; amount: number; currency: Currency; exchangeRate?: number;
-    }>) => {
+    }>, customerId?: string) => {
         if (!selectedBranch) { toast.error('No hay una sede seleccionada'); return; }
         if (!effectiveBranch) { toast.error('Seleccioná una sucursal antes de vender'); return; }
         if (!openRegister) { toast.error('No hay una caja abierta. Abrí una caja antes de vender.'); return; }
@@ -227,6 +227,7 @@ export default function POSPage() {
                 currency: 'COP',
                 exchangeRate: 1,
                 paymentMethods,
+                ...(customerId ? { customerId } : {}),
             };
 
             const res = await api.post('/pos/transactions', payload);
@@ -257,7 +258,7 @@ export default function POSPage() {
             const config = useConfigStore.getState();
             const primaryPrinter = config.printers.find(p => p.isPrimary) || config.printers[0] || null;
 
-            toast.success('¡Venta realizada con éxito!');
+            toast.success(customerId ? '¡Venta a crédito registrada!' : '¡Venta realizada con éxito!');
             setPayOpen(false);
             clearCart();
             refetch();

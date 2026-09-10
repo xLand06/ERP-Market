@@ -313,7 +313,12 @@ model Transaction {
   cashRegisterId String?
   cashRegister   CashRegister? @relation(fields: [cashRegisterId], references: [id])
 
-  items TransactionItem[]
+  // Fiados / CxC: cliente asociado a ventas a crédito
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  items    TransactionItem[]
+  payments CustomerPayment[]
 
   @@index([branchId, createdAt])
   @@index([userId])
@@ -321,6 +326,7 @@ model Transaction {
   @@index([type, status])
   @@index([syncStatus])
   @@index([createdAt])
+  @@index([customerId])
   @@map("transactions")
 }
 
@@ -418,6 +424,52 @@ model Supplier {
   purchaseOrders PurchaseOrder[]
 
   @@map("suppliers")
+}
+
+// =============================================================================
+// CUSTOMERS (Fiados / CxC) — espejo SQLite del schema cloud
+// =============================================================================
+
+model Customer {
+  id          String   @id @default(cuid())
+  name        String
+  cedula      String?  @unique // Cédula/RIF del cliente (V/E)
+  phone       String?
+  email       String?
+  address     String?
+  creditLimit Float?   // Límite de crédito (null = sin límite)
+  balance     Float    @default(0) // Saldo pendiente por cobrar
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  transactions Transaction[]
+  payments     CustomerPayment[]
+
+  @@index([name])
+  @@index([cedula])
+  @@index([isActive])
+  @@map("customers")
+}
+
+model CustomerPayment {
+  id        String   @id @default(cuid())
+  amount    Float    // Monto del abono
+  method    String   @default("cash") // 'cash' | 'transfer' | 'card' | 'other'
+  reference String?  // Referencia del pago (ej: nro de transferencia)
+  notes     String?
+  createdAt DateTime @default(now())
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  transactionId String? // Venta a crédito que se está abonando (opcional)
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+
+  @@index([customerId])
+  @@index([transactionId])
+  @@index([createdAt])
+  @@map("customer_payments")
 }
 
 // =============================================================================

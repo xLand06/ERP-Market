@@ -58,6 +58,9 @@ export const createTransactionSchema = z.object({
 
     // Multi-pago: métodos de pago utilizados (opcional, backward compatible)
     paymentMethods: z.array(paymentMethodSchema).optional(),
+
+    // Fiados/CxC: cliente asociado a la venta (permite pago parcial o nulo)
+    customerId: z.string().min(1, 'ID de cliente es requerido').optional(),
 });
 
 /**

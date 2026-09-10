@@ -139,6 +139,7 @@ db.exec(`
     invoiceNumber TEXT,
     paymentMethods TEXT,
     metadata TEXT,
+    customerId TEXT REFERENCES customers(id),
     userId TEXT NOT NULL REFERENCES users(id),
     branchId TEXT NOT NULL REFERENCES branches(id),
     cashRegisterId TEXT REFERENCES cash_registers(id),
@@ -258,6 +259,31 @@ db.exec(`
     isActive INTEGER DEFAULT 1,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS customers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    cedula TEXT UNIQUE,
+    phone TEXT,
+    email TEXT,
+    address TEXT,
+    creditLimit REAL,
+    balance REAL DEFAULT 0,
+    isActive INTEGER DEFAULT 1,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS customer_payments (
+    id TEXT PRIMARY KEY,
+    customerId TEXT NOT NULL REFERENCES customers(id),
+    transactionId TEXT REFERENCES transactions(id),
+    amount REAL NOT NULL,
+    method TEXT NOT NULL DEFAULT 'cash',
+    reference TEXT,
+    notes TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
   CREATE TABLE IF NOT EXISTS backups (

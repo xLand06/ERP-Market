@@ -1,6 +1,7 @@
 import { prisma } from '../../config/prisma';
 import { TransactionType, TransactionStatus } from '@prisma/client';
 import { parseDateRange } from '../../core/utils/helpers';
+import { validateCreditLimit } from '../customers/customers.service';
 
 export interface TransactionItemInput {
     productId: string;
@@ -33,12 +34,14 @@ export interface CreateTransactionInput {
     invoiceNumber?: string;  // nº factura para INVENTORY_IN
     // Multi-pago
     paymentMethods?: PaymentMethodInput[];
+    // Fiados/CxC: cliente al que se le registra la venta a crédito
+    customerId?: string;
 }
 
 export const createTransaction = async (input: CreateTransactionInput) => {
     const {
         type, branchId, userId, items, cashRegisterId, notes, ipAddress,
-        currency = 'COP', exchangeRate, invoiceNumber, paymentMethods
+        currency = 'COP', exchangeRate, invoiceNumber, paymentMethods, customerId
     } = input;
 
     // 1. Validar que la sede existe y está activa para nuevas operaciones
@@ -56,8 +59,8 @@ export const createTransaction = async (input: CreateTransactionInput) => {
     const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
     // Validación multi-pago: convertir cada pago a la moneda de referencia de la transacción
-    if (paymentMethods && paymentMethods.length > 0) {
-        const sumaMetodosBase = paymentMethods.reduce((sum, pm) => {
+    const sumaMetodosBase = paymentMethods && paymentMethods.length > 0
+        ? paymentMethods.reduce((sum, pm) => {
             if (pm.currency === 'USD') return sum + pm.amount;
             if (pm.currency === 'VES') {
                 const rate = pm.exchangeRate || 5.5;
@@ -68,10 +71,17 @@ export const createTransaction = async (input: CreateTransactionInput) => {
                 return sum + (rate > 0 ? pm.amount / rate : pm.amount);
             }
             return sum + pm.amount;
-        }, 0);
+        }, 0)
+        : 0;
 
-        // Permitir que la suma entregada sea mayor o igual al total (para permitir pago en efectivo con vuelto)
-        // Usamos una tolerancia de 0.05 para evitar bloqueos por imprecisiones de punto flotante
+    // Fiado (venta a crédito): si hay cliente, se permite pago parcial o nulo.
+    // El faltante (total - sumaMetodosBase) queda como deuda del cliente.
+    const isCreditSale = type === TransactionType.SALE && Boolean(customerId);
+
+    if (!isCreditSale && paymentMethods && paymentMethods.length > 0) {
+        // Comportamiento actual sin cliente: exigir que el pago cubra el total.
+        // Permitimos una tolerancia de 0.05 para evitar bloqueos por imprecisiones
+        // de punto flotante (el vuelto se maneja en el frontend).
         if (sumaMetodosBase < (total - 0.05)) {
             throw new Error(
                 `El monto entregado en los métodos de pago (${sumaMetodosBase.toFixed(2)}) es menor al total requerido (${total.toFixed(2)}).`
@@ -98,6 +108,24 @@ export const createTransaction = async (input: CreateTransactionInput) => {
             });
             if (!openReg) throw new Error('No hay una caja abierta en esta sede. Abra caja antes de vender.');
             assignedCashRegisterId = openReg.id;
+        }
+
+        // ── Fiado: validar límite de crédito y actualizar saldo del cliente ──
+        // La deuda es el faltante entre el total y lo pagado (puede ser 0 si
+        // el cliente paga completo: la venta queda vinculada pero sin deuda).
+        if (isCreditSale) {
+            const debt = Math.max(0, total - sumaMetodosBase);
+
+            // Reutiliza la validación del módulo customers (cliente activo + límite).
+            // Se pasa `tx` para que la lectura del saldo sea parte de la transacción.
+            await validateCreditLimit(customerId!, debt, tx);
+
+            if (debt > 0.005) {
+                await tx.customer.update({
+                    where: { id: customerId },
+                    data: { balance: { increment: debt } },
+                });
+            }
         }
 
         // ── Batch pre-fetch: reducir N+1 ──────────────────────────────
@@ -168,6 +196,8 @@ export const createTransaction = async (input: CreateTransactionInput) => {
                 invoiceNumber: invoiceNumber || null,
                 // Campo multi-pago (serializado como string para SQLite)
                 paymentMethods: paymentMethodsData as any,
+                // Fiado/CxC: cliente vinculado a la venta
+                customerId: isCreditSale ? customerId : null,
                 items: {
                     create: processedItems.map((item) => ({
                         productId: item.productId,
@@ -179,7 +209,10 @@ export const createTransaction = async (input: CreateTransactionInput) => {
                     })),
                 },
             },
-            include: { items: { include: { product: { select: { name: true, barcode: true } } } } },
+            include: {
+                items: { include: { product: { select: { name: true, barcode: true } } } },
+                customer: { select: { id: true, name: true, cedula: true } },
+            },
         });
 
         // Afectar stock: SALE descuenta, INVENTORY_IN suma (inmediatamente)
@@ -273,6 +306,7 @@ export const getTransactions = (filters: {
             items: { include: { product: { select: { id: true, name: true, barcode: true, baseUnit: true } }, presentation: true } },
             user: { select: { id: true, nombre: true, username: true } },
             branch: { select: { id: true, name: true } },
+            customer: { select: { id: true, name: true, cedula: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
@@ -288,6 +322,7 @@ export const getTransactionById = (id: string) =>
             user: { select: { id: true, nombre: true, username: true } },
             branch: { select: { id: true, name: true } },
             cashRegister: true,
+            customer: { select: { id: true, name: true, cedula: true } },
         },
     });
 

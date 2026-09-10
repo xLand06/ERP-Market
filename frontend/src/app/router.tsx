@@ -30,6 +30,8 @@ const MermaPage             = lazy(() => import('../features/merma/pages/MermaPa
 const StocktakingPage        = lazy(() => import('../features/stocktaking/pages/StocktakingPage'));
 const StockCountView        = lazy(() => import('../features/stocktaking/pages/StockCountView'));
 const QuotesPage            = lazy(() => import('../features/quotes/pages/QuotesPage'));
+const CustomersPage         = lazy(() => import('../features/customers/pages/CustomersPage'));
+const CustomerDetailPage    = lazy(() => import('../features/customers/pages/CustomerDetail'));
 
 const wrap = (Component: React.ComponentType) => (
     <Suspense fallback={<PageSkeleton />}>
@@ -85,6 +87,8 @@ export const router = createRouter([
             { path: 'settings',          element: wrap(SettingsPage) },
             { path: 'merma',              element: wrap(MermaPage) },
             { path: 'quotes',             element: wrap(QuotesPage) },
+            { path: 'customers',          element: wrap(CustomersPage) },
+            { path: 'customers/:id',      element: wrap(CustomerDetailPage) },
         ],
     },
     { path: '*', element: wrap(NotFoundPage) },
