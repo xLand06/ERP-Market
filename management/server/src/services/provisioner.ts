@@ -84,7 +84,7 @@ async function runAddClientScript(
     args.push(adminUser || 'admin');
     if (adminPassword) args.push(adminPassword);
 
-    const cmd = `BUILD_CONTEXT=/opt/erp-market /repo/deploy/scripts/add-client.sh ${args.join(' ')}`;
+    const cmd = `BUILD_CONTEXT=/repo /repo/deploy/scripts/add-client.sh ${args.join(' ')}`;
     console.log(`[provisioner] Ejecutando: ${cmd}`);
 
     try {
@@ -349,7 +349,7 @@ export async function provisionWithLogs(
     await new Promise<void>((resolve, reject) => {
         const proc = spawn('/bin/bash', [scriptPath, ...args], {
             cwd: `/repo`,
-            env: { ...process.env, PATH: process.env.PATH, BUILD_CONTEXT: '/opt/erp-market' },
+            env: { ...process.env, PATH: process.env.PATH, BUILD_CONTEXT: '/repo' },
             timeout: 10 * 60 * 1000,
         });
 
