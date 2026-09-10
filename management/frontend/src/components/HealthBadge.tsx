@@ -4,8 +4,8 @@ interface HealthBadgeProps {
 }
 
 export default function HealthBadge({ healthy, size = 'md' }: HealthBadgeProps) {
-    const color = healthy === true ? '#4caf50' : healthy === false ? '#f44336' : '#ff9800';
-    const label = healthy === true ? 'Saludable' : healthy === false ? 'Caído' : 'Sin datos';
+    const color = healthy === true ? '#059669' : healthy === false ? '#dc2626' : '#d97706';
+    const label = healthy === true ? 'OK' : healthy === false ? 'Down' : 'No data';
     const dotSize = size === 'sm' ? 8 : 12;
 
     return (
@@ -17,7 +17,10 @@ export default function HealthBadge({ healthy, size = 'md' }: HealthBadgeProps) 
                 background: color,
                 display: 'inline-block',
             }} />
-            <span style={{ fontSize: size === 'sm' ? '0.75rem' : '0.85rem', color: '#555' }}>
+            <span style={{
+                fontSize: size === 'sm' ? '0.75rem' : '0.85rem',
+                color: '#64748b',
+            }}>
                 {label}
             </span>
         </span>
