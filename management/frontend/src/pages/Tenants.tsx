@@ -2,6 +2,22 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import HealthBadge from '../components/HealthBadge';
 
+// Estilo global para animación de spinner
+const spinKeyframes = `
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+`;
+
+// Inyectar estilos una sola vez
+if (typeof document !== 'undefined' && !document.getElementById('tenant-spinner-styles')) {
+    const style = document.createElement('style');
+    style.id = 'tenant-spinner-styles';
+    style.textContent = spinKeyframes;
+    document.head.appendChild(style);
+}
+
 interface Tenant {
     id: string;
     slug: string;
@@ -26,6 +42,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
     ACTIVE: { bg: '#ecfdf5', text: '#065f46' },
     SUSPENDED: { bg: '#fffbeb', text: '#92400e' },
     DELETED: { bg: '#fef2f2', text: '#991b1b' },
+    PROVISIONING: { bg: '#eff6ff', text: '#1e40af' },
 };
 
 export default function Tenants() {
@@ -34,6 +51,8 @@ export default function Tenants() {
     const [filter, setFilter] = useState<string>('');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [creating, setCreating] = useState(false);
+    const [provisioning, setProvisioning] = useState(false);
+    const [provisioningStep, setProvisioningStep] = useState('');
     const [createdTenant, setCreatedTenant] = useState<CreateTenantResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -84,6 +103,9 @@ export default function Tenants() {
         }
 
         setCreating(true);
+        setProvisioning(true);
+        setProvisioningStep('Generando secretos y credenciales...');
+
         try {
             const token = localStorage.getItem('mgmt_token');
             const body: Record<string, string> = {
@@ -94,6 +116,28 @@ export default function Tenants() {
             if (formPassword) body.adminPassword = formPassword;
             if (formPlan) body.plan = formPlan;
 
+            // Simular pasos de provisioning mientras el backend trabaja
+            const steps = [
+                'Generando secretos y credenciales...',
+                'Creando directorio del cliente...',
+                'Generando certificado TLS...',
+                'Insertando tenant en base de datos...',
+                'Creando contenedor PostgreSQL...',
+                'Esperando DB healthy...',
+                'Creando contenedor API...',
+                'Esperando API healthy...',
+                'Semillando usuario admin...',
+                'Configurando Caddy...',
+            ];
+
+            let stepIndex = 0;
+            const stepInterval = setInterval(() => {
+                if (stepIndex < steps.length - 1) {
+                    stepIndex++;
+                    setProvisioningStep(steps[stepIndex]);
+                }
+            }, 8000); // Cada 8 segundos aprox (el provisioning toma ~60-90s)
+
             const res = await fetch('/api/tenants', {
                 method: 'POST',
                 headers: {
@@ -103,6 +147,8 @@ export default function Tenants() {
                 body: JSON.stringify(body),
             });
 
+            clearInterval(stepInterval);
+
             if (!res.ok) {
                 const data = await res.json();
                 setError(data.error || 'Error al crear tenant');
@@ -110,6 +156,7 @@ export default function Tenants() {
             }
 
             const data: CreateTenantResponse = await res.json();
+            setProvisioningStep('¡Tenant provisionado exitosamente!');
             setCreatedTenant(data);
             resetForm();
             fetchTenants();
@@ -117,6 +164,7 @@ export default function Tenants() {
             setError('Error de conexión al crear tenant');
         } finally {
             setCreating(false);
+            setProvisioning(false);
         }
     };
 
@@ -222,6 +270,18 @@ export default function Tenants() {
                                     : null;
                                 const colors = STATUS_COLORS[t.status] || STATUS_COLORS.ACTIVE;
 
+                                // Determinar estado Docker
+                                let dockerStatus = 'desconocido';
+                                if (lastHealth) {
+                                    if (lastHealth.containerUp && lastHealth.apiHealthy && lastHealth.dbHealthy) {
+                                        dockerStatus = 'running';
+                                    } else if (lastHealth.containerUp) {
+                                        dockerStatus = 'parcial';
+                                    } else {
+                                        dockerStatus = 'detenido';
+                                    }
+                                }
+
                                 return (
                                     <tr
                                         key={t.id}
@@ -240,16 +300,27 @@ export default function Tenants() {
                                         </td>
                                         <td>{t.domain}</td>
                                         <td>
-                                            <span style={{
-                                                padding: '2px 10px',
-                                                borderRadius: 12,
-                                                fontSize: '0.75rem',
-                                                fontWeight: 500,
-                                                background: colors.bg,
-                                                color: colors.text,
-                                            }}>
-                                                {t.status}
-                                            </span>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                <span style={{
+                                                    padding: '2px 10px',
+                                                    borderRadius: 12,
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 500,
+                                                    background: colors.bg,
+                                                    color: colors.text,
+                                                    alignSelf: 'flex-start',
+                                                }}>
+                                                    {t.status}
+                                                </span>
+                                                {t.status === 'ACTIVE' && (
+                                                    <span style={{
+                                                        fontSize: '0.7rem',
+                                                        color: dockerStatus === 'running' ? '#059669' : dockerStatus === 'detenido' ? '#dc2626' : '#d97706',
+                                                    }}>
+                                                        Docker: {dockerStatus}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td style={{ textTransform: 'capitalize' }}>{t.plan}</td>
                                         <td><HealthBadge healthy={healthy} size="sm" /></td>
@@ -427,6 +498,32 @@ export default function Tenants() {
                             </select>
                         </div>
 
+                        {provisioning && provisioningStep && (
+                            <div style={{
+                                padding: '0.75rem 1rem',
+                                borderRadius: 6,
+                                background: '#eff6ff',
+                                border: '1px solid #bfdbfe',
+                                marginBottom: '1rem',
+                                fontSize: '0.85rem',
+                                color: '#1e40af',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                            }}>
+                                <div style={{
+                                    width: 14,
+                                    height: 14,
+                                    border: '2px solid rgba(30,64,175,0.3)',
+                                    borderTopColor: '#1e40af',
+                                    borderRadius: '50%',
+                                    animation: 'spin 1s linear infinite',
+                                    flexShrink: 0,
+                                }} />
+                                {provisioningStep}
+                            </div>
+                        )}
+
                         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                             <button
                                 onClick={() => setShowCreateModal(false)}
@@ -457,9 +554,22 @@ export default function Tenants() {
                                     fontSize: '0.85rem',
                                     fontWeight: 600,
                                     minHeight: 44,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
                                 }}
                             >
-                                {creating ? 'Creando...' : 'Crear Tenant'}
+                                {creating && (
+                                    <div style={{
+                                        width: 16,
+                                        height: 16,
+                                        border: '2px solid rgba(255,255,255,0.3)',
+                                        borderTopColor: '#fff',
+                                        borderRadius: '50%',
+                                        animation: 'spin 1s linear infinite',
+                                    }} />
+                                )}
+                                {creating ? 'Provisionando...' : 'Crear Tenant'}
                             </button>
                         </div>
                     </div>
@@ -485,7 +595,7 @@ export default function Tenants() {
                         borderRadius: 12,
                         padding: '2rem',
                         width: '100%',
-                        maxWidth: 480,
+                        maxWidth: 520,
                         boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
                     }}>
                         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
@@ -503,11 +613,27 @@ export default function Tenants() {
                                 ✓
                             </div>
                             <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
-                                Tenant Creado
+                                Tenant Provisionado
                             </h2>
                             <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', color: '#888' }}>
                                 {createdTenant.slug} · {createdTenant.domain}
                             </p>
+                        </div>
+
+                        <div style={{
+                            background: '#f0fdf4',
+                            borderRadius: 8,
+                            padding: '0.75rem 1rem',
+                            marginBottom: '1rem',
+                            fontSize: '0.8rem',
+                            color: '#065f46',
+                        }}>
+                            <div style={{ fontWeight: 600, marginBottom: 4 }}>Infraestructura creada:</div>
+                            <div>✓ Contenedor PostgreSQL (db-{createdTenant.slug})</div>
+                            <div>✓ Contenedor API (api-{createdTenant.slug})</div>
+                            <div>✓ Volumen de datos persistente</div>
+                            <div>✓ Certificado TLS auto-firmado</div>
+                            <div>✓ Configuración Caddy (routing HTTPS)</div>
                         </div>
 
                         <div style={{
@@ -537,6 +663,17 @@ export default function Tenants() {
                                 }}>
                                     {createdTenant.adminPasswordPlain}
                                 </code>
+                            </div>
+                            <div style={{ marginTop: '0.5rem' }}>
+                                <span style={{ fontSize: '0.75rem', color: '#888' }}>URL: </span>
+                                <a
+                                    href={`https://${createdTenant.domain}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ fontSize: '0.85rem', color: '#2563eb' }}
+                                >
+                                    https://{createdTenant.domain}
+                                </a>
                             </div>
                         </div>
 

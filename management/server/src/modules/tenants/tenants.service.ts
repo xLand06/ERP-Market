@@ -1,6 +1,11 @@
-import crypto from 'crypto';
-import bcrypt from 'bcryptjs';
 import { prisma } from '../../config/prisma';
+import {
+    provisionTenant,
+    suspendTenant as dockerSuspend,
+    resumeTenant as dockerResume,
+    deleteTenant as dockerDelete,
+    ProvisionInput,
+} from '../../services/provisioner';
 
 export interface CreateTenantInput {
     slug: string;
@@ -20,7 +25,7 @@ export interface UpdateTenantInput {
 
 /**
  * Servicio de gestión de tenants.
- * Opera sobre la tabla Tenant en PostgreSQL.
+ * Delega provisioning y lifecycle a dockerode via provisioner.ts.
  */
 export async function listTenants() {
     return prisma.tenant.findMany({
@@ -39,48 +44,19 @@ export async function getTenantBySlug(slug: string) {
 }
 
 /**
- * Genera una contraseña aleatoria segura de 24 caracteres.
- */
-function generatePassword(): string {
-    return crypto.randomBytes(18).toString('base64url');
-}
-
-/**
- * Genera un secret JWT aleatorio de 48 caracteres hexadecimales.
- */
-function generateJwtSecret(): string {
-    return crypto.randomBytes(24).toString('hex');
-}
-
-/**
- * Crea un tenant con credenciales auto-generadas.
- * Si se provee adminPassword, se hashea; si no, se genera una aleatoria.
- * Siempre genera dbPassword y jwtSecret nuevos.
+ * Crea un tenant completo: DB record + Docker containers + Caddy routing.
+ * Genera secretos, crea contenedores, espera health, semilla admin, configura Caddy.
  */
 export async function createTenant(input: CreateTenantInput) {
-    const dbPassword = generatePassword();
-    const jwtSecret = generateJwtSecret();
-    const adminPasswordPlain = input.adminPassword || generatePassword();
-    const adminPasswordHashed = await bcrypt.hash(adminPasswordPlain, 10);
-
-    const tenant = await prisma.tenant.create({
-        data: {
-            slug: input.slug,
-            domain: input.domain,
-            url: input.url || `https://${input.domain}`,
-            plan: input.plan || 'free',
-            adminEmail: input.adminEmail,
-            adminPassword: adminPasswordHashed,
-            dbPassword,
-            jwtSecret,
-        },
-    });
-
-    return {
-        ...tenant,
-        // Devolver credenciales en texto plano solo en la respuesta de creación
-        adminPasswordPlain,
+    const provisionInput: ProvisionInput = {
+        slug: input.slug,
+        domain: input.domain,
+        plan: input.plan,
+        adminEmail: input.adminEmail,
+        adminPassword: input.adminPassword,
     };
+
+    return provisionTenant(provisionInput);
 }
 
 export async function updateTenant(slug: string, input: UpdateTenantInput) {
@@ -90,21 +66,30 @@ export async function updateTenant(slug: string, input: UpdateTenantInput) {
     });
 }
 
+/**
+ * Elimina un tenant: contenedores Docker, volumen, Caddy y DB record.
+ */
 export async function deleteTenant(slug: string) {
-    return prisma.tenant.update({
-        where: { slug },
-        data: { status: 'DELETED' },
-    });
+    await dockerDelete(slug);
+    return prisma.tenant.findUnique({ where: { slug } });
 }
 
+/**
+ * Suspende un tenant: detiene contenedores Docker y actualiza estado.
+ */
 export async function suspendTenant(slug: string) {
+    await dockerSuspend(slug);
     return prisma.tenant.update({
         where: { slug },
         data: { status: 'SUSPENDED' },
     });
 }
 
+/**
+ * Reanuda un tenant: inicia contenedores Docker y actualiza estado.
+ */
 export async function resumeTenant(slug: string) {
+    await dockerResume(slug);
     return prisma.tenant.update({
         where: { slug },
         data: { status: 'ACTIVE' },

@@ -1,9 +1,16 @@
 import { prisma } from '../../config/prisma';
 import { inspectContainer, getContainerStats } from '../../services/docker';
 
+// Dockerode para exec en contenedores (reemplaza child_process.execSync)
+import Dockerode from 'dockerode';
+import { env } from '../../config/env';
+
+const docker = new Dockerode({ socketPath: env.DOCKER_SOCKET });
+
 /**
  * Servicio de health checks para tenants.
  * Verifica estado de contenedor, API y DB de cada tenant.
+ * Usa dockerode API para todo (sin shelling out a bash).
  */
 
 export interface HealthResult {
@@ -68,8 +75,56 @@ export async function getHealthHistory(slug: string, limit: number = 20) {
 }
 
 /**
+ * Ejecuta un comando dentro de un contenedor usando la API de dockerode.
+ * Retorna el exit code (0 = éxito).
+ */
+async function execInContainer(containerName: string, cmd: string[]): Promise<number> {
+    const container = docker.getContainer(containerName);
+
+    const exec = await container.exec({
+        Cmd: cmd,
+        AttachStdout: false,
+        AttachStderr: false,
+    });
+
+    return new Promise((resolve, reject) => {
+        exec.start({ Tty: false }, (err, stream) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+
+            if (!stream) {
+                reject(new Error('No se obtuvo stream del exec'));
+                return;
+            }
+
+            docker.modem.followProgress(
+                stream,
+                (err: Error | null, output: any[]) => {
+                    if (err) {
+                        reject(err);
+                        return;
+                    }
+                    // El exit code viene del inspect del exec
+                    exec.inspect((inspectErr, info) => {
+                        if (inspectErr) {
+                            reject(inspectErr);
+                            return;
+                        }
+                        resolve(info?.ExitCode ?? 0);
+                    });
+                },
+                () => {}
+            );
+        });
+    });
+}
+
+/**
  * Realiza health check de un tenant específico.
  * Verifica: contenedor, API, DB, memoria.
+ * Usa dockerode para todo — sin shelling out a bash.
  */
 export async function checkTenantHealth(tenantId: string, slug: string): Promise<HealthResult> {
     const result: HealthResult = {
@@ -108,18 +163,16 @@ export async function checkTenantHealth(tenantId: string, slug: string): Promise
             }
         }
 
-        // Verificar DB
+        // Verificar DB — usa dockerode exec en vez de execSync
         const dbName = `db-${slug}`;
         try {
             const dbContainer = await inspectContainer(dbName).catch(() => null);
             if (dbContainer && dbContainer.State.Running) {
-                // pg_isready via docker exec
-                const { execSync } = await import('child_process');
-                execSync(`docker exec ${dbName} pg_isready -U postgres`, {
-                    timeout: 5000,
-                    stdio: 'pipe',
-                });
-                result.dbHealthy = true;
+                // pg_isready via dockerode API (sin child_process)
+                const exitCode = await execInContainer(dbName, [
+                    'pg_isready', '-U', 'erp', '-d', 'erp_market',
+                ]);
+                result.dbHealthy = exitCode === 0;
             }
         } catch {
             result.dbHealthy = false;

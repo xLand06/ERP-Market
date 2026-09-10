@@ -11,6 +11,7 @@ import auditRoutes from './modules/audit/audit.routes';
 import healthRoutes from './modules/health/health.routes';
 import { startHealthCron, startAuditRetention } from './services/health-cron';
 import { getVpsStats } from './services/vps-stats';
+import { ensureNetwork } from './services/provisioner';
 
 const app = express();
 
@@ -78,9 +79,16 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 // Iniciar server
-app.listen(env.PORT, () => {
+app.listen(env.PORT, async () => {
     console.log(`[mgmt-server] Escuchando en puerto ${env.PORT}`);
     console.log(`[mgmt-server] Entorno: ${env.NODE_ENV}`);
+
+    // Asegurar red de Docker para tenants
+    try {
+        await ensureNetwork();
+    } catch (err) {
+        console.error('[mgmt-server] Error asegurando red erp_proxy:', err);
+    }
 
     // Iniciar crons solo en producción o desarrollo (no en tests)
     startHealthCron();
