@@ -142,6 +142,7 @@ async function waitForHealthy(containerName: string, timeoutSec: number): Promis
 
 /**
  * Ejecuta un comando dentro de un contenedor usando la API de dockerode.
+ * Espera a que el stream termine antes de inspeccionar el exit code.
  */
 async function execInContainer(containerName: string, cmd: string[]): Promise<{ exitCode: number }> {
     const container = docker.getContainer(containerName);
@@ -159,13 +160,8 @@ async function execInContainer(containerName: string, cmd: string[]): Promise<{ 
                 return;
             }
 
-            // Consumir el stream
-            if (stream) {
-                stream.resume();
-            }
-
-            // Obtener exit code via inspect
-            const checkExit = () => {
+            if (!stream) {
+                // Sin stream, inspeccionar directamente
                 exec.inspect((inspectErr: Error | null, info: any) => {
                     if (inspectErr) {
                         reject(inspectErr);
@@ -173,10 +169,24 @@ async function execInContainer(containerName: string, cmd: string[]): Promise<{ 
                     }
                     resolve({ exitCode: info?.ExitCode ?? 0 });
                 });
-            };
+                return;
+            }
 
-            // Esperar un momento para que el stream termine
-            setTimeout(checkExit, 100);
+            // Consumir el stream hasta que termine
+            stream.resume();
+            stream.on('end', () => {
+                // Stream cerrado — ahora sí inspeccionar el exit code
+                exec.inspect((inspectErr: Error | null, info: any) => {
+                    if (inspectErr) {
+                        reject(inspectErr);
+                        return;
+                    }
+                    resolve({ exitCode: info?.ExitCode ?? 0 });
+                });
+            });
+            stream.on('error', (streamErr: Error) => {
+                reject(streamErr);
+            });
         });
     });
 }
@@ -415,6 +425,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
             'NODE_ENV=production',
             'PORT=3000',
             'DEPLOY_MODE=server',
+            `DB_HOST=${dbContainerName}`,
             `DATABASE_URL=postgresql://erp:${dbPassword}@${dbContainerName}:5432/erp_market?schema=public&connection_limit=5`,
             `DIRECT_URL=postgresql://erp:${dbPassword}@${dbContainerName}:5432/erp_market?schema=public`,
             `JWT_SECRET=${jwtSecret}`,

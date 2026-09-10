@@ -132,10 +132,11 @@ RUN cat > /usr/local/bin/docker-entrypoint.sh <<'SH'
 #!/bin/bash
 set -Eeuo pipefail
 
-echo "[entrypoint] waiting for Postgres (db:5432, up to 60s)..."
+DB_HOST="${DB_HOST:-db}"
+echo "[entrypoint] waiting for Postgres (${DB_HOST}:5432, up to 60s)..."
 ready=0
 for i in $(seq 1 30); do
-    if (exec 3<>/dev/tcp/db/5432) 2>/dev/null; then
+    if (exec 3<>/dev/tcp/${DB_HOST}/5432) 2>/dev/null; then
         exec 3>&- 3<&-
         ready=1
         break
