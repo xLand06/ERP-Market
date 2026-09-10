@@ -248,7 +248,7 @@ async function registerTenantFromEnv(
     adminEmailFinal: string,
     adminPasswordFinal: string,
 ): Promise<ProvisionResult> {
-    const envPath = path.join(HOST_DEPLOY_DIR, 'clients', slug, '.env');
+    const envPath = path.join(DEPLOY_DIR, 'clients', slug, '.env');
     let envVars: Record<string, string>;
     try {
         const envContent = await fs.readFile(envPath, 'utf-8');
@@ -621,7 +621,7 @@ export async function deleteTenant(slug: string): Promise<void> {
 
     // Eliminar directorio del cliente
     try {
-        await fs.rm(path.join(HOST_DEPLOY_DIR, 'clients', slug), { recursive: true, force: true });
+        await fs.rm(path.join(DEPLOY_DIR, 'clients', slug), { recursive: true, force: true });
         console.log(`[provisioner] Directorio clients/${slug} eliminado`);
     } catch {
         // No existia
