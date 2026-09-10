@@ -24,8 +24,8 @@ export interface UpdateTenantInput {
 }
 
 /**
- * Servicio de gestión de tenants.
- * Delega provisioning y lifecycle a dockerode via provisioner.ts.
+ * Servicio de gestion de tenants.
+ * Delega provisioning y lifecycle a add-client.sh via provisioner.ts.
  */
 export async function listTenants() {
     return prisma.tenant.findMany({
@@ -44,7 +44,7 @@ export async function getTenantBySlug(slug: string) {
 }
 
 /**
- * Crea un tenant completo: DB record + Docker containers + Caddy routing.
+ * Crea un tenant completo ejecutando add-client.sh via Docker.
  * Genera secretos, crea contenedores, espera health, semilla admin, configura Caddy.
  */
 export async function createTenant(input: CreateTenantInput) {
@@ -59,10 +59,23 @@ export async function createTenant(input: CreateTenantInput) {
     return provisionTenant(provisionInput);
 }
 
+/**
+ * Actualiza campos generales de un tenant (dominio, URL, plan, email).
+ */
 export async function updateTenant(slug: string, input: UpdateTenantInput) {
     return prisma.tenant.update({
         where: { slug },
         data: input,
+    });
+}
+
+/**
+ * Actualiza solo el plan de un tenant.
+ */
+export async function updatePlan(slug: string, plan: string) {
+    return prisma.tenant.update({
+        where: { slug },
+        data: { plan },
     });
 }
 
