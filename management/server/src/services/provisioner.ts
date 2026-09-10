@@ -91,7 +91,7 @@ async function runAddClientScript(
     const containerName = `provision-${slug}-${Date.now()}`;
 
     const container = await docker.createContainer({
-        Image: 'alpine:3.20',
+        Image: 'alpine:latest',
         Cmd: ['sh', '-c', setupCmd],
         name: containerName,
         HostConfig: {
@@ -394,7 +394,7 @@ export async function provisionWithLogs(
     sendLog(`Creando contenedor efimero: ${containerName}`);
 
     const container = await docker.createContainer({
-        Image: 'alpine:3.20',
+        Image: 'alpine:latest',
         Cmd: ['sh', '-c', setupCmd],
         name: containerName,
         HostConfig: {
