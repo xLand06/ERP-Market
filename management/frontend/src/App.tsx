@@ -1,36 +1,61 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Layout from './components/Layout';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import Tenants from './pages/Tenants';
+import TenantDetail from './pages/TenantDetail';
+import Payments from './pages/Payments';
 
-interface HealthStatus {
-    status: string;
-    timestamp: string;
-    database: string;
+interface AuthState {
+    token: string;
+    user: { username: string; role: string };
 }
 
 export default function App() {
-    const [health, setHealth] = useState<HealthStatus | null>(null);
-    const [error, setError] = useState<string | null>(null);
+    const [auth, setAuth] = useState<AuthState | null>(null);
 
+    // Restaurar sesión desde localStorage
     useEffect(() => {
-        fetch('/api/health')
-            .then((res) => res.json())
-            .then(setHealth)
-            .catch((err) => setError(err.message));
+        const token = localStorage.getItem('mgmt_token');
+        const userStr = localStorage.getItem('mgmt_user');
+        if (token && userStr) {
+            try {
+                setAuth({ token, user: JSON.parse(userStr) });
+            } catch {
+                localStorage.removeItem('mgmt_token');
+                localStorage.removeItem('mgmt_user');
+            }
+        }
     }, []);
 
+    const handleLogin = useCallback((token: string, user: { username: string; role: string }) => {
+        localStorage.setItem('mgmt_user', JSON.stringify(user));
+        setAuth({ token, user });
+    }, []);
+
+    const handleLogout = useCallback(() => {
+        localStorage.removeItem('mgmt_token');
+        localStorage.removeItem('mgmt_user');
+        setAuth(null);
+    }, []);
+
+    // No autenticado — mostrar login
+    if (!auth) {
+        return <Login onLogin={handleLogin} />;
+    }
+
     return (
-        <div style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
-            <h1>ERP Market — Panel de Gestión</h1>
-            <h2>Estado del Sistema</h2>
-            {error && <p style={{ color: 'red' }}>Error: {error}</p>}
-            {health ? (
-                <ul>
-                    <li>Estado: <strong>{health.status}</strong></li>
-                    <li>Base de datos: <strong>{health.database}</strong></li>
-                    <li>Timestamp: {health.timestamp}</li>
-                </ul>
-            ) : (
-                <p>Cargando...</p>
-            )}
-        </div>
+        <BrowserRouter>
+            <Layout onLogout={handleLogout}>
+                <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/tenants" element={<Tenants />} />
+                    <Route path="/tenants/:slug" element={<TenantDetail />} />
+                    <Route path="/payments" element={<Payments />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+            </Layout>
+        </BrowserRouter>
     );
 }
