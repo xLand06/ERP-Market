@@ -64,7 +64,7 @@ export const createTransactionSchema = z.object({
  * Filtros para listar transacciones
  */
 export const transactionFiltersSchema = paginationSchema.extend({
-    type: z.enum(['SALE', 'INVENTORY_IN']).optional(),
+    type: z.enum(['SALE', 'INVENTORY_IN', 'QUOTE']).optional(),
     status: z.enum(['COMPLETED', 'CANCELLED', 'PENDING']).optional(),
     branchId: z.string().optional(),
     userId: z.string().optional(),
@@ -81,6 +81,27 @@ export const cancelTransactionSchema = z.object({
 });
 
 /**
+ * Esquema para crear una cotización (F4)
+ * Sin caja, sin pagos, sin descuento de stock — solo valida sucursal + items.
+ */
+export const createQuoteSchema = z.object({
+    // 'QUOTE' o sin type (se asume QUOTE)
+    type: z.literal('QUOTE').optional(),
+    branchId: z.string().min(1, 'ID de sede es requerido'),
+    items: z.array(transactionItemSchema).min(1, 'Debe incluir al menos un producto'),
+    notes: z.string().max(500, 'Las notas son muy largas').optional().or(z.literal('')),
+    currency: z.enum(['COP', 'USD', 'VES']).optional(),
+});
+
+/**
+ * Esquema para convertir una cotización en venta (F4)
+ * Vacío o con branchId opcional (usa el de la cotización por defecto).
+ */
+export const convertQuoteSchema = z.object({
+    branchId: z.string().min(1, 'ID de sede es requerido').optional(),
+}).default({});
+
+/**
  * Tipos inferidos
  */
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
@@ -88,3 +109,5 @@ export type TransactionItemInput = z.infer<typeof transactionItemSchema>;
 export type TransactionFiltersInput = z.infer<typeof transactionFiltersSchema>;
 export type CancelTransactionInput = z.infer<typeof cancelTransactionSchema>;
 export type PaymentMethodInput = z.infer<typeof paymentMethodSchema>;
+export type CreateQuoteInput = z.infer<typeof createQuoteSchema>;
+export type ConvertQuoteInput = z.infer<typeof convertQuoteSchema>;

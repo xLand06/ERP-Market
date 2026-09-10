@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../core/middlewares/auth.middleware';
 import { roleGuard } from '../../core/middlewares/roleGuard';
+import { planEnforcement } from '../../core/middlewares/plan.middleware';
 import { validate } from '../../core/middlewares/validate.middleware';
 import { idParamSchema } from '../../core/validations/common.zod';
 import { productFiltersSchema, createProductSchema, updateProductSchema } from '../../core/validations/products.zod';
@@ -41,7 +42,7 @@ router.get('/:id', validate(idParamSchema, { source: 'params' }), ctrl.getProduc
  * Crear producto (SOLO OWNER)
  * Body: { name, description, barcode, price, cost, subGroupId }
  */
-router.post('/', roleGuard('OWNER'), validate(createProductSchema), ctrl.createProduct);
+router.post('/', planEnforcement('products'), roleGuard('OWNER'), validate(createProductSchema), ctrl.createProduct);
 
 /**
  * PUT /api/products/:id

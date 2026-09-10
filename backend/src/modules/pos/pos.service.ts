@@ -333,3 +333,202 @@ export const cancelTransaction = async (id: string) => {
         return txClient.transaction.findUnique({ where: { id } });
     });
 };
+
+// =============================================================================
+// F4 — COTIZACIONES
+// =============================================================================
+
+export interface CreateQuoteInput {
+    branchId: string;
+    userId: string;
+    items: TransactionItemInput[];
+    notes?: string;
+    currency?: string;
+}
+
+export interface ConvertQuoteInput {
+    userId: string;
+    branchId?: string;
+}
+
+/**
+ * Parsea el metadata de una transacción (JSON string en SQLite local).
+ * En la nube (Postgres) es Json — se normaliza a objeto.
+ */
+const parseTransactionMetadata = (raw: unknown): Record<string, any> => {
+    if (!raw) return {};
+    if (typeof raw === 'object') return raw as Record<string, any>;
+    try {
+        return JSON.parse(raw as string);
+    } catch {
+        return {};
+    }
+};
+
+/**
+ * Serializa metadata para escritura (JSON string en SQLite local).
+ */
+const serializeMetadata = (metadata: Record<string, any>): string =>
+    JSON.stringify(metadata);
+
+/**
+ * Crea una cotización (QUOTE) sin afectar stock, sin caja y sin validar pagos.
+ * Valida sucursal activa + que los productos existan y estén activos.
+ */
+export const createQuote = async (input: CreateQuoteInput): Promise<any> => {
+    const { branchId, userId, items, notes, currency = 'COP' } = input;
+
+    // 1. Validar que la sucursal existe y está activa
+    const branch = await prisma.branch.findUnique({
+        where: { id: branchId },
+        select: { isActive: true, name: true },
+    });
+    if (!branch) throw new Error('La sucursal no existe.');
+    if (!branch.isActive) {
+        throw new Error(`La sucursal "${branch.name}" está desactivada y no puede procesar nuevas cotizaciones.`);
+    }
+
+    // 2. Validar que los productos existen y están activos
+    const productIds = items.map(i => i.productId);
+    const products = await prisma.product.findMany({
+        where: { id: { in: productIds }, isActive: true },
+        select: { id: true },
+    });
+    if (products.length !== new Set(productIds).size) {
+        throw new Error('Uno o más productos no existen o están inactivos.');
+    }
+
+    // Total en la moneda de referencia de los ítems
+    const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+
+    return prisma.$transaction(async (tx) => {
+        const txRecord = await tx.transaction.create({
+            data: {
+                type: TransactionType.QUOTE,
+                status: TransactionStatus.COMPLETED,
+                total,
+                notes,
+                userId,
+                branchId,
+                cashRegisterId: null,
+                currency: currency || 'COP',
+                exchangeRate: null,
+                invoiceNumber: null,
+                // Sin métodos de pago ni descuento de stock
+                paymentMethods: null as any,
+                metadata: serializeMetadata({ type: 'quote' }),
+                items: {
+                    create: items.map((item) => ({
+                        productId: item.productId,
+                        presentationId: item.presentationId || null,
+                        quantity: item.quantity,
+                        multiplierUsed: 1,
+                        unitPrice: item.unitPrice,
+                        subtotal: item.quantity * item.unitPrice,
+                    })),
+                },
+            },
+            include: { items: { include: { product: { select: { name: true, barcode: true } } } } },
+        });
+
+        return txRecord;
+    });
+};
+
+/**
+ * Lista cotizaciones con filtros y paginación.
+ */
+export const getQuotes = async (filters: { branchId?: string; page?: number; limit?: number }): Promise<any[]> => {
+    const { branchId, page = 1, limit = 50 } = filters;
+    const rows = await prisma.transaction.findMany({
+        where: {
+            type: TransactionType.QUOTE,
+            ...(branchId && branchId !== 'all' && { branchId }),
+        },
+        include: {
+            items: { include: { product: { select: { id: true, name: true, barcode: true, baseUnit: true } } } },
+            user: { select: { id: true, nombre: true, username: true } },
+            branch: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+    });
+
+    // Normalizar metadata + exponer flag de conversión para el frontend
+    return rows.map((q: any) => {
+        const metadata = parseTransactionMetadata(q.metadata);
+        return { ...q, metadata, alreadyConverted: Boolean(metadata.quoteConvertedTo) };
+    });
+};
+
+/**
+ * Detalle de una cotización por ID.
+ */
+export const getQuoteById = async (id: string): Promise<any> => {
+    const quote = await prisma.transaction.findUnique({
+        where: { id },
+        include: {
+            items: { include: { product: true, presentation: true } },
+            user: { select: { id: true, nombre: true, username: true } },
+            branch: { select: { id: true, name: true } },
+        },
+    });
+    if (!quote) return null;
+
+    const metadata = parseTransactionMetadata((quote as any).metadata);
+    return { ...quote, metadata, alreadyConverted: Boolean(metadata.quoteConvertedTo) };
+};
+
+/**
+ * Convierte una cotización en una venta real (SALE).
+ * Idempotente: si la cotización ya fue convertida, devuelve error 409.
+ */
+export const convertQuoteToSale = async (quoteId: string, input: ConvertQuoteInput): Promise<any> => {
+    const quote = await prisma.transaction.findUnique({
+        where: { id: quoteId },
+        include: { items: true },
+    });
+
+    if (!quote) throw new Error('Cotización no encontrada');
+    if (quote.type !== TransactionType.QUOTE) throw new Error('La transacción no es una cotización');
+
+    // Idempotencia: si ya convertida, error 409
+    const metadata = parseTransactionMetadata((quote as any).metadata);
+    if (metadata.quoteConvertedTo) {
+        const err: any = new Error('La cotización ya fue convertida a venta.');
+        err.status = 409;
+        err.alreadyConverted = true;
+        throw err;
+    }
+
+    // Crear la venta real reutilizando createTransaction con los items y moneda de la cotización
+    const sale = await createTransaction({
+        type: TransactionType.SALE,
+        branchId: input.branchId || quote.branchId,
+        userId: input.userId,
+        items: quote.items.map((item) => ({
+            productId: item.productId,
+            presentationId: item.presentationId || undefined,
+            quantity: Number(item.quantity),
+            unitPrice: Number(item.unitPrice),
+        })),
+        currency: (quote as any).currency || 'COP',
+        notes: quote.notes || undefined,
+    });
+
+    // Marcar la cotización como convertida (quoteConvertedTo = id de la venta)
+    const newQuoteMetadata = { ...metadata, quoteConvertedTo: sale.id };
+    await prisma.transaction.update({
+        where: { id: quoteId },
+        data: { metadata: serializeMetadata(newQuoteMetadata) },
+    });
+
+    // Marcar la venta con su origen (quoteSource)
+    await prisma.transaction.update({
+        where: { id: sale.id },
+        data: { metadata: serializeMetadata({ quoteSource: quoteId }) },
+    });
+
+    return sale;
+};
