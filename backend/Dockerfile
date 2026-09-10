@@ -105,6 +105,8 @@ COPY --from=build --chown=node:node /app/package.json /app/prisma.config.ts ./
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/prisma ./prisma
 COPY --from=build --chown=node:node /app/dist ./dist
+# Copiar seed script para creación de admin (se ejecuta con ts-node)
+COPY --from=build --chown=node:node /app/src/scripts/seed-admin.ts ./src/scripts/seed-admin.ts
 # The API serves the web UI from path.join(__dirname, '../public') — same
 # location as before, but now FROM the fresh bundle built by web-build.
 COPY --from=web-build --chown=node:node /repo/frontend/dist ./public
