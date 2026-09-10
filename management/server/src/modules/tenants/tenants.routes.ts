@@ -16,10 +16,10 @@ const router = Router();
 // Schemas de validación
 const createTenantSchema = z.object({
     slug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/),
-    domain: z.string().min(1).optional(),
+    domain: z.string().min(1).optional().or(z.literal('')).transform(v => v || undefined),
     url: z.string().url().optional(),
     plan: z.string().optional(),
-    adminEmail: z.string().email().optional(),
+    adminEmail: z.string().email().optional().or(z.literal('')).transform(v => v || undefined),
     adminPassword: z.string().min(8).optional(),
 });
 
