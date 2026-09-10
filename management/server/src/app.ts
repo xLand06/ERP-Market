@@ -3,12 +3,14 @@ import cors from 'cors';
 import path from 'path';
 import { env } from './config/env';
 import { prisma } from './config/prisma';
+import { authMiddleware } from './middlewares/auth';
 import authRoutes from './modules/auth/auth.routes';
 import tenantsRoutes from './modules/tenants/tenants.routes';
 import paymentsRoutes from './modules/payments/payments.routes';
 import auditRoutes from './modules/audit/audit.routes';
 import healthRoutes from './modules/health/health.routes';
 import { startHealthCron, startAuditRetention } from './services/health-cron';
+import { getVpsStats } from './services/vps-stats';
 
 const app = express();
 
@@ -45,6 +47,17 @@ app.use('/api/tenants', tenantsRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/health', healthRoutes);
+
+// GET /api/vps/stats — estadísticas del servidor VPS
+app.get('/api/vps/stats', authMiddleware, (_req, res) => {
+    try {
+        const stats = getVpsStats();
+        res.json(stats);
+    } catch (error) {
+        console.error('[mgmt-server] Error obteniendo stats VPS:', error);
+        res.status(500).json({ error: 'Error al obtener estadísticas del servidor' });
+    }
+});
 
 // Servir frontend estático (production build)
 const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');

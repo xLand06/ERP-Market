@@ -17,9 +17,10 @@ const router = Router();
 const createTenantSchema = z.object({
     slug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/),
     domain: z.string().min(1),
-    url: z.string().url(),
+    url: z.string().url().optional(),
     plan: z.string().optional(),
     adminEmail: z.string().email().optional(),
+    adminPassword: z.string().min(8).optional(),
 });
 
 const updateTenantSchema = z.object({
