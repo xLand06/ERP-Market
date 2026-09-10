@@ -15,7 +15,9 @@ const NETWORK_NAME = 'erp_proxy';
 const DB_IMAGE = 'postgres:16-alpine';
 const API_IMAGE = 'erp-market:latest';
 const DEPLOY_DIR = process.env.DEPLOY_DIR || path.resolve(__dirname, '../../../../deploy');
-const SITES_DIR = path.join(DEPLOY_DIR, 'caddy/sites');
+// Path del host para volume mounts de Docker (los containers DB necesitan el path del host, no del contenedor)
+const HOST_DEPLOY_DIR = process.env.HOST_DEPLOY_DIR || DEPLOY_DIR;
+const SITES_DIR = path.join(HOST_DEPLOY_DIR, 'caddy/sites');
 
 // Tiempo máximo de espera para que DB esté healthy (segundos)
 const DB_HEALTH_TIMEOUT = 120;
@@ -273,7 +275,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     console.log(`[provisioner] Iniciando provisioning para tenant: ${slug}`);
 
     // ── 2. Crear directorio del cliente + TLS ────────────────────────────
-    const clientDir = path.join(DEPLOY_DIR, 'clients', slug);
+    const clientDir = path.join(HOST_DEPLOY_DIR, 'clients', slug);
     const tlsDir = path.join(clientDir, 'tls');
 
     await fs.mkdir(tlsDir, { recursive: true });
@@ -507,7 +509,7 @@ async function rollbackProvisioning(slug: string, tenantId: string): Promise<voi
 
     // Eliminar directorio del cliente
     try {
-        await fs.rm(path.join(DEPLOY_DIR, 'clients', slug), { recursive: true, force: true });
+        await fs.rm(path.join(HOST_DEPLOY_DIR, 'clients', slug), { recursive: true, force: true });
     } catch {
         // No existía
     }
@@ -637,7 +639,7 @@ export async function deleteTenant(slug: string): Promise<void> {
 
     // Eliminar directorio del cliente
     try {
-        await fs.rm(path.join(DEPLOY_DIR, 'clients', slug), { recursive: true, force: true });
+        await fs.rm(path.join(HOST_DEPLOY_DIR, 'clients', slug), { recursive: true, force: true });
         console.log(`[provisioner] Directorio clients/${slug} eliminado`);
     } catch {
         // No existía
