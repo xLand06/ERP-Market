@@ -25,6 +25,7 @@ export interface ProvisionInput {
     slug: string;
     domain?: string;
     plan?: string;
+    product?: string;
     adminEmail?: string;
     adminUser?: string;
     adminPassword?: string;
@@ -222,6 +223,7 @@ async function removeCaddySite(slug: string): Promise<void> {
 export async function provisionTenant(input: ProvisionInput): Promise<ProvisionResult> {
     const { slug, adminEmail, adminPassword: adminPasswordInput } = input;
     const plan = input.plan || 'free';
+    const product = input.product || 'market';
     const domain = input.domain || '';
     const adminEmailFinal = adminEmail || `admin@${slug}.local`;
     const adminPasswordFinal = adminPasswordInput || '';
@@ -234,7 +236,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     console.log(`[provisioner] add-client.sh completado para ${slug}`);
 
     // ── 2. Registrar/actualizar tenant en la DB ───────────────────────
-    return await registerTenantFromEnv(slug, domain, plan, adminEmailFinal, adminPasswordFinal);
+    return await registerTenantFromEnv(slug, domain, plan, product, adminEmailFinal, adminPasswordFinal);
 }
 
 /**
@@ -245,6 +247,7 @@ async function registerTenantFromEnv(
     slug: string,
     domain: string,
     plan: string,
+    product: string,
     adminEmailFinal: string,
     adminPasswordFinal: string,
 ): Promise<ProvisionResult> {
@@ -273,6 +276,7 @@ async function registerTenantFromEnv(
             domain: clientDomain,
             url: clientUrl,
             plan,
+            product,
             adminEmail: finalAdminEmail,
             adminPassword: adminPasswordHashed,
             jwtSecret,
@@ -284,6 +288,7 @@ async function registerTenantFromEnv(
             domain: clientDomain,
             url: clientUrl,
             plan,
+            product,
             adminEmail: finalAdminEmail,
             adminPassword: adminPasswordHashed,
             jwtSecret,
@@ -328,6 +333,7 @@ export async function provisionWithLogs(
     slug: string,
     domain: string,
     plan: string,
+    product: string,
     adminEmail: string,
     adminUser: string,
     adminPassword: string,
@@ -366,7 +372,7 @@ export async function provisionWithLogs(
     sendLog('add-client.sh completado — registrando tenant en DB...');
 
     // Registrar en DB
-    const result = await registerTenantFromEnv(slug, domain, plan, adminEmail, adminPassword);
+    const result = await registerTenantFromEnv(slug, domain, plan, product, adminEmail, adminPassword);
     sendLog(`Tenant ${slug} registrado exitosamente (id: ${result.tenantId})`);
 
     return result;
@@ -408,6 +414,7 @@ export function getProvisioningState(slug: string) {
 export async function startProvisioningInBackground(input: ProvisionInput): Promise<void> {
     const { slug, domain, plan } = input;
     const tenantDomain = domain || `${slug}.89.167.46.144.sslip.io`;
+    const product = input.product || 'market';
 
     // 1. Crear/actualizar el tenant con status PROVISIONING
     await prisma.tenant.upsert({
@@ -415,6 +422,7 @@ export async function startProvisioningInBackground(input: ProvisionInput): Prom
         update: {
             status: 'PROVISIONING',
             plan: plan || 'free',
+            product,
         },
         create: {
             slug,
@@ -422,6 +430,7 @@ export async function startProvisioningInBackground(input: ProvisionInput): Prom
             url: `https://${tenantDomain}`,
             status: 'PROVISIONING',
             plan: plan || 'free',
+            product,
         },
     });
 
@@ -450,6 +459,7 @@ export async function startProvisioningInBackground(input: ProvisionInput): Prom
         slug,
         domain || '',
         plan || 'free',
+        product,
         input.adminEmail || `admin@${slug}.local`,
         input.adminUser || 'admin',
         input.adminPassword || '',

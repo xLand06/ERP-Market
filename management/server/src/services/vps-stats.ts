@@ -76,7 +76,7 @@ function parseDfOutput(output: string): { totalGb: number; usedGb: number; freeG
 
 /**
  * Obtiene estadísticas del VPS con cache de 10 segundos.
- * Usa comandos del sistema: free, df, nproc, docker, uptime.
+ * Usa comandos del sistema: free, df, nproc, docker, /proc/uptime.
  */
 export function getVpsStats(): VpsStats {
     const now = Date.now();
@@ -103,8 +103,18 @@ export function getVpsStats(): VpsStats {
     const allContainers = parseInt(safeExec('docker ps -aq | wc -l'), 10) || 0;
     const stopped = Math.max(0, allContainers - running);
 
-    // Uptime
-    const uptime = safeExec('uptime -s') || safeExec('uptime') || 'No disponible';
+    // Uptime: /proc/uptime tiene los segundos desde el boot
+    // (BusyBox no soporta `uptime -p`, por eso lo formateamos a mano)
+    const uptimeRaw = safeExec('cat /proc/uptime').split(' ')[0];
+    const uptimeSec = parseInt(uptimeRaw, 10) || 0;
+    const upDays = Math.floor(uptimeSec / 86400);
+    const upHours = Math.floor((uptimeSec % 86400) / 3600);
+    const upMins = Math.floor((uptimeSec % 3600) / 60);
+    const uptime = upDays > 0
+        ? `${upDays}d ${upHours}h ${upMins}m`
+        : upHours > 0
+            ? `${upHours}h ${upMins}m`
+            : `${upMins}m`;
 
     cache = {
         cpu: { cores, usagePercent },

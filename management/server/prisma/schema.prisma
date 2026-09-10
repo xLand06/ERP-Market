@@ -30,6 +30,7 @@ model Tenant {
     url           String
     status        TenantStatus @default(ACTIVE)
     plan          String       @default("free")
+    product       String       @default("market")   // ALL MARKET, ALL REPAIR, ...
     adminEmail    String?
     adminPassword String?
     dbPassword    String?

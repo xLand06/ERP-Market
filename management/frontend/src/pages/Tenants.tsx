@@ -70,6 +70,7 @@ interface Tenant {
     url: string;
     status: string;
     plan: string;
+    product?: string;
     adminEmail: string | null;
     createdAt: string;
 }
@@ -137,6 +138,17 @@ const HEALTH_STATUS = {
     unknown: { label: 'Desconocido', color: '#64748b', bg: '#f1f5f9' },
     partial: { label: 'Parcial', color: '#d97706', bg: '#fffbeb' },
 };
+
+// Etiquetas cortas para el badge de producto en la tabla
+const PRODUCT_LABELS: Record<string, string> = {
+    market: 'MARKET',
+    repair: 'REPAIR',
+};
+
+function getProductLabel(product?: string): string {
+    if (!product) return 'MARKET';
+    return PRODUCT_LABELS[product] || product.toUpperCase();
+}
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 
@@ -253,6 +265,7 @@ export default function Tenants() {
     const [formUser, setFormUser] = useState('');
     const [formPassword, setFormPassword] = useState('');
     const [formPlan, setFormPlan] = useState('free');
+    const [formProduct, setFormProduct] = useState('market');
     const [formError, setFormError] = useState<string | null>(null);
 
     const [confirmAction, setConfirmAction] = useState<{
@@ -316,6 +329,7 @@ export default function Tenants() {
         setFormUser('');
         setFormPassword('');
         setFormPlan('free');
+        setFormProduct('market');
         setFormError(null);
     }, []);
 
@@ -338,6 +352,7 @@ export default function Tenants() {
             const body: Record<string, string> = {
                 slug: formSlug,
                 domain: formDomain,
+                product: formProduct,
             };
             if (formEmail) body.adminEmail = formEmail;
             if (formUser) body.adminUser = formUser;
@@ -371,7 +386,7 @@ export default function Tenants() {
         } finally {
             setCreating(false);
         }
-    }, [formSlug, formDomain, formEmail, formPassword, formPlan, resetForm, fetchTenants, addToast]);
+    }, [formSlug, formDomain, formEmail, formPassword, formPlan, formProduct, resetForm, fetchTenants, addToast]);
 
     const handleSuspend = useCallback(async (slug: string) => {
         const token = localStorage.getItem('mgmt_token');
@@ -713,17 +728,33 @@ export default function Tenants() {
                                     >
                                         <td style={{ padding: '0.85rem 1rem' }}>
                                             <div>
-                                                <span
-                                                    onClick={() => navigate(`/tenants/${t.slug}`)}
-                                                    style={{
-                                                        color: COLORS.info,
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <span
+                                                        onClick={() => navigate(`/tenants/${t.slug}`)}
+                                                        style={{
+                                                            color: COLORS.info,
+                                                            fontWeight: 600,
+                                                            fontSize: '0.9rem',
+                                                            cursor: 'pointer',
+                                                        }}
+                                                    >
+                                                        {t.slug}
+                                                    </span>
+                                                    <span style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        padding: '1px 6px',
+                                                        borderRadius: 6,
+                                                        fontSize: '0.65rem',
                                                         fontWeight: 600,
-                                                        fontSize: '0.9rem',
-                                                        cursor: 'pointer',
-                                                    }}
-                                                >
-                                                    {t.slug}
-                                                </span>
+                                                        letterSpacing: '0.05em',
+                                                        background: '#f1f5f9',
+                                                        color: '#475569',
+                                                        border: '1px solid #e2e8f0',
+                                                    }}>
+                                                        {getProductLabel(t.product)}
+                                                    </span>
+                                                </div>
                                                 <div style={{ fontSize: '0.75rem', color: COLORS.muted, marginTop: 2 }}>
                                                     {t.domain}
                                                 </div>
@@ -880,12 +911,28 @@ export default function Tenants() {
                         >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
                                 <div>
-                                    <span
-                                        onClick={() => navigate(`/tenants/${t.slug}`)}
-                                        style={{ color: COLORS.info, fontWeight: 600, fontSize: '0.95rem', cursor: 'pointer' }}
-                                    >
-                                        {t.slug}
-                                    </span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                        <span
+                                            onClick={() => navigate(`/tenants/${t.slug}`)}
+                                            style={{ color: COLORS.info, fontWeight: 600, fontSize: '0.95rem', cursor: 'pointer' }}
+                                        >
+                                            {t.slug}
+                                        </span>
+                                        <span style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            padding: '1px 6px',
+                                            borderRadius: 6,
+                                            fontSize: '0.65rem',
+                                            fontWeight: 600,
+                                            letterSpacing: '0.05em',
+                                            background: '#f1f5f9',
+                                            color: '#475569',
+                                            border: '1px solid #e2e8f0',
+                                        }}>
+                                            {getProductLabel(t.product)}
+                                        </span>
+                                    </div>
                                     <div style={{ fontSize: '0.75rem', color: COLORS.muted }}>{t.domain}</div>
                                 </div>
                                 <span style={{
@@ -1142,6 +1189,33 @@ export default function Tenants() {
                                     minHeight: 44,
                                 }}
                             />
+                        </div>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                                Producto
+                            </label>
+                            <select
+                                value={formProduct}
+                                onChange={(e) => setFormProduct(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.6rem 0.75rem',
+                                    borderRadius: 6,
+                                    border: '1px solid #e2e8f0',
+                                    fontSize: '0.9rem',
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                    minHeight: 44,
+                                    background: '#fff',
+                                }}
+                            >
+                                <option value="market">ALL MARKET — Sistema de supermercados</option>
+                                <option value="repair" disabled>ALL REPAIR — Próximamente</option>
+                            </select>
+                            <span style={{ fontSize: '0.75rem', color: COLORS.muted }}>
+                                Más productos próximamente
+                            </span>
                         </div>
 
                         <div style={{ marginBottom: '1.5rem' }}>
