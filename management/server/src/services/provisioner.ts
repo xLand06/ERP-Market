@@ -14,7 +14,7 @@ const docker = new Dockerode({ socketPath: env.DOCKER_SOCKET });
 const NETWORK_NAME = 'erp_proxy';
 const DB_IMAGE = 'postgres:16-alpine';
 const API_IMAGE = 'erp-market:latest';
-const DEPLOY_DIR = path.resolve(__dirname, '../../../../deploy');
+const DEPLOY_DIR = process.env.DEPLOY_DIR || path.resolve(__dirname, '../../../../deploy');
 const SITES_DIR = path.join(DEPLOY_DIR, 'caddy/sites');
 
 // Tiempo máximo de espera para que DB esté healthy (segundos)

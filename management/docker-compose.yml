@@ -15,8 +15,10 @@ services:
       DATABASE_URL: postgresql://mgmt:${MGMT_DB_PASSWORD}@mgmt-db:5432/mgmt
       JWT_SECRET: ${JWT_SECRET}
       DOCKER_SOCKET: /var/run/docker.sock
+      DEPLOY_DIR: /deploy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/erp-market/deploy:/deploy
     depends_on:
       mgmt-db:
         condition: service_healthy
