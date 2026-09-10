@@ -42,6 +42,8 @@ COMPOSE_OP_FILE="$DEPLOY_DIR/docker-compose.yml"
 SLUG="${1:-}"
 DOMAIN_ARG="${2:-}"
 ADMIN_EMAIL="${3:-}"
+ADMIN_USER="${4:-admin}"
+ADMIN_PASSWORD="${5:-admin123}"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -51,7 +53,7 @@ command -v envsubst >/dev/null 2>&1 || fail "envsubst not found (Debian/Ubuntu: 
 command -v openssl >/dev/null 2>&1 || fail "openssl not found"
 command -v curl >/dev/null 2>&1 || fail "curl not found"
 
-[[ -n "$SLUG" ]] || fail "usage: add-client.sh <slug> [domain] [admin-email]"
+[[ -n "$SLUG" ]] || fail "usage: add-client.sh <slug> [domain] [admin-email] [admin-user] [admin-password]"
 [[ "$SLUG" =~ ^[a-z0-9-]{3,32}$ ]] || fail "slug must be 3-32 chars of lowercase alnum + hyphens: '$SLUG'"
 [[ "$SLUG" != -* && "$SLUG" != *- ]] || fail "slug must not start or end with '-'"
 
@@ -277,6 +279,34 @@ if [[ "$REVERIFY" == "1" ]]; then
     echo "already provisioned — re-verified OK"
 fi
 
+# ── Registrar en el dashboard del management server ──────────────────────────
+if docker ps --format '{{.Names}}' | grep -q "mgmt-api"; then
+    echo "registrando tenant en el dashboard..."
+    docker exec mgmt-api node -e "
+const { PrismaClient } = require('@prisma/client');
+async function main() {
+    const prisma = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
+    await prisma.tenant.upsert({
+        where: { slug: '$SLUG' },
+        update: { domain: '$CLIENT_DOMAIN', status: 'ACTIVE', adminEmail: '$ADMIN_EMAIL' },
+        create: {
+            slug: '$SLUG',
+            domain: '$CLIENT_DOMAIN',
+            url: '$CLIENT_URL',
+            status: 'ACTIVE',
+            plan: 'free',
+            adminEmail: '$ADMIN_EMAIL'
+        }
+    });
+    console.log('tenant registrado en dashboard');
+    await prisma.\$disconnect();
+}
+main();
+" 2>&1 && echo "✅ Dashboard registrado" || echo "⚠️ No se pudo registrar en el dashboard (no es crítico)"
+else
+    echo "management server no está corriendo — saltando registro en dashboard"
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 {
     echo "┌──────────────────────────────────────────────────────────────────┐"
@@ -287,8 +317,11 @@ fi
     printf "│  VPS IP   : %-58s │\n" "${VPS_IP:-custom domain (no sslip.io)}"
     echo "│                                                                    │"
     echo "│  Admin credentials (first login):                                │"
+    printf "│  User     : %-58s │\n" "$ADMIN_USER"
     printf "│  Email    : %-58s │\n" "$ADMIN_EMAIL"
     printf "│  Password : %-58s │\n" "$ADMIN_PASSWORD"
+    echo "│                                                                    │"
+    echo "│  Dashboard: https://mgmt.89.167.46.144.sslip.io                   │"
     echo "│                                                                    │"
     echo "│  Build the Android APK for this client:                           │"
     printf "│    ./deploy/scripts/build-apk.sh %-39s │\n" "$SLUG"
