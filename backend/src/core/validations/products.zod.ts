@@ -39,6 +39,13 @@ export const createProductSchema = z.object({
         price: z.preprocess((val) => (val === '' || val === null || val === undefined) ? 0 : Number(val), z.number().min(0)),
         barcode: z.string().max(100).nullable().optional().or(z.literal('')),
     })).optional().default([]),
+
+    // Componentes del Kit (producto compuesto). El kit se vende a su propio
+    // precio; el stock se valida/descuenta por componente.
+    kitComponents: z.array(z.object({
+        componentProductId: z.string().min(1, 'El componente es requerido'),
+        quantity: z.preprocess((val) => (val === '' || val === null || val === undefined) ? undefined : Number(val), z.number().positive('La cantidad debe ser mayor a 0')),
+    })).optional().default([]),
 });
 
 /**

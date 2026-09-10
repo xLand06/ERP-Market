@@ -12,6 +12,118 @@ interface ProductListParams extends PaginationParams {
 }
 
 // =========================================================================
+// KITS — Validación de componentes (existencia + circularidad)
+// =========================================================================
+
+interface KitComponentInputData {
+    componentProductId: string;
+    quantity: number;
+}
+
+// Cliente mínimo para correr las queries de validación (prisma o un tx client)
+interface KitValidationClient {
+    product: {
+        findMany: (args: {
+            where: { id: { in: string[] } };
+            select: { id: true };
+        }) => Promise<Array<{ id: string }>>;
+    };
+    kitComponent: {
+        findMany: (args: {
+            where: { kitProductId: { in: string[] } };
+            select: { componentProductId: true };
+        }) => Promise<Array<{ componentProductId: string }>>;
+    };
+}
+
+/**
+ * Valida los componentes de un kit antes de persistirlos:
+ * 1. Sin componentes duplicados.
+ * 2. El componente no puede ser el propio kit.
+ * 3. Los componentes deben existir en el catálogo.
+ * 4. Guarda circular: un componente no puede ser un kit que contenga
+ *    (directa o transitivamente) al kit padre — BFS acotado sobre la
+ *    relación kit→componentes.
+ * Lanza error 422 con mensaje en español ante cualquier violación.
+ */
+async function validateKitComponents(
+    kitProductId: string,
+    components: KitComponentInputData[],
+    client: KitValidationClient = prisma as any
+): Promise<void> {
+    if (!components.length) return;
+
+    // 1. Duplicados
+    const seen = new Set<string>();
+    for (const c of components) {
+        if (seen.has(c.componentProductId)) {
+            throw Object.assign(
+                new Error('No se permiten componentes duplicados'),
+                { status: 422 }
+            );
+        }
+        seen.add(c.componentProductId);
+    }
+
+    // 2. El componente no puede ser el propio kit
+    if (seen.has(kitProductId)) {
+        throw Object.assign(
+            new Error('El producto no puede ser componente de sí mismo'),
+            { status: 422 }
+        );
+    }
+
+    // 3. Los componentes deben existir
+    const ids = [...seen];
+    const existing = await client.product.findMany({
+        where: { id: { in: ids } },
+        select: { id: true },
+    });
+    if (existing.length !== ids.length) {
+        throw Object.assign(
+            new Error('Uno o más componentes del kit no existen'),
+            { status: 422 }
+        );
+    }
+
+    // 4. Guarda circular: BFS desde cada componente hacia abajo (sus propios
+    //    componentes). Si en el camino aparece el kit padre → ciclo ilegal.
+    const visited = new Set<string>([kitProductId, ...ids]);
+    let frontier = [...ids];
+    while (frontier.length > 0) {
+        const level = await client.kitComponent.findMany({
+            where: { kitProductId: { in: frontier } },
+            select: { componentProductId: true },
+        });
+        const next: string[] = [];
+        for (const row of level) {
+            if (row.componentProductId === kitProductId) {
+                throw Object.assign(
+                    new Error('No se permite componente circular'),
+                    { status: 422 }
+                );
+            }
+            if (!visited.has(row.componentProductId)) {
+                visited.add(row.componentProductId);
+                next.push(row.componentProductId);
+            }
+        }
+        frontier = next;
+    }
+}
+
+// Include reutilizable para traer los componentes del kit junto al producto
+const KIT_COMPONENTS_INCLUDE = {
+    kitComponents: {
+        include: {
+            componentProduct: {
+                select: { id: true, name: true, price: true, baseUnit: true, barcode: true },
+            },
+        },
+    },
+} as const;
+
+// =========================================================================
 // Validación de dígito verificador EAN/UPC (algoritmo GS1 módulo 10)
 // =========================================================================
 
@@ -135,6 +247,7 @@ export const getAllProducts = async (filters: ProductListParams): Promise<ApiLis
                 subGroup: { include: { group: true } },
                 presentations: true,
                 barcodes: true,
+                ...KIT_COMPONENTS_INCLUDE,
             },
             orderBy: { name: 'asc' },
             skip,
@@ -165,6 +278,7 @@ export const getProductById = async (id: string): Promise<ProductDTO | null> => 
             subGroup: { include: { group: true } },
             presentations: true,
             barcodes: true,
+            ...KIT_COMPONENTS_INCLUDE,
         }
     });
     if (!product) return null;
@@ -176,7 +290,7 @@ export const getProductById = async (id: string): Promise<ProductDTO | null> => 
 };
 
 export const createProduct = async (data: CreateProductInput): Promise<ProductDTO> => {
-    const { presentations, barcodes, minStock, branchId, ...productData } = data as any;
+    const { presentations, barcodes, minStock, branchId, kitComponents, ...productData } = data as any;
 
     // Validar formato de códigos de barras según su label
     validateBarcodes(barcodes);
@@ -184,24 +298,55 @@ export const createProduct = async (data: CreateProductInput): Promise<ProductDT
     // Normalizar subGroupId: si es string vacío, convertir a null
     const subGroupId = productData.subGroupId === '' ? null : productData.subGroupId;
 
-    const product = await prisma.product.create({
-        data: {
-            ...productData,
-            subGroupId,
-            presentations: {
-                create: presentations ?? [],
+    // Crear el producto + componentes del kit en una sola transacción:
+    // si la validación de componentes falla, no queda un producto huérfano.
+    const product = await prisma.$transaction(async (tx) => {
+        const created = await tx.product.create({
+            data: {
+                ...productData,
+                subGroupId,
+                presentations: {
+                    create: presentations ?? [],
+                },
+                barcodes: {
+                    create: (barcodes ?? []).map((b: any) => ({
+                        code: b.code,
+                        label: b.label || null,
+                    })),
+                },
             },
-            barcodes: {
-                create: (barcodes ?? []).map((b: any) => ({
-                    code: b.code,
-                    label: b.label || null,
+            include: {
+                presentations: true,
+                barcodes: true,
+                ...KIT_COMPONENTS_INCLUDE,
+            },
+        });
+
+        // Kits: validar (existencia + circularidad) y persistir componentes.
+        // Al ser un producto nuevo no puede existir un ciclo previo que lo
+        // incluya, pero la validación corre igual con su id recién creado.
+        if (kitComponents && kitComponents.length > 0) {
+            await validateKitComponents(created.id, kitComponents, tx as any);
+            await tx.kitComponent.createMany({
+                data: kitComponents.map((c: any) => ({
+                    kitProductId: created.id,
+                    componentProductId: c.componentProductId,
+                    quantity: Number(c.quantity),
                 })),
-            },
-        },
-        include: {
-            presentations: true,
-            barcodes: true,
-        },
+            });
+            // Re-consultar para devolver el producto con sus componentes ya creados
+            const refetched = await tx.product.findUnique({
+                where: { id: created.id },
+                include: {
+                    presentations: true,
+                    barcodes: true,
+                    ...KIT_COMPONENTS_INCLUDE,
+                },
+            });
+            return refetched!;
+        }
+
+        return created;
     });
 
     // Inicializar stock en 0 en todas las sedes para este nuevo producto
@@ -225,10 +370,15 @@ export const createProduct = async (data: CreateProductInput): Promise<ProductDT
 };
 
 export const updateProduct = async (id: string, data: UpdateProductInput): Promise<ProductDTO> => {
-    const { presentations, barcodes, minStock, branchId, ...productData } = data as any;
+    const { presentations, barcodes, minStock, branchId, kitComponents, ...productData } = data as any;
 
     // Validar formato de códigos de barras según su label
     validateBarcodes(barcodes);
+
+    // Kits: validar ANTES de mutar (self, duplicados, existencia, circularidad)
+    if (kitComponents !== undefined) {
+        await validateKitComponents(id, kitComponents);
+    }
 
     // Sincronizar presentaciones: borrar anteriores y crear nuevas (MVP)
     if (presentations !== undefined) {
@@ -243,7 +393,7 @@ export const updateProduct = async (id: string, data: UpdateProductInput): Promi
     // Normalizar subGroupId: si es string vacío, convertir a null
     const subGroupId = productData.subGroupId === '' ? null : productData.subGroupId;
 
-    const product = await prisma.product.update({
+    await prisma.product.update({
         where: { id },
         data: {
             ...productData,
@@ -262,11 +412,21 @@ export const updateProduct = async (id: string, data: UpdateProductInput): Promi
                 },
             }),
         },
-        include: {
-            presentations: true,
-            barcodes: true,
-        },
     });
+
+    // Sincronizar componentes del kit: borrar anteriores y crear los nuevos (MVP)
+    if (kitComponents !== undefined) {
+        await prisma.kitComponent.deleteMany({ where: { kitProductId: id } });
+        if (kitComponents.length > 0) {
+            await prisma.kitComponent.createMany({
+                data: kitComponents.map((c: any) => ({
+                    kitProductId: id,
+                    componentProductId: c.componentProductId,
+                    quantity: Number(c.quantity),
+                })),
+            });
+        }
+    }
 
     if (minStock !== undefined) {
         const effectiveBranchId = branchId || undefined;
@@ -284,10 +444,20 @@ export const updateProduct = async (id: string, data: UpdateProductInput): Promi
         }
     }
 
+    // Re-consultar: el update anterior no incluye los componentes recién sincronizados
+    const updated = await prisma.product.findUnique({
+        where: { id },
+        include: {
+            presentations: true,
+            barcodes: true,
+            ...KIT_COMPONENTS_INCLUDE,
+        },
+    });
+
     return {
-        ...product,
-        price: Number(product.price),
-        cost: product.cost ? Number(product.cost) : undefined,
+        ...updated!,
+        price: Number(updated!.price),
+        cost: updated!.cost ? Number(updated!.cost) : undefined,
     } as ProductDTO;
 };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Barcode, PackageOpen, Plus, Trash2, Layers, DollarSign, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { X, Save, Barcode, PackageOpen, Plus, Trash2, Layers, DollarSign, RefreshCw, AlertTriangle, CheckCircle2, Search } from 'lucide-react';
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -23,6 +23,12 @@ interface ProductFormModalProps {
     groups: Group[];
     subgroups: Category[];
     onSuccess: () => void;
+}
+
+// Fila del editor de kits: producto componente + cantidad por kit
+interface KitComponentRow {
+    product: { id: string; name: string; price: number; baseUnit?: string } | null;
+    quantity: number | '';
 }
 
 function formatInWords(value: number): string {
@@ -155,6 +161,12 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
     const [presentations, setPresentations] = useState<ProductPresentation[]>([]);
     const [saving, setSaving] = useState(false);
     const [minStock, setMinStock] = useState<number | ''>('');
+    // ── Kits / Combos ──────────────────────────────────────────────────────
+    const [isKit, setIsKit] = useState(false);
+    const [kitRows, setKitRows] = useState<KitComponentRow[]>([]);
+    const [componentSearch, setComponentSearch] = useState('');
+    const [componentResults, setComponentResults] = useState<Product[]>([]);
+    const [searchingComponents, setSearchingComponents] = useState(false);
     const initialFocusRef = useRef<HTMLInputElement>(null);
 
     // ── Tracking de barcodes: keys únicos para manejar auto-detección ────────
@@ -188,6 +200,23 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                 manualLabelKeys.current.clear();
                 setPresentations(product.presentations || []);
 
+                // Kits: cargar componentes existentes del producto
+                const kcs = product.kitComponents || [];
+                setIsKit(kcs.length > 0);
+                setKitRows(kcs.map(kc => ({
+                    product: kc.componentProduct
+                        ? {
+                            id: kc.componentProduct.id,
+                            name: kc.componentProduct.name,
+                            price: Number(kc.componentProduct.price || 0),
+                            baseUnit: kc.componentProduct.baseUnit,
+                        }
+                        : null,
+                    quantity: Number(kc.quantity),
+                })));
+                setComponentSearch('');
+                setComponentResults([]);
+
                 // Fetch stock info to populate minStock
                 api.get(`/inventory/stock/product/${product.id}`)
                     .then(res => {
@@ -220,6 +249,11 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                 manualLabelKeys.current.clear();
                 setPresentations([]);
                 setMinStock('');
+                // Kits: resetear editor
+                setIsKit(false);
+                setKitRows([]);
+                setComponentSearch('');
+                setComponentResults([]);
             }
             setTimeout(() => initialFocusRef.current?.focus(), 100);
         }
@@ -265,6 +299,51 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
         setPresentations(prev => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
     };
 
+    // ── Kits: búsqueda de componentes (debounce) ──────────────────────────
+    useEffect(() => {
+        const q = componentSearch.trim();
+        if (!isKit || q.length < 2) {
+            setComponentResults([]);
+            setSearchingComponents(false);
+            return;
+        }
+        setSearchingComponents(true);
+        const t = setTimeout(async () => {
+            try {
+                const res = await api.get('/products', { params: { search: q, limit: 8 } });
+                setComponentResults(res.data?.data || []);
+            } catch {
+                setComponentResults([]);
+            } finally {
+                setSearchingComponents(false);
+            }
+        }, 300);
+        return () => clearTimeout(t);
+    }, [componentSearch, isKit]);
+
+    // Componentes candidatos: excluir el propio producto y los ya agregados
+    const availableComponentResults = componentResults.filter(
+        p => p.id !== product?.id && !kitRows.some(r => r.product?.id === p.id)
+    );
+
+    const addKitComponent = (p: Product) => {
+        setKitRows(prev => [...prev, {
+            product: { id: p.id, name: p.name, price: Number(p.price || 0), baseUnit: p.baseUnit },
+            quantity: 1,
+        }]);
+        setComponentSearch('');
+        setComponentResults([]);
+    };
+    const removeKitComponent = (idx: number) => setKitRows(prev => prev.filter((_, i) => i !== idx));
+    const updateKitComponentQty = (idx: number, qty: number | '') =>
+        setKitRows(prev => prev.map((r, i) => (i === idx ? { ...r, quantity: qty } : r)));
+
+    // Suma de referencia: precio sugerido = Σ(precio componente × cantidad)
+    const kitComponentsSum = kitRows.reduce(
+        (acc, r) => acc + (r.product ? Number(r.product.price) * (Number(r.quantity) || 0) : 0),
+        0
+    );
+
     // ── Auto-precio desde costo ───────────────────────────────────────────────
     const suggestPrice = () => {
         if (costNum > 0) {
@@ -309,6 +388,16 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                         price: Number(p.price) || 0,
                         barcode: p.barcode || null,
                     })),
+                // Kits: solo se envían si el producto es kit (isKit).
+                // Si se desactiva el toggle, se limpian los componentes.
+                kitComponents: isKit
+                    ? kitRows
+                        .filter(r => r.product && r.quantity !== '' && Number(r.quantity) > 0)
+                        .map(r => ({
+                            componentProductId: r.product!.id,
+                            quantity: Number(r.quantity),
+                        }))
+                    : [],
             };
 
             const activeBranchId = useAuthStore.getState().selectedBranch;
@@ -704,6 +793,120 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* KITS / COMBOS */}
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider">
+                                    <PackageOpen className="w-4 h-4 text-amber-500" />
+                                    Kit / Combo
+                                </h3>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsKit(v => !v)}
+                                    className={`text-xs font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+                                        isKit
+                                            ? 'bg-amber-100 text-amber-700'
+                                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                    }`}
+                                    title="Activar para componer este producto de otros productos"
+                                >
+                                    <span className={`w-7 h-4 rounded-full relative transition-colors ${isKit ? 'bg-amber-400' : 'bg-slate-300'}`}>
+                                        <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${isKit ? 'left-3.5' : 'left-0.5'}`} />
+                                    </span>
+                                    {isKit ? 'Producto compuesto' : 'Producto simple'}
+                                </button>
+                            </div>
+
+                            {isKit ? (
+                                <>
+                                    {/* Buscador de productos para agregar como componente */}
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            value={componentSearch}
+                                            onChange={(e) => setComponentSearch(e.target.value)}
+                                            className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500/40 outline-none text-sm"
+                                            placeholder="Buscar producto para agregar como componente..."
+                                        />
+                                        {componentSearch.trim().length >= 2 && (
+                                            <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">
+                                                {searchingComponents ? (
+                                                    <div className="px-3 py-2.5 text-xs text-slate-400">Buscando...</div>
+                                                ) : availableComponentResults.length === 0 ? (
+                                                    <div className="px-3 py-2.5 text-xs text-slate-400">
+                                                        Sin resultados o producto ya agregado.
+                                                    </div>
+                                                ) : (
+                                                    availableComponentResults.map(p => (
+                                                        <button
+                                                            key={p.id}
+                                                            type="button"
+                                                            onClick={() => addKitComponent(p)}
+                                                            className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-amber-50 transition-colors"
+                                                        >
+                                                            <span className="text-xs font-semibold text-slate-700 truncate">{p.name}</span>
+                                                            <span className="text-[11px] font-bold text-emerald-600 shrink-0">{fmtCOP(Number(p.price || 0))}</span>
+                                                        </button>
+                                                    ))
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Lista de componentes con cantidad */}
+                                    {kitRows.length === 0 ? (
+                                        <div className="text-center py-4 border-2 border-dashed border-slate-100 rounded-xl text-slate-400 text-xs italic">
+                                            Sin componentes. Buscá productos para armar el combo (ej: Combo Hamburguesa = Pan + Carne + Queso).
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {kitRows.map((row, idx) => (
+                                                <div key={idx} className="grid grid-cols-12 gap-2 items-center p-2.5 bg-white border border-slate-200 rounded-xl">
+                                                    <div className="col-span-6 min-w-0">
+                                                        <p className="text-xs font-bold text-slate-700 truncate">{row.product?.name || 'Producto desconocido'}</p>
+                                                        <p className="text-[10px] text-slate-400">{fmtCOP(Number(row.product?.price || 0))} c/u</p>
+                                                    </div>
+                                                    <div className="col-span-4">
+                                                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">Cantidad</label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.001"
+                                                            min="0.001"
+                                                            value={row.quantity}
+                                                            onChange={(e) => updateKitComponentQty(idx, e.target.value === '' ? '' : Number(e.target.value))}
+                                                            className="w-full px-2 py-1 border border-slate-100 rounded-lg text-xs outline-none focus:border-amber-300 font-bold"
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div className="col-span-1 flex justify-center">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeKitComponent(idx)}
+                                                            className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"
+                                                            title="Quitar componente"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {kitRows.length > 0 && (
+                                        <p className="text-[11px] text-slate-400">
+                                            Costo de componentes: <span className="font-bold text-slate-600">{fmtCOP(kitComponentsSum)}</span>. El kit se vende a su propio precio (campo Precio de Venta); el stock se descuenta por componente.
+                                        </p>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="text-center py-4 border-2 border-dashed border-slate-100 rounded-xl text-slate-400 text-xs italic">
+                                    Producto simple: se vende y se controla stock por unidad propia.
                                 </div>
                             )}
                         </div>

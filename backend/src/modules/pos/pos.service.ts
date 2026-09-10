@@ -38,6 +38,90 @@ export interface CreateTransactionInput {
     customerId?: string;
 }
 
+// =============================================================================
+// KITS — Expansión de kits en componentes (F3)
+// El kit se vende a su propio precio (item.unitPrice del kit); los componentes
+// existen SOLO para validar y descontar stock por pieza.
+// =============================================================================
+
+export interface KitExpandedItem {
+    productId: string;
+    presentationId?: string;
+    quantity: number;
+    unitPrice: number;
+    multiplierUsed: number;
+    productName?: string;
+    baseUnit?: string;
+}
+
+/**
+ * Expande los items de una venta: si el producto es un kit (tiene componentes),
+ * lo reemplaza por una línea por componente:
+ *   quantity     = item.quantity × componente.quantity
+ *   unitPrice    = precio del componente (solo referencia; el total de la venta
+ *                  se calcula con el precio del kit)
+ *   multiplierUsed = 1
+ * Un solo nivel: los componentes se tratan como productos planos — los kits
+ * anidados nunca se expanden recursivamente.
+ * Los productos que NO son kit se mantienen tal cual.
+ */
+export const expandKitItems = async (
+    items: TransactionItemInput[],
+    tx: any
+): Promise<KitExpandedItem[]> => {
+    const productIds = items.map(i => i.productId);
+
+    const kitComponents = productIds.length > 0
+        ? await tx.kitComponent.findMany({
+            where: { kitProductId: { in: productIds } },
+            include: {
+                componentProduct: {
+                    select: { id: true, name: true, price: true, baseUnit: true },
+                },
+            },
+          })
+        : [];
+
+    const kitMap = new Map<string, typeof kitComponents>();
+    for (const kc of kitComponents) {
+        const list = kitMap.get(kc.kitProductId) ?? [];
+        list.push(kc);
+        kitMap.set(kc.kitProductId, list);
+    }
+
+    const expanded: KitExpandedItem[] = [];
+    for (const item of items) {
+        const components = kitMap.get(item.productId);
+
+        // Producto normal (o kit sin componentes): se mantiene como está
+        if (!components || components.length === 0) {
+            expanded.push({
+                productId: item.productId,
+                presentationId: item.presentationId,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                multiplierUsed: 1,
+            });
+            continue;
+        }
+
+        // Kit: una línea por componente (solo movimiento de stock)
+        for (const comp of components) {
+            expanded.push({
+                productId: comp.componentProductId,
+                presentationId: undefined,
+                quantity: Number(item.quantity) * Number(comp.quantity),
+                unitPrice: Number(comp.componentProduct.price),
+                multiplierUsed: 1,
+                productName: comp.componentProduct.name,
+                baseUnit: comp.componentProduct.baseUnit,
+            });
+        }
+    }
+
+    return expanded;
+};
+
 export const createTransaction = async (input: CreateTransactionInput) => {
     const {
         type, branchId, userId, items, cashRegisterId, notes, ipAddress,
@@ -147,24 +231,42 @@ export const createTransaction = async (input: CreateTransactionInput) => {
             : [];
         const productMap = new Map(products.map(p => [p.id, p]));
 
+        // ── Kits (F3): expandir cada kit en sus componentes ─────────────
+        // Solo para SALE y solo un nivel: los componentes se tratan como
+        // productos planos. El total de la venta se mantiene con el precio
+        // del kit (calculado arriba); los componentes rigen el stock.
+        let itemsToProcess: KitExpandedItem[] | TransactionItemInput[] = items;
+        if (type === TransactionType.SALE) {
+            itemsToProcess = await expandKitItems(items, tx);
+        }
+
+        const expandedProductIds = type === TransactionType.SALE
+            ? [...new Set(itemsToProcess.map(i => i.productId))]
+            : productIds;
+
         const inventoryItems = type === TransactionType.SALE
             ? await tx.branchInventory.findMany({
-                where: { productId: { in: productIds }, branchId }
+                where: { productId: { in: expandedProductIds }, branchId }
               })
             : [];
         const invMap = new Map(inventoryItems.map(i => [i.productId, Number(i.stock)]));
 
         // ── Procesar items con datos precargados ──────────────────────
-        for (const item of items) {
+        for (const item of itemsToProcess) {
             const multiplier = item.presentationId ? (presMap.get(item.presentationId) ?? 1) : 1;
             const totalUnitsToDeduct = item.quantity * multiplier;
 
             if (type === TransactionType.SALE) {
                 const availableStock = invMap.get(item.productId) ?? 0;
                 if (availableStock < totalUnitsToDeduct) {
+                    // Para componentes de kit el nombre/baseUnit vienen de la
+                    // expansión; para productos normales, del pre-fetch.
+                    const expanded = item as KitExpandedItem;
                     const prod = productMap.get(item.productId);
+                    const name = expanded.productName || prod?.name || item.productId;
+                    const unit = expanded.baseUnit || prod?.baseUnit || 'UNIDAD';
                     throw new Error(
-                        `Stock insuficiente para "${prod?.name || item.productId}". Requerido: ${totalUnitsToDeduct} ${prod?.baseUnit || 'UNIDAD'}. Disponible: ${availableStock}`
+                        `Stock insuficiente para "${name}". Requerido: ${totalUnitsToDeduct} ${unit}. Disponible: ${availableStock}`
                     );
                 }
             }
