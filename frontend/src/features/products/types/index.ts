@@ -23,6 +23,26 @@ export interface ProductPresentation {
     barcode?: string;
 }
 
+// Componente de un kit (producto compuesto). En edición se manda el id del
+// producto + cantidad; al leer un producto el backend incluye el componente
+// con sus datos (componentProduct).
+export interface KitComponentInput {
+    componentProductId: string;
+    quantity: number;
+}
+
+export interface ProductKitComponent {
+    id: string;
+    quantity: number;
+    componentProduct?: {
+        id: string;
+        name: string;
+        price: number;
+        baseUnit?: string;
+        barcode?: string;
+    };
+}
+
 export interface Product {
     id: string;
     name: string;
@@ -37,6 +57,7 @@ export interface Product {
     expectedSpoilagePercent?: number;
     barcodes: ProductBarcode[];
     presentations: ProductPresentation[];
+    kitComponents?: ProductKitComponent[];
 }
 
 export interface ProductListParams {
@@ -62,6 +83,7 @@ export interface CreateProductPayload {
         price: number;
         barcode?: string | null;
     }>;
+    kitComponents?: KitComponentInput[];
     minStock?: number;
     branchId?: string | null;
 }

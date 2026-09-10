@@ -215,12 +215,35 @@ model Product {
   mermas             Merma[]
   stockCountItems    StockCountItem[]
   productBatches     ProductBatch[]
+  // Kits: componentes que componen este producto (padre)
+  kitComponents KitComponent[] @relation("KitComponents")
+  // Kits: kits de los cuales este producto es componente
+  partOfKits   KitComponent[] @relation("KitMemberOf")
 
   @@index([name])
   @@index([subGroupId])
   @@index([isActive])
   @@index([barcode])
   @@map("products")
+}
+
+// =============================================================================
+// KITS — Producto compuesto por otros productos (espejo SQLite del schema cloud)
+// El kit se vende a su propio precio; el stock se valida/descuenta por componente.
+// =============================================================================
+
+model KitComponent {
+  id                 String  @id @default(cuid())
+  kitProductId       String
+  kitProduct         Product @relation("KitComponents", fields: [kitProductId], references: [id], onDelete: Cascade)
+  componentProductId String
+  componentProduct   Product @relation("KitMemberOf", fields: [componentProductId], references: [id])
+  quantity           Float   @default(1) // cantidad del componente por kit
+  createdAt          DateTime @default(now())
+
+  @@unique([kitProductId, componentProductId])
+  @@index([componentProductId])
+  @@map("kit_components")
 }
 
 model ProductPresentation {

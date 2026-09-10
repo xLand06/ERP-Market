@@ -72,6 +72,15 @@ db.exec(`
     updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  CREATE TABLE IF NOT EXISTS kit_components (
+    id TEXT PRIMARY KEY,
+    kitProductId TEXT NOT NULL REFERENCES products(id),
+    componentProductId TEXT NOT NULL REFERENCES products(id),
+    quantity REAL NOT NULL DEFAULT 1,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(kitProductId, componentProductId)
+  );
+
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL UNIQUE,

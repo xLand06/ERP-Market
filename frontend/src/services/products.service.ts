@@ -27,6 +27,7 @@ export interface CreateProductPayload {
     subGroupId?: string;
     baseUnit?: string;
     presentations?: { name: string; multiplier: number; price: number; barcode?: string }[];
+    kitComponents?: { componentProductId: string; quantity: number }[];
 }
 
 export interface UpdateProductPayload extends Partial<CreateProductPayload> {
