@@ -21,6 +21,7 @@ const createTenantSchema = z.object({
     url: z.string().url().optional(),
     plan: z.string().optional(),
     adminEmail: z.string().email().optional().or(z.literal('')).transform(v => v || undefined),
+    adminUser: z.string().min(1).optional().or(z.literal('')).transform(v => v || undefined),
     adminPassword: z.string().min(8).optional(),
 });
 
@@ -50,7 +51,7 @@ router.post('/create', async (req: Request, res: Response) => {
         return;
     }
 
-    const { slug, domain, plan, adminEmail, adminPassword } = parsed.data;
+    const { slug, domain, plan, adminEmail, adminUser, adminPassword } = parsed.data;
 
     // Headers SSE
     res.setHeader('Content-Type', 'text/event-stream');
@@ -70,6 +71,7 @@ router.post('/create', async (req: Request, res: Response) => {
             domain || '',
             plan || 'free',
             adminEmail || `admin@${slug}.local`,
+            adminUser || 'admin',
             adminPassword || '',
             sendLog,
         );

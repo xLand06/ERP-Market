@@ -238,6 +238,7 @@ export default function Tenants() {
     const [formSlug, setFormSlug] = useState('');
     const [formDomain, setFormDomain] = useState('');
     const [formEmail, setFormEmail] = useState('');
+    const [formUser, setFormUser] = useState('');
     const [formPassword, setFormPassword] = useState('');
     const [formPlan, setFormPlan] = useState('free');
     const [formError, setFormError] = useState<string | null>(null);
@@ -293,11 +294,10 @@ export default function Tenants() {
         setFormSlug('');
         setFormDomain('');
         setFormEmail('');
+        setFormUser('');
         setFormPassword('');
         setFormPlan('free');
-        setFormError(null);
-        setTerminalLines([]);
-        setProvisionStatus('idle');
+        setError(null);
     }, []);
 
     const handleCreate = useCallback(async () => {
@@ -319,13 +319,14 @@ export default function Tenants() {
 
         try {
             const token = localStorage.getItem('mgmt_token');
-            const body: Record<string, string> = {
-                slug: formSlug,
-                domain: formDomain,
-            };
-            if (formEmail) body.adminEmail = formEmail;
-            if (formPassword) body.adminPassword = formPassword;
-            if (formPlan) body.plan = formPlan;
+                const body: Record<string, string> = {
+                    slug: formSlug,
+                    domain: formDomain,
+                };
+                if (formEmail) body.adminEmail = formEmail;
+                if (formUser) body.adminUser = formUser;
+                if (formPassword) body.adminPassword = formPassword;
+                if (formPlan) body.plan = formPlan;
 
             // Usar fetch con POST para SSE (no soporta Authorization header directo con EventSource)
             const res = await fetch('/api/tenants/create', {
@@ -1142,6 +1143,31 @@ export default function Tenants() {
                                     minHeight: 44,
                                 }}
                             />
+                        </div>
+
+                        <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                                Usuario (opcional)
+                            </label>
+                            <input
+                                type="text"
+                                value={formUser}
+                                onChange={(e) => setFormUser(e.target.value)}
+                                placeholder="admin"
+                                style={{
+                                    width: '100%',
+                                    padding: '0.6rem 0.75rem',
+                                    borderRadius: 6,
+                                    border: '1px solid #e2e8f0',
+                                    fontSize: '0.9rem',
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                    minHeight: 44,
+                                }}
+                            />
+                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                Default: admin
+                            </span>
                         </div>
 
                         <div style={{ marginBottom: '1rem' }}>

@@ -26,6 +26,7 @@ export interface ProvisionInput {
     domain?: string;
     plan?: string;
     adminEmail?: string;
+    adminUser?: string;
     adminPassword?: string;
 }
 
@@ -71,6 +72,7 @@ async function runAddClientScript(
     slug: string,
     domain: string,
     adminEmail: string,
+    adminUser: string,
     adminPassword: string,
 ): Promise<string> {
     const { execSync } = await import('child_process');
@@ -79,7 +81,7 @@ async function runAddClientScript(
     const args = [slug];
     if (domain) args.push(domain);
     if (adminEmail) args.push(adminEmail);
-    args.push('admin'); // admin user
+    args.push(adminUser || 'admin');
     if (adminPassword) args.push(adminPassword);
 
     const cmd = `cd ${HOST_DEPLOY_DIR}/.. && ./deploy/scripts/add-client.sh ${args.join(' ')}`;
@@ -225,11 +227,12 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     const domain = input.domain || '';
     const adminEmailFinal = adminEmail || `admin@${slug}.local`;
     const adminPasswordFinal = adminPasswordInput || '';
+    const adminUserFinal = input.adminUser || 'admin';
 
     console.log(`[provisioner] Iniciando provisioning para tenant: ${slug} via add-client.sh`);
 
     // ── 1. Ejecutar add-client.sh ──────────────────────────────────────
-    const output = await runAddClientScript(slug, domain, adminEmailFinal, adminPasswordFinal);
+    const output = await runAddClientScript(slug, domain, adminEmailFinal, adminUserFinal, adminPasswordFinal);
     console.log(`[provisioner] add-client.sh completado para ${slug}`);
 
     // ── 2. Registrar/actualizar tenant en la DB ───────────────────────
@@ -328,6 +331,7 @@ export async function provisionWithLogs(
     domain: string,
     plan: string,
     adminEmail: string,
+    adminUser: string,
     adminPassword: string,
     sendLog: LogCallback,
 ): Promise<ProvisionResult> {
@@ -336,7 +340,7 @@ export async function provisionWithLogs(
     const args = [slug];
     if (domain) args.push(domain);
     if (adminEmail) args.push(adminEmail);
-    args.push('admin');
+    args.push(adminUser || 'admin');
     if (adminPassword) args.push(adminPassword);
 
     const scriptPath = `${HOST_DEPLOY_DIR}/../deploy/scripts/add-client.sh`;
