@@ -40,6 +40,11 @@ export interface SystemSettings {
     // Plan comercial (F2 — Límites de plan)
     planTier: string;       // 'basic' | 'pro'
     planConfig: string;     // JSON string: { maxUsers, maxBranches, maxProducts }
+
+    // Catálogo digital (F5)
+    catalogSlug: string;    // slug público del catálogo ('' = sin catálogo)
+    catalogActive: boolean; // flag maestro que habilita el catálogo público
+    socialLinks: string;    // JSON string: { facebook?, instagram?, whatsapp? }
 }
 
 const DEFAULT_SETTINGS: SystemSettings = {
@@ -77,6 +82,10 @@ const DEFAULT_SETTINGS: SystemSettings = {
 
     planTier: 'basic',
     planConfig: JSON.stringify({ maxUsers: 3, maxBranches: 1, maxProducts: 250 }),
+
+    catalogSlug: '',
+    catalogActive: false,
+    socialLinks: '{}',
 };
 
 export async function getSettings(): Promise<SystemSettings> {
@@ -90,7 +99,7 @@ export async function getSettings(): Promise<SystemSettings> {
         for (const s of dbSettings) {
             if (s.key === 'iva' || s.key === 'ivaPercent' || s.key === 'purgeRetentionDays' || s.key === 'purgeLogRetentionDays' || s.key === 'printCopies') {
                 config[s.key] = Number(s.value);
-            } else if (s.key === 'ivaEnabled' || s.key === 'autoCut' || s.key === 'openCashDrawer' || s.key === 'autoPrintOnCheckout' || s.key.startsWith('show')) {
+            } else if (s.key === 'ivaEnabled' || s.key === 'autoCut' || s.key === 'openCashDrawer' || s.key === 'autoPrintOnCheckout' || s.key === 'catalogActive' || s.key.startsWith('show')) {
                 config[s.key] = s.value === 'true';
             } else {
                 config[s.key] = s.value === 'null' ? null : s.value;

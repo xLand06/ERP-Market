@@ -33,6 +33,7 @@ import settingsRouter from './modules/settings/settings.routes';
 import mermaRouter from './modules/merma/merma.routes';
 import stocktakingRouter from './modules/stocktaking/stocktaking.routes';
 import batchesRouter from './modules/batches/batches.routes';
+import catalogRouter from './modules/catalog/catalog.routes';
 
 const app = express();
 
@@ -219,6 +220,8 @@ app.use('/api/settings',   settingsRouter);
 app.use('/api/merma',       mermaRouter);
 app.use('/api/stocktaking', stocktakingRouter);
 app.use('/api/batches',     batchesRouter);
+// Catálogo público (F5): ruta SIN auth — el router no aplica authMiddleware
+app.use('/api/catalog',     catalogRouter);
 
 // ─── FRONTEND ESTÁTICO (modo standalone sin Electron) ─────────────────────
 // Sirve el frontend compilado desde backend/public/
