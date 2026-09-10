@@ -503,6 +503,9 @@ model PurchaseOrder {
   id         String              @id @default(cuid())
   status     PurchaseOrderStatus @default(DRAFT)
   total      Float
+  // CxP (F7): monto ya pagado al proveedor y fecha límite de pago
+  paidAmount Float    @default(0)
+  dueDate    DateTime?
   notes      String?
   expectedAt DateTime?
   receivedAt DateTime?
@@ -515,11 +518,28 @@ model PurchaseOrder {
   branchId String
   branch   Branch @relation(fields: [branchId], references: [id])
 
-  items PurchaseOrderItem[]
+  items    PurchaseOrderItem[]
+  payments SupplierPayment[]
 
   @@index([supplierId])
   @@index([branchId])
   @@map("purchase_orders")
+}
+
+model SupplierPayment {
+  id        String   @id @default(cuid())
+  amount    Float    // Monto del pago al proveedor
+  method    String   @default("cash") // 'cash' | 'transfer' | 'card' | 'other'
+  reference String?  // Referencia del pago (ej: nro de transferencia)
+  notes     String?
+  createdAt DateTime @default(now())
+
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+
+  @@index([purchaseOrderId])
+  @@index([createdAt])
+  @@map("supplier_payments")
 }
 
 model PurchaseOrderItem {
@@ -657,6 +677,44 @@ model ProductBatch {
   @@index([productId, branchId])
   @@index([expiryDate])
   @@map("product_batches")
+}
+
+// =============================================================================
+// BANKS (F6) — Cuentas bancarias y movimientos (espejo SQLite del schema cloud)
+// El saldo NO se almacena: se calcula en tiempo real como
+// saldoInicial + Σ(income) − Σ(expense).
+// =============================================================================
+
+model BankAccount {
+  id             String   @id @default(cuid())
+  name           String
+  bankName       String?
+  accountType    String   @default("checking") // 'checking' | 'savings'
+  initialBalance Float    @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  transactions BankTransaction[]
+
+  @@index([isActive])
+  @@map("bank_accounts")
+}
+
+model BankTransaction {
+  id        String   @id @default(cuid())
+  type      String   @default("income") // 'income' | 'expense'
+  amount    Float
+  concept   String?
+  reference String?
+  createdAt DateTime @default(now())
+
+  accountId String
+  account   BankAccount @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+  @@index([createdAt])
+  @@map("bank_transactions")
 }
 
 // =============================================================================

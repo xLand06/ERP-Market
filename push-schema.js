@@ -243,6 +243,8 @@ db.exec(`
     createdById TEXT NOT NULL REFERENCES users(id),
     status TEXT NOT NULL DEFAULT 'DRAFT',
     total REAL,
+    paidAmount REAL DEFAULT 0,
+    dueDate DATETIME,
     notes TEXT,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -295,6 +297,39 @@ db.exec(`
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  -- CxP (F7): pagos a proveedores contra órdenes de compra
+  CREATE TABLE IF NOT EXISTS supplier_payments (
+    id TEXT PRIMARY KEY,
+    purchaseOrderId TEXT NOT NULL REFERENCES purchase_orders(id),
+    amount REAL NOT NULL,
+    method TEXT NOT NULL DEFAULT 'cash',
+    reference TEXT,
+    notes TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Bancos (F6): cuentas bancarias y movimientos
+  CREATE TABLE IF NOT EXISTS bank_accounts (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    bankName TEXT,
+    accountType TEXT NOT NULL DEFAULT 'checking',
+    initialBalance REAL DEFAULT 0,
+    isActive INTEGER DEFAULT 1,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS bank_transactions (
+    id TEXT PRIMARY KEY,
+    accountId TEXT NOT NULL REFERENCES bank_accounts(id),
+    type TEXT NOT NULL DEFAULT 'income',
+    amount REAL NOT NULL,
+    concept TEXT,
+    reference TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   CREATE TABLE IF NOT EXISTS backups (
     id TEXT PRIMARY KEY,
     filename TEXT NOT NULL,
@@ -304,6 +339,19 @@ db.exec(`
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
+
+// Migraciones idempotentes: CREATE TABLE IF NOT EXISTS no modifica tablas ya
+// existentes, así que las columnas nuevas se agregan vía ALTER si faltan.
+const addColumnIfMissing = (table, column, definition) => {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+    if (!cols.some(c => c.name === column)) {
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+        console.log(`   + columna ${table}.${column}`);
+    }
+};
+
+addColumnIfMissing('purchase_orders', 'paidAmount', 'REAL DEFAULT 0');
+addColumnIfMissing('purchase_orders', 'dueDate', 'DATETIME');
 
 const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all();
 console.log('✅ Schema creado. Tablas:', tables.length);

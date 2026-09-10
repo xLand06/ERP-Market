@@ -34,6 +34,7 @@ import mermaRouter from './modules/merma/merma.routes';
 import stocktakingRouter from './modules/stocktaking/stocktaking.routes';
 import batchesRouter from './modules/batches/batches.routes';
 import catalogRouter from './modules/catalog/catalog.routes';
+import banksRouter from './modules/banks/banks.routes';
 
 const app = express();
 
@@ -222,6 +223,8 @@ app.use('/api/stocktaking', stocktakingRouter);
 app.use('/api/batches',     batchesRouter);
 // Catálogo público (F5): ruta SIN auth — el router no aplica authMiddleware
 app.use('/api/catalog',     catalogRouter);
+// Bancos (F6): cuentas y movimientos bancarios
+app.use('/api/banks',       banksRouter);
 
 // ─── FRONTEND ESTÁTICO (modo standalone sin Electron) ─────────────────────
 // Sirve el frontend compilado desde backend/public/

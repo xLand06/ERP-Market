@@ -32,6 +32,8 @@ const StockCountView        = lazy(() => import('../features/stocktaking/pages/S
 const QuotesPage            = lazy(() => import('../features/quotes/pages/QuotesPage'));
 const CustomersPage         = lazy(() => import('../features/customers/pages/CustomersPage'));
 const CustomerDetailPage    = lazy(() => import('../features/customers/pages/CustomerDetail'));
+const BanksPage             = lazy(() => import('../features/banks/pages/BanksPage'));
+const BankAccountDetailPage = lazy(() => import('../features/banks/pages/AccountDetail'));
 // Catálogo digital (F5) — página standalone pública, fuera del AppShell
 const PublicCatalogPage     = lazy(() => import('../features/catalog/pages/PublicCatalogPage'));
 
@@ -97,6 +99,8 @@ export const router = createRouter([
             { path: 'quotes',             element: wrap(QuotesPage) },
             { path: 'customers',          element: wrap(CustomersPage) },
             { path: 'customers/:id',      element: wrap(CustomerDetailPage) },
+            { path: 'banks',              element: wrap(BanksPage) },
+            { path: 'banks/:id',          element: wrap(BankAccountDetailPage) },
         ],
     },
     { path: '*', element: wrap(NotFoundPage) },

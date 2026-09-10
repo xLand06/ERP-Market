@@ -1,16 +1,17 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CreditCard, TrendingDown, TrendingUp, ArrowRight, AlertTriangle, Clock, CheckCircle2 } from 'lucide-react';
+import { CreditCard, TrendingDown, TrendingUp, ArrowRight, AlertTriangle, Clock, CheckCircle2, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import {
+    Dialog, DialogContent, DialogHeader,
+    DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-
-// ─── Mock accounts ────────────────────────────────────────────────────────────
-const AP_ITEMS = [
-    { supplier: 'Aceites Venezuela',        amount: 3800, dueIn: -5,  status: 'overdue'  },
-    { supplier: 'Distribuidora La Montaña', amount: 1240, dueIn: 12,  status: 'pending'  },
-    { supplier: 'Carnes Premium',           amount: 560,  dueIn: 3,   status: 'upcoming' },
-    { supplier: 'Bebidas y Más',            amount: 1100, dueIn: 18,  status: 'pending'  },
-];
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { purchasesApi, type PurchaseOrder } from '@/services/purchases.service';
+import toast from 'react-hot-toast';
 
 const CASH_FLOW_ITEMS = [
     { day: 'Lun 17', income: 1820, expense: 320 },
@@ -28,11 +29,158 @@ const STATUS_CONFIG: Record<StatusType, { badge: 'destructive' | 'warning' | 'in
     pending:  { badge: 'info',        icon: CheckCircle2,   label: 'Pendiente'},
 };
 
-const totalAP   = AP_ITEMS.reduce((s, i) => s + i.amount, 0);
-const overdueAP = AP_ITEMS.filter(i => i.status === 'overdue').reduce((s, i) => s + i.amount, 0);
+/** Saldo pendiente de una orden */
+const remainingOf = (order: PurchaseOrder) => order.total - (order.paidAmount || 0);
+
+/** Estado CxP según fecha de vencimiento */
+const statusOf = (order: PurchaseOrder): StatusType => {
+    if (!order.dueDate) return 'pending';
+    const due = new Date(order.dueDate).getTime();
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+    if (due < now) return 'overdue';
+    if (due <= now + 7 * day) return 'upcoming';
+    return 'pending';
+};
+
+// ─── Modal "Registrar Pago" (CxP) ────────────────────────────────────────────
+function SupplierPaymentModal({ order, onClose }: { order: PurchaseOrder | null; onClose: () => void }) {
+    const queryClient = useQueryClient();
+    const [amount, setAmount] = useState('');
+    const [method, setMethod] = useState('cash');
+    const [reference, setReference] = useState('');
+    const [error, setError] = useState('');
+
+    const remaining = order ? remainingOf(order) : 0;
+
+    const paymentMutation = useMutation({
+        mutationFn: async (payload: { amount: number; method: string; reference?: string }) => {
+            return purchasesApi.recordPayment(order!.id, payload);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['purchases'] });
+            toast.success('Pago registrado correctamente');
+            onClose();
+        },
+        onError: (err: unknown) => {
+            const e = err as { response?: { data?: { error?: string } } };
+            toast.error(e?.response?.data?.error || 'Error al registrar el pago');
+        },
+    });
+
+    const handleSave = () => {
+        const value = parseFloat(amount);
+        if (!value || value <= 0) {
+            setError('Ingresa un monto mayor a 0');
+            return;
+        }
+        if (value > remaining + 0.005) {
+            setError(`El pago excede el saldo pendiente ($${remaining.toFixed(2)})`);
+            return;
+        }
+        setError('');
+        paymentMutation.mutate({ amount: value, method, reference: reference.trim() || undefined });
+    };
+
+    const handleClose = () => {
+        setAmount('');
+        setMethod('cash');
+        setReference('');
+        setError('');
+        onClose();
+    };
+
+    return (
+        <Dialog open={!!order} onOpenChange={open => !open && handleClose()}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                            <Wallet className="w-4 h-4 text-emerald-600" />
+                        </div>
+                        Registrar Pago a Proveedor
+                    </DialogTitle>
+                    <DialogDescription>
+                        {order?.supplier.name} · Saldo pendiente ${remaining.toFixed(2)}
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="px-6 pb-4 space-y-4">
+                    <div className="flex flex-col gap-1.5">
+                        <label htmlFor="pay-amount" className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                            Monto <span className="text-red-500 ml-0.5">*</span>
+                        </label>
+                        <Input
+                            id="pay-amount"
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={amount}
+                            onChange={e => setAmount(e.target.value)}
+                            className={cn('tabular-nums', error && 'border-red-400 focus-visible:ring-red-400')}
+                            aria-invalid={!!error}
+                        />
+                        {error && <p className="text-xs text-red-500 mt-0.5">{error}</p>}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                        <label htmlFor="pay-method" className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                            Método
+                        </label>
+                        <select
+                            id="pay-method"
+                            value={method}
+                            onChange={e => setMethod(e.target.value)}
+                            className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm bg-white text-slate-700 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                        >
+                            <option value="cash">Efectivo</option>
+                            <option value="transfer">Transferencia</option>
+                            <option value="card">Tarjeta</option>
+                            <option value="other">Otro</option>
+                        </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                        <label htmlFor="pay-reference" className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                            Referencia
+                        </label>
+                        <Input
+                            id="pay-reference"
+                            placeholder="Nº de transferencia, cheque, etc."
+                            value={reference}
+                            onChange={e => setReference(e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                <DialogFooter className="border-t border-slate-100">
+                    <Button variant="outline" onClick={handleClose}>Cancelar</Button>
+                    <Button onClick={handleSave} disabled={paymentMutation.isPending} className="shadow-sm shadow-emerald-500/20">
+                        {paymentMutation.isPending ? 'Registrando...' : 'Registrar Pago'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 export default function FinancePage() {
     const maxBar = Math.max(...CASH_FLOW_ITEMS.map(d => d.income));
+    const [payingOrder, setPayingOrder] = useState<PurchaseOrder | null>(null);
+
+    // CxP real: órdenes de compra con saldo pendiente (total - paidAmount > 0)
+    const { data: orders = [], isLoading } = useQuery({
+        queryKey: ['purchases-payable'],
+        queryFn: () => purchasesApi.getOrders({ limit: 1000 }),
+        retry: false,
+    });
+
+    const payable = orders.filter(o => o.status !== 'CANCELLED' && remainingOf(o) > 0.005);
+    const totalAP = payable.reduce((sum, o) => sum + remainingOf(o), 0);
+    const overdueAP = payable
+        .filter(o => statusOf(o) === 'overdue')
+        .reduce((sum, o) => sum + remainingOf(o), 0);
 
     return (
         <div className="flex flex-col gap-6 max-w-350 mx-auto pb-8">
@@ -80,12 +228,14 @@ export default function FinancePage() {
 
             {/* Two-col bottom */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Accounts Payable */}
+                {/* Accounts Payable — datos reales */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
                         <div>
                             <h2 className="text-sm font-bold text-slate-900">Cuentas por Pagar</h2>
-                            <p className="text-xs text-slate-400 mt-0.5">{AP_ITEMS.length} facturas pendientes</p>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                                {isLoading ? 'Cargando...' : `${payable.length} facturas con saldo pendiente`}
+                            </p>
                         </div>
                         <Link to="/suppliers">
                             <Button variant="ghost" className="touch-target text-xs text-slate-500 font-bold">
@@ -93,37 +243,59 @@ export default function FinancePage() {
                             </Button>
                         </Link>
                     </div>
-                    <div className="divide-y divide-slate-100">
-                        {AP_ITEMS.map(item => {
-                            const conf = STATUS_CONFIG[item.status as StatusType];
-                            const StatusIcon = conf.icon;
-                            return (
-                                <div key={item.supplier} className="flex items-center justify-between px-5 py-3.5">
-                                    <div className="flex items-center gap-3">
-                                        <StatusIcon className={cn('w-4 h-4 shrink-0',
-                                            item.status === 'overdue' ? 'text-red-500' :
-                                            item.status === 'upcoming' ? 'text-amber-500' : 'text-blue-400'
-                                        )} />
-                                        <div>
-                                            <p className="text-sm font-semibold text-slate-800">{item.supplier}</p>
-                                            <p className="text-[11px] text-slate-400">
-                                                {item.dueIn < 0
-                                                    ? `Venció hace ${Math.abs(item.dueIn)} días`
-                                                    : `Vence en ${item.dueIn} días`
-                                                }
-                                            </p>
+
+                    {!isLoading && payable.length === 0 ? (
+                        <div className="p-8 text-center">
+                            <Wallet className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                            <p className="text-sm text-slate-400 font-medium">Sin cuentas por pagar pendientes</p>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-slate-100">
+                            {payable.map(item => {
+                                const conf = STATUS_CONFIG[statusOf(item)];
+                                const StatusIcon = conf.icon;
+                                return (
+                                    <div key={item.id} className="px-5 py-3.5">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <StatusIcon className={cn('w-4 h-4 shrink-0',
+                                                    statusOf(item) === 'overdue' ? 'text-red-500' :
+                                                    statusOf(item) === 'upcoming' ? 'text-amber-500' : 'text-blue-400'
+                                                )} />
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-semibold text-slate-800 truncate">{item.supplier.name}</p>
+                                                    <p className="text-[11px] text-slate-400 font-mono">
+                                                        Factura #{item.id.slice(-6).toUpperCase()}
+                                                        {item.dueDate
+                                                            ? ` · Vence ${new Date(item.dueDate).toLocaleDateString('es-VE', { day: '2-digit', month: 'short' })}`
+                                                            : ' · Sin vencimiento'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <div className="text-right">
+                                                    <p className="text-sm font-bold tabular-nums text-slate-900">
+                                                        ${remainingOf(item).toLocaleString()}
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-400 tabular-nums">
+                                                        ${item.total.toLocaleString()} · pagado ${(item.paidAmount || 0).toLocaleString()}
+                                                    </p>
+                                                </div>
+                                                <Badge variant={conf.badge}>{conf.label}</Badge>
+                                                <Button
+                                                    size="sm"
+                                                    className="text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700"
+                                                    onClick={() => setPayingOrder(item)}
+                                                >
+                                                    Pagar
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-sm font-bold tabular-nums text-slate-900">
-                                            ${item.amount.toLocaleString()}
-                                        </span>
-                                        <Badge variant={conf.badge}>{conf.label}</Badge>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
 
                 {/* Cash Flow mini chart */}
@@ -172,6 +344,9 @@ export default function FinancePage() {
                     </div>
                 </div>
             </div>
+
+            {/* Modal de pago CxP */}
+            <SupplierPaymentModal order={payingOrder} onClose={() => setPayingOrder(null)} />
         </div>
     );
 }
