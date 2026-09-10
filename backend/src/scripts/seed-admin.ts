@@ -20,11 +20,15 @@ const prisma = new PrismaClient({
 async function main() {
     const email = process.env.ADMIN_EMAIL;
     const password = process.env.ADMIN_PASSWORD;
+    const username = process.env.ADMIN_USERNAME; // opcional
 
     if (!email || !password) {
         console.error('ERROR: ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required.');
         process.exit(1);
     }
+
+    // Username: usar ADMIN_USER si se prove, si no derivar del email
+    const finalUsername = username || email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
 
     console.log(`[seed-admin] Creando admin para tenant...`);
 
@@ -50,11 +54,10 @@ async function main() {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
 
     const admin = await prisma.user.create({
         data: {
-            username,
+            username: finalUsername,
             email,
             password: hashedPassword,
             nombre: 'Administrador',
@@ -67,7 +70,7 @@ async function main() {
     });
 
     console.log(`[seed-admin] Admin creado:`);
-    console.log(`  Username : ${admin.username}`);
+    console.log(`  Username : ${finalUsername}`);
     console.log(`  Email    : ${admin.email}`);
     console.log(`  Role     : ${admin.role}`);
     console.log(`  Branch   : ${branch.name}`);

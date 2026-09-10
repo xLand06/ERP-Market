@@ -161,6 +161,7 @@ DB_PASSWORD=$DB_PASSWORD
 JWT_SECRET=$JWT_SECRET
 ADMIN_EMAIL=$ADMIN_EMAIL
 ADMIN_PASSWORD=$ADMIN_PASSWORD
+ADMIN_USER=$ADMIN_USER
 EOF
     umask 022
 
@@ -241,7 +242,7 @@ echo "smoke check OK — db healthy, /api/health returned 200 (inside stack)"
 # ── Seed admin user (idempotent) ────────────────────────────────────────────
 echo "seeding admin user for '$SLUG'..."
 if docker exec "api-$SLUG" sh -c \
-    "ADMIN_EMAIL='$ADMIN_EMAIL' ADMIN_PASSWORD='$ADMIN_PASSWORD' npx ts-node src/scripts/seed-admin.ts" \
+    "ADMIN_EMAIL='$ADMIN_EMAIL' ADMIN_PASSWORD='$ADMIN_PASSWORD' ADMIN_USERNAME='$ADMIN_USER' npx ts-node src/scripts/seed-admin.ts" \
     2>&1; then
     echo "admin user seeded: $ADMIN_EMAIL"
 else
