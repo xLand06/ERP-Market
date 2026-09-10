@@ -13,6 +13,7 @@ export interface CreateTenantInput {
     url?: string;
     plan?: string;
     adminEmail?: string;
+    adminUser?: string;
     adminPassword?: string;
 }
 
@@ -53,6 +54,7 @@ export async function createTenant(input: CreateTenantInput) {
         domain: input.domain,
         plan: input.plan,
         adminEmail: input.adminEmail,
+        adminUser: input.adminUser,
         adminPassword: input.adminPassword,
     };
 
