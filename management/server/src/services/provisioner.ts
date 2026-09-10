@@ -84,7 +84,7 @@ async function runAddClientScript(
     args.push(adminUser || 'admin');
     if (adminPassword) args.push(adminPassword);
 
-    const cmd = `cd ${DEPLOY_DIR}/.. && ./deploy/scripts/add-client.sh ${args.join(' ')}`;
+    const cmd = `/deploy/scripts/add-client.sh ${args.join(' ')}`;
     console.log(`[provisioner] Ejecutando: ${cmd}`);
 
     try {
@@ -342,13 +342,13 @@ export async function provisionWithLogs(
     if (adminEmail) args.push(adminEmail);
     args.push(adminUser || 'admin');
     if (adminPassword) args.push(adminPassword);
-    const scriptPath = `${DEPLOY_DIR}/../deploy/scripts/add-client.sh`;
+    const scriptPath = `${DEPLOY_DIR}/scripts/add-client.sh`;
 
     sendLog(`Ejecutando add-client.sh para ${slug}...`);
 
     await new Promise<void>((resolve, reject) => {
         const proc = spawn('/bin/bash', [scriptPath, ...args], {
-            cwd: `${DEPLOY_DIR}/..`,
+            cwd: `${DEPLOY_DIR}`,
             env: { ...process.env, PATH: process.env.PATH },
             timeout: 10 * 60 * 1000,
         });
