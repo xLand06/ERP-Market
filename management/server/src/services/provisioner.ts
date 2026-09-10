@@ -82,7 +82,7 @@ async function runAddClientScript(
     // sino los argumentos se corren de posición y el script falla.
     const args = [slug, domain || '', adminEmail || '', adminUser || 'admin', adminPassword || ''];
 
-    const cmd = `BUILD_CONTEXT=/repo /repo/deploy/scripts/add-client.sh ${args.join(' ')}`;
+    const cmd = `BUILD_CONTEXT=/repo HOST_TLS_DIR=/opt/erp-market/deploy/clients/${slug}/tls /repo/deploy/scripts/add-client.sh ${args.join(' ')}`;
     console.log(`[provisioner] Ejecutando: ${cmd}`);
 
     try {
@@ -343,7 +343,7 @@ export async function provisionWithLogs(
     await new Promise<void>((resolve, reject) => {
         const proc = spawn('/bin/bash', [scriptPath, ...args], {
             cwd: `/repo`,
-            env: { ...process.env, PATH: process.env.PATH, BUILD_CONTEXT: '/repo' },
+            env: { ...process.env, PATH: process.env.PATH, BUILD_CONTEXT: '/repo', HOST_TLS_DIR: `/opt/erp-market/deploy/clients/${slug}/tls` },
             timeout: 10 * 60 * 1000,
         });
 

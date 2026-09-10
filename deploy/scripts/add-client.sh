@@ -194,6 +194,12 @@ if [[ -n "${BUILD_CONTEXT:-}" ]]; then
     sed -i "s|context: ../../..|context: ${BUILD_CONTEXT}|g" "$CLIENT_DIR/docker-compose.yml"
     echo "build context fixed to: $BUILD_CONTEXT"
 fi
+# Fix TLS volume path: Docker daemon interpreta los bind mounts como paths del HOST.
+# Cuando corremos dentro del contenedor mgmt, ./tls resuelve a /repo/... que no existe en el host.
+if [[ -n "${HOST_TLS_DIR:-}" ]]; then
+    sed -i "s|./tls|${HOST_TLS_DIR}|g" "$CLIENT_DIR/docker-compose.yml"
+    echo "tls volume fixed to: $HOST_TLS_DIR"
+fi
 
 # ── Deploy the stack ──────────────────────────────────────────────────────────
 echo "building + starting stack for '$SLUG'..."
