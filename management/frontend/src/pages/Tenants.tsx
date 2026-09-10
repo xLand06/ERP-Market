@@ -420,7 +420,9 @@ export default function Tenants() {
         }
     }, [confirmAction, addToast, fetchTenants]);
 
-    const filtered = filter ? tenants.filter((t) => t.status === filter) : tenants;
+    const filtered = filter
+        ? tenants.filter((t) => t.status === filter)
+        : tenants.filter((t) => t.status !== 'DELETED');
 
     const healthyTenants = tenants.filter((t) => {
         const h = healthMap.get(t.slug);
