@@ -65,8 +65,10 @@ const COLORS = {
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
     ACTIVE: { bg: '#ecfdf5', text: '#065f46' },
+    PROVISIONING: { bg: '#eff6ff', text: '#1e40af' },
+    ERROR: { bg: '#fef2f2', text: '#991b1b' },
     SUSPENDED: { bg: '#fffbeb', text: '#92400e' },
-    DELETED: { bg: '#fef2f2', text: '#991b1b' },
+    DELETED: { bg: '#f1f5f9', text: '#64748b' },
 };
 
 /* ── Componente principal ───────────────────────────────────────────────── */
@@ -93,6 +95,7 @@ export default function TenantDetailPage() {
     const [consoleLogs, setConsoleLogs] = useState<TerminalLine[]>([]);
     const [consoleLoading, setConsoleLoading] = useState(false);
     const [activeConsoleTab, setActiveConsoleTab] = useState<'api' | 'db'>('api');
+    const [provisionLogs, setProvisionLogs] = useState<TerminalLine[]>([]);
 
     const token = localStorage.getItem('mgmt_token');
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -160,6 +163,58 @@ export default function TenantDetailPage() {
             fetchConsoleLogs();
         }
     }, [slug, tenant?.status, fetchConsoleLogs]);
+
+    /* ── Logs de provisioning en vivo ──────────────────────────────────── */
+
+    const buildTerminalLines = (rawLogs: string[]): TerminalLine[] =>
+        rawLogs.map((line) => ({
+            timestamp: new Date(),
+            message: line,
+            type: line.toLowerCase().includes('error')
+                ? 'error' as const
+                : line.toLowerCase().includes('warn')
+                    ? 'warning' as const
+                    : 'info' as const,
+        }));
+
+    // Trae { status, logs } del provisioning en background (o { api, db } si ya no hay estado en memoria)
+    const fetchProvisioningLogs = useCallback(async () => {
+        if (!slug) return;
+        try {
+            const token = localStorage.getItem('mgmt_token');
+            const res = await fetch(`/api/tenants/${slug}/logs`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) throw new Error('Error al obtener logs');
+            const data = await res.json();
+
+            if (Array.isArray(data.logs)) {
+                setProvisionLogs(buildTerminalLines(data.logs));
+            }
+        } catch {
+            // El polling reintenta en el siguiente tick; no romper la UI
+        }
+    }, [slug]);
+
+    // Polling cada 3s mientras el tenant este en PROVISIONING:
+    // actualiza los logs en vivo y refresca el tenant para detectar
+    // la transicion a ACTIVE o ERROR (ahi se corta el polling)
+    useEffect(() => {
+        if (tenant?.status !== 'PROVISIONING') return;
+        fetchProvisioningLogs();
+        const interval = setInterval(() => {
+            fetchProvisioningLogs();
+            fetchTenant();
+        }, 3000);
+        return () => clearInterval(interval);
+    }, [tenant?.status, fetchProvisioningLogs, fetchTenant]);
+
+    // Si el provisioning termino en ERROR, capturar los logs finales una vez
+    useEffect(() => {
+        if (tenant?.status === 'ERROR') {
+            fetchProvisioningLogs();
+        }
+    }, [tenant?.status, fetchProvisioningLogs]);
 
     /* ── Acciones ──────────────────────────────────────────────────────── */
 
@@ -528,56 +583,86 @@ export default function TenantDetailPage() {
             </div>
 
             {/* ── Consola del contenedor ──────────────────────────────────── */}
-            {tenant.status === 'ACTIVE' && (
+            {(tenant.status === 'ACTIVE' || tenant.status === 'PROVISIONING' || tenant.status === 'ERROR') && (
                 <div style={{ background: '#fff', borderRadius: 8, padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                        <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: '#1e293b' }}>Consola</h3>
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', gap: 4 }}>
-                                {(['api', 'db'] as const).map((tab) => (
-                                    <button
-                                        key={tab}
-                                        onClick={() => {
-                                            setActiveConsoleTab(tab);
-                                            fetchConsoleLogs();
-                                        }}
-                                        style={{
-                                            padding: '0.3rem 0.75rem',
-                                            borderRadius: 6,
-                                            border: activeConsoleTab === tab ? `1px solid ${COLORS.dark}` : `1px solid ${COLORS.border}`,
-                                            background: activeConsoleTab === tab ? COLORS.dark : '#fff',
-                                            color: activeConsoleTab === tab ? '#fff' : '#64748b',
-                                            cursor: 'pointer',
-                                            fontSize: '0.75rem',
-                                            fontWeight: 500,
-                                            minHeight: 32,
-                                        }}
-                                    >
-                                        {tab.toUpperCase()}
-                                    </button>
-                                ))}
-                            </div>
-                            <button
-                                onClick={fetchConsoleLogs}
-                                disabled={consoleLoading}
-                                style={{
-                                    padding: '0.3rem 0.75rem',
-                                    borderRadius: 6,
-                                    border: `1px solid ${COLORS.border}`,
-                                    background: '#fff',
-                                    color: COLORS.info,
-                                    cursor: consoleLoading ? 'not-allowed' : 'pointer',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 500,
-                                    minHeight: 32,
-                                }}
-                            >
-                                {consoleLoading ? 'Cargando...' : 'Actualizar'}
-                            </button>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: '#1e293b' }}>Consola</h3>
+                            <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 5,
+                                padding: '3px 10px',
+                                borderRadius: 12,
+                                fontSize: '0.75rem',
+                                fontWeight: 500,
+                                background: statusStyle.bg,
+                                color: statusStyle.text,
+                            }}>
+                                {tenant.status === 'PROVISIONING' && (
+                                    <div style={{
+                                        width: 8,
+                                        height: 8,
+                                        border: '2px solid rgba(37,99,235,0.25)',
+                                        borderTopColor: '#2563eb',
+                                        borderRadius: '50%',
+                                        animation: 'spin 1s linear infinite',
+                                    }} />
+                                )}
+                                {tenant.status}
+                            </span>
                         </div>
+
+                        {tenant.status === 'ACTIVE' && (
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                    {(['api', 'db'] as const).map((tab) => (
+                                        <button
+                                            key={tab}
+                                            onClick={() => {
+                                                setActiveConsoleTab(tab);
+                                                fetchConsoleLogs();
+                                            }}
+                                            style={{
+                                                padding: '0.3rem 0.75rem',
+                                                borderRadius: 6,
+                                                border: activeConsoleTab === tab ? `1px solid ${COLORS.dark}` : `1px solid ${COLORS.border}`,
+                                                background: activeConsoleTab === tab ? COLORS.dark : '#fff',
+                                                color: activeConsoleTab === tab ? '#fff' : '#64748b',
+                                                cursor: 'pointer',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 500,
+                                                minHeight: 32,
+                                            }}
+                                        >
+                                            {tab.toUpperCase()}
+                                        </button>
+                                    ))}
+                                </div>
+                                <button
+                                    onClick={fetchConsoleLogs}
+                                    disabled={consoleLoading}
+                                    style={{
+                                        padding: '0.3rem 0.75rem',
+                                        borderRadius: 6,
+                                        border: `1px solid ${COLORS.border}`,
+                                        background: '#fff',
+                                        color: COLORS.info,
+                                        cursor: consoleLoading ? 'not-allowed' : 'pointer',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 500,
+                                        minHeight: 32,
+                                    }}
+                                >
+                                    {consoleLoading ? 'Cargando...' : 'Actualizar'}
+                                </button>
+                            </div>
+                        )}
                     </div>
 
-                    {consoleLogs.length === 0 && !consoleLoading ? (
+                    {tenant.status === 'PROVISIONING' || tenant.status === 'ERROR' ? (
+                        <Terminal lines={provisionLogs} maxHeight={300} />
+                    ) : consoleLogs.length === 0 && !consoleLoading ? (
                         <div style={{
                             background: '#1a1a2e',
                             borderRadius: 8,

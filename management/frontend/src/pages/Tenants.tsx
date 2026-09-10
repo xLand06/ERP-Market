@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import HealthBadge from '../components/HealthBadge';
-import Terminal, { TerminalLine } from '../components/Terminal';
 
 /* ── Estilos globales inyectados una sola vez ─────────────────────────────── */
 
@@ -90,10 +89,7 @@ interface TenantHealth {
 
 interface CreateTenantResponse {
     slug: string;
-    domain: string;
-    adminEmail: string | null;
-    adminPasswordPlain: string;
-    dbPassword: string;
+    status: string;
 }
 
 interface VpsStats {
@@ -129,9 +125,10 @@ const COLORS = {
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
     ACTIVE: { bg: '#ecfdf5', text: '#065f46', dot: '#059669' },
-    SUSPENDED: { bg: '#fffbeb', text: '#92400e', dot: '#d97706' },
-    DELETED: { bg: '#fef2f2', text: '#991b1b', dot: '#dc2626' },
     PROVISIONING: { bg: '#eff6ff', text: '#1e40af', dot: '#2563eb' },
+    ERROR: { bg: '#fef2f2', text: '#991b1b', dot: '#dc2626' },
+    SUSPENDED: { bg: '#fffbeb', text: '#92400e', dot: '#d97706' },
+    DELETED: { bg: '#f1f5f9', text: '#64748b', dot: '#94a3b8' },
 };
 
 const HEALTH_STATUS = {
@@ -150,6 +147,23 @@ function getHealthStatus(lastCheck: TenantHealth['lastCheck']): keyof typeof HEA
     if (lastCheck.containerUp && lastCheck.apiHealthy && lastCheck.dbHealthy) return 'running';
     if (lastCheck.containerUp) return 'partial';
     return 'stopped';
+}
+
+function StatusDot({ status, color }: { status: string; color: string }) {
+    if (status === 'PROVISIONING') {
+        return (
+            <div style={{
+                width: 8,
+                height: 8,
+                border: '2px solid rgba(37,99,235,0.25)',
+                borderTopColor: '#2563eb',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                flexShrink: 0,
+            }} />
+        );
+    }
+    return <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />;
 }
 
 function ProgressBar({ percent, color }: { percent: number; color: string }) {
@@ -233,8 +247,6 @@ export default function Tenants() {
 
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [creating, setCreating] = useState(false);
-    const [provisioning, setProvisioning] = useState(false);
-    const [createdTenant, setCreatedTenant] = useState<CreateTenantResponse | null>(null);
     const [formSlug, setFormSlug] = useState('');
     const [formDomain, setFormDomain] = useState('');
     const [formEmail, setFormEmail] = useState('');
@@ -242,8 +254,6 @@ export default function Tenants() {
     const [formPassword, setFormPassword] = useState('');
     const [formPlan, setFormPlan] = useState('free');
     const [formError, setFormError] = useState<string | null>(null);
-    const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([]);
-    const [provisionStatus, setProvisionStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
 
     const [confirmAction, setConfirmAction] = useState<{
         title: string;
@@ -290,6 +300,15 @@ export default function Tenants() {
         fetchTenants();
     }, [fetchTenants]);
 
+    // Auto-refresh: pollear cada 5s mientras haya al menos un tenant en PROVISIONING
+    const hasProvisioning = tenants.some((t) => t.status === 'PROVISIONING');
+
+    useEffect(() => {
+        if (!hasProvisioning) return;
+        const interval = setInterval(fetchTenants, 5000);
+        return () => clearInterval(interval);
+    }, [hasProvisioning, fetchTenants]);
+
     const resetForm = useCallback(() => {
         setFormSlug('');
         setFormDomain('');
@@ -313,23 +332,21 @@ export default function Tenants() {
         }
 
         setCreating(true);
-        setProvisioning(true);
-        setProvisionStatus('running');
-        setTerminalLines([]);
 
         try {
             const token = localStorage.getItem('mgmt_token');
-                const body: Record<string, string> = {
-                    slug: formSlug,
-                    domain: formDomain,
-                };
-                if (formEmail) body.adminEmail = formEmail;
-                if (formUser) body.adminUser = formUser;
-                if (formPassword) body.adminPassword = formPassword;
-                if (formPlan) body.plan = formPlan;
+            const body: Record<string, string> = {
+                slug: formSlug,
+                domain: formDomain,
+            };
+            if (formEmail) body.adminEmail = formEmail;
+            if (formUser) body.adminUser = formUser;
+            if (formPassword) body.adminPassword = formPassword;
+            if (formPlan) body.plan = formPlan;
 
-            // Usar fetch con POST para SSE (no soporta Authorization header directo con EventSource)
-            const res = await fetch('/api/tenants/create', {
+            // POST no bloqueante: el provisioning corre en background y
+            // la respuesta llega inmediatamente con status PROVISIONING
+            const res = await fetch('/api/tenants', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -341,89 +358,20 @@ export default function Tenants() {
             if (!res.ok) {
                 const data = await res.json();
                 setFormError(data.error || 'Error al crear tenant');
-                setProvisionStatus('error');
-                setCreating(false);
-                setProvisioning(false);
                 return;
             }
 
-            // Leer stream de SSE
-            const reader = res.body?.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-
-            if (!reader) {
-                setFormError('No se pudo leer el stream de respuesta');
-                setProvisionStatus('error');
-                setCreating(false);
-                setProvisioning(false);
-                return;
-            }
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-
-                // Procesar eventos SSE completos (separados por doble newline)
-                const events = buffer.split('\n\n');
-                buffer = events.pop() || '';
-
-                for (const event of events) {
-                    const dataLine = event.split('\n').find((l) => l.startsWith('data: '));
-                    if (!dataLine) continue;
-
-                    try {
-                        const payload = JSON.parse(dataLine.slice(6));
-
-                        if (payload.type === 'log') {
-                            setTerminalLines((prev) => [
-                                ...prev,
-                                {
-                                    timestamp: new Date(),
-                                    message: payload.message,
-                                    type: 'info',
-                                },
-                            ]);
-                        } else if (payload.type === 'done') {
-                            setProvisionStatus('success');
-                            setCreatedTenant(payload.tenant);
-                            setTerminalLines((prev) => [
-                                ...prev,
-                                {
-                                    timestamp: new Date(),
-                                    message: 'Tenant provisionado exitosamente!',
-                                    type: 'success',
-                                },
-                            ]);
-                            resetForm();
-                            fetchTenants();
-                        } else if (payload.type === 'error') {
-                            setProvisionStatus('error');
-                            setFormError(payload.error);
-                            setTerminalLines((prev) => [
-                                ...prev,
-                                {
-                                    timestamp: new Date(),
-                                    message: payload.error,
-                                    type: 'error',
-                                },
-                            ]);
-                        }
-                    } catch {
-                        // Ignorar lineas SSE malformadas
-                    }
-                }
-            }
+            const data: CreateTenantResponse = await res.json();
+            addToast(`Tenant ${data.slug} creado — provisionando en background`, 'success');
+            resetForm();
+            setShowCreateModal(false);
+            fetchTenants();
         } catch {
             setFormError('Error de conexion al crear tenant');
-            setProvisionStatus('error');
         } finally {
             setCreating(false);
-            setProvisioning(false);
         }
-    }, [formSlug, formDomain, formEmail, formPassword, formPlan, resetForm, fetchTenants]);
+    }, [formSlug, formDomain, formEmail, formPassword, formPlan, resetForm, fetchTenants, addToast]);
 
     const handleSuspend = useCallback(async (slug: string) => {
         const token = localStorage.getItem('mgmt_token');
@@ -677,6 +625,8 @@ export default function Tenants() {
                     {[
                         { value: '', label: 'Todos' },
                         { value: 'ACTIVE', label: 'Activos' },
+                        { value: 'PROVISIONING', label: 'Provisionando' },
+                        { value: 'ERROR', label: 'Error' },
                         { value: 'SUSPENDED', label: 'Suspendidos' },
                         { value: 'DELETED', label: 'Eliminados' },
                     ].map(({ value, label }) => (
@@ -792,7 +742,7 @@ export default function Tenants() {
                                                     color: colors.text,
                                                     alignSelf: 'flex-start',
                                                 }}>
-                                                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: colors.dot, flexShrink: 0 }} />
+                                                    <StatusDot status={t.status} color={colors.dot} />
                                                     {t.status}
                                                 </span>
                                             </div>
@@ -947,7 +897,7 @@ export default function Tenants() {
                                     background: colors.bg,
                                     color: colors.text,
                                 }}>
-                                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: colors.dot }} />
+                                    <StatusDot status={t.status} color={colors.dot} />
                                     {t.status}
                                 </span>
                             </div>
@@ -1218,35 +1168,6 @@ export default function Tenants() {
                             </select>
                         </div>
 
-                        {provisioning && terminalLines.length > 0 && (
-                            <div style={{ marginBottom: '1rem' }}>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    marginBottom: '0.5rem',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 600,
-                                    color: provisionStatus === 'success' ? '#059669'
-                                        : provisionStatus === 'error' ? '#dc2626'
-                                        : '#1e40af',
-                                }}>
-                                    {provisionStatus === 'running' && (
-                                        <div style={{
-                                            width: 12,
-                                            height: 12,
-                                            border: '2px solid rgba(30,64,175,0.3)',
-                                            borderTopColor: '#1e40af',
-                                            borderRadius: '50%',
-                                            animation: 'spin 1s linear infinite',
-                                        }} />
-                                    )}
-                                    {provisionStatus === 'success' ? 'Completado' : provisionStatus === 'error' ? 'Error' : 'Provisionando...'}
-                                </div>
-                                <Terminal lines={terminalLines} maxHeight={260} />
-                            </div>
-                        )}
-
                         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                             <button
                                 onClick={() => setShowCreateModal(false)}
@@ -1292,145 +1213,9 @@ export default function Tenants() {
                                         animation: 'spin 1s linear infinite',
                                     }} />
                                 )}
-                                {creating ? 'Provisionando...' : 'Crear Tenant'}
+                                {creating ? 'Creando...' : 'Crear Tenant'}
                             </button>
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ── Modal: Credenciales generadas ──────────────────────────────── */}
-            {createdTenant && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        inset: 0,
-                        background: 'rgba(0,0,0,0.5)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 1000,
-                    }}
-                    onClick={(e) => { if (e.target === e.currentTarget) setCreatedTenant(null); }}
-                >
-                    <div style={{
-                        background: '#fff',
-                        borderRadius: 12,
-                        padding: '2rem',
-                        width: '100%',
-                        maxWidth: 520,
-                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-                        animation: 'fadeIn 0.2s ease',
-                    }}>
-                        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-                            <div style={{
-                                width: 48,
-                                height: 48,
-                                borderRadius: '50%',
-                                background: '#ecfdf5',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                margin: '0 auto 0.75rem',
-                            }}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                                    <path d="M5 13l4 4L19 7" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                            </div>
-                            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>
-                                Tenant Provisionado
-                            </h2>
-                            <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', color: COLORS.muted }}>
-                                {createdTenant.slug} · {createdTenant.domain}
-                            </p>
-                        </div>
-
-                        <div style={{
-                            background: '#f0fdf4',
-                            borderRadius: 8,
-                            padding: '0.75rem 1rem',
-                            marginBottom: '1rem',
-                            fontSize: '0.8rem',
-                            color: '#065f46',
-                        }}>
-                            <div style={{ fontWeight: 600, marginBottom: 4 }}>Infraestructura creada:</div>
-                            <div>- Contenedor PostgreSQL (db-{createdTenant.slug})</div>
-                            <div>- Contenedor API (api-{createdTenant.slug})</div>
-                            <div>- Volumen de datos persistente</div>
-                            <div>- Certificado TLS auto-firmado</div>
-                            <div>- Configuracion Caddy (routing HTTPS)</div>
-                        </div>
-
-                        <div style={{
-                            background: '#f8fafc',
-                            borderRadius: 8,
-                            padding: '1rem',
-                            marginBottom: '1.5rem',
-                        }}>
-                            <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}>
-                                Credenciales de administrador
-                            </p>
-                            {createdTenant.adminEmail && (
-                                <div style={{ marginBottom: '0.5rem' }}>
-                                    <span style={{ fontSize: '0.75rem', color: COLORS.muted }}>Email: </span>
-                                    <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#1e293b' }}>{createdTenant.adminEmail}</span>
-                                </div>
-                            )}
-                            <div>
-                                <span style={{ fontSize: '0.75rem', color: COLORS.muted }}>Contrasena: </span>
-                                <code style={{
-                                    fontSize: '0.85rem',
-                                    fontWeight: 600,
-                                    background: '#fff',
-                                    padding: '2px 6px',
-                                    borderRadius: 4,
-                                    border: '1px solid #e2e8f0',
-                                }}>
-                                    {createdTenant.adminPasswordPlain}
-                                </code>
-                            </div>
-                            <div style={{ marginTop: '0.5rem' }}>
-                                <span style={{ fontSize: '0.75rem', color: COLORS.muted }}>URL: </span>
-                                <a
-                                    href={`https://${createdTenant.domain}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={{ fontSize: '0.85rem', color: COLORS.info }}
-                                >
-                                    https://{createdTenant.domain}
-                                </a>
-                            </div>
-                        </div>
-
-                        <div style={{
-                            padding: '0.75rem 1rem',
-                            borderRadius: 6,
-                            background: '#fffbeb',
-                            color: '#92400e',
-                            fontSize: '0.8rem',
-                            marginBottom: '1.5rem',
-                            border: '1px solid #fde68a',
-                        }}>
-                            Guarda estas credenciales. No se van a mostrar de nuevo.
-                        </div>
-
-                        <button
-                            onClick={() => setCreatedTenant(null)}
-                            style={{
-                                width: '100%',
-                                padding: '0.5rem',
-                                borderRadius: 6,
-                                border: 'none',
-                                background: COLORS.dark,
-                                color: '#fff',
-                                cursor: 'pointer',
-                                fontSize: '0.85rem',
-                                fontWeight: 600,
-                                minHeight: 44,
-                            }}
-                        >
-                            Entendido
-                        </button>
                     </div>
                 </div>
             )}

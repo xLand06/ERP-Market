@@ -9,6 +9,8 @@ datasource db {
 
 enum TenantStatus {
     ACTIVE
+    PROVISIONING
+    ERROR
     SUSPENDED
     DELETED
 }
