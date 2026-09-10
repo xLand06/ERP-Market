@@ -343,7 +343,7 @@ export async function provisionWithLogs(
     sendLog(`Ejecutando add-client.sh para ${slug}...`);
 
     await new Promise<void>((resolve, reject) => {
-        const proc = spawn('bash', [scriptPath, ...args], {
+        const proc = spawn('/bin/bash', [scriptPath, ...args], {
             cwd: `${HOST_DEPLOY_DIR}/..`,
             env: { ...process.env, PATH: process.env.PATH },
             timeout: 10 * 60 * 1000,
