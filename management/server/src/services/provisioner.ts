@@ -27,7 +27,7 @@ const HEALTH_POLL_INTERVAL = 5;
 // ── Interfaces ───────────────────────────────────────────────────────────────
 export interface ProvisionInput {
     slug: string;
-    domain: string;
+    domain?: string;
     plan?: string;
     adminEmail?: string;
     adminPassword?: string;
@@ -258,8 +258,11 @@ async function removeCaddySite(slug: string): Promise<void> {
  * 10. Retorna credenciales
  */
 export async function provisionTenant(input: ProvisionInput): Promise<ProvisionResult> {
-    const { slug, domain, adminEmail, adminPassword: adminPasswordInput } = input;
+    const { slug, adminEmail, adminPassword: adminPasswordInput } = input;
     const plan = input.plan || 'free';
+
+    // Auto-generar dominio si no se prove
+    const domain = input.domain || `${slug}.89.167.46.144.sslip.io`;
 
     // ── 1. Generar secretos ──────────────────────────────────────────────
     const dbPassword = generatePassword();

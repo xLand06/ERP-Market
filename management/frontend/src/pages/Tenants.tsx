@@ -93,10 +93,6 @@ export default function Tenants() {
             setError('El slug solo puede contener minúsculas, números y guiones');
             return;
         }
-        if (!formDomain) {
-            setError('El dominio es requerido');
-            return;
-        }
         if (formPassword && formPassword.length < 8) {
             setError('La contraseña debe tener al menos 8 caracteres');
             return;
@@ -408,13 +404,13 @@ export default function Tenants() {
 
                         <div style={{ marginBottom: '1rem' }}>
                             <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-                                Dominio *
+                                Dominio (opcional)
                             </label>
                             <input
                                 type="text"
                                 value={formDomain}
                                 onChange={(e) => setFormDomain(e.target.value)}
-                                placeholder="mi-tenant.erpmarket.com"
+                                placeholder="Se genera automáticamente si se deja vacío"
                                 style={{
                                     width: '100%',
                                     padding: '0.6rem 0.75rem',
@@ -543,14 +539,14 @@ export default function Tenants() {
                             </button>
                             <button
                                 onClick={handleCreate}
-                                disabled={creating || !formSlug || !formDomain}
-                                style={{
-                                    padding: '0.5rem 1.25rem',
-                                    borderRadius: 6,
-                                    border: 'none',
-                                    background: creating || !formSlug || !formDomain ? '#9ca3af' : '#059669',
-                                    color: '#fff',
-                                    cursor: creating || !formSlug || !formDomain ? 'not-allowed' : 'pointer',
+                disabled={creating || !formSlug}
+                style={{
+                    padding: '0.5rem 1.25rem',
+                    borderRadius: 6,
+                    border: 'none',
+                    background: creating || !formSlug ? '#9ca3af' : '#059669',
+                    color: '#fff',
+                    cursor: creating || !formSlug ? 'not-allowed' : 'pointer',
                                     fontSize: '0.85rem',
                                     fontWeight: 600,
                                     minHeight: 44,
