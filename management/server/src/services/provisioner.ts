@@ -15,7 +15,7 @@ const NETWORK_NAME = 'erp_proxy';
 const DB_IMAGE = 'postgres:16-alpine';
 const API_IMAGE = 'erp-market:latest';
 const DEPLOY_DIR = process.env.DEPLOY_DIR || path.resolve(__dirname, '../../../../deploy');
-// Path del host para volume mounts de Docker (los containers DB necesitan el path del host, no del contenedor)
+// Path del host para volume mounts de Docker (los containers DB necesitan el path del host)
 const HOST_DEPLOY_DIR = process.env.HOST_DEPLOY_DIR || DEPLOY_DIR;
 const SITES_DIR = path.join(HOST_DEPLOY_DIR, 'caddy/sites');
 
@@ -275,8 +275,11 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     console.log(`[provisioner] Iniciando provisioning para tenant: ${slug}`);
 
     // ── 2. Crear directorio del cliente + TLS ────────────────────────────
-    const clientDir = path.join(HOST_DEPLOY_DIR, 'clients', slug);
+    // clientDir del contenedor para escritura de archivos
+    const clientDir = path.join(DEPLOY_DIR, 'clients', slug);
     const tlsDir = path.join(clientDir, 'tls');
+    // clientDir del host para mounts de Docker (el container DB necesita el path real del host)
+    const hostClientDir = path.join(HOST_DEPLOY_DIR, 'clients', slug);
 
     await fs.mkdir(tlsDir, { recursive: true });
 
@@ -367,8 +370,8 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
         HostConfig: {
             Binds: [
                 `${volumeName}:/var/lib/postgresql/data`,
-                `${path.join(tlsDir, 'server.crt')}:/run/secrets/server.crt:ro`,
-                `${path.join(tlsDir, 'server.key')}:/run/secrets/server.key:ro`,
+                `${path.join(hostClientDir, 'tls/server.crt')}:/run/secrets/server.crt:ro`,
+                `${path.join(hostClientDir, 'tls/server.key')}:/run/secrets/server.key:ro`,
             ],
             NetworkMode: NETWORK_NAME,
             RestartPolicy: { Name: 'unless-stopped' },
