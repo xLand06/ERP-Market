@@ -39,10 +39,11 @@ if docker ps --format '{{.Names}}' | grep -q '^mgmt-api$'; then
 const { PrismaClient } = require('@prisma/client');
 async function main() {
     const prisma = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
-    await prisma.tenant.deleteMany({});
+    // Borrar hijos primero (FK constraints), tenants al final
     await prisma.healthCheck.deleteMany({});
     await prisma.payment.deleteMany({});
     await prisma.auditLog.deleteMany({});
+    await prisma.tenant.deleteMany({});
     console.log('DB management limpia');
     await prisma.\$disconnect();
 }
