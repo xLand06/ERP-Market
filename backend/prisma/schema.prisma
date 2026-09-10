@@ -23,6 +23,7 @@ enum Role {
 enum TransactionType {
   SALE
   INVENTORY_IN
+  QUOTE
 }
 
 enum TransactionStatus {
@@ -285,6 +286,11 @@ model Transaction {
 
   // Multi-pago
   paymentMethods Json?             // [{ type: "cash", amount: 5000, currency: "COP" }, ...]
+
+  // Metadata flexible (F4 Cotizaciones)
+  // QUOTE: { type: "quote", quoteConvertedTo: <saleId> }
+  // SALE:  { quoteSource: <quoteId> }
+  metadata Json?
 
   userId String
   user   User   @relation(fields: [userId], references: [id])

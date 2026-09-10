@@ -138,6 +138,7 @@ db.exec(`
     exchangeRate REAL,
     invoiceNumber TEXT,
     paymentMethods TEXT,
+    metadata TEXT,
     userId TEXT NOT NULL REFERENCES users(id),
     branchId TEXT NOT NULL REFERENCES branches(id),
     cashRegisterId TEXT REFERENCES cash_registers(id),

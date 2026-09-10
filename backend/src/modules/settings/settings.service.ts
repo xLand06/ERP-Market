@@ -36,6 +36,10 @@ export interface SystemSettings {
     showPaymentMethods: boolean;
     showIvaBreakdown: boolean;
     footerMessage: string;
+
+    // Plan comercial (F2 — Límites de plan)
+    planTier: string;       // 'basic' | 'pro'
+    planConfig: string;     // JSON string: { maxUsers, maxBranches, maxProducts }
 }
 
 const DEFAULT_SETTINGS: SystemSettings = {
@@ -70,6 +74,9 @@ const DEFAULT_SETTINGS: SystemSettings = {
     showPaymentMethods: true,
     showIvaBreakdown: true,
     footerMessage: '¡Gracias por su compra! Vuelva pronto',
+
+    planTier: 'basic',
+    planConfig: JSON.stringify({ maxUsers: 3, maxBranches: 1, maxProducts: 250 }),
 };
 
 export async function getSettings(): Promise<SystemSettings> {

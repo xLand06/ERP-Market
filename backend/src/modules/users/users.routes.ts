@@ -6,6 +6,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { authMiddleware } from '../../core/middlewares/auth.middleware';
 import { roleGuard } from '../../core/middlewares/roleGuard';
+import { planEnforcement } from '../../core/middlewares/plan.middleware';
 import { validate } from '../../core/middlewares/validate.middleware';
 import { idParamSchema } from '../../core/validations/common.zod';
 import { registerSchema, updateUserSchema } from '../../core/validations/auth.zod';
@@ -23,7 +24,7 @@ router.get('/', ctrl.getAll);
 router.get('/:id', validate(idParamSchema, { source: 'params' }), ctrl.getOne);
 
 /** POST /api/users — Crear usuario */
-router.post('/', validate(registerSchema), ctrl.create);
+router.post('/', planEnforcement('users'), validate(registerSchema), ctrl.create);
 
 /** PUT  /api/users/:id — Actualizar usuario */
 router.put('/:id', validate(idParamSchema, { source: 'params' }), validate(updateUserSchema), ctrl.update);

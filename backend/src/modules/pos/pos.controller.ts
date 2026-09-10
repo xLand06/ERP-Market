@@ -180,3 +180,88 @@ export const cancelTransaction = async (req: AuthRequest, res: Response): Promis
         res.status(422).json({ success: false, error: err.message });
     }
 };
+
+// =============================================================================
+// F4 — COTIZACIONES
+// =============================================================================
+
+/**
+ * Crear una cotización (sin caja, sin pagos, sin stock)
+ */
+export const createQuote = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const data = validatedData(req, 'body');
+
+        const quote = await posService.createQuote({
+            ...data,
+            userId: req.user!.id,
+        });
+
+        await logAudit({
+            action: 'SALE_CREATE',
+            module: 'pos',
+            details: {
+                cotizacionId: quote.id,
+                sucursalId: data.branchId,
+                monto: Number(quote.total),
+            },
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
+        });
+
+        res.status(201).json({ success: true, data: quote });
+    } catch (err: any) {
+        res.status(422).json({ success: false, error: err.message });
+    }
+};
+
+/**
+ * Listar cotizaciones
+ */
+export const getQuotes = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const filters = validatedData(req, 'query') || {};
+
+        const quotes = await posService.getQuotes({
+            branchId: filters.branchId as string | undefined,
+            page: filters.page,
+            limit: filters.limit,
+        });
+
+        res.json({ success: true, data: quotes });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Convertir una cotización en venta real
+ */
+export const convertQuote = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const { id } = validatedData(req, 'params');
+        const body = validatedData(req, 'body') || {};
+
+        const sale = await posService.convertQuoteToSale(id, {
+            userId: req.user!.id,
+            branchId: body.branchId as string | undefined,
+        });
+
+        await logAudit({
+            action: 'SALE_CREATE',
+            module: 'pos',
+            details: {
+                cotizacionId: id,
+                ventaId: sale.id,
+                monto: Number(sale.total),
+            },
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
+        });
+
+        res.json({ success: true, data: sale });
+    } catch (err: any) {
+        const status = err?.status || 422;
+        res.status(status).json({ success: false, error: err.message });
+    }
+};

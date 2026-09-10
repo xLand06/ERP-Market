@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../core/middlewares/auth.middleware';
 import { roleGuard } from '../../core/middlewares/roleGuard';
+import { planEnforcement } from '../../core/middlewares/plan.middleware';
 import { validate } from '../../core/middlewares/validate.middleware';
 import { idParamSchema } from '../../core/validations/common.zod';
 import { createBranchSchema, updateBranchSchema } from '../../core/validations/branches.zod';
@@ -21,7 +22,7 @@ router.get('/', ctrl.getAll);
 router.get('/:id', validate(idParamSchema, { source: 'params' }), ctrl.getOne);
 
 /** POST /api/branches — Crear sede (Solo OWNER) */
-router.post('/', roleGuard('OWNER'), validate(createBranchSchema), ctrl.create);
+router.post('/', planEnforcement('branches'), roleGuard('OWNER'), validate(createBranchSchema), ctrl.create);
 
 /** PUT  /api/branches/:id — Actualizar sede (Solo OWNER) */
 router.put('/:id', 
