@@ -110,7 +110,10 @@ DB_PASSWORD="$(openssl rand -hex 24)"
 JWT_SECRET="$(openssl rand -hex 24)"
 
 # ── Admin credentials (temp password for first login) ───────────────────────
-ADMIN_PASSWORD="$(openssl rand -base64 12 | tr -d '=+/' | head -c 16)"
+# Si no se pasó contraseña (vacía), se genera una aleatoria
+if [[ -z "$ADMIN_PASSWORD" ]]; then
+    ADMIN_PASSWORD="$(openssl rand -base64 12 | tr -d '=+/' | head -c 16)"
+fi
 if [[ -z "$ADMIN_EMAIL" ]]; then
     ADMIN_EMAIL="admin@${SLUG}.local"
 fi
