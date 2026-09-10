@@ -331,90 +331,45 @@ export async function provisionWithLogs(
     adminPassword: string,
     sendLog: LogCallback,
 ): Promise<ProvisionResult> {
-    const args = [`'${slug}'`];
-    if (domain) args.push(`'${domain}'`);
-    if (adminEmail) args.push(`'${adminEmail}'`);
-    args.push("'admin'");
-    if (adminPassword) args.push(`'${adminPassword}'`);
+    const { spawn } = await import('child_process');
 
-    const scriptCmd = `cd /repo && ./deploy/scripts/add-client.sh ${args.join(' ')}`;
+    const args = [slug];
+    if (domain) args.push(domain);
+    if (adminEmail) args.push(adminEmail);
+    args.push('admin');
+    if (adminPassword) args.push(adminPassword);
 
-    const setupCmd = [
-        'apk add --no-cache bash docker-cli docker-cli-compose openssl curl gettext >/dev/null 2>&1',
-        scriptCmd,
-    ].join(' && ');
-
-    const containerName = `provision-${slug}-${Date.now()}`;
-
-    sendLog(`Creando contenedor efimero: ${containerName}`);
-
-    const container = await docker.createContainer({
-        Image: 'alpine:latest',
-        Cmd: ['sh', '-c', setupCmd],
-        name: containerName,
-        HostConfig: {
-            Binds: [
-                `${HOST_DEPLOY_DIR}:/repo`,
-                '/var/run/docker.sock:/var/run/docker.sock',
-            ],
-            NetworkMode: 'host',
-        },
-    });
-
-    await container.start();
-    sendLog('Contenedor iniciado — ejecutando add-client.sh...');
-
-    // Adjuntar stream de stdout + stderr
-    const stream = await container.attach({ stream: true, stdout: true, stderr: true });
-
-    // Buffer para acumular datos parciales (chunks de Docker pueden cortar lineas)
-    let lineBuffer = '';
+    const scriptPath = `${HOST_DEPLOY_DIR}/../deploy/scripts/add-client.sh`;
+    sendLog(`Ejecutando add-client.sh para ${slug}...`);
 
     await new Promise<void>((resolve, reject) => {
-        stream.on('data', (chunk: Buffer) => {
-            // Docker multiplexed streams: primer byte indica stream type,
-            // los primeros 8 bytes son header de longitud — los ignoramos.
-            const raw = chunk.toString('utf-8');
-            // Separar en lineas y procesar cada una
-            const parts = raw.split('\n');
-            for (let i = 0; i < parts.length; i++) {
-                const part = parts[i];
-                if (i === parts.length - 1 && part !== '') {
-                    // Ultimo fragmento incompleto — acumular
-                    lineBuffer += part;
-                } else {
-                    const fullLine = lineBuffer + part;
-                    lineBuffer = '';
-                    const trimmed = fullLine.trim();
-                    if (trimmed) {
-                        sendLog(trimmed);
-                    }
-                }
-            }
+        const proc = spawn('bash', [scriptPath, ...args], {
+            cwd: `${HOST_DEPLOY_DIR}/..`,
+            env: { ...process.env, PATH: process.env.PATH },
+            timeout: 10 * 60 * 1000,
         });
 
-        stream.on('end', resolve);
-        stream.on('error', reject);
-    });
+        proc.stdout.on('data', (data: Buffer) => {
+            data.toString().split('\n').filter(l => l.trim()).forEach(line => sendLog(line));
+        });
 
-    // Flush residual
-    if (lineBuffer.trim()) {
-        sendLog(lineBuffer.trim());
-    }
+        proc.stderr.on('data', (data: Buffer) => {
+            data.toString().split('\n').filter(l => l.trim()).forEach(line => sendLog(line));
+        });
+
+        proc.on('close', (code) => {
+            if (code === 0) resolve();
+            else reject(new Error(`add-client.sh fallo con exit code ${code}`));
+        });
+
+        proc.on('error', reject);
+    });
 
     sendLog('add-client.sh completado — registrando tenant en DB...');
 
     // Registrar en DB
     const result = await registerTenantFromEnv(slug, domain, plan, adminEmail, adminPassword);
     sendLog(`Tenant ${slug} registrado exitosamente (id: ${result.tenantId})`);
-
-    // Limpiar contenedor efimero
-    try {
-        await container.remove({ force: true });
-        sendLog('Contenedor efimero eliminado');
-    } catch {
-        // Ya fue eliminado
-    }
 
     return result;
 }
