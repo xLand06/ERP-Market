@@ -1,22 +1,67 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import HealthBadge from '../components/HealthBadge';
 
-// Estilo global para animación de spinner
-const spinKeyframes = `
+/* ── Estilos globales inyectados una sola vez ─────────────────────────────── */
+
+const globalStyles = `
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(-12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes progressPulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+
+.tenant-toast {
+    animation: slideIn 0.3s ease;
+}
+.tenant-row:hover {
+    background: #f8fafc !important;
+}
+.tenant-action-btn {
+    transition: all 0.15s ease;
+}
+.tenant-action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+.tenant-skeleton-pulse {
+    animation: progressPulse 1.5s ease-in-out infinite;
+}
+
+/* Responsive: cards en mobile */
+@media (max-width: 768px) {
+    .tenant-desktop-table { display: none !important; }
+    .tenant-mobile-cards { display: flex !important; }
+    .tenant-toolbar { flex-direction: column !important; align-items: stretch !important; }
+    .tenant-toolbar-filters { flex-wrap: wrap !important; }
+    .tenant-vps-grid { grid-template-columns: 1fr !important; }
+    .tenant-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (min-width: 769px) {
+    .tenant-mobile-cards { display: none !important; }
+}
 `;
 
-// Inyectar estilos una sola vez
-if (typeof document !== 'undefined' && !document.getElementById('tenant-spinner-styles')) {
+if (typeof document !== 'undefined' && !document.getElementById('tenant-page-styles')) {
     const style = document.createElement('style');
-    style.id = 'tenant-spinner-styles';
-    style.textContent = spinKeyframes;
+    style.id = 'tenant-page-styles';
+    style.textContent = globalStyles;
     document.head.appendChild(style);
 }
+
+/* ── Tipos ────────────────────────────────────────────────────────────────── */
 
 interface Tenant {
     id: string;
@@ -27,7 +72,19 @@ interface Tenant {
     plan: string;
     adminEmail: string | null;
     createdAt: string;
-    healthChecks: { apiHealthy: boolean; dbHealthy: boolean; containerUp: boolean }[];
+}
+
+interface TenantHealth {
+    tenantId: string;
+    slug: string;
+    domain: string;
+    status: string;
+    lastCheck: {
+        apiHealthy: boolean;
+        dbHealthy: boolean;
+        containerUp: boolean;
+        checkedAt: string;
+    } | null;
 }
 
 interface CreateTenantResponse {
@@ -38,63 +95,226 @@ interface CreateTenantResponse {
     dbPassword: string;
 }
 
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-    ACTIVE: { bg: '#ecfdf5', text: '#065f46' },
-    SUSPENDED: { bg: '#fffbeb', text: '#92400e' },
-    DELETED: { bg: '#fef2f2', text: '#991b1b' },
-    PROVISIONING: { bg: '#eff6ff', text: '#1e40af' },
+interface VpsStats {
+    cpu: { cores: number; usagePercent: number };
+    memory: { totalMb: number; usedMb: number; freeMb: number; usagePercent: number };
+    disk: { totalGb: number; usedGb: number; freeGb: number; usagePercent: number };
+    docker: { containers: number; running: number; stopped: number };
+    uptime: string;
+}
+
+interface Toast {
+    id: number;
+    message: string;
+    type: 'success' | 'error';
+}
+
+/* ── Constantes de color ──────────────────────────────────────────────────── */
+
+const COLORS = {
+    primary: '#059669',
+    primaryHover: '#047857',
+    danger: '#dc2626',
+    dangerHover: '#b91c1c',
+    warning: '#d97706',
+    info: '#2563eb',
+    dark: '#1a1a2e',
+    darkHover: '#16213e',
+    muted: '#888',
+    border: '#e5e7eb',
+    borderLight: '#f3f4f6',
+    bg: '#f5f5f5',
 };
 
+const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
+    ACTIVE: { bg: '#ecfdf5', text: '#065f46', dot: '#059669' },
+    SUSPENDED: { bg: '#fffbeb', text: '#92400e', dot: '#d97706' },
+    DELETED: { bg: '#fef2f2', text: '#991b1b', dot: '#dc2626' },
+    PROVISIONING: { bg: '#eff6ff', text: '#1e40af', dot: '#2563eb' },
+};
+
+const HEALTH_STATUS = {
+    running: { label: 'Running', color: '#059669', bg: '#ecfdf5' },
+    stopped: { label: 'Detenido', color: '#dc2626', bg: '#fef2f2' },
+    unknown: { label: 'Desconocido', color: '#888', bg: '#f3f4f6' },
+    partial: { label: 'Parcial', color: '#d97706', bg: '#fffbeb' },
+};
+
+/* ── Helpers ──────────────────────────────────────────────────────────────── */
+
+let toastCounter = 0;
+
+function getHealthStatus(lastCheck: TenantHealth['lastCheck']): keyof typeof HEALTH_STATUS {
+    if (!lastCheck) return 'unknown';
+    if (lastCheck.containerUp && lastCheck.apiHealthy && lastCheck.dbHealthy) return 'running';
+    if (lastCheck.containerUp) return 'partial';
+    return 'stopped';
+}
+
+/** Barra de progreso reutilizable */
+function ProgressBar({ percent, color }: { percent: number; color: string }) {
+    return (
+        <div style={{
+            width: '100%',
+            height: 8,
+            background: '#e5e7eb',
+            borderRadius: 4,
+            overflow: 'hidden',
+        }}>
+            <div style={{
+                width: `${Math.min(percent, 100)}%`,
+                height: '100%',
+                background: color,
+                borderRadius: 4,
+                transition: 'width 0.3s ease',
+            }} />
+        </div>
+    );
+}
+
+/** Botón de acción reutilizable con mínimo touch target 44px */
+function ActionButton({
+    onClick,
+    color,
+    hoverColor,
+    disabled,
+    title,
+    children,
+}: {
+    onClick: () => void;
+    color: string;
+    hoverColor: string;
+    disabled?: boolean;
+    title: string;
+    children: React.ReactNode;
+}) {
+    const [hovered, setHovered] = useState(false);
+    return (
+        <button
+            className="tenant-action-btn"
+            onClick={onClick}
+            disabled={disabled}
+            title={title}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            style={{
+                padding: '0.4rem 0.6rem',
+                borderRadius: 6,
+                border: 'none',
+                background: disabled ? '#e5e7eb' : hovered ? hoverColor : color,
+                color: disabled ? '#9ca3af' : '#fff',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                minHeight: 44,
+                minWidth: 44,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 4,
+                transition: 'all 0.15s ease',
+            }}
+        >
+            {children}
+        </button>
+    );
+}
+
+/* ── Componente principal ─────────────────────────────────────────────────── */
+
 export default function Tenants() {
+    const navigate = useNavigate();
+
+    // Estado
     const [tenants, setTenants] = useState<Tenant[]>([]);
+    const [healthMap, setHealthMap] = useState<Map<string, TenantHealth>>(new Map());
+    const [vpsStats, setVpsStats] = useState<VpsStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<string>('');
+    const [toasts, setToasts] = useState<Toast[]>([]);
+
+    // Modal de crear
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [creating, setCreating] = useState(false);
     const [provisioning, setProvisioning] = useState(false);
     const [provisioningStep, setProvisioningStep] = useState('');
     const [createdTenant, setCreatedTenant] = useState<CreateTenantResponse | null>(null);
-    const [error, setError] = useState<string | null>(null);
-
-    // Form state
     const [formSlug, setFormSlug] = useState('');
     const [formDomain, setFormDomain] = useState('');
     const [formEmail, setFormEmail] = useState('');
     const [formPassword, setFormPassword] = useState('');
     const [formPlan, setFormPlan] = useState('free');
+    const [formError, setFormError] = useState<string | null>(null);
 
-    const fetchTenants = () => {
+    // Modal de confirmación
+    const [confirmAction, setConfirmAction] = useState<{
+        title: string;
+        message: string;
+        variant: 'danger' | 'warning';
+        onConfirm: () => Promise<void>;
+    } | null>(null);
+    const [confirmLoading, setConfirmLoading] = useState(false);
+
+    // Toast helper
+    const addToast = useCallback((message: string, type: 'success' | 'error') => {
+        const id = ++toastCounter;
+        setToasts((prev) => [...prev, { id, message, type }]);
+        setTimeout(() => {
+            setToasts((prev) => prev.filter((t) => t.id !== id));
+        }, 4000);
+    }, []);
+
+    // Fetch datos
+    const fetchTenants = useCallback(() => {
         const token = localStorage.getItem('mgmt_token');
-        fetch('/api/tenants', { headers: { Authorization: `Bearer ${token}` } })
-            .then((r) => r.json())
-            .then((data) => setTenants(Array.isArray(data) ? data : []))
+        const headers = { Authorization: `Bearer ${token}` };
+
+        return Promise.all([
+            fetch('/api/tenants', { headers }).then((r) => r.json()),
+            fetch('/api/health/tenants', { headers }).then((r) => r.json()),
+            fetch('/api/vps/stats', { headers }).then((r) => r.json()),
+        ])
+            .then(([tenantsData, healthData, vpsData]) => {
+                setTenants(Array.isArray(tenantsData) ? tenantsData : []);
+
+                // Indexar health por slug para acceso O(1)
+                const map = new Map<string, TenantHealth>();
+                if (Array.isArray(healthData)) {
+                    for (const h of healthData) {
+                        map.set(h.slug, h);
+                    }
+                }
+                setHealthMap(map);
+                setVpsStats(vpsData);
+            })
             .catch(console.error)
             .finally(() => setLoading(false));
-    };
+    }, []);
 
     useEffect(() => {
         fetchTenants();
-    }, []);
+    }, [fetchTenants]);
 
-    const resetForm = () => {
+    // Reset form
+    const resetForm = useCallback(() => {
         setFormSlug('');
         setFormDomain('');
         setFormEmail('');
         setFormPassword('');
         setFormPlan('free');
-        setError(null);
-    };
+        setFormError(null);
+    }, []);
 
-    const handleCreate = async () => {
-        setError(null);
+    // Crear tenant
+    const handleCreate = useCallback(async () => {
+        setFormError(null);
 
-        // Validación client-side
         if (!formSlug || !/^[a-z0-9-]+$/.test(formSlug)) {
-            setError('El slug solo puede contener minúsculas, números y guiones');
+            setFormError('El slug solo puede contener minusculas, numeros y guiones');
             return;
         }
         if (formPassword && formPassword.length < 8) {
-            setError('La contraseña debe tener al menos 8 caracteres');
+            setFormError('La contrasena debe tener al menos 8 caracteres');
             return;
         }
 
@@ -112,7 +332,6 @@ export default function Tenants() {
             if (formPassword) body.adminPassword = formPassword;
             if (formPlan) body.plan = formPlan;
 
-            // Simular pasos de provisioning mientras el backend trabaja
             const steps = [
                 'Generando secretos y credenciales...',
                 'Creando directorio del cliente...',
@@ -132,7 +351,7 @@ export default function Tenants() {
                     stepIndex++;
                     setProvisioningStep(steps[stepIndex]);
                 }
-            }, 8000); // Cada 8 segundos aprox (el provisioning toma ~60-90s)
+            }, 8000);
 
             const res = await fetch('/api/tenants', {
                 method: 'POST',
@@ -147,40 +366,115 @@ export default function Tenants() {
 
             if (!res.ok) {
                 const data = await res.json();
-                setError(data.error || 'Error al crear tenant');
+                setFormError(data.error || 'Error al crear tenant');
                 return;
             }
 
             const data: CreateTenantResponse = await res.json();
-            setProvisioningStep('¡Tenant provisionado exitosamente!');
+            setProvisioningStep('Tenant provisionado exitosamente!');
             setCreatedTenant(data);
             resetForm();
             fetchTenants();
         } catch {
-            setError('Error de conexión al crear tenant');
+            setFormError('Error de conexion al crear tenant');
         } finally {
             setCreating(false);
             setProvisioning(false);
         }
-    };
+    }, [formSlug, formDomain, formEmail, formPassword, formPlan, resetForm, fetchTenants]);
 
-    const filtered = filter
-        ? tenants.filter((t) => t.status === filter)
-        : tenants;
+    // Acciones de tenant
+    const handleSuspend = useCallback(async (slug: string) => {
+        const token = localStorage.getItem('mgmt_token');
+        const res = await fetch(`/api/tenants/${slug}/suspend`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Error al suspender');
+    }, []);
+
+    const handleResume = useCallback(async (slug: string) => {
+        const token = localStorage.getItem('mgmt_token');
+        const res = await fetch(`/api/tenants/${slug}/resume`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Error al reactivar');
+    }, []);
+
+    const handleDelete = useCallback(async (slug: string) => {
+        const token = localStorage.getItem('mgmt_token');
+        const res = await fetch(`/api/tenants/${slug}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Error al eliminar');
+    }, []);
+
+    // Ejecutar accion confirmada
+    const executeConfirmAction = useCallback(async () => {
+        if (!confirmAction) return;
+        setConfirmLoading(true);
+        try {
+            await confirmAction.onConfirm();
+            addToast(
+                confirmAction.variant === 'danger'
+                    ? 'Accion ejecutada exitosamente'
+                    : 'Tenant actualizado',
+                'success'
+            );
+            setConfirmAction(null);
+            fetchTenants();
+        } catch (err) {
+            addToast(err instanceof Error ? err.message : 'Error desconocido', 'error');
+        } finally {
+            setConfirmLoading(false);
+        }
+    }, [confirmAction, addToast, fetchTenants]);
+
+    // Filtrar tenants
+    const filtered = filter ? tenants.filter((t) => t.status === filter) : tenants;
+
+    // Stats derivados
+    const healthyTenants = tenants.filter((t) => {
+        const h = healthMap.get(t.slug);
+        return h?.lastCheck?.apiHealthy && h?.lastCheck?.dbHealthy && h?.lastCheck?.containerUp;
+    }).length;
+
+    /* ── Loading skeleton ──────────────────────────────────────────────────── */
 
     if (loading) {
         return (
             <div>
+                {/* Skeleton VPS stats */}
+                <div className="tenant-vps-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+                    {Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="tenant-skeleton-pulse" style={{
+                            background: '#fff',
+                            borderRadius: 8,
+                            padding: '1.25rem',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        }}>
+                            <div style={{ width: '40%', height: 12, background: '#e5e7eb', borderRadius: 4, marginBottom: 12 }} />
+                            <div style={{ width: '60%', height: 28, background: '#e5e7eb', borderRadius: 4, marginBottom: 8 }} />
+                            <div style={{ width: '100%', height: 8, background: '#e5e7eb', borderRadius: 4 }} />
+                        </div>
+                    ))}
+                </div>
+
+                {/* Skeleton filters */}
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
                     {Array.from({ length: 4 }).map((_, i) => (
-                        <div key={i} style={{
+                        <div key={i} className="tenant-skeleton-pulse" style={{
                             width: 80,
-                            height: 32,
+                            height: 36,
                             background: '#e5e7eb',
-                            borderRadius: 4,
+                            borderRadius: 6,
                         }} />
                     ))}
                 </div>
+
+                {/* Skeleton table */}
                 <div style={{
                     background: '#fff',
                     borderRadius: 8,
@@ -188,32 +482,182 @@ export default function Tenants() {
                     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                 }}>
                     {Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} style={{
-                            height: 48,
+                        <div key={i} className="tenant-skeleton-pulse" style={{
+                            height: 52,
                             background: i % 2 === 0 ? '#f9fafb' : '#fff',
                             borderBottom: '1px solid #f3f4f6',
-                        }} />
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '0 1rem',
+                            gap: '2rem',
+                        }}>
+                            <div style={{ width: 120, height: 14, background: '#e5e7eb', borderRadius: 4 }} />
+                            <div style={{ width: 100, height: 14, background: '#e5e7eb', borderRadius: 4 }} />
+                            <div style={{ width: 60, height: 20, background: '#e5e7eb', borderRadius: 10 }} />
+                            <div style={{ width: 50, height: 14, background: '#e5e7eb', borderRadius: 4 }} />
+                            <div style={{ flex: 1 }} />
+                            <div style={{ width: 80, height: 14, background: '#e5e7eb', borderRadius: 4 }} />
+                        </div>
                     ))}
                 </div>
             </div>
         );
     }
 
+    /* ── Render principal ──────────────────────────────────────────────────── */
+
     return (
         <div>
-            {/* Toolbar: filtros + botón crear */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    {['', 'ACTIVE', 'SUSPENDED', 'DELETED'].map((s) => (
+            {/* ── VPS Stats ──────────────────────────────────────────────────── */}
+            {vpsStats && (
+                <div className="tenant-vps-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+                    {/* CPU */}
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: 8,
+                        padding: '1.25rem',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                            <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600 }}>CPU</h3>
+                            <span style={{
+                                fontSize: '1.4rem',
+                                fontWeight: 700,
+                                color: vpsStats.cpu.usagePercent > 80 ? COLORS.danger : vpsStats.cpu.usagePercent > 60 ? COLORS.warning : COLORS.primary,
+                            }}>
+                                {vpsStats.cpu.usagePercent}%
+                            </span>
+                        </div>
+                        <ProgressBar
+                            percent={vpsStats.cpu.usagePercent}
+                            color={vpsStats.cpu.usagePercent > 80 ? COLORS.danger : vpsStats.cpu.usagePercent > 60 ? COLORS.warning : COLORS.primary}
+                        />
+                        <p style={{ margin: '0.5rem 0 0', fontSize: '0.75rem', color: COLORS.muted }}>
+                            {vpsStats.cpu.cores} cores
+                        </p>
+                    </div>
+
+                    {/* Memoria */}
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: 8,
+                        padding: '1.25rem',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                            <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600 }}>Memoria</h3>
+                            <span style={{
+                                fontSize: '1.4rem',
+                                fontWeight: 700,
+                                color: vpsStats.memory.usagePercent > 80 ? COLORS.danger : vpsStats.memory.usagePercent > 60 ? COLORS.warning : COLORS.primary,
+                            }}>
+                                {vpsStats.memory.usagePercent}%
+                            </span>
+                        </div>
+                        <ProgressBar
+                            percent={vpsStats.memory.usagePercent}
+                            color={vpsStats.memory.usagePercent > 80 ? COLORS.danger : vpsStats.memory.usagePercent > 60 ? COLORS.warning : COLORS.primary}
+                        />
+                        <p style={{ margin: '0.5rem 0 0', fontSize: '0.75rem', color: COLORS.muted }}>
+                            {vpsStats.memory.usedMb} / {vpsStats.memory.totalMb} MB
+                        </p>
+                    </div>
+
+                    {/* Disco */}
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: 8,
+                        padding: '1.25rem',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                            <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600 }}>Disco</h3>
+                            <span style={{
+                                fontSize: '1.4rem',
+                                fontWeight: 700,
+                                color: vpsStats.disk.usagePercent > 80 ? COLORS.danger : vpsStats.disk.usagePercent > 60 ? COLORS.warning : COLORS.primary,
+                            }}>
+                                {vpsStats.disk.usagePercent}%
+                            </span>
+                        </div>
+                        <ProgressBar
+                            percent={vpsStats.disk.usagePercent}
+                            color={vpsStats.disk.usagePercent > 80 ? COLORS.danger : vpsStats.disk.usagePercent > 60 ? COLORS.warning : COLORS.primary}
+                        />
+                        <p style={{ margin: '0.5rem 0 0', fontSize: '0.75rem', color: COLORS.muted }}>
+                            {vpsStats.disk.usedGb} / {vpsStats.disk.totalGb} GB
+                        </p>
+                    </div>
+
+                    {/* Docker */}
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: 8,
+                        padding: '1.25rem',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    }}>
+                        <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', fontWeight: 600 }}>Docker</h3>
+                        <div style={{ display: 'flex', gap: '1.25rem', marginBottom: '0.5rem' }}>
+                            <div>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: COLORS.primary }}>{vpsStats.docker.running}</div>
+                                <div style={{ fontSize: '0.7rem', color: COLORS.muted }}>Running</div>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: vpsStats.docker.stopped > 0 ? COLORS.warning : COLORS.muted }}>{vpsStats.docker.stopped}</div>
+                                <div style={{ fontSize: '0.7rem', color: COLORS.muted }}>Stopped</div>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: COLORS.dark }}>{vpsStats.docker.containers}</div>
+                                <div style={{ fontSize: '0.7rem', color: COLORS.muted }}>Total</div>
+                            </div>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: COLORS.muted }}>
+                            Uptime: {vpsStats.uptime}
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Resumen rapido ─────────────────────────────────────────────── */}
+            <div className="tenant-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <div style={{ background: '#fff', borderRadius: 8, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: `3px solid ${COLORS.dark}` }}>
+                    <div style={{ fontSize: '0.7rem', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Total</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: COLORS.dark }}>{tenants.length}</div>
+                </div>
+                <div style={{ background: '#fff', borderRadius: 8, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: `3px solid ${COLORS.primary}` }}>
+                    <div style={{ fontSize: '0.7rem', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Activos</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: COLORS.primary }}>{tenants.filter((t) => t.status === 'ACTIVE').length}</div>
+                </div>
+                <div style={{ background: '#fff', borderRadius: 8, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: `3px solid ${COLORS.warning}` }}>
+                    <div style={{ fontSize: '0.7rem', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Suspendidos</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: COLORS.warning }}>{tenants.filter((t) => t.status === 'SUSPENDED').length}</div>
+                </div>
+                <div style={{ background: '#fff', borderRadius: 8, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: `3px solid ${healthyTenants === tenants.filter((t) => t.status === 'ACTIVE').length && tenants.length > 0 ? COLORS.primary : COLORS.warning}` }}>
+                    <div style={{ fontSize: '0.7rem', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Saludables</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: healthyTenants === tenants.filter((t) => t.status === 'ACTIVE').length && tenants.length > 0 ? COLORS.primary : COLORS.warning }}>
+                        {healthyTenants}/{tenants.filter((t) => t.status === 'ACTIVE').length}
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Toolbar: filtros + boton crear ────────────────────────────── */}
+            <div className="tenant-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div className="tenant-toolbar-filters" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {[
+                        { value: '', label: 'Todos' },
+                        { value: 'ACTIVE', label: 'Activos' },
+                        { value: 'SUSPENDED', label: 'Suspendidos' },
+                        { value: 'DELETED', label: 'Eliminados' },
+                    ].map(({ value, label }) => (
                         <button
-                            key={s}
-                            onClick={() => setFilter(s)}
+                            key={value}
+                            onClick={() => setFilter(value)}
                             style={{
                                 padding: '0.4rem 0.75rem',
                                 borderRadius: 6,
-                                border: filter === s ? '1px solid #1a1a2e' : '1px solid #d1d5db',
-                                background: filter === s ? '#1a1a2e' : '#fff',
-                                color: filter === s ? '#fff' : '#6b7280',
+                                border: filter === value ? `1px solid ${COLORS.dark}` : `1px solid ${COLORS.border}`,
+                                background: filter === value ? COLORS.dark : '#fff',
+                                color: filter === value ? '#fff' : '#6b7280',
                                 cursor: 'pointer',
                                 fontSize: '0.8rem',
                                 fontWeight: 500,
@@ -221,7 +665,7 @@ export default function Tenants() {
                                 transition: 'all 0.15s ease',
                             }}
                         >
-                            {s || 'Todos'}
+                            {label}
                         </button>
                     ))}
                 </div>
@@ -231,7 +675,7 @@ export default function Tenants() {
                         padding: '0.5rem 1.25rem',
                         borderRadius: 6,
                         border: 'none',
-                        background: '#059669',
+                        background: COLORS.primary,
                         color: '#fff',
                         cursor: 'pointer',
                         fontSize: '0.85rem',
@@ -244,61 +688,72 @@ export default function Tenants() {
                 </button>
             </div>
 
-            {/* Tabla */}
-            <div style={{ background: '#fff', borderRadius: 8, padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            {/* ── Tabla desktop ─────────────────────────────────────────────── */}
+            <div className="tenant-desktop-table" style={{
+                background: '#fff',
+                borderRadius: 8,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                animation: 'fadeIn 0.3s ease',
+            }}>
                 <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                         <thead>
-                            <tr style={{ borderBottom: '2px solid #e5e7eb', textAlign: 'left' }}>
-                                <th style={{ padding: '0.75rem 0' }}>Slug</th>
-                                <th>Dominio</th>
-                                <th>Estado</th>
-                                <th>Plan</th>
-                                <th>Salud</th>
-                                <th>Creado</th>
+                            <tr style={{ borderBottom: `2px solid ${COLORS.border}`, textAlign: 'left' }}>
+                                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280' }}>Tenant</th>
+                                <th style={{ padding: '0.85rem 0', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280' }}>Estado</th>
+                                <th style={{ padding: '0.85rem 0', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280' }}>Plan</th>
+                                <th style={{ padding: '0.85rem 0', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280' }}>Docker</th>
+                                <th style={{ padding: '0.85rem 0', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280' }}>API</th>
+                                <th style={{ padding: '0.85rem 0', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280' }}>DB</th>
+                                <th style={{ padding: '0.85rem 0', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280' }}>Creado</th>
+                                <th style={{ padding: '0.85rem 0', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280', textAlign: 'right' }}>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map((t, idx) => {
-                                const lastHealth = t.healthChecks?.[0];
-                                const healthy = lastHealth
-                                    ? lastHealth.apiHealthy && lastHealth.dbHealthy && lastHealth.containerUp
-                                    : null;
-                                const colors = STATUS_COLORS[t.status] || STATUS_COLORS.ACTIVE;
-
-                                // Determinar estado Docker
-                                let dockerStatus = 'desconocido';
-                                if (lastHealth) {
-                                    if (lastHealth.containerUp && lastHealth.apiHealthy && lastHealth.dbHealthy) {
-                                        dockerStatus = 'running';
-                                    } else if (lastHealth.containerUp) {
-                                        dockerStatus = 'parcial';
-                                    } else {
-                                        dockerStatus = 'detenido';
-                                    }
-                                }
+                            {filtered.map((t) => {
+                                const health = healthMap.get(t.slug);
+                                const lastCheck = health?.lastCheck ?? null;
+                                const dockerStatus = getHealthStatus(lastCheck);
+                                const colors = STATUS_STYLES[t.status] || STATUS_STYLES.ACTIVE;
+                                const hs = HEALTH_STATUS[dockerStatus];
 
                                 return (
                                     <tr
                                         key={t.id}
+                                        className="tenant-row"
                                         style={{
-                                            borderBottom: '1px solid #f3f4f6',
-                                            background: idx % 2 === 0 ? '#fff' : '#fafafa',
+                                            borderBottom: `1px solid ${COLORS.borderLight}`,
+                                            transition: 'background 0.1s ease',
                                         }}
                                     >
-                                        <td style={{ padding: '0.75rem 0' }}>
-                                            <Link
-                                                to={`/tenants/${t.slug}`}
-                                                style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}
-                                            >
-                                                {t.slug}
-                                            </Link>
+                                        {/* Tenant info */}
+                                        <td style={{ padding: '0.85rem 1rem' }}>
+                                            <div>
+                                                <span
+                                                    onClick={() => navigate(`/tenants/${t.slug}`)}
+                                                    style={{
+                                                        color: COLORS.info,
+                                                        fontWeight: 600,
+                                                        fontSize: '0.9rem',
+                                                        cursor: 'pointer',
+                                                    }}
+                                                >
+                                                    {t.slug}
+                                                </span>
+                                                <div style={{ fontSize: '0.75rem', color: COLORS.muted, marginTop: 2 }}>
+                                                    {t.domain}
+                                                </div>
+                                            </div>
                                         </td>
-                                        <td>{t.domain}</td>
+
+                                        {/* Estado con badge */}
                                         <td>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                                 <span style={{
-                                                    padding: '2px 10px',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: 5,
+                                                    padding: '3px 10px',
                                                     borderRadius: 12,
                                                     fontSize: '0.75rem',
                                                     fontWeight: 500,
@@ -306,30 +761,122 @@ export default function Tenants() {
                                                     color: colors.text,
                                                     alignSelf: 'flex-start',
                                                 }}>
+                                                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: colors.dot, flexShrink: 0 }} />
                                                     {t.status}
                                                 </span>
-                                                {t.status === 'ACTIVE' && (
-                                                    <span style={{
-                                                        fontSize: '0.7rem',
-                                                        color: dockerStatus === 'running' ? '#059669' : dockerStatus === 'detenido' ? '#dc2626' : '#d97706',
-                                                    }}>
-                                                        Docker: {dockerStatus}
-                                                    </span>
-                                                )}
                                             </div>
                                         </td>
+
+                                        {/* Plan */}
                                         <td style={{ textTransform: 'capitalize' }}>{t.plan}</td>
-                                        <td><HealthBadge healthy={healthy} size="sm" /></td>
-                                        <td style={{ color: '#888', fontSize: '0.8rem' }}>
+
+                                        {/* Docker status */}
+                                        <td>
+                                            <span style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: 5,
+                                                padding: '2px 8px',
+                                                borderRadius: 8,
+                                                fontSize: '0.75rem',
+                                                fontWeight: 500,
+                                                background: hs.bg,
+                                                color: hs.color,
+                                            }}>
+                                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: hs.color, flexShrink: 0 }} />
+                                                {hs.label}
+                                            </span>
+                                        </td>
+
+                                        {/* API health */}
+                                        <td>
+                                            <HealthBadge healthy={lastCheck?.apiHealthy ?? null} size="sm" />
+                                        </td>
+
+                                        {/* DB health */}
+                                        <td>
+                                            <HealthBadge healthy={lastCheck?.dbHealthy ?? null} size="sm" />
+                                        </td>
+
+                                        {/* Creado */}
+                                        <td style={{ color: COLORS.muted, fontSize: '0.8rem' }}>
                                             {new Date(t.createdAt).toLocaleDateString('es-AR')}
+                                        </td>
+
+                                        {/* Acciones */}
+                                        <td>
+                                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                                {/* Ver detalle */}
+                                                <ActionButton
+                                                    onClick={() => navigate(`/tenants/${t.slug}`)}
+                                                    color={COLORS.info}
+                                                    hoverColor="#1d4ed8"
+                                                    title="Ver detalle"
+                                                >
+                                                    Ver
+                                                </ActionButton>
+
+                                                {/* Suspend / Resume */}
+                                                {t.status === 'ACTIVE' ? (
+                                                    <ActionButton
+                                                        onClick={() => setConfirmAction({
+                                                            title: `Suspender ${t.slug}`,
+                                                            message: `El tenant ${t.slug} sera suspendido. Los contenedores se detendran y los usuarios no tendran acceso.`,
+                                                            variant: 'warning',
+                                                            onConfirm: () => handleSuspend(t.slug),
+                                                        })}
+                                                        color={COLORS.warning}
+                                                        hoverColor="#b45309"
+                                                        title="Suspender tenant"
+                                                    >
+                                                        Suspender
+                                                    </ActionButton>
+                                                ) : t.status === 'SUSPENDED' ? (
+                                                    <ActionButton
+                                                        onClick={() => setConfirmAction({
+                                                            title: `Reactivar ${t.slug}`,
+                                                            message: `El tenant ${t.slug} sera reactivado. Los contenedores se iniciaran nuevamente.`,
+                                                            variant: 'warning',
+                                                            onConfirm: () => handleResume(t.slug),
+                                                        })}
+                                                        color={COLORS.primary}
+                                                        hoverColor={COLORS.primaryHover}
+                                                        title="Reactivar tenant"
+                                                    >
+                                                        Reactivar
+                                                    </ActionButton>
+                                                ) : null}
+
+                                                {/* Eliminar */}
+                                                <ActionButton
+                                                    onClick={() => setConfirmAction({
+                                                        title: `Eliminar ${t.slug}`,
+                                                        message: `Esta accion marcará el tenant ${t.slug} como eliminado. Esta accion puede ser revertida contactando soporte.`,
+                                                        variant: 'danger',
+                                                        onConfirm: () => handleDelete(t.slug),
+                                                    })}
+                                                    color={COLORS.danger}
+                                                    hoverColor={COLORS.dangerHover}
+                                                    disabled={t.status === 'DELETED'}
+                                                    title="Eliminar tenant"
+                                                >
+                                                    Eliminar
+                                                </ActionButton>
+                                            </div>
                                         </td>
                                     </tr>
                                 );
                             })}
                             {filtered.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#888' }}>
-                                        No se encontraron tenants
+                                    <td colSpan={8} style={{ padding: '3rem', textAlign: 'center' }}>
+                                        <div style={{ color: COLORS.muted }}>
+                                            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🏢</div>
+                                            <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>No se encontraron tenants</div>
+                                            <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                                                {filter ? `No hay tenants con estado "${filter}"` : 'Creá tu primer tenant para comenzar'}
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
                             )}
@@ -338,7 +885,140 @@ export default function Tenants() {
                 </div>
             </div>
 
-            {/* Modal: Crear Tenant */}
+            {/* ── Cards mobile ──────────────────────────────────────────────── */}
+            <div className="tenant-mobile-cards" style={{ display: 'none', flexDirection: 'column', gap: '0.75rem' }}>
+                {filtered.map((t) => {
+                    const health = healthMap.get(t.slug);
+                    const lastCheck = health?.lastCheck ?? null;
+                    const dockerStatus = getHealthStatus(lastCheck);
+                    const colors = STATUS_STYLES[t.status] || STATUS_STYLES.ACTIVE;
+                    const hs = HEALTH_STATUS[dockerStatus];
+
+                    return (
+                        <div
+                            key={t.id}
+                            style={{
+                                background: '#fff',
+                                borderRadius: 8,
+                                padding: '1rem',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                animation: 'fadeIn 0.3s ease',
+                            }}
+                        >
+                            {/* Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                                <div>
+                                    <span
+                                        onClick={() => navigate(`/tenants/${t.slug}`)}
+                                        style={{ color: COLORS.info, fontWeight: 600, fontSize: '0.95rem', cursor: 'pointer' }}
+                                    >
+                                        {t.slug}
+                                    </span>
+                                    <div style={{ fontSize: '0.75rem', color: COLORS.muted }}>{t.domain}</div>
+                                </div>
+                                <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    padding: '2px 8px',
+                                    borderRadius: 10,
+                                    fontSize: '0.7rem',
+                                    fontWeight: 500,
+                                    background: colors.bg,
+                                    color: colors.text,
+                                }}>
+                                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: colors.dot }} />
+                                    {t.status}
+                                </span>
+                            </div>
+
+                            {/* Health indicators */}
+                            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', padding: '2px 6px', borderRadius: 6, background: hs.bg, color: hs.color }}>
+                                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: hs.color }} />
+                                    Docker: {hs.label}
+                                </span>
+                                <HealthBadge healthy={lastCheck?.apiHealthy ?? null} size="sm" />
+                                <HealthBadge healthy={lastCheck?.dbHealthy ?? null} size="sm" />
+                            </div>
+
+                            {/* Footer */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ fontSize: '0.75rem', color: COLORS.muted, textTransform: 'capitalize' }}>
+                                    {t.plan} · {new Date(t.createdAt).toLocaleDateString('es-AR')}
+                                </div>
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                    <ActionButton onClick={() => navigate(`/tenants/${t.slug}`)} color={COLORS.info} hoverColor="#1d4ed8" title="Ver">
+                                        Ver
+                                    </ActionButton>
+                                    {t.status === 'ACTIVE' && (
+                                        <ActionButton
+                                            onClick={() => setConfirmAction({
+                                                title: `Suspender ${t.slug}`,
+                                                message: `El tenant ${t.slug} sera suspendido.`,
+                                                variant: 'warning',
+                                                onConfirm: () => handleSuspend(t.slug),
+                                            })}
+                                            color={COLORS.warning}
+                                            hoverColor="#b45309"
+                                            title="Suspender"
+                                        >
+                                            Suspender
+                                        </ActionButton>
+                                    )}
+                                    {t.status === 'SUSPENDED' && (
+                                        <ActionButton
+                                            onClick={() => setConfirmAction({
+                                                title: `Reactivar ${t.slug}`,
+                                                message: `El tenant ${t.slug} sera reactivado.`,
+                                                variant: 'warning',
+                                                onConfirm: () => handleResume(t.slug),
+                                            })}
+                                            color={COLORS.primary}
+                                            hoverColor={COLORS.primaryHover}
+                                            title="Reactivar"
+                                        >
+                                            Reactivar
+                                        </ActionButton>
+                                    )}
+                                    <ActionButton
+                                        onClick={() => setConfirmAction({
+                                            title: `Eliminar ${t.slug}`,
+                                            message: `El tenant ${t.slug} sera eliminado.`,
+                                            variant: 'danger',
+                                            onConfirm: () => handleDelete(t.slug),
+                                        })}
+                                        color={COLORS.danger}
+                                        hoverColor={COLORS.dangerHover}
+                                        disabled={t.status === 'DELETED'}
+                                        title="Eliminar"
+                                    >
+                                        Eliminar
+                                    </ActionButton>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+                {filtered.length === 0 && (
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: 8,
+                        padding: '3rem',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        textAlign: 'center',
+                        color: COLORS.muted,
+                    }}>
+                        <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🏢</div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>No se encontraron tenants</div>
+                        <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                            {filter ? `No hay tenants con estado "${filter}"` : 'Creá tu primer tenant para comenzar'}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* ── Modal: Crear Tenant ───────────────────────────────────────── */}
             {showCreateModal && (
                 <div
                     style={{
@@ -359,12 +1039,13 @@ export default function Tenants() {
                         width: '100%',
                         maxWidth: 480,
                         boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                        animation: 'fadeIn 0.2s ease',
                     }}>
                         <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.1rem', fontWeight: 700 }}>
                             Crear Nuevo Tenant
                         </h2>
 
-                        {error && (
+                        {formError && (
                             <div style={{
                                 padding: '0.75rem 1rem',
                                 borderRadius: 6,
@@ -373,7 +1054,7 @@ export default function Tenants() {
                                 fontSize: '0.85rem',
                                 marginBottom: '1rem',
                             }}>
-                                {error}
+                                {formError}
                             </div>
                         )}
 
@@ -397,8 +1078,8 @@ export default function Tenants() {
                                     minHeight: 44,
                                 }}
                             />
-                            <span style={{ fontSize: '0.75rem', color: '#888' }}>
-                                Solo minúsculas, números y guiones
+                            <span style={{ fontSize: '0.75rem', color: COLORS.muted }}>
+                                Solo minusculas, numeros y guiones
                             </span>
                         </div>
 
@@ -410,7 +1091,7 @@ export default function Tenants() {
                                 type="text"
                                 value={formDomain}
                                 onChange={(e) => setFormDomain(e.target.value)}
-                                placeholder="Se genera automáticamente si se deja vacío"
+                                placeholder="Se genera automaticamente si se deja vacio"
                                 style={{
                                     width: '100%',
                                     padding: '0.6rem 0.75rem',
@@ -448,13 +1129,13 @@ export default function Tenants() {
 
                         <div style={{ marginBottom: '1rem' }}>
                             <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-                                Contraseña (opcional)
+                                Contrasena (opcional)
                             </label>
                             <input
                                 type="password"
                                 value={formPassword}
                                 onChange={(e) => setFormPassword(e.target.value)}
-                                placeholder="Se genera automáticamente si se deja vacío"
+                                placeholder="Se genera automaticamente si se deja vacio"
                                 style={{
                                     width: '100%',
                                     padding: '0.6rem 0.75rem',
@@ -539,14 +1220,14 @@ export default function Tenants() {
                             </button>
                             <button
                                 onClick={handleCreate}
-                disabled={creating || !formSlug}
-                style={{
-                    padding: '0.5rem 1.25rem',
-                    borderRadius: 6,
-                    border: 'none',
-                    background: creating || !formSlug ? '#9ca3af' : '#059669',
-                    color: '#fff',
-                    cursor: creating || !formSlug ? 'not-allowed' : 'pointer',
+                                disabled={creating || !formSlug}
+                                style={{
+                                    padding: '0.5rem 1.25rem',
+                                    borderRadius: 6,
+                                    border: 'none',
+                                    background: creating || !formSlug ? '#9ca3af' : COLORS.primary,
+                                    color: '#fff',
+                                    cursor: creating || !formSlug ? 'not-allowed' : 'pointer',
                                     fontSize: '0.85rem',
                                     fontWeight: 600,
                                     minHeight: 44,
@@ -572,7 +1253,7 @@ export default function Tenants() {
                 </div>
             )}
 
-            {/* Modal: Credenciales generadas */}
+            {/* ── Modal: Credenciales generadas ──────────────────────────────── */}
             {createdTenant && (
                 <div
                     style={{
@@ -593,6 +1274,7 @@ export default function Tenants() {
                         width: '100%',
                         maxWidth: 520,
                         boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                        animation: 'fadeIn 0.2s ease',
                     }}>
                         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
                             <div style={{
@@ -611,7 +1293,7 @@ export default function Tenants() {
                             <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
                                 Tenant Provisionado
                             </h2>
-                            <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', color: '#888' }}>
+                            <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', color: COLORS.muted }}>
                                 {createdTenant.slug} · {createdTenant.domain}
                             </p>
                         </div>
@@ -629,7 +1311,7 @@ export default function Tenants() {
                             <div>✓ Contenedor API (api-{createdTenant.slug})</div>
                             <div>✓ Volumen de datos persistente</div>
                             <div>✓ Certificado TLS auto-firmado</div>
-                            <div>✓ Configuración Caddy (routing HTTPS)</div>
+                            <div>✓ Configuracion Caddy (routing HTTPS)</div>
                         </div>
 
                         <div style={{
@@ -643,12 +1325,12 @@ export default function Tenants() {
                             </p>
                             {createdTenant.adminEmail && (
                                 <div style={{ marginBottom: '0.5rem' }}>
-                                    <span style={{ fontSize: '0.75rem', color: '#888' }}>Email: </span>
+                                    <span style={{ fontSize: '0.75rem', color: COLORS.muted }}>Email: </span>
                                     <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{createdTenant.adminEmail}</span>
                                 </div>
                             )}
                             <div>
-                                <span style={{ fontSize: '0.75rem', color: '#888' }}>Contraseña: </span>
+                                <span style={{ fontSize: '0.75rem', color: COLORS.muted }}>Contrasena: </span>
                                 <code style={{
                                     fontSize: '0.85rem',
                                     fontWeight: 600,
@@ -661,12 +1343,12 @@ export default function Tenants() {
                                 </code>
                             </div>
                             <div style={{ marginTop: '0.5rem' }}>
-                                <span style={{ fontSize: '0.75rem', color: '#888' }}>URL: </span>
+                                <span style={{ fontSize: '0.75rem', color: COLORS.muted }}>URL: </span>
                                 <a
                                     href={`https://${createdTenant.domain}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    style={{ fontSize: '0.85rem', color: '#2563eb' }}
+                                    style={{ fontSize: '0.85rem', color: COLORS.info }}
                                 >
                                     https://{createdTenant.domain}
                                 </a>
@@ -681,7 +1363,7 @@ export default function Tenants() {
                             fontSize: '0.8rem',
                             marginBottom: '1.5rem',
                         }}>
-                            ⚠ Guardá estas credenciales. No se van a mostrar de nuevo.
+                            ⚠ Guarda estas credenciales. No se van a mostrar de nuevo.
                         </div>
 
                         <button
@@ -691,7 +1373,7 @@ export default function Tenants() {
                                 padding: '0.5rem',
                                 borderRadius: 6,
                                 border: 'none',
-                                background: '#1a1a2e',
+                                background: COLORS.dark,
                                 color: '#fff',
                                 cursor: 'pointer',
                                 fontSize: '0.85rem',
@@ -704,6 +1386,136 @@ export default function Tenants() {
                     </div>
                 </div>
             )}
+
+            {/* ── Modal: Confirmar accion ───────────────────────────────────── */}
+            {confirmAction && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                    }}
+                    onClick={(e) => { if (e.target === e.currentTarget && !confirmLoading) setConfirmAction(null); }}
+                >
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: 12,
+                        padding: '2rem',
+                        width: '100%',
+                        maxWidth: 420,
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                        animation: 'fadeIn 0.2s ease',
+                    }}>
+                        <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+                            <div style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: '50%',
+                                background: confirmAction.variant === 'danger' ? '#fef2f2' : '#fffbeb',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 0.75rem',
+                                fontSize: '1.5rem',
+                            }}>
+                                {confirmAction.variant === 'danger' ? '🗑' : '⚠'}
+                            </div>
+                            <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>
+                                {confirmAction.title}
+                            </h2>
+                            <p style={{ margin: '0.75rem 0 0', fontSize: '0.85rem', color: '#6b7280', lineHeight: 1.5 }}>
+                                {confirmAction.message}
+                            </p>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                            <button
+                                onClick={() => setConfirmAction(null)}
+                                disabled={confirmLoading}
+                                style={{
+                                    padding: '0.5rem 1.5rem',
+                                    borderRadius: 6,
+                                    border: '1px solid #d1d5db',
+                                    background: '#fff',
+                                    color: '#374151',
+                                    cursor: confirmLoading ? 'not-allowed' : 'pointer',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 500,
+                                    minHeight: 44,
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={executeConfirmAction}
+                                disabled={confirmLoading}
+                                style={{
+                                    padding: '0.5rem 1.5rem',
+                                    borderRadius: 6,
+                                    border: 'none',
+                                    background: confirmAction.variant === 'danger' ? COLORS.danger : COLORS.warning,
+                                    color: '#fff',
+                                    cursor: confirmLoading ? 'not-allowed' : 'pointer',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 600,
+                                    minHeight: 44,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                }}
+                            >
+                                {confirmLoading && (
+                                    <div style={{
+                                        width: 14,
+                                        height: 14,
+                                        border: '2px solid rgba(255,255,255,0.3)',
+                                        borderTopColor: '#fff',
+                                        borderRadius: '50%',
+                                        animation: 'spin 1s linear infinite',
+                                    }} />
+                                )}
+                                {confirmLoading ? 'Procesando...' : 'Confirmar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Toast notifications ─────────────────────────────────────────── */}
+            <div style={{
+                position: 'fixed',
+                bottom: '1.5rem',
+                right: '1.5rem',
+                zIndex: 2000,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem',
+                pointerEvents: 'none',
+            }}>
+                {toasts.map((toast) => (
+                    <div
+                        key={toast.id}
+                        className="tenant-toast"
+                        style={{
+                            padding: '0.75rem 1.25rem',
+                            borderRadius: 8,
+                            background: toast.type === 'success' ? '#065f46' : '#991b1b',
+                            color: '#fff',
+                            fontSize: '0.85rem',
+                            fontWeight: 500,
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                            maxWidth: 360,
+                            pointerEvents: 'auto',
+                        }}
+                    >
+                        {toast.type === 'success' ? '✓ ' : '✕ '}{toast.message}
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }
