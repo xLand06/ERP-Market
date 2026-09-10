@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import HealthBadge from '../components/HealthBadge';
+import Terminal, { TerminalLine } from '../components/Terminal';
 
 /* ── Estilos globales inyectados una sola vez ─────────────────────────────── */
 
@@ -233,7 +234,6 @@ export default function Tenants() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [creating, setCreating] = useState(false);
     const [provisioning, setProvisioning] = useState(false);
-    const [provisioningStep, setProvisioningStep] = useState('');
     const [createdTenant, setCreatedTenant] = useState<CreateTenantResponse | null>(null);
     const [formSlug, setFormSlug] = useState('');
     const [formDomain, setFormDomain] = useState('');
@@ -241,6 +241,8 @@ export default function Tenants() {
     const [formPassword, setFormPassword] = useState('');
     const [formPlan, setFormPlan] = useState('free');
     const [formError, setFormError] = useState<string | null>(null);
+    const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([]);
+    const [provisionStatus, setProvisionStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
 
     const [confirmAction, setConfirmAction] = useState<{
         title: string;
@@ -294,6 +296,8 @@ export default function Tenants() {
         setFormPassword('');
         setFormPlan('free');
         setFormError(null);
+        setTerminalLines([]);
+        setProvisionStatus('idle');
     }, []);
 
     const handleCreate = useCallback(async () => {
@@ -310,7 +314,8 @@ export default function Tenants() {
 
         setCreating(true);
         setProvisioning(true);
-        setProvisioningStep('Generando secretos y credenciales...');
+        setProvisionStatus('running');
+        setTerminalLines([]);
 
         try {
             const token = localStorage.getItem('mgmt_token');
@@ -322,28 +327,8 @@ export default function Tenants() {
             if (formPassword) body.adminPassword = formPassword;
             if (formPlan) body.plan = formPlan;
 
-            const steps = [
-                'Generando secretos y credenciales...',
-                'Creando directorio del cliente...',
-                'Generando certificado TLS...',
-                'Insertando tenant en base de datos...',
-                'Creando contenedor PostgreSQL...',
-                'Esperando DB healthy...',
-                'Creando contenedor API...',
-                'Esperando API healthy...',
-                'Semillando usuario admin...',
-                'Configurando Caddy...',
-            ];
-
-            let stepIndex = 0;
-            const stepInterval = setInterval(() => {
-                if (stepIndex < steps.length - 1) {
-                    stepIndex++;
-                    setProvisioningStep(steps[stepIndex]);
-                }
-            }, 8000);
-
-            const res = await fetch('/api/tenants', {
+            // Usar fetch con POST para SSE (no soporta Authorization header directo con EventSource)
+            const res = await fetch('/api/tenants/create', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -352,21 +337,87 @@ export default function Tenants() {
                 body: JSON.stringify(body),
             });
 
-            clearInterval(stepInterval);
-
             if (!res.ok) {
                 const data = await res.json();
                 setFormError(data.error || 'Error al crear tenant');
+                setProvisionStatus('error');
+                setCreating(false);
+                setProvisioning(false);
                 return;
             }
 
-            const data: CreateTenantResponse = await res.json();
-            setProvisioningStep('Tenant provisionado exitosamente!');
-            setCreatedTenant(data);
-            resetForm();
-            fetchTenants();
+            // Leer stream de SSE
+            const reader = res.body?.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            if (!reader) {
+                setFormError('No se pudo leer el stream de respuesta');
+                setProvisionStatus('error');
+                setCreating(false);
+                setProvisioning(false);
+                return;
+            }
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+
+                // Procesar eventos SSE completos (separados por doble newline)
+                const events = buffer.split('\n\n');
+                buffer = events.pop() || '';
+
+                for (const event of events) {
+                    const dataLine = event.split('\n').find((l) => l.startsWith('data: '));
+                    if (!dataLine) continue;
+
+                    try {
+                        const payload = JSON.parse(dataLine.slice(6));
+
+                        if (payload.type === 'log') {
+                            setTerminalLines((prev) => [
+                                ...prev,
+                                {
+                                    timestamp: new Date(),
+                                    message: payload.message,
+                                    type: 'info',
+                                },
+                            ]);
+                        } else if (payload.type === 'done') {
+                            setProvisionStatus('success');
+                            setCreatedTenant(payload.tenant);
+                            setTerminalLines((prev) => [
+                                ...prev,
+                                {
+                                    timestamp: new Date(),
+                                    message: 'Tenant provisionado exitosamente!',
+                                    type: 'success',
+                                },
+                            ]);
+                            resetForm();
+                            fetchTenants();
+                        } else if (payload.type === 'error') {
+                            setProvisionStatus('error');
+                            setFormError(payload.error);
+                            setTerminalLines((prev) => [
+                                ...prev,
+                                {
+                                    timestamp: new Date(),
+                                    message: payload.error,
+                                    type: 'error',
+                                },
+                            ]);
+                        }
+                    } catch {
+                        // Ignorar lineas SSE malformadas
+                    }
+                }
+            }
         } catch {
             setFormError('Error de conexion al crear tenant');
+            setProvisionStatus('error');
         } finally {
             setCreating(false);
             setProvisioning(false);
@@ -1141,29 +1192,32 @@ export default function Tenants() {
                             </select>
                         </div>
 
-                        {provisioning && provisioningStep && (
-                            <div style={{
-                                padding: '0.75rem 1rem',
-                                borderRadius: 6,
-                                background: '#eff6ff',
-                                border: '1px solid #bfdbfe',
-                                marginBottom: '1rem',
-                                fontSize: '0.85rem',
-                                color: '#1e40af',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                            }}>
+                        {provisioning && terminalLines.length > 0 && (
+                            <div style={{ marginBottom: '1rem' }}>
                                 <div style={{
-                                    width: 14,
-                                    height: 14,
-                                    border: '2px solid rgba(30,64,175,0.3)',
-                                    borderTopColor: '#1e40af',
-                                    borderRadius: '50%',
-                                    animation: 'spin 1s linear infinite',
-                                    flexShrink: 0,
-                                }} />
-                                {provisioningStep}
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    marginBottom: '0.5rem',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 600,
+                                    color: provisionStatus === 'success' ? '#059669'
+                                        : provisionStatus === 'error' ? '#dc2626'
+                                        : '#1e40af',
+                                }}>
+                                    {provisionStatus === 'running' && (
+                                        <div style={{
+                                            width: 12,
+                                            height: 12,
+                                            border: '2px solid rgba(30,64,175,0.3)',
+                                            borderTopColor: '#1e40af',
+                                            borderRadius: '50%',
+                                            animation: 'spin 1s linear infinite',
+                                        }} />
+                                    )}
+                                    {provisionStatus === 'success' ? 'Completado' : provisionStatus === 'error' ? 'Error' : 'Provisionando...'}
+                                </div>
+                                <Terminal lines={terminalLines} maxHeight={260} />
                             </div>
                         )}
 

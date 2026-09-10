@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import HealthBadge from '../components/HealthBadge';
+import Terminal, { TerminalLine } from '../components/Terminal';
 
 /* ── Estilos inyectados ─────────────────────────────────────────────────── */
 
@@ -89,6 +90,9 @@ export default function TenantDetailPage() {
     const [confirmLoading, setConfirmLoading] = useState(false);
 
     const [toasts, setToasts] = useState<Toast[]>([]);
+    const [consoleLogs, setConsoleLogs] = useState<TerminalLine[]>([]);
+    const [consoleLoading, setConsoleLoading] = useState(false);
+    const [activeConsoleTab, setActiveConsoleTab] = useState<'api' | 'db'>('api');
 
     const token = localStorage.getItem('mgmt_token');
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -113,6 +117,49 @@ export default function TenantDetailPage() {
     useEffect(() => {
         fetchTenant();
     }, [fetchTenant]);
+
+    /* ── Logs del contenedor ─────────────────────────────────────────── */
+
+    const fetchConsoleLogs = useCallback(async () => {
+        if (!slug) return;
+        setConsoleLoading(true);
+        try {
+            const token = localStorage.getItem('mgmt_token');
+            const res = await fetch(`/api/tenants/${slug}/logs?tail=50`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) throw new Error('Error al obtener logs');
+            const data = await res.json();
+
+            const buildLines = (rawLogs: string[]): TerminalLine[] =>
+                rawLogs.map((line) => ({
+                    timestamp: new Date(),
+                    message: line,
+                    type: line.toLowerCase().includes('error')
+                        ? 'error' as const
+                        : line.toLowerCase().includes('warn')
+                            ? 'warning' as const
+                            : 'info' as const,
+                }));
+
+            setConsoleLogs(buildLines(data.api || []));
+        } catch {
+            setConsoleLogs([{
+                timestamp: new Date(),
+                message: 'No se pudieron obtener los logs del contenedor',
+                type: 'error',
+            }]);
+        } finally {
+            setConsoleLoading(false);
+        }
+    }, [slug]);
+
+    // Cargar logs cuando se monta la pestana de consola
+    useEffect(() => {
+        if (slug && tenant?.status === 'ACTIVE') {
+            fetchConsoleLogs();
+        }
+    }, [slug, tenant?.status, fetchConsoleLogs]);
 
     /* ── Acciones ──────────────────────────────────────────────────────── */
 
@@ -441,7 +488,7 @@ export default function TenantDetailPage() {
             </div>
 
             {/* Payments */}
-            <div style={{ background: '#fff', borderRadius: 8, padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            <div style={{ background: '#fff', borderRadius: 8, padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '1.5rem' }}>
                 <h3 style={{ margin: '0 0 1rem', fontSize: '0.95rem', fontWeight: 600, color: '#1e293b' }}>Pagos Recientes</h3>
                 {tenant.payments.length === 0 ? (
                     <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Sin pagos registrados</p>
@@ -479,6 +526,74 @@ export default function TenantDetailPage() {
                     </table>
                 )}
             </div>
+
+            {/* ── Consola del contenedor ──────────────────────────────────── */}
+            {tenant.status === 'ACTIVE' && (
+                <div style={{ background: '#fff', borderRadius: 8, padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: '#1e293b' }}>Consola</h3>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                                {(['api', 'db'] as const).map((tab) => (
+                                    <button
+                                        key={tab}
+                                        onClick={() => {
+                                            setActiveConsoleTab(tab);
+                                            fetchConsoleLogs();
+                                        }}
+                                        style={{
+                                            padding: '0.3rem 0.75rem',
+                                            borderRadius: 6,
+                                            border: activeConsoleTab === tab ? `1px solid ${COLORS.dark}` : `1px solid ${COLORS.border}`,
+                                            background: activeConsoleTab === tab ? COLORS.dark : '#fff',
+                                            color: activeConsoleTab === tab ? '#fff' : '#64748b',
+                                            cursor: 'pointer',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 500,
+                                            minHeight: 32,
+                                        }}
+                                    >
+                                        {tab.toUpperCase()}
+                                    </button>
+                                ))}
+                            </div>
+                            <button
+                                onClick={fetchConsoleLogs}
+                                disabled={consoleLoading}
+                                style={{
+                                    padding: '0.3rem 0.75rem',
+                                    borderRadius: 6,
+                                    border: `1px solid ${COLORS.border}`,
+                                    background: '#fff',
+                                    color: COLORS.info,
+                                    cursor: consoleLoading ? 'not-allowed' : 'pointer',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 500,
+                                    minHeight: 32,
+                                }}
+                            >
+                                {consoleLoading ? 'Cargando...' : 'Actualizar'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {consoleLogs.length === 0 && !consoleLoading ? (
+                        <div style={{
+                            background: '#1a1a2e',
+                            borderRadius: 8,
+                            padding: '2rem',
+                            textAlign: 'center',
+                            color: '#64748b',
+                            fontFamily: "'JetBrains Mono', monospace",
+                            fontSize: '0.8rem',
+                        }}>
+                            Sin logs disponibles — el contenedor podria estar detenido
+                        </div>
+                    ) : (
+                        <Terminal lines={consoleLogs} maxHeight={300} />
+                    )}
+                </div>
+            )}
 
             {/* ── Modal: Confirmar accion ─────────────────────────────────── */}
             {confirmAction && (

@@ -1,8 +1,6 @@
-import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
 import Dockerode from 'dockerode';
-import selfsigned from 'selfsigned';
 import { prisma } from '../config/prisma';
 import { env } from '../config/env';
 import { createAuditEntry } from '../modules/audit/audit.service';
@@ -12,17 +10,13 @@ const docker = new Dockerode({ socketPath: env.DOCKER_SOCKET });
 
 // ── Constantes ───────────────────────────────────────────────────────────────
 const NETWORK_NAME = 'erp_proxy';
-const DB_IMAGE = 'postgres:16-alpine';
-const API_IMAGE = 'erp-market:latest';
 const DEPLOY_DIR = process.env.DEPLOY_DIR || path.resolve(__dirname, '../../../../deploy');
-// Path del host para volume mounts de Docker (los containers DB necesitan el path del host)
+// Path del host para volume mounts de Docker
 const HOST_DEPLOY_DIR = process.env.HOST_DEPLOY_DIR || DEPLOY_DIR;
 const SITES_DIR = path.join(HOST_DEPLOY_DIR, 'caddy/sites');
 
-// Tiempo máximo de espera para que DB esté healthy (segundos)
+// Tiempo maximo de espera para que DB este healthy (segundos)
 const DB_HEALTH_TIMEOUT = 120;
-// Tiempo máximo de espera para que API responda (segundos)
-const API_HEALTH_TIMEOUT = 60;
 // Intervalo entre reintentos de health check (segundos)
 const HEALTH_POLL_INTERVAL = 5;
 
@@ -45,34 +39,108 @@ export interface ProvisionResult {
     dbPassword: string;
 }
 
-// ── Generación de secretos ───────────────────────────────────────────────────
-function generatePassword(): string {
-    return crypto.randomBytes(18).toString('base64url');
-}
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-function generateJwtSecret(): string {
-    return crypto.randomBytes(24).toString('hex');
+/**
+ * Parsea un archivo .env en un diccionario clave-valor.
+ * Ignora lineas vacias y comentarios.
+ */
+function parseEnvFile(content: string): Record<string, string> {
+    const result: Record<string, string> = {};
+    for (const line of content.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx === -1) continue;
+        const key = trimmed.slice(0, eqIdx).trim();
+        const value = trimmed.slice(eqIdx + 1).trim();
+        result[key] = value;
+    }
+    return result;
 }
 
 /**
- * Genera un keypair TLS auto-firmado para PostgreSQL.
- * Usa la librería selfsigned (pure JS) que genera certificados X.509
- * compatibles con PostgreSQL ssl=on. Clave de 2048 bits RSA, válida 5 años.
+ * Ejecuta add-client.sh en un contenedor Docker efimero con acceso al socket
+ * y al repositorio. Reutiliza el script probado en vez de reimplementar el
+ * provisioning con dockerode.
+ *
+ * Requisitos de la imagen base:
+ * - bash, docker-cli, docker-cli-compose, openssl, curl, gettext (envsubst)
  */
-async function generateTlsKeypair(commonName: string): Promise<{ key: string; cert: string }> {
-    const attrs = [{ name: 'commonName', value: commonName }];
-    const pems = await selfsigned.generate(attrs, {
-        algorithm: 'sha256',
-        keySize: 2048,
-        extensions: [
-            { name: 'subjectAltName', altNames: [] },
-        ],
+async function runAddClientScript(
+    slug: string,
+    domain: string,
+    adminEmail: string,
+    adminPassword: string,
+): Promise<string> {
+    // add-client.sh: add-client.sh <slug> [domain] [admin-email] [admin-user] [admin-password]
+    const args = [`'${slug}'`];
+    if (domain) args.push(`'${domain}'`);
+    if (adminEmail) args.push(`'${adminEmail}'`);
+    args.push("'admin'"); // admin user
+    if (adminPassword) args.push(`'${adminPassword}'`);
+
+    const scriptCmd = `cd /repo && ./deploy/scripts/add-client.sh ${args.join(' ')}`;
+
+    // Instalar dependencias + ejecutar script
+    const setupCmd = [
+        'apk add --no-cache bash docker-cli docker-cli-compose openssl curl gettext >/dev/null 2>&1',
+        scriptCmd,
+    ].join(' && ');
+
+    const containerName = `provision-${slug}-${Date.now()}`;
+
+    const container = await docker.createContainer({
+        Image: 'alpine:3.20',
+        Cmd: ['sh', '-c', setupCmd],
+        name: containerName,
+        HostConfig: {
+            Binds: [
+                `${HOST_DEPLOY_DIR}:/repo`,
+                '/var/run/docker.sock:/var/run/docker.sock',
+            ],
+            NetworkMode: 'host',
+        },
     });
 
-    return {
-        key: pems.private,
-        cert: pems.cert,
-    };
+    await container.start();
+
+    // Timeout de 10 minutos (el script tiene sus propios timeouts internos)
+    const TIMEOUT_MS = 10 * 60 * 1000;
+    const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Provisioning timeout after ${TIMEOUT_MS / 1000}s`)), TIMEOUT_MS),
+    );
+
+    try {
+        const result: any = await Promise.race([
+            container.wait().then((r: any) => r),
+            timeoutPromise,
+        ]);
+
+        // Obtener logs del contenedor
+        const logData = await new Promise<Buffer>((resolve, reject) => {
+            container.logs({ stdout: true, stderr: true }, (err: any, data: Buffer | undefined) => {
+                if (err) reject(err);
+                else resolve(data ?? Buffer.alloc(0));
+            });
+        });
+
+        const output = logData.toString('utf-8');
+        const exitCode = result?.StatusCode ?? 0;
+
+        if (exitCode !== 0) {
+            throw new Error(`add-client.sh fallo (exit ${exitCode}):\n${output}`);
+        }
+
+        return output;
+    } finally {
+        // Limpiar contenedor efimero
+        try {
+            await container.remove({ force: true });
+        } catch {
+            // Ya fue eliminado
+        }
+    }
 }
 
 // ── Docker helpers ───────────────────────────────────────────────────────────
@@ -90,28 +158,7 @@ export async function ensureNetwork(): Promise<void> {
 }
 
 /**
- * Crea y levanta un contenedor con la configuración dada.
- */
-async function createAndStartContainer(config: Dockerode.ContainerCreateOptions): Promise<void> {
-    // Verificar si ya existe (idempotencia)
-    try {
-        const existing = docker.getContainer(config.name!);
-        const info = await existing.inspect();
-        if (info.State.Running) {
-            return;
-        }
-        // Si existe pero no está corriendo, lo eliminamos y recreamos
-        await existing.remove({ force: true });
-    } catch {
-        // No existe, procedemos a crear
-    }
-
-    const container = await docker.createContainer(config);
-    await container.start();
-}
-
-/**
- * Espera a que un contenedor esté healthy.
+ * Espera a que un contenedor este healthy.
  */
 async function waitForHealthy(containerName: string, timeoutSec: number): Promise<boolean> {
     const deadline = Date.now() + timeoutSec * 1000;
@@ -126,11 +173,11 @@ async function waitForHealthy(containerName: string, timeoutSec: number): Promis
             }
 
             if (info.State.Status === 'exited' || info.State.Status === 'dead') {
-                console.error(`[provisioner] Contenedor ${containerName} terminó inesperadamente: ${info.State.Status}`);
+                console.error(`[provisioner] Contenedor ${containerName} termino inesperadamente: ${info.State.Status}`);
                 return false;
             }
         } catch {
-            // Contenedor aún no existe o fue eliminado
+            // Contenedor aun no existe o fue eliminado
         }
 
         await sleep(HEALTH_POLL_INTERVAL * 1000);
@@ -138,57 +185,6 @@ async function waitForHealthy(containerName: string, timeoutSec: number): Promis
 
     console.error(`[provisioner] Timeout esperando health de ${containerName} (${timeoutSec}s)`);
     return false;
-}
-
-/**
- * Ejecuta un comando dentro de un contenedor usando la API de dockerode.
- * Espera a que el stream termine antes de inspeccionar el exit code.
- */
-async function execInContainer(containerName: string, cmd: string[]): Promise<{ exitCode: number }> {
-    const container = docker.getContainer(containerName);
-
-    const exec = await container.exec({
-        Cmd: cmd,
-        AttachStdout: false,
-        AttachStderr: false,
-    });
-
-    return new Promise((resolve, reject) => {
-        exec.start({ Tty: false }, (err: Error | null, stream: NodeJS.ReadableStream | undefined) => {
-            if (err) {
-                reject(err);
-                return;
-            }
-
-            if (!stream) {
-                // Sin stream, inspeccionar directamente
-                exec.inspect((inspectErr: Error | null, info: any) => {
-                    if (inspectErr) {
-                        reject(inspectErr);
-                        return;
-                    }
-                    resolve({ exitCode: info?.ExitCode ?? 0 });
-                });
-                return;
-            }
-
-            // Consumir el stream hasta que termine
-            stream.resume();
-            stream.on('end', () => {
-                // Stream cerrado — ahora sí inspeccionar el exit code
-                exec.inspect((inspectErr: Error | null, info: any) => {
-                    if (inspectErr) {
-                        reject(inspectErr);
-                        return;
-                    }
-                    resolve({ exitCode: info?.ExitCode ?? 0 });
-                });
-            });
-            stream.on('error', (streamErr: Error) => {
-                reject(streamErr);
-            });
-        });
-    });
 }
 
 /**
@@ -208,7 +204,7 @@ ${domain} {
 }
 
 /**
- * Recarga Caddy (si está corriendo).
+ * Recarga Caddy (si esta corriendo).
  */
 async function reloadCaddy(): Promise<void> {
     try {
@@ -232,7 +228,7 @@ async function reloadCaddy(): Promise<void> {
             if (stream) stream.resume();
             console.log('[provisioner] Caddy recargado');
         } else {
-            console.log('[provisioner] Caddy no está corriendo — site file escrito pero inactivo');
+            console.log('[provisioner] Caddy no esta corriendo — site file escrito pero inactivo');
         }
     } catch (err) {
         console.warn('[provisioner] No se pudo recargar Caddy:', err);
@@ -248,87 +244,94 @@ async function removeCaddySite(slug: string): Promise<void> {
         await fs.unlink(siteFile);
         console.log(`[provisioner] Archivo Caddy eliminado: ${slug}.caddy`);
     } catch {
-        // El archivo no existía, no es error
+        // El archivo no existia, no es error
     }
 }
 
 // ── Servicio principal de provisioning ───────────────────────────────────────
 
 /**
- * Crea un tenant completo: DB record + Docker containers + Caddy routing.
+ * Crea un tenant completo ejecutando add-client.sh via un contenedor Docker
+ * efimero. El script se encarga de:
+ *  - Generar secretos (DB_PASSWORD, JWT_SECRET)
+ *  - Crear directorio deploy/clients/<slug>/ con TLS y .env
+ *  - Renderizar docker-compose.yml desde template
+ *  - Crear y levantar contenedores db-<slug> + api-<slug>
+ *  - Verificar health checks
+ *  - Semillar usuario admin
+ *  - Configurar Caddy (site file + reload)
  *
- * Flujo:
- * 1. Genera secretos (dbPassword, jwtSecret, adminPassword, TLS keypair)
- * 2. Crea directorio deploy/clients/<slug>/ con TLS y .env
- * 3. Inserta tenant en la base de datos de management
- * 4. Crea contenedor db-<slug> (PostgreSQL con TLS)
- * 5. Espera a que DB esté healthy
- * 6. Crea contenedor api-<slug> (ERP-Market backend)
- * 7. Espera a que API responda health check
- * 8. Semilla usuario admin
- * 9. Configura Caddy (site file + reload)
- * 10. Retorna credenciales
+ * Despues de la ejecucion, leemos el .env generado para registrar/actualizar
+ * el tenant en la base de datos de management con todos los campos necesarios.
  */
 export async function provisionTenant(input: ProvisionInput): Promise<ProvisionResult> {
     const { slug, adminEmail, adminPassword: adminPasswordInput } = input;
     const plan = input.plan || 'free';
-
-    // Auto-generar dominio si no se prove
-    const domain = input.domain || `${slug}.89.167.46.144.sslip.io`;
-
-    // ── 1. Generar secretos ──────────────────────────────────────────────
-    const dbPassword = generatePassword();
-    const jwtSecret = generateJwtSecret();
-    const adminPasswordPlain = adminPasswordInput || generatePassword();
+    const domain = input.domain || '';
     const adminEmailFinal = adminEmail || `admin@${slug}.local`;
+    const adminPasswordFinal = adminPasswordInput || '';
 
-    console.log(`[provisioner] Iniciando provisioning para tenant: ${slug}`);
+    console.log(`[provisioner] Iniciando provisioning para tenant: ${slug} via add-client.sh`);
 
-    // ── 2. Crear directorio del cliente + TLS ────────────────────────────
-    // clientDir del contenedor para escritura de archivos
-    const clientDir = path.join(DEPLOY_DIR, 'clients', slug);
-    const tlsDir = path.join(clientDir, 'tls');
-    // clientDir del host para mounts de Docker (el container DB necesita el path real del host)
-    const hostClientDir = path.join(HOST_DEPLOY_DIR, 'clients', slug);
+    // ── 1. Ejecutar add-client.sh ──────────────────────────────────────
+    const output = await runAddClientScript(slug, domain, adminEmailFinal, adminPasswordFinal);
+    console.log(`[provisioner] add-client.sh completado para ${slug}`);
 
-    await fs.mkdir(tlsDir, { recursive: true });
+    // ── 2. Registrar/actualizar tenant en la DB ───────────────────────
+    return await registerTenantFromEnv(slug, domain, plan, adminEmailFinal, adminPasswordFinal);
+}
 
-    const { key: tlsKey, cert: tlsCert } = await generateTlsKeypair(`db-${slug}`);
+/**
+ * Registra un tenant en la DB despues de que add-client.sh genero el .env.
+ * Extrae secretos, hashea password, y hace upsert en la tabla Tenant.
+ */
+async function registerTenantFromEnv(
+    slug: string,
+    domain: string,
+    plan: string,
+    adminEmailFinal: string,
+    adminPasswordFinal: string,
+): Promise<ProvisionResult> {
+    const envPath = path.join(HOST_DEPLOY_DIR, 'clients', slug, '.env');
+    let envVars: Record<string, string>;
+    try {
+        const envContent = await fs.readFile(envPath, 'utf-8');
+        envVars = parseEnvFile(envContent);
+    } catch (err) {
+        throw new Error(`No se pudo leer ${envPath} despues de add-client.sh: ${err}`);
+    }
 
-    // Escribir clave TLS (mode 600)
-    await fs.writeFile(path.join(tlsDir, 'server.key'), tlsKey, { mode: 0o600 });
-    await fs.writeFile(path.join(tlsDir, 'server.crt'), tlsCert, { mode: 0o644 });
+    const clientDomain = envVars.CLIENT_DOMAIN || domain || `${slug}.89.167.46.144.sslip.io`;
+    const clientUrl = envVars.CLIENT_URL || `https://${clientDomain}`;
+    const finalAdminEmail = envVars.ADMIN_EMAIL || adminEmailFinal;
+    const finalAdminPassword = envVars.ADMIN_PASSWORD || adminPasswordFinal || 'admin123';
+    const dbPassword = envVars.DB_PASSWORD || '';
+    const jwtSecret = envVars.JWT_SECRET || '';
 
-    // Escribir archivo .env para referencia
-    const envContent = [
-        `# Generado por provisioner.ts — no editar manualmente`,
-        `CLIENT_SLUG=${slug}`,
-        `CLIENT_DOMAIN=${domain}`,
-        `CLIENT_URL=https://${domain}`,
-        `DB_NAME=erp_market`,
-        `DB_USER=erp`,
-        `DB_PASSWORD=${dbPassword}`,
-        `JWT_SECRET=${jwtSecret}`,
-        `ADMIN_EMAIL=${adminEmailFinal}`,
-        `ADMIN_PASSWORD=${adminPasswordPlain}`,
-    ].join('\n');
-
-    await fs.writeFile(path.join(clientDir, '.env'), envContent, { mode: 0o600 });
-
-    // ── 3. Insertar tenant en la DB de management ────────────────────────
     const bcrypt = await import('bcryptjs');
-    const adminPasswordHashed = await bcrypt.hash(adminPasswordPlain, 10);
+    const adminPasswordHashed = await bcrypt.hash(finalAdminPassword, 10);
 
-    const tenant = await prisma.tenant.create({
-        data: {
-            slug,
-            domain,
-            url: `https://${domain}`,
+    const tenant = await prisma.tenant.upsert({
+        where: { slug },
+        update: {
+            domain: clientDomain,
+            url: clientUrl,
             plan,
-            adminEmail: adminEmailFinal,
+            adminEmail: finalAdminEmail,
             adminPassword: adminPasswordHashed,
-            dbPassword,
             jwtSecret,
+            dbPassword,
+            status: 'ACTIVE',
+        },
+        create: {
+            slug,
+            domain: clientDomain,
+            url: clientUrl,
+            plan,
+            adminEmail: finalAdminEmail,
+            adminPassword: adminPasswordHashed,
+            jwtSecret,
+            dbPassword,
             status: 'ACTIVE',
         },
     });
@@ -337,210 +340,155 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
         actor: 'provisioner',
         action: 'TENANT_CREATED',
         tenantId: tenant.id,
-        details: { slug, domain },
+        details: { slug, domain: clientDomain, method: 'add-client.sh' },
     });
 
-    console.log(`[provisioner] Tenant ${slug} creado en DB (id: ${tenant.id})`);
-
-    // ── 4. Asegurar red erp_proxy ────────────────────────────────────────
-    await ensureNetwork();
-
-    // ── 5. Crear contenedor DB ───────────────────────────────────────────
-    const dbContainerName = `db-${slug}`;
-    const volumeName = `erp-db-${slug}`;
-
-    // Crear volumen si no existe
-    try {
-        await docker.getVolume(volumeName).inspect();
-    } catch {
-        await docker.createVolume({ Name: volumeName });
-    }
-
-    console.log(`[provisioner] Creando contenedor ${dbContainerName}`);
-
-    await createAndStartContainer({
-        name: dbContainerName,
-        Image: DB_IMAGE,
-        Env: [
-            'POSTGRES_USER=erp',
-            `POSTGRES_PASSWORD=${dbPassword}`,
-            'POSTGRES_DB=erp_market',
-        ],
-        Cmd: [
-            'postgres',
-            '-c', 'ssl=on',
-            '-c', 'ssl_cert_file=/run/secrets/server.crt',
-            '-c', 'ssl_key_file=/run/secrets/server.key',
-            '-c', 'shared_buffers=32MB',
-            '-c', 'effective_cache_size=96MB',
-            '-c', 'work_mem=4MB',
-            '-c', 'maintenance_work_mem=32MB',
-            '-c', 'max_connections=20',
-        ],
-        HostConfig: {
-            Binds: [
-                `${volumeName}:/var/lib/postgresql/data`,
-                `${path.join(hostClientDir, 'tls/server.crt')}:/run/secrets/server.crt:ro`,
-                `${path.join(hostClientDir, 'tls/server.key')}:/run/secrets/server.key:ro`,
-            ],
-            NetworkMode: NETWORK_NAME,
-            RestartPolicy: { Name: 'unless-stopped' },
-        },
-        // Healthcheck: pg_isready
-        Healthcheck: {
-            Test: ['CMD-SHELL', 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'],
-            Interval: 10_000_000_000, // 10s en nanoseconds
-            Timeout: 5_000_000_000,   // 5s
-            Retries: 5,
-            StartPeriod: 60_000_000_000, // 60s
-        },
-        NetworkingConfig: {
-            EndpointsConfig: {
-                [NETWORK_NAME]: {},
-            },
-        },
-    });
-
-    // ── 6. Esperar DB healthy ────────────────────────────────────────────
-    console.log(`[provisioner] Esperando ${dbContainerName} healthy (timeout: ${DB_HEALTH_TIMEOUT}s)...`);
-
-    const dbHealthy = await waitForHealthy(dbContainerName, DB_HEALTH_TIMEOUT);
-    if (!dbHealthy) {
-        await rollbackProvisioning(slug, tenant.id);
-        throw new Error(`DB ${dbContainerName} no se volvió healthy en ${DB_HEALTH_TIMEOUT}s`);
-    }
-
-    console.log(`[provisioner] ${dbContainerName} healthy`);
-
-    // ── 7. Crear contenedor API ──────────────────────────────────────────
-    const apiContainerName = `api-${slug}`;
-    const clientUrl = `https://${domain}`;
-
-    console.log(`[provisioner] Creando contenedor ${apiContainerName}`);
-
-    await createAndStartContainer({
-        name: apiContainerName,
-        Image: API_IMAGE,
-        Env: [
-            'NODE_ENV=production',
-            'PORT=3000',
-            'DEPLOY_MODE=server',
-            `DB_HOST=${dbContainerName}`,
-            `DATABASE_URL=postgresql://erp:${dbPassword}@${dbContainerName}:5432/erp_market?schema=public&connection_limit=5`,
-            `DIRECT_URL=postgresql://erp:${dbPassword}@${dbContainerName}:5432/erp_market?schema=public`,
-            `JWT_SECRET=${jwtSecret}`,
-            `FRONTEND_URL=${clientUrl}`,
-        ],
-        HostConfig: {
-            NetworkMode: NETWORK_NAME,
-            RestartPolicy: { Name: 'unless-stopped' },
-        },
-        // Healthcheck: GET /api/health
-        Healthcheck: {
-            Test: ['CMD', 'node', '-e', 'fetch(\'http://127.0.0.1:3000/api/health\').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))'],
-            Interval: 10_000_000_000, // 10s
-            Timeout: 5_000_000_000,   // 5s
-            Retries: 5,
-            StartPeriod: 30_000_000_000, // 30s
-        },
-        NetworkingConfig: {
-            EndpointsConfig: {
-                [NETWORK_NAME]: {},
-            },
-        },
-    });
-
-    // ── 8. Esperar API healthy ───────────────────────────────────────────
-    console.log(`[provisioner] Esperando ${apiContainerName} healthy (timeout: ${API_HEALTH_TIMEOUT}s)...`);
-
-    const apiHealthy = await waitForHealthy(apiContainerName, API_HEALTH_TIMEOUT);
-    if (!apiHealthy) {
-        await rollbackProvisioning(slug, tenant.id);
-        throw new Error(`API ${apiContainerName} no respondió en ${API_HEALTH_TIMEOUT}s`);
-    }
-
-    console.log(`[provisioner] ${apiContainerName} healthy`);
-
-    // ── 9. Semilla usuario admin ─────────────────────────────────────────
-    console.log(`[provisioner] Semillando usuario admin para ${slug}...`);
-
-    try {
-        await execInContainer(apiContainerName, [
-            'sh', '-c',
-            `ADMIN_EMAIL='${adminEmailFinal}' ADMIN_PASSWORD='${adminPasswordPlain}' npx ts-node src/scripts/seed-admin.ts`,
-        ]);
-        console.log(`[provisioner] Admin ${adminEmailFinal} semillado`);
-    } catch (err) {
-        console.warn(`[provisioner] Admin seed falló (no fatal): ${err}`);
-    }
-
-    // ── 10. Configurar Caddy ────────────────────────────────────────────
-    await writeCaddySite(slug, domain);
-    await reloadCaddy();
-
-    await createAuditEntry({
-        actor: 'provisioner',
-        action: 'TENANT_PROVISIONED',
-        tenantId: tenant.id,
-        details: { slug, domain, apiHealthy: true, dbHealthy: true },
-    });
-
-    console.log(`[provisioner] Tenant ${slug} provisionado exitosamente`);
+    console.log(`[provisioner] Tenant ${slug} registrado en DB (id: ${tenant.id})`);
 
     return {
         tenantId: tenant.id,
         slug,
-        domain,
+        domain: clientDomain,
         url: clientUrl,
-        adminEmail: adminEmailFinal,
-        adminPasswordPlain,
+        adminEmail: finalAdminEmail,
+        adminPasswordPlain: finalAdminPassword,
         dbPassword,
     };
 }
 
+// ── Streaming provisioning (SSE) ────────────────────────────────────────────
+
+/** Tipo de callback para enviar logs en tiempo real al cliente SSE */
+export type LogCallback = (message: string) => void;
+
 /**
- * Rollback completo: elimina contenedores, volumen, directorio y tenant de DB.
+ * Crea un tenant con logging en tiempo real via streaming.
+ * Ejecuta add-client.sh en un contenedor Docker efimero y captura
+ * stdout/stderr linea por linea, invocando sendLog() con cada una.
+ *
+ * Al completar, registra el tenant en la DB usando registerTenantFromEnv.
  */
-async function rollbackProvisioning(slug: string, tenantId: string): Promise<void> {
-    console.log(`[provisioner] Rollback: limpiando provisioning de ${slug}`);
+export async function provisionWithLogs(
+    slug: string,
+    domain: string,
+    plan: string,
+    adminEmail: string,
+    adminPassword: string,
+    sendLog: LogCallback,
+): Promise<ProvisionResult> {
+    const args = [`'${slug}'`];
+    if (domain) args.push(`'${domain}'`);
+    if (adminEmail) args.push(`'${adminEmail}'`);
+    args.push("'admin'");
+    if (adminPassword) args.push(`'${adminPassword}'`);
 
-    // Eliminar contenedores
-    for (const name of [`api-${slug}`, `db-${slug}`]) {
-        try {
-            const container = docker.getContainer(name);
-            await container.remove({ force: true, v: true });
-        } catch {
-            // No existía
-        }
-    }
+    const scriptCmd = `cd /repo && ./deploy/scripts/add-client.sh ${args.join(' ')}`;
 
-    // Eliminar volumen
-    try {
-        await docker.getVolume(`erp-db-${slug}`).remove();
-    } catch {
-        // No existía
-    }
+    const setupCmd = [
+        'apk add --no-cache bash docker-cli docker-cli-compose openssl curl gettext >/dev/null 2>&1',
+        scriptCmd,
+    ].join(' && ');
 
-    // Eliminar directorio del cliente
-    try {
-        await fs.rm(path.join(HOST_DEPLOY_DIR, 'clients', slug), { recursive: true, force: true });
-    } catch {
-        // No existía
-    }
+    const containerName = `provision-${slug}-${Date.now()}`;
 
-    // Eliminar tenant de DB
-    try {
-        await prisma.tenant.delete({ where: { id: tenantId } });
-    } catch {
-        // Ya fue eliminado o no existía
-    }
+    sendLog(`Creando contenedor efimero: ${containerName}`);
 
-    await createAuditEntry({
-        actor: 'provisioner',
-        action: 'TENANT_ROLLBACK',
-        tenantId,
-        details: { slug, reason: 'Provisioning falló' },
+    const container = await docker.createContainer({
+        Image: 'alpine:3.20',
+        Cmd: ['sh', '-c', setupCmd],
+        name: containerName,
+        HostConfig: {
+            Binds: [
+                `${HOST_DEPLOY_DIR}:/repo`,
+                '/var/run/docker.sock:/var/run/docker.sock',
+            ],
+            NetworkMode: 'host',
+        },
     });
+
+    await container.start();
+    sendLog('Contenedor iniciado — ejecutando add-client.sh...');
+
+    // Adjuntar stream de stdout + stderr
+    const stream = await container.attach({ stream: true, stdout: true, stderr: true });
+
+    // Buffer para acumular datos parciales (chunks de Docker pueden cortar lineas)
+    let lineBuffer = '';
+
+    await new Promise<void>((resolve, reject) => {
+        stream.on('data', (chunk: Buffer) => {
+            // Docker multiplexed streams: primer byte indica stream type,
+            // los primeros 8 bytes son header de longitud — los ignoramos.
+            const raw = chunk.toString('utf-8');
+            // Separar en lineas y procesar cada una
+            const parts = raw.split('\n');
+            for (let i = 0; i < parts.length; i++) {
+                const part = parts[i];
+                if (i === parts.length - 1 && part !== '') {
+                    // Ultimo fragmento incompleto — acumular
+                    lineBuffer += part;
+                } else {
+                    const fullLine = lineBuffer + part;
+                    lineBuffer = '';
+                    const trimmed = fullLine.trim();
+                    if (trimmed) {
+                        sendLog(trimmed);
+                    }
+                }
+            }
+        });
+
+        stream.on('end', resolve);
+        stream.on('error', reject);
+    });
+
+    // Flush residual
+    if (lineBuffer.trim()) {
+        sendLog(lineBuffer.trim());
+    }
+
+    sendLog('add-client.sh completado — registrando tenant en DB...');
+
+    // Registrar en DB
+    const result = await registerTenantFromEnv(slug, domain, plan, adminEmail, adminPassword);
+    sendLog(`Tenant ${slug} registrado exitosamente (id: ${result.tenantId})`);
+
+    // Limpiar contenedor efimero
+    try {
+        await container.remove({ force: true });
+        sendLog('Contenedor efimero eliminado');
+    } catch {
+        // Ya fue eliminado
+    }
+
+    return result;
+}
+
+/**
+ * Obtiene las ultimas lineas de log de un contenedor Docker.
+ * Util para la consola de tenant detail.
+ */
+export async function getContainerLogs(containerName: string, tail: number = 50): Promise<string[]> {
+    try {
+        const container = docker.getContainer(containerName);
+        const logData = await new Promise<Buffer>((resolve, reject) => {
+            container.logs(
+                { stdout: true, stderr: true, tail, follow: false },
+                (err: any, data: Buffer | undefined) => {
+                    if (err) reject(err);
+                    else resolve(data ?? Buffer.alloc(0));
+                },
+            );
+        });
+
+        return logData
+            .toString('utf-8')
+            .split('\n')
+            .map((l) => l.trim())
+            .filter((l) => l.length > 0);
+    } catch {
+        return [];
+    }
 }
 
 // ── Lifecycle: suspend / resume / delete ─────────────────────────────────────
@@ -601,10 +549,10 @@ export async function resumeTenant(slug: string): Promise<void> {
         }
     }
 
-    // Esperar a que DB esté healthy
+    // Esperar a que DB este healthy
     const dbHealthy = await waitForHealthy(`db-${slug}`, DB_HEALTH_TIMEOUT);
     if (!dbHealthy) {
-        console.error(`[provisioner] DB no se recuperó al reanudar ${slug}`);
+        console.error(`[provisioner] DB no se recupero al reanudar ${slug}`);
     }
 
     // Actualizar DB
@@ -624,7 +572,7 @@ export async function resumeTenant(slug: string): Promise<void> {
 }
 
 /**
- * Elimina un tenant: fuerza eliminación de contenedores, volumen, Caddy y DB record.
+ * Elimina un tenant: contenedores Docker, volumen, directorio, Caddy y DB record.
  */
 export async function deleteTenant(slug: string): Promise<void> {
     console.log(`[provisioner] Eliminando tenant: ${slug}`);
@@ -648,7 +596,7 @@ export async function deleteTenant(slug: string): Promise<void> {
         await docker.getVolume(`erp-db-${slug}`).remove();
         console.log(`[provisioner] Volumen erp-db-${slug} eliminado`);
     } catch {
-        // No existía
+        // No existia
     }
 
     // Eliminar directorio del cliente
@@ -656,7 +604,7 @@ export async function deleteTenant(slug: string): Promise<void> {
         await fs.rm(path.join(HOST_DEPLOY_DIR, 'clients', slug), { recursive: true, force: true });
         console.log(`[provisioner] Directorio clients/${slug} eliminado`);
     } catch {
-        // No existía
+        // No existia
     }
 
     // Eliminar sitio de Caddy
