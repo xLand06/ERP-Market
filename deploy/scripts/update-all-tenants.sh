@@ -17,7 +17,8 @@ git pull origin master
 
 # 2. Reconstruir imagen
 echo "▶ Reconstruyendo erp-market:latest..."
-./management/build-image.sh
+cd "$ROOT"
+docker buildx build -t erp-market:latest -f backend/Dockerfile . --load
 
 # 3. Actualizar cada tenant
 COUNT=0
