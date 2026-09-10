@@ -10,8 +10,8 @@ const docker = new Dockerode({ socketPath: env.DOCKER_SOCKET });
 
 // ── Constantes ───────────────────────────────────────────────────────────────
 const NETWORK_NAME = 'erp_proxy';
-const DEPLOY_DIR = process.env.DEPLOY_DIR || path.resolve(__dirname, '../../../../deploy');
-// Path del host para volume mounts de Docker
+const DEPLOY_DIR = process.env.DEPLOY_DIR || '/repo/deploy';
+// Path del host para volume mounts de Docker (los containers DB necesitan el path del host)
 const HOST_DEPLOY_DIR = process.env.HOST_DEPLOY_DIR || DEPLOY_DIR;
 const SITES_DIR = path.join(HOST_DEPLOY_DIR, 'caddy/sites');
 
@@ -84,7 +84,7 @@ async function runAddClientScript(
     args.push(adminUser || 'admin');
     if (adminPassword) args.push(adminPassword);
 
-    const cmd = `/deploy/scripts/add-client.sh ${args.join(' ')}`;
+    const cmd = `/repo/deploy/scripts/add-client.sh ${args.join(' ')}`;
     console.log(`[provisioner] Ejecutando: ${cmd}`);
 
     try {
@@ -348,7 +348,7 @@ export async function provisionWithLogs(
 
     await new Promise<void>((resolve, reject) => {
         const proc = spawn('/bin/bash', [scriptPath, ...args], {
-            cwd: `${DEPLOY_DIR}`,
+            cwd: `/repo`,
             env: { ...process.env, PATH: process.env.PATH },
             timeout: 10 * 60 * 1000,
         });
