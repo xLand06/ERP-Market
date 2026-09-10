@@ -113,7 +113,7 @@ export const createTransaction = async (req: AuthRequest, res: Response): Promis
 
         res.status(201).json({ success: true, data: transaction });
     } catch (err: any) {
-        res.status(422).json({ success: false, error: err.message });
+        res.status(err.status || 422).json({ success: false, error: err.message });
     }
 };
 

@@ -14,11 +14,15 @@ import { $Enums } from '@prisma/client';
 //   6. Barcodes         (→ Products)    — reconciliar por code
 //   7. Users            (→ Branches)    — reconciliar por username
 //   8. ExchangeRates    (sin deps)      — reconciliar por code
-//   9. BranchInventory  (→ Products, Branches)
-//  10. CashRegisters    (→ Users, Branches) — solo PENDING
-//  11. Transactions     (→ Users, Branches, CashRegisters) — solo PENDING
-//  12. Mermas           (→ Users, Branches, Products) — solo PENDING
-//  13. StockCounts      (→ Users, Branches) — solo PENDING
+//   9. Customers        (sin deps)      — reconciliar por cedula o name (Fiados/CxC)
+//  10. BranchInventory  (→ Products, Branches)
+//  11. CashRegisters    (→ Users, Branches) — solo PENDING
+//  12. Transactions     (→ Users, Branches, CashRegisters, Customers) — solo PENDING
+//  13. CustomerPayments (→ Customers, Transactions) — abonos (Fiados/CxC)
+//  14. Mermas           (→ Users, Branches, Products) — solo PENDING
+//  15. StockCounts      (→ Users, Branches) — solo PENDING
+//  16. ProductBatches   (→ Products, Branches)
+//  17. SystemSettings   (sin deps)
 // =============================================================================
 
 export async function pushSales(): Promise<{ success: boolean; pushedItems?: number; error?: string }> {
@@ -372,8 +376,71 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
             }
         }
 
-        // ─── STEP 9: BRANCH INVENTORY ──────────────────────────────────────────
-        logger.info('[Sync] Step 9: Pushing BranchInventory...');
+        // ─── STEP 9: CUSTOMERS (Fiados/CxC — batch por cedula o name) ──────────
+        logger.info('[Sync] Step 9: Pushing Customers...');
+        const localCustomers = await localPrisma.customer.findMany();
+        const customerMap = new Map<string, string>(); // localCustomerId -> cloudCustomerId
+
+        if (localCustomers.length > 0) {
+            const cloudCustomersByCedula = new Map<string, any>();
+            const cloudCustomersByName = new Map<string, any>();
+
+            // Batch 1: reconciliar por cédula (identificador más estable)
+            const cedulas = localCustomers.map(c => c.cedula).filter(Boolean) as string[];
+            if (cedulas.length > 0) {
+                const byCedula = await cloud.customer.findMany({ where: { cedula: { in: cedulas } } });
+                for (const cc of byCedula) {
+                    if (cc.cedula) cloudCustomersByCedula.set(cc.cedula, cc);
+                }
+            }
+
+            // Batch 2: clientes sin cédula (o no encontrados por cédula) por nombre
+            const namesToFetch = localCustomers
+                .filter(c => !c.cedula || !cloudCustomersByCedula.has(c.cedula))
+                .map(c => c.name);
+            if (namesToFetch.length > 0) {
+                const byName = await cloud.customer.findMany({ where: { name: { in: namesToFetch } } });
+                for (const cn of byName) cloudCustomersByName.set(cn.name, cn);
+            }
+
+            for (const customer of localCustomers) {
+                try {
+                    const existingCustomer = customer.cedula
+                        ? (cloudCustomersByCedula.get(customer.cedula) ?? cloudCustomersByName.get(customer.name) ?? null)
+                        : (cloudCustomersByName.get(customer.name) ?? null);
+
+                    const customerData = {
+                        name: customer.name,
+                        cedula: customer.cedula ?? null,
+                        phone: customer.phone ?? null,
+                        email: customer.email ?? null,
+                        address: customer.address ?? null,
+                        creditLimit: customer.creditLimit != null ? Number(customer.creditLimit) : null,
+                        balance: Number(customer.balance),
+                        isActive: customer.isActive,
+                    };
+
+                    if (existingCustomer) {
+                        await cloud.customer.update({
+                            where: { id: existingCustomer.id },
+                            data: customerData,
+                        });
+                        customerMap.set(customer.id, existingCustomer.id);
+                    } else {
+                        const created = await cloud.customer.create({
+                            data: { id: customer.id, ...customerData },
+                        });
+                        customerMap.set(customer.id, created.id);
+                    }
+                    pushedCount++;
+                } catch (err: any) {
+                    logger.warn(`[Sync] Customer ${customer.name} skip: ${err.message?.slice(0, 100)}`);
+                }
+            }
+        }
+
+        // ─── STEP 10: BRANCH INVENTORY ──────────────────────────────────────────
+        logger.info('[Sync] Step 10: Pushing BranchInventory...');
         const localInventory = await localPrisma.branchInventory.findMany();
         for (const inv of localInventory) {
             try {
@@ -400,8 +467,8 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
             }
         }
 
-        // ─── STEP 10: CASH REGISTERS (cerrados y pendientes) ───────────────────
-        logger.info('[Sync] Step 10: Pushing CashRegisters...');
+        // ─── STEP 11: CASH REGISTERS (cerrados y pendientes) ───────────────────
+        logger.info('[Sync] Step 11: Pushing CashRegisters...');
         const pendingRegisters = await localPrisma.cashRegister.findMany({
             where: { syncStatus: 'PENDING', status: 'CLOSED' },
         });
@@ -475,8 +542,8 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
             }
         }
 
-        // ─── STEP 11: TRANSACTIONS + ITEMS ─────────────────────────────────────
-        logger.info('[Sync] Step 11: Pushing Transactions...');
+        // ─── STEP 12: TRANSACTIONS + ITEMS ─────────────────────────────────────
+        logger.info('[Sync] Step 12: Pushing Transactions...');
         const pendingTxs = await localPrisma.transaction.findMany({
             where: { syncStatus: 'PENDING' },
             include: { items: true },
@@ -498,15 +565,18 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                 }
 
                 // Verificar FKs en cloud
-                const [userInCloud, branchInCloud, cashRegInCloud] = await Promise.all([
+                const [userInCloud, branchInCloud, cashRegInCloud, customerInCloud] = await Promise.all([
                     cloud.user.findFirst({ where: { id: cloudUserId }, select: { id: true } }),
                     cloud.branch.findFirst({ where: { id: cloudBranchId }, select: { id: true } }),
                     tx.cashRegisterId
                         ? cloud.cashRegister.findUnique({ where: { id: tx.cashRegisterId }, select: { id: true } })
                         : Promise.resolve(true),
+                    (tx as any).customerId
+                        ? cloud.customer.findUnique({ where: { id: (tx as any).customerId }, select: { id: true } })
+                        : Promise.resolve(true),
                 ]);
-                if (!userInCloud || !branchInCloud || !cashRegInCloud) {
-                    logger.warn(`[Sync] Tx ${tx.id} skip: FK faltante en cloud (user=${!!userInCloud}, branch=${!!branchInCloud}, cashReg=${!!cashRegInCloud})`);
+                if (!userInCloud || !branchInCloud || !cashRegInCloud || !customerInCloud) {
+                    logger.warn(`[Sync] Tx ${tx.id} skip: FK faltante en cloud (user=${!!userInCloud}, branch=${!!branchInCloud}, cashReg=${!!cashRegInCloud}, customer=${!!customerInCloud})`);
                     continue;
                 }
 
@@ -522,6 +592,7 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                         exchangeRate: (tx as any).exchangeRate != null ? Number((tx as any).exchangeRate) : null,
                         invoiceNumber: (tx as any).invoiceNumber ?? null,
                         paymentMethods: (tx as any).paymentMethods ?? null,
+                        customerId: (tx as any).customerId ?? null,
                         createdAt: tx.createdAt,
                         userId: cloudUserId,
                         branchId: cloudBranchId,
@@ -540,6 +611,7 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
                         exchangeRate: (tx as any).exchangeRate != null ? Number((tx as any).exchangeRate) : null,
                         invoiceNumber: (tx as any).invoiceNumber ?? null,
                         paymentMethods: (tx as any).paymentMethods ?? null,
+                        customerId: (tx as any).customerId ?? null,
                         createdAt: tx.createdAt,
                         userId: cloudUserId,
                         branchId: cloudBranchId,
@@ -592,8 +664,64 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
             }
         }
 
-        // ─── STEP 12: MERMAS ───────────────────────────────────────────────────
-        logger.info('[Sync] Step 12: Pushing Mermas...');
+        // ─── STEP 13: CUSTOMER PAYMENTS (Abonos — Fiados/CxC) ──────────────────
+        logger.info('[Sync] Step 13: Pushing CustomerPayments...');
+        const localPayments = await localPrisma.customerPayment.findMany();
+
+        if (localPayments.length === 0) {
+            logger.info('[Sync] No hay abonos pendientes de sync');
+        }
+
+        for (const payment of localPayments) {
+            try {
+                // El cliente DEBE existir en cloud (los clientes se sincronizan antes)
+                const cloudCustomerId = customerMap.get(payment.customerId);
+                if (!cloudCustomerId) {
+                    logger.warn(`[Sync] CustomerPayment ${payment.id} skip: cliente ${payment.customerId} no sincronizado en cloud`);
+                    continue;
+                }
+
+                // Verificar FKs en cloud (cliente + transacción si viene referenciada)
+                const [customerInCloud, txInCloud] = await Promise.all([
+                    cloud.customer.findUnique({ where: { id: cloudCustomerId }, select: { id: true } }),
+                    payment.transactionId
+                        ? cloud.transaction.findUnique({ where: { id: payment.transactionId }, select: { id: true } })
+                        : Promise.resolve(true),
+                ]);
+                if (!customerInCloud || !txInCloud) {
+                    logger.warn(`[Sync] CustomerPayment ${payment.id} skip: FK faltante en cloud (customer=${!!customerInCloud}, tx=${!!txInCloud})`);
+                    continue;
+                }
+
+                await cloud.customerPayment.upsert({
+                    where: { id: payment.id },
+                    update: {
+                        amount: Number(payment.amount),
+                        method: payment.method,
+                        reference: payment.reference ?? null,
+                        notes: payment.notes ?? null,
+                        customerId: cloudCustomerId,
+                        transactionId: payment.transactionId ?? null,
+                    },
+                    create: {
+                        id: payment.id,
+                        customerId: cloudCustomerId,
+                        transactionId: payment.transactionId ?? null,
+                        amount: Number(payment.amount),
+                        method: payment.method,
+                        reference: payment.reference ?? null,
+                        notes: payment.notes ?? null,
+                        createdAt: payment.createdAt,
+                    },
+                });
+                pushedCount++;
+            } catch (err: any) {
+                logger.warn(`[Sync] CustomerPayment ${payment.id} skip: ${err.message?.slice(0, 100)}`);
+            }
+        }
+
+        // ─── STEP 14: MERMAS ───────────────────────────────────────────────────
+        logger.info('[Sync] Step 14: Pushing Mermas...');
         const pendingMermas = await localPrisma.merma.findMany({
             where: { syncStatus: 'PENDING' },
         });
@@ -653,8 +781,8 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
             }
         }
 
-        // ─── STEP 13: STOCK COUNTS ─────────────────────────────────────────────
-        logger.info('[Sync] Step 13: Pushing StockCounts...');
+        // ─── STEP 15: STOCK COUNTS ─────────────────────────────────────────────
+        logger.info('[Sync] Step 15: Pushing StockCounts...');
         const pendingCounts = await localPrisma.stockCount.findMany({
             where: { syncStatus: 'PENDING', status: 'COMPLETED' },
             include: { items: true },
@@ -737,8 +865,8 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
             }
         }
 
-        // ─── STEP 14: PRODUCT BATCHES (LOTES) ───────────────────────────────────
-        logger.info('[Sync] Step 14: Pushing Product Batches...');
+        // ─── STEP 16: PRODUCT BATCHES (LOTES) ───────────────────────────────────
+        logger.info('[Sync] Step 16: Pushing Product Batches...');
         const allBatches = await localPrisma.productBatch.findMany();
 
         for (const batch of allBatches) {
@@ -778,8 +906,8 @@ export async function pushSales(): Promise<{ success: boolean; pushedItems?: num
             }
         }
 
-        // ─── STEP 15: SYSTEM SETTINGS (Push de configuraciones) ───────────────
-        logger.info('[Sync] Step 15: Pushing System Settings...');
+        // ─── STEP 17: SYSTEM SETTINGS (Push de configuraciones) ───────────────
+        logger.info('[Sync] Step 17: Pushing System Settings...');
         try {
             const localSettings = await localPrisma.systemSetting.findMany();
             for (const setting of localSettings) {

@@ -1,13 +1,16 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Loader2, Plus, Trash2, Wallet, Send, CreditCard, ArrowRightLeft, Printer } from 'lucide-react';
+import { Loader2, Plus, Trash2, Wallet, Send, CreditCard, ArrowRightLeft, Printer, BookOpenCheck, UserPlus, Search } from 'lucide-react';
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { usePayment } from '../hooks/usePayment';
+import { customersApi, type Customer } from '@/services/customers.service';
 import type { PaymentMethodType, Currency, CartItem } from '../types';
 
 interface PaymentDialogProps {
@@ -21,7 +24,7 @@ interface PaymentDialogProps {
         amount: number;
         currency: Currency;
         exchangeRate?: number;
-    }>) => void;
+    }>, customerId?: string) => void;
     isSubmitting: boolean;
 }
 
@@ -114,6 +117,59 @@ export function PaymentDialog({
         setPrevOpen(open);
     }, [open, prevOpen, total, reset, updateTotal]);
 
+    // ── Fiado / Crédito ───────────────────────────────────────────────────────
+    const [fiadoMode, setFiadoMode] = useState(false);
+    const [customer, setCustomer] = useState<Customer | null>(null);
+    const [customerSearch, setCustomerSearch] = useState('');
+    const [creatingCustomer, setCreatingCustomer] = useState(false);
+    const [newCustomerName, setNewCustomerName] = useState('');
+    const queryClient = useQueryClient();
+
+    // Cerrar el modo fiado y limpiar el cliente al cerrar el diálogo
+    useEffect(() => {
+        if (!open) {
+            setFiadoMode(false);
+            setCustomer(null);
+            setCustomerSearch('');
+            setNewCustomerName('');
+        }
+    }, [open]);
+
+    const { data: customers = [], isLoading: customersLoading } = useQuery({
+        queryKey: ['customers'],
+        queryFn: () => customersApi.getCustomers({ isActive: true }),
+        enabled: open && fiadoMode,
+        retry: false,
+    });
+
+    const filteredCustomers = customers.filter(c =>
+        c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+        (c.cedula || '').toLowerCase().includes(customerSearch.toLowerCase())
+    );
+
+    const handleQuickCreateCustomer = async () => {
+        const name = newCustomerName.trim();
+        if (!name) return;
+        setCreatingCustomer(true);
+        try {
+            const created = await customersApi.createCustomer({ name });
+            setCustomer(created);
+            setNewCustomerName('');
+            queryClient.invalidateQueries({ queryKey: ['customers'] });
+            toast.success(`Cliente "${created.name}" creado`);
+        } catch (err: any) {
+            toast.error(err?.response?.data?.error || 'Error al crear el cliente');
+        } finally {
+            setCreatingCustomer(false);
+        }
+    };
+
+    // En modo fiado se permite pago parcial o nulo: basta con un cliente
+    // seleccionado y que el monto pagado no exceda el total.
+    const fiadoCanConfirm = fiadoMode
+        ? Boolean(customer) && paidTotalInUSD <= (totalInUSD + 0.01)
+        : canConfirm;
+
     // Productos por peso
     const weightItems = useMemo(() => {
         return cartItems.filter(item => {
@@ -166,7 +222,7 @@ export function PaymentDialog({
 
     const handleConfirm = () => {
         const payload = getPayload();
-        onConfirm(payload);
+        onConfirm(payload, fiadoMode && customer ? customer.id : undefined);
     };
 
     return (
@@ -277,6 +333,109 @@ export function PaymentDialog({
                                 </div>
                             </div>
                         )}
+
+                        {/* Fiado / Venta a Crédito */}
+                        <div className="space-y-2">
+                            <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">Venta a Crédito (Fiado)</span>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setFiadoMode(prev => !prev);
+                                    if (!fiadoMode) setCustomer(null);
+                                }}
+                                className={cn(
+                                    'h-11 w-full px-3 rounded-xl font-black text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 border-2 shadow-2xs',
+                                    fiadoMode
+                                        ? 'bg-amber-500 text-white border-amber-600 shadow-md ring-2 ring-amber-500/20'
+                                        : 'bg-white text-slate-900 border-slate-300 hover:border-amber-400 hover:bg-amber-50'
+                                )}
+                            >
+                                <BookOpenCheck className="w-4 h-4 shrink-0" />
+                                <span>{fiadoMode ? 'Fiado ACTIVADO' : 'Activar Fiado'}</span>
+                            </button>
+
+                            {fiadoMode && (
+                                <div className="p-3 bg-amber-50/80 border-2 border-amber-300 rounded-xl space-y-2.5">
+                                    {customer ? (
+                                        <div className="flex items-center justify-between gap-2 bg-white rounded-lg border border-amber-300 px-3 py-2">
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="text-xs font-black text-slate-900 truncate">{customer.name}</span>
+                                                <span className="text-[10px] text-slate-500 font-mono">{customer.cedula || 'Sin cédula'} · Saldo {customer.balance.toFixed(2)}</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCustomer(null)}
+                                                className="text-[10px] font-black text-amber-700 hover:bg-amber-100 px-2 py-1 rounded-lg border border-amber-300 shrink-0"
+                                            >
+                                                Cambiar
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="relative">
+                                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                                <Input
+                                                    placeholder="Buscar cliente por nombre o cédula..."
+                                                    value={customerSearch}
+                                                    onChange={e => setCustomerSearch(e.target.value)}
+                                                    className="pl-8 h-9 text-xs rounded-lg"
+                                                />
+                                            </div>
+
+                                            <div className="max-h-36 overflow-y-auto custom-scrollbar space-y-1">
+                                                {customersLoading && (
+                                                    <p className="text-[11px] text-slate-400 text-center py-2">Cargando clientes...</p>
+                                                )}
+                                                {!customersLoading && filteredCustomers.length === 0 && (
+                                                    <p className="text-[11px] text-slate-400 text-center py-2">Sin resultados</p>
+                                                )}
+                                                {filteredCustomers.map(c => (
+                                                    <button
+                                                        key={c.id}
+                                                        type="button"
+                                                        onClick={() => setCustomer(c)}
+                                                        className="w-full text-left flex items-center justify-between gap-2 bg-white hover:bg-amber-100 border border-slate-200 hover:border-amber-400 rounded-lg px-2.5 py-1.5 transition-colors"
+                                                    >
+                                                        <span className="text-xs font-semibold text-slate-800 truncate">{c.name}</span>
+                                                        <span className="text-[10px] tabular-nums font-bold shrink-0">
+                                                            <span className={c.balance > 0 ? 'text-amber-600' : 'text-emerald-600'}>
+                                                                {c.balance.toFixed(2)}
+                                                            </span>
+                                                        </span>
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            {/* Crear cliente rápido */}
+                                            <div className="flex gap-1.5">
+                                                <Input
+                                                    placeholder="Nombre del nuevo cliente..."
+                                                    value={newCustomerName}
+                                                    onChange={e => setNewCustomerName(e.target.value)}
+                                                    className="h-9 text-xs rounded-lg"
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={handleQuickCreateCustomer}
+                                                    disabled={creatingCustomer || !newCustomerName.trim()}
+                                                    className="h-9 shrink-0 border-amber-400 text-amber-900 hover:bg-amber-100 font-black text-[11px] rounded-lg"
+                                                >
+                                                    {creatingCustomer
+                                                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                        : <UserPlus className="w-3.5 h-3.5" />}
+                                                    <span className="hidden sm:inline">Crear</span>
+                                                </Button>
+                                            </div>
+                                        </>
+                                    )}
+                                    <p className="text-[10px] text-amber-800/80 font-semibold leading-snug">
+                                        El faltante entre el pago y el total queda registrado como deuda del cliente (límite validado en el servidor).
+                                    </p>
+                                </div>
+                            )}
+                        </div>
 
                         {/* Vuelto / Cambio al Cliente - Alto Contraste */}
                         {changeInUSD > 0.01 && (
@@ -433,12 +592,14 @@ export function PaymentDialog({
                             </Button>
                             <Button
                                 type="button"
-                                onClick={canConfirm ? handleConfirm : undefined}
-                                disabled={!canConfirm || isSubmitting}
+                                onClick={fiadoCanConfirm ? handleConfirm : undefined}
+                                disabled={!fiadoCanConfirm || isSubmitting}
                                 className={cn(
                                     'flex-[2] h-14 rounded-2xl font-black text-sm sm:text-base text-white transition-all shadow-lg flex items-center justify-center gap-2',
-                                    canConfirm && !isSubmitting
-                                        ? 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] shadow-emerald-600/30 ring-2 ring-emerald-600/30'
+                                    fiadoCanConfirm && !isSubmitting
+                                        ? fiadoMode
+                                            ? 'bg-amber-500 hover:bg-amber-600 active:scale-[0.99] shadow-amber-500/30 ring-2 ring-amber-500/30'
+                                            : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] shadow-emerald-600/30 ring-2 ring-emerald-600/30'
                                         : 'bg-slate-300 cursor-not-allowed shadow-none border-0'
                                 )}
                             >
@@ -446,6 +607,11 @@ export function PaymentDialog({
                                     <>
                                         <Loader2 className="w-5 h-5 animate-spin" />
                                         Procesando Venta...
+                                    </>
+                                ) : fiadoMode ? (
+                                    <>
+                                        <BookOpenCheck className="w-5 h-5" />
+                                        Confirmar Fiado
                                     </>
                                 ) : (
                                     <>
