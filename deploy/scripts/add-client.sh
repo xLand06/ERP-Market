@@ -188,6 +188,13 @@ if ! docker network inspect erp_proxy >/dev/null 2>&1; then
     docker network create erp_proxy >/dev/null
 fi
 
+# ── Fix build context for container environments ────────────────────────────
+# Si BUILD_CONTEXT está seteado (ej: management server), reemplazar el context relativo
+if [[ -n "${BUILD_CONTEXT:-}" ]]; then
+    sed -i "s|context: ../../..|context: ${BUILD_CONTEXT}|g" "$CLIENT_DIR/docker-compose.yml"
+    echo "build context fixed to: $BUILD_CONTEXT"
+fi
+
 # ── Deploy the stack ──────────────────────────────────────────────────────────
 echo "building + starting stack for '$SLUG'..."
 docker compose -f "$CLIENT_DIR/docker-compose.yml" up -d --build
