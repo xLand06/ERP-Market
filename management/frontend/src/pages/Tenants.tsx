@@ -120,10 +120,10 @@ const COLORS = {
     info: '#2563eb',
     dark: '#1a1a2e',
     darkHover: '#16213e',
-    muted: '#888',
-    border: '#e5e7eb',
-    borderLight: '#f3f4f6',
-    bg: '#f5f5f5',
+    muted: '#64748b',
+    border: '#e2e8f0',
+    borderLight: '#f1f5f9',
+    bg: '#f8fafc',
 };
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
@@ -136,7 +136,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> =
 const HEALTH_STATUS = {
     running: { label: 'Running', color: '#059669', bg: '#ecfdf5' },
     stopped: { label: 'Detenido', color: '#dc2626', bg: '#fef2f2' },
-    unknown: { label: 'Desconocido', color: '#888', bg: '#f3f4f6' },
+    unknown: { label: 'Desconocido', color: '#64748b', bg: '#f1f5f9' },
     partial: { label: 'Parcial', color: '#d97706', bg: '#fffbeb' },
 };
 
@@ -151,13 +151,12 @@ function getHealthStatus(lastCheck: TenantHealth['lastCheck']): keyof typeof HEA
     return 'stopped';
 }
 
-/** Barra de progreso reutilizable */
 function ProgressBar({ percent, color }: { percent: number; color: string }) {
     return (
         <div style={{
             width: '100%',
             height: 8,
-            background: '#e5e7eb',
+            background: '#e2e8f0',
             borderRadius: 4,
             overflow: 'hidden',
         }}>
@@ -172,7 +171,6 @@ function ProgressBar({ percent, color }: { percent: number; color: string }) {
     );
 }
 
-/** Botón de acción reutilizable con mínimo touch target 44px */
 function ActionButton({
     onClick,
     color,
@@ -201,8 +199,8 @@ function ActionButton({
                 padding: '0.4rem 0.6rem',
                 borderRadius: 6,
                 border: 'none',
-                background: disabled ? '#e5e7eb' : hovered ? hoverColor : color,
-                color: disabled ? '#9ca3af' : '#fff',
+                background: disabled ? '#e2e8f0' : hovered ? hoverColor : color,
+                color: disabled ? '#94a3b8' : '#fff',
                 cursor: disabled ? 'not-allowed' : 'pointer',
                 fontSize: '0.75rem',
                 fontWeight: 600,
@@ -225,7 +223,6 @@ function ActionButton({
 export default function Tenants() {
     const navigate = useNavigate();
 
-    // Estado
     const [tenants, setTenants] = useState<Tenant[]>([]);
     const [healthMap, setHealthMap] = useState<Map<string, TenantHealth>>(new Map());
     const [vpsStats, setVpsStats] = useState<VpsStats | null>(null);
@@ -233,7 +230,6 @@ export default function Tenants() {
     const [filter, setFilter] = useState<string>('');
     const [toasts, setToasts] = useState<Toast[]>([]);
 
-    // Modal de crear
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [creating, setCreating] = useState(false);
     const [provisioning, setProvisioning] = useState(false);
@@ -246,7 +242,6 @@ export default function Tenants() {
     const [formPlan, setFormPlan] = useState('free');
     const [formError, setFormError] = useState<string | null>(null);
 
-    // Modal de confirmación
     const [confirmAction, setConfirmAction] = useState<{
         title: string;
         message: string;
@@ -255,7 +250,6 @@ export default function Tenants() {
     } | null>(null);
     const [confirmLoading, setConfirmLoading] = useState(false);
 
-    // Toast helper
     const addToast = useCallback((message: string, type: 'success' | 'error') => {
         const id = ++toastCounter;
         setToasts((prev) => [...prev, { id, message, type }]);
@@ -264,7 +258,6 @@ export default function Tenants() {
         }, 4000);
     }, []);
 
-    // Fetch datos
     const fetchTenants = useCallback(() => {
         const token = localStorage.getItem('mgmt_token');
         const headers = { Authorization: `Bearer ${token}` };
@@ -277,7 +270,6 @@ export default function Tenants() {
             .then(([tenantsData, healthData, vpsData]) => {
                 setTenants(Array.isArray(tenantsData) ? tenantsData : []);
 
-                // Indexar health por slug para acceso O(1)
                 const map = new Map<string, TenantHealth>();
                 if (Array.isArray(healthData)) {
                     for (const h of healthData) {
@@ -295,7 +287,6 @@ export default function Tenants() {
         fetchTenants();
     }, [fetchTenants]);
 
-    // Reset form
     const resetForm = useCallback(() => {
         setFormSlug('');
         setFormDomain('');
@@ -305,7 +296,6 @@ export default function Tenants() {
         setFormError(null);
     }, []);
 
-    // Crear tenant
     const handleCreate = useCallback(async () => {
         setFormError(null);
 
@@ -383,7 +373,6 @@ export default function Tenants() {
         }
     }, [formSlug, formDomain, formEmail, formPassword, formPlan, resetForm, fetchTenants]);
 
-    // Acciones de tenant
     const handleSuspend = useCallback(async (slug: string) => {
         const token = localStorage.getItem('mgmt_token');
         const res = await fetch(`/api/tenants/${slug}/suspend`, {
@@ -411,7 +400,6 @@ export default function Tenants() {
         if (!res.ok) throw new Error('Error al eliminar');
     }, []);
 
-    // Ejecutar accion confirmada
     const executeConfirmAction = useCallback(async () => {
         if (!confirmAction) return;
         setConfirmLoading(true);
@@ -432,10 +420,8 @@ export default function Tenants() {
         }
     }, [confirmAction, addToast, fetchTenants]);
 
-    // Filtrar tenants
     const filtered = filter ? tenants.filter((t) => t.status === filter) : tenants;
 
-    // Stats derivados
     const healthyTenants = tenants.filter((t) => {
         const h = healthMap.get(t.slug);
         return h?.lastCheck?.apiHealthy && h?.lastCheck?.dbHealthy && h?.lastCheck?.containerUp;
@@ -446,57 +432,54 @@ export default function Tenants() {
     if (loading) {
         return (
             <div>
-                {/* Skeleton VPS stats */}
-                <div className="tenant-vps-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div className="tenant-vps-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '1.5rem' }}>
                     {Array.from({ length: 4 }).map((_, i) => (
                         <div key={i} className="tenant-skeleton-pulse" style={{
                             background: '#fff',
                             borderRadius: 8,
-                            padding: '1.25rem',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                            padding: '1.5rem',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                         }}>
-                            <div style={{ width: '40%', height: 12, background: '#e5e7eb', borderRadius: 4, marginBottom: 12 }} />
-                            <div style={{ width: '60%', height: 28, background: '#e5e7eb', borderRadius: 4, marginBottom: 8 }} />
-                            <div style={{ width: '100%', height: 8, background: '#e5e7eb', borderRadius: 4 }} />
+                            <div style={{ width: '40%', height: 12, background: '#e2e8f0', borderRadius: 4, marginBottom: 12 }} />
+                            <div style={{ width: '60%', height: 28, background: '#e2e8f0', borderRadius: 4, marginBottom: 8 }} />
+                            <div style={{ width: '100%', height: 8, background: '#e2e8f0', borderRadius: 4 }} />
                         </div>
                     ))}
                 </div>
 
-                {/* Skeleton filters */}
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
                     {Array.from({ length: 4 }).map((_, i) => (
                         <div key={i} className="tenant-skeleton-pulse" style={{
                             width: 80,
                             height: 36,
-                            background: '#e5e7eb',
+                            background: '#e2e8f0',
                             borderRadius: 6,
                         }} />
                     ))}
                 </div>
 
-                {/* Skeleton table */}
                 <div style={{
                     background: '#fff',
                     borderRadius: 8,
                     padding: '1.5rem',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                 }}>
                     {Array.from({ length: 5 }).map((_, i) => (
                         <div key={i} className="tenant-skeleton-pulse" style={{
                             height: 52,
-                            background: i % 2 === 0 ? '#f9fafb' : '#fff',
-                            borderBottom: '1px solid #f3f4f6',
+                            background: i % 2 === 0 ? '#f8fafc' : '#fff',
+                            borderBottom: '1px solid #f1f5f9',
                             display: 'flex',
                             alignItems: 'center',
                             padding: '0 1rem',
                             gap: '2rem',
                         }}>
-                            <div style={{ width: 120, height: 14, background: '#e5e7eb', borderRadius: 4 }} />
-                            <div style={{ width: 100, height: 14, background: '#e5e7eb', borderRadius: 4 }} />
-                            <div style={{ width: 60, height: 20, background: '#e5e7eb', borderRadius: 10 }} />
-                            <div style={{ width: 50, height: 14, background: '#e5e7eb', borderRadius: 4 }} />
+                            <div style={{ width: 120, height: 14, background: '#e2e8f0', borderRadius: 4 }} />
+                            <div style={{ width: 100, height: 14, background: '#e2e8f0', borderRadius: 4 }} />
+                            <div style={{ width: 60, height: 20, background: '#e2e8f0', borderRadius: 10 }} />
+                            <div style={{ width: 50, height: 14, background: '#e2e8f0', borderRadius: 4 }} />
                             <div style={{ flex: 1 }} />
-                            <div style={{ width: 80, height: 14, background: '#e5e7eb', borderRadius: 4 }} />
+                            <div style={{ width: 80, height: 14, background: '#e2e8f0', borderRadius: 4 }} />
                         </div>
                     ))}
                 </div>
@@ -508,18 +491,17 @@ export default function Tenants() {
 
     return (
         <div>
-            {/* ── VPS Stats ──────────────────────────────────────────────────── */}
+            {/* ── Estadisticas VPS ──────────────────────────────────────────────── */}
             {vpsStats && (
-                <div className="tenant-vps-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
-                    {/* CPU */}
+                <div className="tenant-vps-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '1.5rem' }}>
                     <div style={{
                         background: '#fff',
                         borderRadius: 8,
-                        padding: '1.25rem',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        padding: '1.5rem',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                            <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600 }}>CPU</h3>
+                            <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>CPU</h3>
                             <span style={{
                                 fontSize: '1.4rem',
                                 fontWeight: 700,
@@ -537,15 +519,14 @@ export default function Tenants() {
                         </p>
                     </div>
 
-                    {/* Memoria */}
                     <div style={{
                         background: '#fff',
                         borderRadius: 8,
-                        padding: '1.25rem',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        padding: '1.5rem',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                            <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600 }}>Memoria</h3>
+                            <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>Memoria</h3>
                             <span style={{
                                 fontSize: '1.4rem',
                                 fontWeight: 700,
@@ -563,15 +544,14 @@ export default function Tenants() {
                         </p>
                     </div>
 
-                    {/* Disco */}
                     <div style={{
                         background: '#fff',
                         borderRadius: 8,
-                        padding: '1.25rem',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        padding: '1.5rem',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                            <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600 }}>Disco</h3>
+                            <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>Disco</h3>
                             <span style={{
                                 fontSize: '1.4rem',
                                 fontWeight: 700,
@@ -589,14 +569,13 @@ export default function Tenants() {
                         </p>
                     </div>
 
-                    {/* Docker */}
                     <div style={{
                         background: '#fff',
                         borderRadius: 8,
-                        padding: '1.25rem',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        padding: '1.5rem',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                     }}>
-                        <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', fontWeight: 600 }}>Docker</h3>
+                        <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>Docker</h3>
                         <div style={{ display: 'flex', gap: '1.25rem', marginBottom: '0.5rem' }}>
                             <div>
                                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: COLORS.primary }}>{vpsStats.docker.running}</div>
@@ -607,7 +586,7 @@ export default function Tenants() {
                                 <div style={{ fontSize: '0.7rem', color: COLORS.muted }}>Stopped</div>
                             </div>
                             <div>
-                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: COLORS.dark }}>{vpsStats.docker.containers}</div>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#1e293b' }}>{vpsStats.docker.containers}</div>
                                 <div style={{ fontSize: '0.7rem', color: COLORS.muted }}>Total</div>
                             </div>
                         </div>
@@ -620,20 +599,20 @@ export default function Tenants() {
 
             {/* ── Resumen rapido ─────────────────────────────────────────────── */}
             <div className="tenant-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                <div style={{ background: '#fff', borderRadius: 8, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: `3px solid ${COLORS.dark}` }}>
-                    <div style={{ fontSize: '0.7rem', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Total</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: COLORS.dark }}>{tenants.length}</div>
+                <div style={{ background: '#fff', borderRadius: 8, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `3px solid ${COLORS.dark}` }}>
+                    <div style={{ fontSize: '0.7rem', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Total</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>{tenants.length}</div>
                 </div>
-                <div style={{ background: '#fff', borderRadius: 8, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: `3px solid ${COLORS.primary}` }}>
-                    <div style={{ fontSize: '0.7rem', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Activos</div>
+                <div style={{ background: '#fff', borderRadius: 8, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `3px solid ${COLORS.primary}` }}>
+                    <div style={{ fontSize: '0.7rem', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Activos</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700, color: COLORS.primary }}>{tenants.filter((t) => t.status === 'ACTIVE').length}</div>
                 </div>
-                <div style={{ background: '#fff', borderRadius: 8, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: `3px solid ${COLORS.warning}` }}>
-                    <div style={{ fontSize: '0.7rem', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Suspendidos</div>
+                <div style={{ background: '#fff', borderRadius: 8, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `3px solid ${COLORS.warning}` }}>
+                    <div style={{ fontSize: '0.7rem', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Suspendidos</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700, color: COLORS.warning }}>{tenants.filter((t) => t.status === 'SUSPENDED').length}</div>
                 </div>
-                <div style={{ background: '#fff', borderRadius: 8, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: `3px solid ${healthyTenants === tenants.filter((t) => t.status === 'ACTIVE').length && tenants.length > 0 ? COLORS.primary : COLORS.warning}` }}>
-                    <div style={{ fontSize: '0.7rem', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Saludables</div>
+                <div style={{ background: '#fff', borderRadius: 8, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `3px solid ${healthyTenants === tenants.filter((t) => t.status === 'ACTIVE').length && tenants.length > 0 ? COLORS.primary : COLORS.warning}` }}>
+                    <div style={{ fontSize: '0.7rem', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Saludables</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700, color: healthyTenants === tenants.filter((t) => t.status === 'ACTIVE').length && tenants.length > 0 ? COLORS.primary : COLORS.warning }}>
                         {healthyTenants}/{tenants.filter((t) => t.status === 'ACTIVE').length}
                     </div>
@@ -657,7 +636,7 @@ export default function Tenants() {
                                 borderRadius: 6,
                                 border: filter === value ? `1px solid ${COLORS.dark}` : `1px solid ${COLORS.border}`,
                                 background: filter === value ? COLORS.dark : '#fff',
-                                color: filter === value ? '#fff' : '#6b7280',
+                                color: filter === value ? '#fff' : '#64748b',
                                 cursor: 'pointer',
                                 fontSize: '0.8rem',
                                 fontWeight: 500,
@@ -683,8 +662,10 @@ export default function Tenants() {
                         minHeight: 44,
                         transition: 'background 0.15s ease',
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = COLORS.primaryHover; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = COLORS.primary; }}
                 >
-                    + Nuevo Tenant
+                    Nuevo Tenant
                 </button>
             </div>
 
@@ -692,21 +673,21 @@ export default function Tenants() {
             <div className="tenant-desktop-table" style={{
                 background: '#fff',
                 borderRadius: 8,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                 animation: 'fadeIn 0.3s ease',
             }}>
                 <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                         <thead>
                             <tr style={{ borderBottom: `2px solid ${COLORS.border}`, textAlign: 'left' }}>
-                                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280' }}>Tenant</th>
-                                <th style={{ padding: '0.85rem 0', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280' }}>Estado</th>
-                                <th style={{ padding: '0.85rem 0', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280' }}>Plan</th>
-                                <th style={{ padding: '0.85rem 0', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280' }}>Docker</th>
-                                <th style={{ padding: '0.85rem 0', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280' }}>API</th>
-                                <th style={{ padding: '0.85rem 0', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280' }}>DB</th>
-                                <th style={{ padding: '0.85rem 0', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280' }}>Creado</th>
-                                <th style={{ padding: '0.85rem 0', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5, color: '#6b7280', textAlign: 'right' }}>Acciones</th>
+                                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Tenant</th>
+                                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Estado</th>
+                                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Plan</th>
+                                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Docker</th>
+                                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>API</th>
+                                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>DB</th>
+                                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Creado</th>
+                                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', textAlign: 'right' }}>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -726,7 +707,6 @@ export default function Tenants() {
                                             transition: 'background 0.1s ease',
                                         }}
                                     >
-                                        {/* Tenant info */}
                                         <td style={{ padding: '0.85rem 1rem' }}>
                                             <div>
                                                 <span
@@ -746,7 +726,6 @@ export default function Tenants() {
                                             </div>
                                         </td>
 
-                                        {/* Estado con badge */}
                                         <td>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                                 <span style={{
@@ -767,11 +746,9 @@ export default function Tenants() {
                                             </div>
                                         </td>
 
-                                        {/* Plan */}
-                                        <td style={{ textTransform: 'capitalize' }}>{t.plan}</td>
+                                        <td style={{ padding: '0.85rem 1rem', textTransform: 'capitalize' }}>{t.plan}</td>
 
-                                        {/* Docker status */}
-                                        <td>
+                                        <td style={{ padding: '0.85rem 1rem' }}>
                                             <span style={{
                                                 display: 'inline-flex',
                                                 alignItems: 'center',
@@ -788,25 +765,20 @@ export default function Tenants() {
                                             </span>
                                         </td>
 
-                                        {/* API health */}
-                                        <td>
+                                        <td style={{ padding: '0.85rem 1rem' }}>
                                             <HealthBadge healthy={lastCheck?.apiHealthy ?? null} size="sm" />
                                         </td>
 
-                                        {/* DB health */}
-                                        <td>
+                                        <td style={{ padding: '0.85rem 1rem' }}>
                                             <HealthBadge healthy={lastCheck?.dbHealthy ?? null} size="sm" />
                                         </td>
 
-                                        {/* Creado */}
-                                        <td style={{ color: COLORS.muted, fontSize: '0.8rem' }}>
+                                        <td style={{ padding: '0.85rem 1rem', color: COLORS.muted, fontSize: '0.8rem' }}>
                                             {new Date(t.createdAt).toLocaleDateString('es-AR')}
                                         </td>
 
-                                        {/* Acciones */}
                                         <td>
                                             <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                                                {/* Ver detalle */}
                                                 <ActionButton
                                                     onClick={() => navigate(`/tenants/${t.slug}`)}
                                                     color={COLORS.info}
@@ -816,7 +788,6 @@ export default function Tenants() {
                                                     Ver
                                                 </ActionButton>
 
-                                                {/* Suspend / Resume */}
                                                 {t.status === 'ACTIVE' ? (
                                                     <ActionButton
                                                         onClick={() => setConfirmAction({
@@ -847,11 +818,10 @@ export default function Tenants() {
                                                     </ActionButton>
                                                 ) : null}
 
-                                                {/* Eliminar */}
                                                 <ActionButton
                                                     onClick={() => setConfirmAction({
                                                         title: `Eliminar ${t.slug}`,
-                                                        message: `Esta accion marcará el tenant ${t.slug} como eliminado. Esta accion puede ser revertida contactando soporte.`,
+                                                        message: `Esta accion marcara el tenant ${t.slug} como eliminado. Esta accion puede ser revertida contactando soporte.`,
                                                         variant: 'danger',
                                                         onConfirm: () => handleDelete(t.slug),
                                                     })}
@@ -871,10 +841,9 @@ export default function Tenants() {
                                 <tr>
                                     <td colSpan={8} style={{ padding: '3rem', textAlign: 'center' }}>
                                         <div style={{ color: COLORS.muted }}>
-                                            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🏢</div>
                                             <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>No se encontraron tenants</div>
                                             <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
-                                                {filter ? `No hay tenants con estado "${filter}"` : 'Creá tu primer tenant para comenzar'}
+                                                {filter ? `No hay tenants con estado "${filter}"` : 'Crea tu primer tenant para comenzar'}
                                             </div>
                                         </div>
                                     </td>
@@ -901,11 +870,10 @@ export default function Tenants() {
                                 background: '#fff',
                                 borderRadius: 8,
                                 padding: '1rem',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                                 animation: 'fadeIn 0.3s ease',
                             }}
                         >
-                            {/* Header */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
                                 <div>
                                     <span
@@ -932,7 +900,6 @@ export default function Tenants() {
                                 </span>
                             </div>
 
-                            {/* Health indicators */}
                             <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', padding: '2px 6px', borderRadius: 6, background: hs.bg, color: hs.color }}>
                                     <span style={{ width: 5, height: 5, borderRadius: '50%', background: hs.color }} />
@@ -942,7 +909,6 @@ export default function Tenants() {
                                 <HealthBadge healthy={lastCheck?.dbHealthy ?? null} size="sm" />
                             </div>
 
-                            {/* Footer */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div style={{ fontSize: '0.75rem', color: COLORS.muted, textTransform: 'capitalize' }}>
                                     {t.plan} · {new Date(t.createdAt).toLocaleDateString('es-AR')}
@@ -1005,14 +971,13 @@ export default function Tenants() {
                         background: '#fff',
                         borderRadius: 8,
                         padding: '3rem',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                         textAlign: 'center',
                         color: COLORS.muted,
                     }}>
-                        <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🏢</div>
                         <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>No se encontraron tenants</div>
                         <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
-                            {filter ? `No hay tenants con estado "${filter}"` : 'Creá tu primer tenant para comenzar'}
+                            {filter ? `No hay tenants con estado "${filter}"` : 'Crea tu primer tenant para comenzar'}
                         </div>
                     </div>
                 )}
@@ -1041,7 +1006,7 @@ export default function Tenants() {
                         boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
                         animation: 'fadeIn 0.2s ease',
                     }}>
-                        <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.1rem', fontWeight: 700 }}>
+                        <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>
                             Crear Nuevo Tenant
                         </h2>
 
@@ -1053,13 +1018,14 @@ export default function Tenants() {
                                 color: '#991b1b',
                                 fontSize: '0.85rem',
                                 marginBottom: '1rem',
+                                border: '1px solid #fecaca',
                             }}>
                                 {formError}
                             </div>
                         )}
 
                         <div style={{ marginBottom: '1rem' }}>
-                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: 4 }}>
                                 Slug *
                             </label>
                             <input
@@ -1071,7 +1037,7 @@ export default function Tenants() {
                                     width: '100%',
                                     padding: '0.6rem 0.75rem',
                                     borderRadius: 6,
-                                    border: '1px solid #d1d5db',
+                                    border: '1px solid #e2e8f0',
                                     fontSize: '0.9rem',
                                     outline: 'none',
                                     boxSizing: 'border-box',
@@ -1084,7 +1050,7 @@ export default function Tenants() {
                         </div>
 
                         <div style={{ marginBottom: '1rem' }}>
-                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: 4 }}>
                                 Dominio (opcional)
                             </label>
                             <input
@@ -1096,7 +1062,7 @@ export default function Tenants() {
                                     width: '100%',
                                     padding: '0.6rem 0.75rem',
                                     borderRadius: 6,
-                                    border: '1px solid #d1d5db',
+                                    border: '1px solid #e2e8f0',
                                     fontSize: '0.9rem',
                                     outline: 'none',
                                     boxSizing: 'border-box',
@@ -1106,7 +1072,7 @@ export default function Tenants() {
                         </div>
 
                         <div style={{ marginBottom: '1rem' }}>
-                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: 4 }}>
                                 Email del Admin
                             </label>
                             <input
@@ -1118,7 +1084,7 @@ export default function Tenants() {
                                     width: '100%',
                                     padding: '0.6rem 0.75rem',
                                     borderRadius: 6,
-                                    border: '1px solid #d1d5db',
+                                    border: '1px solid #e2e8f0',
                                     fontSize: '0.9rem',
                                     outline: 'none',
                                     boxSizing: 'border-box',
@@ -1128,7 +1094,7 @@ export default function Tenants() {
                         </div>
 
                         <div style={{ marginBottom: '1rem' }}>
-                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: 4 }}>
                                 Contrasena (opcional)
                             </label>
                             <input
@@ -1140,7 +1106,7 @@ export default function Tenants() {
                                     width: '100%',
                                     padding: '0.6rem 0.75rem',
                                     borderRadius: 6,
-                                    border: '1px solid #d1d5db',
+                                    border: '1px solid #e2e8f0',
                                     fontSize: '0.9rem',
                                     outline: 'none',
                                     boxSizing: 'border-box',
@@ -1150,7 +1116,7 @@ export default function Tenants() {
                         </div>
 
                         <div style={{ marginBottom: '1.5rem' }}>
-                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: 4 }}>
                                 Plan
                             </label>
                             <select
@@ -1160,7 +1126,7 @@ export default function Tenants() {
                                     width: '100%',
                                     padding: '0.6rem 0.75rem',
                                     borderRadius: 6,
-                                    border: '1px solid #d1d5db',
+                                    border: '1px solid #e2e8f0',
                                     fontSize: '0.9rem',
                                     outline: 'none',
                                     boxSizing: 'border-box',
@@ -1207,9 +1173,9 @@ export default function Tenants() {
                                 style={{
                                     padding: '0.5rem 1.25rem',
                                     borderRadius: 6,
-                                    border: '1px solid #d1d5db',
+                                    border: '1px solid #e2e8f0',
                                     background: '#fff',
-                                    color: '#374151',
+                                    color: '#475569',
                                     cursor: 'pointer',
                                     fontSize: '0.85rem',
                                     fontWeight: 500,
@@ -1225,7 +1191,7 @@ export default function Tenants() {
                                     padding: '0.5rem 1.25rem',
                                     borderRadius: 6,
                                     border: 'none',
-                                    background: creating || !formSlug ? '#9ca3af' : COLORS.primary,
+                                    background: creating || !formSlug ? '#94a3b8' : COLORS.primary,
                                     color: '#fff',
                                     cursor: creating || !formSlug ? 'not-allowed' : 'pointer',
                                     fontSize: '0.85rem',
@@ -1286,11 +1252,12 @@ export default function Tenants() {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 margin: '0 auto 0.75rem',
-                                fontSize: '1.5rem',
                             }}>
-                                ✓
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                    <path d="M5 13l4 4L19 7" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
                             </div>
-                            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
+                            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>
                                 Tenant Provisionado
                             </h2>
                             <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', color: COLORS.muted }}>
@@ -1307,26 +1274,26 @@ export default function Tenants() {
                             color: '#065f46',
                         }}>
                             <div style={{ fontWeight: 600, marginBottom: 4 }}>Infraestructura creada:</div>
-                            <div>✓ Contenedor PostgreSQL (db-{createdTenant.slug})</div>
-                            <div>✓ Contenedor API (api-{createdTenant.slug})</div>
-                            <div>✓ Volumen de datos persistente</div>
-                            <div>✓ Certificado TLS auto-firmado</div>
-                            <div>✓ Configuracion Caddy (routing HTTPS)</div>
+                            <div>- Contenedor PostgreSQL (db-{createdTenant.slug})</div>
+                            <div>- Contenedor API (api-{createdTenant.slug})</div>
+                            <div>- Volumen de datos persistente</div>
+                            <div>- Certificado TLS auto-firmado</div>
+                            <div>- Configuracion Caddy (routing HTTPS)</div>
                         </div>
 
                         <div style={{
-                            background: '#f9fafb',
+                            background: '#f8fafc',
                             borderRadius: 8,
                             padding: '1rem',
                             marginBottom: '1.5rem',
                         }}>
-                            <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', fontWeight: 600, color: '#374151' }}>
+                            <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}>
                                 Credenciales de administrador
                             </p>
                             {createdTenant.adminEmail && (
                                 <div style={{ marginBottom: '0.5rem' }}>
                                     <span style={{ fontSize: '0.75rem', color: COLORS.muted }}>Email: </span>
-                                    <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{createdTenant.adminEmail}</span>
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#1e293b' }}>{createdTenant.adminEmail}</span>
                                 </div>
                             )}
                             <div>
@@ -1337,7 +1304,7 @@ export default function Tenants() {
                                     background: '#fff',
                                     padding: '2px 6px',
                                     borderRadius: 4,
-                                    border: '1px solid #e5e7eb',
+                                    border: '1px solid #e2e8f0',
                                 }}>
                                     {createdTenant.adminPasswordPlain}
                                 </code>
@@ -1362,8 +1329,9 @@ export default function Tenants() {
                             color: '#92400e',
                             fontSize: '0.8rem',
                             marginBottom: '1.5rem',
+                            border: '1px solid #fde68a',
                         }}>
-                            ⚠ Guarda estas credenciales. No se van a mostrar de nuevo.
+                            Guarda estas credenciales. No se van a mostrar de nuevo.
                         </div>
 
                         <button
@@ -1421,13 +1389,15 @@ export default function Tenants() {
                                 justifyContent: 'center',
                                 margin: '0 auto 0.75rem',
                                 fontSize: '1.5rem',
+                                fontWeight: 700,
+                                color: confirmAction.variant === 'danger' ? '#dc2626' : '#d97706',
                             }}>
-                                {confirmAction.variant === 'danger' ? '🗑' : '⚠'}
+                                {confirmAction.variant === 'danger' ? 'X' : '!'}
                             </div>
-                            <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>
+                            <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#1e293b' }}>
                                 {confirmAction.title}
                             </h2>
-                            <p style={{ margin: '0.75rem 0 0', fontSize: '0.85rem', color: '#6b7280', lineHeight: 1.5 }}>
+                            <p style={{ margin: '0.75rem 0 0', fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5 }}>
                                 {confirmAction.message}
                             </p>
                         </div>
@@ -1439,9 +1409,9 @@ export default function Tenants() {
                                 style={{
                                     padding: '0.5rem 1.5rem',
                                     borderRadius: 6,
-                                    border: '1px solid #d1d5db',
+                                    border: '1px solid #e2e8f0',
                                     background: '#fff',
-                                    color: '#374151',
+                                    color: '#475569',
                                     cursor: confirmLoading ? 'not-allowed' : 'pointer',
                                     fontSize: '0.85rem',
                                     fontWeight: 500,
@@ -1512,7 +1482,7 @@ export default function Tenants() {
                             pointerEvents: 'auto',
                         }}
                     >
-                        {toast.type === 'success' ? '✓ ' : '✕ '}{toast.message}
+                        {toast.type === 'success' ? '[OK] ' : '[ERROR] '}{toast.message}
                     </div>
                 ))}
             </div>

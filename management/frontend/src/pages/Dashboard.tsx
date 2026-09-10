@@ -36,13 +36,12 @@ interface VpsStats {
     uptime: string;
 }
 
-/** Barra de progreso con porcentaje */
 function ProgressBar({ percent, color }: { percent: number; color: string }) {
     return (
         <div style={{
             width: '100%',
             height: 8,
-            background: '#e5e7eb',
+            background: '#e2e8f0',
             borderRadius: 4,
             overflow: 'hidden',
         }}>
@@ -57,36 +56,18 @@ function ProgressBar({ percent, color }: { percent: number; color: string }) {
     );
 }
 
-/** Skeleton loader para las cards */
 function SkeletonCard() {
     return (
         <div style={{
             background: '#fff',
             borderRadius: 8,
-            padding: '1.25rem',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            borderLeft: '4px solid #e5e7eb',
+            padding: '1.5rem',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+            borderLeft: '4px solid #e2e8f0',
         }}>
-            <div style={{
-                width: '60%',
-                height: 12,
-                background: '#e5e7eb',
-                borderRadius: 4,
-                marginBottom: 12,
-            }} />
-            <div style={{
-                width: '40%',
-                height: 28,
-                background: '#e5e7eb',
-                borderRadius: 4,
-                marginBottom: 8,
-            }} />
-            <div style={{
-                width: '50%',
-                height: 12,
-                background: '#f3f4f6',
-                borderRadius: 4,
-            }} />
+            <div style={{ width: '60%', height: 12, background: '#e2e8f0', borderRadius: 4, marginBottom: 12 }} />
+            <div style={{ width: '40%', height: 28, background: '#e2e8f0', borderRadius: 4, marginBottom: 8 }} />
+            <div style={{ width: '50%', height: 12, background: '#f1f5f9', borderRadius: 4 }} />
         </div>
     );
 }
@@ -128,12 +109,12 @@ export default function Dashboard() {
     if (loading) {
         return (
             <div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
                     {Array.from({ length: 4 }).map((_, i) => (
                         <SkeletonCard key={i} />
                     ))}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
                     {Array.from({ length: 3 }).map((_, i) => (
                         <SkeletonCard key={`vps-${i}`} />
                     ))}
@@ -148,12 +129,12 @@ export default function Dashboard() {
 
     return (
         <div>
-            {/* Stats cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+            {/* Tarjetas de estadisticas */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
                 <StatsCard
                     title="Total Tenants"
                     value={tenantsSummary?.total || 0}
-                    subtitle={`${tenantsSummary?.active || 0} activos · ${tenantsSummary?.suspended || 0} suspendidos`}
+                    subtitle={`${tenantsSummary?.active || 0} activos / ${tenantsSummary?.suspended || 0} suspendidos`}
                     color="#1a1a2e"
                 />
                 <StatsCard
@@ -175,19 +156,23 @@ export default function Dashboard() {
                 />
             </div>
 
-            {/* VPS Stats */}
+            {/* Estadisticas VPS */}
             {vpsStats && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
                     {/* CPU */}
                     <div style={{
                         background: '#fff',
                         borderRadius: 8,
-                        padding: '1.25rem',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        padding: '1.5rem',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                            <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>CPU</h3>
-                            <span style={{ fontSize: '1.5rem', fontWeight: 700, color: vpsStats.cpu.usagePercent > 80 ? '#dc2626' : '#059669' }}>
+                            <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>CPU</h3>
+                            <span style={{
+                                fontSize: '1.5rem',
+                                fontWeight: 700,
+                                color: vpsStats.cpu.usagePercent > 80 ? '#dc2626' : vpsStats.cpu.usagePercent > 60 ? '#d97706' : '#059669',
+                            }}>
                                 {vpsStats.cpu.usagePercent}%
                             </span>
                         </div>
@@ -195,21 +180,25 @@ export default function Dashboard() {
                             percent={vpsStats.cpu.usagePercent}
                             color={vpsStats.cpu.usagePercent > 80 ? '#dc2626' : vpsStats.cpu.usagePercent > 60 ? '#d97706' : '#059669'}
                         />
-                        <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#888' }}>
+                        <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>
                             {vpsStats.cpu.cores} cores
                         </p>
                     </div>
 
-                    {/* Memory */}
+                    {/* Memoria */}
                     <div style={{
                         background: '#fff',
                         borderRadius: 8,
-                        padding: '1.25rem',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        padding: '1.5rem',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                            <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>Memoria</h3>
-                            <span style={{ fontSize: '1.5rem', fontWeight: 700, color: vpsStats.memory.usagePercent > 80 ? '#dc2626' : '#059669' }}>
+                            <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>Memoria</h3>
+                            <span style={{
+                                fontSize: '1.5rem',
+                                fontWeight: 700,
+                                color: vpsStats.memory.usagePercent > 80 ? '#dc2626' : vpsStats.memory.usagePercent > 60 ? '#d97706' : '#059669',
+                            }}>
                                 {vpsStats.memory.usagePercent}%
                             </span>
                         </div>
@@ -217,21 +206,25 @@ export default function Dashboard() {
                             percent={vpsStats.memory.usagePercent}
                             color={vpsStats.memory.usagePercent > 80 ? '#dc2626' : vpsStats.memory.usagePercent > 60 ? '#d97706' : '#059669'}
                         />
-                        <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#888' }}>
+                        <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>
                             {vpsStats.memory.usedMb} / {vpsStats.memory.totalMb} MB
                         </p>
                     </div>
 
-                    {/* Disk */}
+                    {/* Disco */}
                     <div style={{
                         background: '#fff',
                         borderRadius: 8,
-                        padding: '1.25rem',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        padding: '1.5rem',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                            <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>Disco</h3>
-                            <span style={{ fontSize: '1.5rem', fontWeight: 700, color: vpsStats.disk.usagePercent > 80 ? '#dc2626' : '#059669' }}>
+                            <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>Disco</h3>
+                            <span style={{
+                                fontSize: '1.5rem',
+                                fontWeight: 700,
+                                color: vpsStats.disk.usagePercent > 80 ? '#dc2626' : vpsStats.disk.usagePercent > 60 ? '#d97706' : '#059669',
+                            }}>
                                 {vpsStats.disk.usagePercent}%
                             </span>
                         </div>
@@ -239,7 +232,7 @@ export default function Dashboard() {
                             percent={vpsStats.disk.usagePercent}
                             color={vpsStats.disk.usagePercent > 80 ? '#dc2626' : vpsStats.disk.usagePercent > 60 ? '#d97706' : '#059669'}
                         />
-                        <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#888' }}>
+                        <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>
                             {vpsStats.disk.usedGb} / {vpsStats.disk.totalGb} GB
                         </p>
                     </div>
@@ -248,25 +241,25 @@ export default function Dashboard() {
                     <div style={{
                         background: '#fff',
                         borderRadius: 8,
-                        padding: '1.25rem',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        padding: '1.5rem',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                     }}>
-                        <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.9rem', fontWeight: 600 }}>Docker</h3>
+                        <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>Docker</h3>
                         <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.75rem' }}>
                             <div>
                                 <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#059669' }}>{vpsStats.docker.running}</div>
-                                <div style={{ fontSize: '0.75rem', color: '#888' }}>Running</div>
+                                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Running</div>
                             </div>
                             <div>
-                                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: vpsStats.docker.stopped > 0 ? '#d97706' : '#888' }}>{vpsStats.docker.stopped}</div>
-                                <div style={{ fontSize: '0.75rem', color: '#888' }}>Stopped</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: vpsStats.docker.stopped > 0 ? '#d97706' : '#94a3b8' }}>{vpsStats.docker.stopped}</div>
+                                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Stopped</div>
                             </div>
                             <div>
-                                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1a1a2e' }}>{vpsStats.docker.containers}</div>
-                                <div style={{ fontSize: '0.75rem', color: '#888' }}>Total</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1e293b' }}>{vpsStats.docker.containers}</div>
+                                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Total</div>
                             </div>
                         </div>
-                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#888' }}>
+                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
                             Uptime: {vpsStats.uptime}
                         </p>
                     </div>
@@ -274,21 +267,26 @@ export default function Dashboard() {
             )}
 
             {/* Tabla de salud */}
-            <div style={{ background: '#fff', borderRadius: 8, padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                <h3 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: 600 }}>
+            <div style={{
+                background: '#fff',
+                borderRadius: 8,
+                padding: '1.5rem',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+            }}>
+                <h3 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: 600, color: '#1e293b' }}>
                     Estado de Salud Reciente
                 </h3>
                 <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                         <thead>
-                            <tr style={{ borderBottom: '2px solid #e5e7eb', textAlign: 'left' }}>
-                                <th style={{ padding: '0.75rem 0' }}>Tenant</th>
-                                <th>Dominio</th>
-                                <th>Estado</th>
-                                <th>API</th>
-                                <th>DB</th>
-                                <th>Contenedor</th>
-                                <th>Último Check</th>
+                            <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left' }}>
+                                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Tenant</th>
+                                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Dominio</th>
+                                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Estado</th>
+                                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>API</th>
+                                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>DB</th>
+                                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Contenedor</th>
+                                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Ultimo Check</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -296,13 +294,13 @@ export default function Dashboard() {
                                 <tr
                                     key={h.tenantId}
                                     style={{
-                                        borderBottom: '1px solid #f3f4f6',
-                                        background: idx % 2 === 0 ? '#fff' : '#fafafa',
+                                        borderBottom: '1px solid #f1f5f9',
+                                        background: idx % 2 === 0 ? '#fff' : '#f8fafc',
                                     }}
                                 >
-                                    <td style={{ padding: '0.75rem 0', fontWeight: 600 }}>{h.slug}</td>
-                                    <td>{h.domain}</td>
-                                    <td>
+                                    <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#1e293b' }}>{h.slug}</td>
+                                    <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{h.domain}</td>
+                                    <td style={{ padding: '0.75rem 1rem' }}>
                                         <span style={{
                                             padding: '2px 10px',
                                             borderRadius: 12,
@@ -314,19 +312,19 @@ export default function Dashboard() {
                                             {h.status}
                                         </span>
                                     </td>
-                                    <td><HealthBadge healthy={h.lastCheck?.apiHealthy ?? null} size="sm" /></td>
-                                    <td><HealthBadge healthy={h.lastCheck?.dbHealthy ?? null} size="sm" /></td>
-                                    <td><HealthBadge healthy={h.lastCheck?.containerUp ?? null} size="sm" /></td>
-                                    <td style={{ color: '#888', fontSize: '0.8rem' }}>
+                                    <td style={{ padding: '0.75rem 1rem' }}><HealthBadge healthy={h.lastCheck?.apiHealthy ?? null} size="sm" /></td>
+                                    <td style={{ padding: '0.75rem 1rem' }}><HealthBadge healthy={h.lastCheck?.dbHealthy ?? null} size="sm" /></td>
+                                    <td style={{ padding: '0.75rem 1rem' }}><HealthBadge healthy={h.lastCheck?.containerUp ?? null} size="sm" /></td>
+                                    <td style={{ padding: '0.75rem 1rem', color: '#64748b', fontSize: '0.8rem' }}>
                                         {h.lastCheck?.checkedAt
                                             ? new Date(h.lastCheck.checkedAt).toLocaleString('es-AR')
-                                            : 'Nunca'}
+                                            : 'Sin datos'}
                                     </td>
                                 </tr>
                             ))}
                             {health.length === 0 && (
                                 <tr>
-                                    <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#888' }}>
+                                    <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
                                         No hay tenants activos
                                     </td>
                                 </tr>
