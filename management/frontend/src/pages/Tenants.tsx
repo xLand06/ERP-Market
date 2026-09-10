@@ -297,7 +297,7 @@ export default function Tenants() {
         setFormUser('');
         setFormPassword('');
         setFormPlan('free');
-        setError(null);
+        setFormError(null);
     }, []);
 
     const handleCreate = useCallback(async () => {
