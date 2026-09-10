@@ -72,6 +72,11 @@ export interface ConfigState {
     showIvaBreakdown: boolean;
     footerMessage: string;
 
+    // Catálogo digital (F5)
+    catalogSlug: string;    // slug público del catálogo ('' = sin catálogo)
+    catalogActive: boolean; // flag maestro que habilita el catálogo público
+    socialLinks: string;    // JSON string: { facebook?, instagram?, whatsapp? }
+
     // Convenience getters
     vesRate: number;
     copRate: number;
@@ -155,6 +160,10 @@ export const useConfigStore = create<ConfigState>()(
             showPaymentMethods: true,
             showIvaBreakdown: true,
             footerMessage: '¡Gracias por su compra! Vuelva pronto',
+
+            catalogSlug: '',
+            catalogActive: false,
+            socialLinks: '{}',
 
             get vesRate() { return get().rates['VES'] || 5.5; },
             get copRate() { return get().rates['USD'] || get().rates['COP'] || 3600; },

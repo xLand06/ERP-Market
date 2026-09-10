@@ -27,10 +27,10 @@ Basado en: `openspec/changes/comercial-suite/design.md` + specs en Engram.
 - [ ] Sync: reconcile KitComponent
 
 ## Batch 4: Catálogo digital (F5)
-- [ ] Endpoint público GET /api/catalog/:slug (auth optional)
-- [ ] Settings: catalogSlug + socialLinks
-- [ ] Página standalone pública /catalogo/:slug
-- [ ] Link compartible en Settings
+- [x] Endpoint público GET /api/catalog/:slug (auth optional)
+- [x] Settings: catalogSlug + socialLinks
+- [x] Página standalone pública /catalogo/:slug
+- [x] Link compartible en Settings
 
 ## Batch 5: CxP (F7) + Bancos (F6)
 - [ ] Schema dual: SupplierPayment; PurchaseOrder +paidAmount/dueDate

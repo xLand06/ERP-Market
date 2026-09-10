@@ -32,6 +32,8 @@ const StockCountView        = lazy(() => import('../features/stocktaking/pages/S
 const QuotesPage            = lazy(() => import('../features/quotes/pages/QuotesPage'));
 const CustomersPage         = lazy(() => import('../features/customers/pages/CustomersPage'));
 const CustomerDetailPage    = lazy(() => import('../features/customers/pages/CustomerDetail'));
+// Catálogo digital (F5) — página standalone pública, fuera del AppShell
+const PublicCatalogPage     = lazy(() => import('../features/catalog/pages/PublicCatalogPage'));
 
 const wrap = (Component: React.ComponentType) => (
     <Suspense fallback={<PageSkeleton />}>
@@ -57,6 +59,12 @@ export const router = createRouter([
     { 
         path: '/login', 
         element: wrap(LoginPage),
+        errorElement: <RouteErrorBoundary />
+    },
+    // Catálogo público (F5): standalone, sin PrivateRoute ni AppShell
+    {
+        path: '/catalogo/:slug',
+        element: wrap(PublicCatalogPage),
         errorElement: <RouteErrorBoundary />
     },
     {
