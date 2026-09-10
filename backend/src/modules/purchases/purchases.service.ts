@@ -4,8 +4,19 @@
 // =============================================================================
 
 import { prisma } from '../../config/prisma';
-import { CreatePurchaseOrderInput, UpdatePurchaseOrderStatusInput, PurchaseOrderFiltersInput } from '../../core/validations/purchases.zod';
+import { CreatePurchaseOrderInput, UpdatePurchaseOrderStatusInput, PurchaseOrderFiltersInput, SupplierPaymentInput } from '../../core/validations/purchases.zod';
 import { parseDateRange } from '../../core/utils/helpers';
+
+/**
+ * Normaliza Decimal de Prisma a number para el frontend
+ * (Prisma serializa Decimal como string en JSON).
+ */
+const normalizeOrder = (order: any) => ({
+    ...order,
+    total: Number(order.total),
+    paidAmount: Number(order.paidAmount || 0),
+    payments: order.payments?.map((p: any) => ({ ...p, amount: Number(p.amount) })),
+});
 
 /**
  * Listar órdenes de compra con filtros
@@ -13,7 +24,7 @@ import { parseDateRange } from '../../core/utils/helpers';
 export const getAllOrders = async (filters: PurchaseOrderFiltersInput) => {
     const { supplierId, branchId, status, from, to, page = 1, limit = 50 } = filters;
     
-    return prisma.purchaseOrder.findMany({
+    const orders = await prisma.purchaseOrder.findMany({
         where: {
             ...(supplierId && { supplierId }),
             ...(branchId && { branchId }),
@@ -33,17 +44,20 @@ export const getAllOrders = async (filters: PurchaseOrderFiltersInput) => {
             supplier: { select: { id: true, name: true, rut: true } },
             branch: { select: { id: true, name: true } },
             items: { include: { product: { select: { name: true, barcode: true } } } },
+            payments: { orderBy: { createdAt: 'desc' } },
         },
         skip: (page - 1) * limit,
         take: limit,
     });
+
+    return orders.map(normalizeOrder);
 };
 
 /**
  * Obtener detalle de una orden
  */
 export const getOrderById = async (id: string) => {
-    return prisma.purchaseOrder.findUnique({
+    const order = await prisma.purchaseOrder.findUnique({
         where: { id },
         include: {
             supplier: true,
@@ -53,8 +67,11 @@ export const getOrderById = async (id: string) => {
                     product: { select: { id: true, name: true, barcode: true, price: true, cost: true } } 
                 } 
             },
+            payments: { orderBy: { createdAt: 'desc' } },
         },
     });
+
+    return order ? normalizeOrder(order) : null;
 };
 
 /**
@@ -229,4 +246,79 @@ export const getOrderStats = async (branchId?: string) => {
         received,
         totalValue: Number(totalValue._sum.total || 0),
     };
+};
+
+/**
+ * Registrar un pago parcial o total contra una orden de compra (CxP).
+ * Incrementa paidAmount y, si la orden queda saldada, cambia el status a RECEIVED.
+ */
+export const recordSupplierPayment = async (purchaseOrderId: string, input: SupplierPaymentInput) => {
+    const { amount, method = 'cash', reference, notes } = input;
+
+    const order = await prisma.purchaseOrder.findUnique({
+        where: { id: purchaseOrderId },
+        select: { id: true, status: true, total: true, paidAmount: true },
+    });
+
+    if (!order) {
+        const err: any = new Error('Orden de compra no encontrada');
+        err.status = 404;
+        throw err;
+    }
+    if (order.status === 'CANCELLED') {
+        const err: any = new Error('No se puede pagar una orden cancelada');
+        err.status = 422;
+        throw err;
+    }
+
+    const total = Number(order.total);
+    const paid = Number(order.paidAmount || 0);
+    const remaining = total - paid;
+
+    // Tolerancia de centavos por redondeo de flotantes
+    if (amount > remaining + 0.005) {
+        const err: any = new Error('El pago excede el saldo pendiente');
+        err.status = 422;
+        err.pendiente = remaining;
+        err.monto = amount;
+        throw err;
+    }
+
+    const newPaid = paid + amount;
+
+    // Atómico: crear el pago + incrementar paidAmount (+ RECEIVED si queda saldada)
+    return prisma.$transaction(async (tx) => {
+        const payment = await tx.supplierPayment.create({
+            data: {
+                purchaseOrderId,
+                amount,
+                method,
+                reference: reference || null,
+                notes: notes || null,
+            },
+        });
+
+        await tx.purchaseOrder.update({
+            where: { id: purchaseOrderId },
+            data: {
+                paidAmount: { increment: amount },
+                // Regla de negocio REQ-CX-03: si paidAmount >= total → RECEIVED
+                ...(newPaid >= total - 0.005 && order.status !== 'RECEIVED' ? { status: 'RECEIVED' } : {}),
+            },
+        });
+
+        return payment;
+    });
+};
+
+/**
+ * Historial de pagos de una orden de compra
+ */
+export const getSupplierPayments = async (purchaseOrderId: string) => {
+    const payments = await prisma.supplierPayment.findMany({
+        where: { purchaseOrderId },
+        orderBy: { createdAt: 'desc' },
+    });
+
+    return payments.map((p: any) => ({ ...p, amount: Number(p.amount) }));
 };

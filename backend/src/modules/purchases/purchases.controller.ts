@@ -121,3 +121,40 @@ export const deleteOrder = async (req: AuthRequest, res: Response) => {
         res.status(500).json({ success: false, error: error.message });
     }
 };
+
+/**
+ * Registrar un pago a proveedor contra una orden (CxP) — Auditado
+ */
+export const recordSupplierPayment = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = validatedData(req, 'params');
+        const data = validatedData(req, 'body');
+
+        const payment = await purchasesService.recordSupplierPayment(id, data);
+
+        await logAudit({
+            action: 'SUPPLIER_PAYMENT',
+            module: 'purchases',
+            details: { purchaseOrderId: id, monto: data.amount, metodo: data.method },
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
+        });
+
+        res.status(201).json({ success: true, data: payment });
+    } catch (error: any) {
+        res.status(error.status || 500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Historial de pagos de una orden de compra
+ */
+export const getSupplierPayments = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = validatedData(req, 'params');
+        const payments = await purchasesService.getSupplierPayments(id);
+        res.json({ success: true, data: payments });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};

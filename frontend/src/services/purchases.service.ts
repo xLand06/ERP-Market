@@ -14,11 +14,23 @@ export interface PurchaseOrderItem {
     product?: { name: string; barcode: string | null };
 }
 
+export interface SupplierPayment {
+    id: string;
+    purchaseOrderId: string;
+    amount: number;
+    method: string;
+    reference?: string | null;
+    notes?: string | null;
+    createdAt: string;
+}
+
 export interface PurchaseOrder {
     id: string;
     supplierId: string;
     branchId: string;
     total: number;
+    paidAmount: number;
+    dueDate?: string | null;
     status: 'DRAFT' | 'SENT' | 'RECEIVED' | 'CANCELLED';
     notes?: string;
     expectedAt?: string;
@@ -27,6 +39,7 @@ export interface PurchaseOrder {
     supplier: { id: string; name: string; rut?: string };
     branch: { id: string; name: string };
     items: PurchaseOrderItem[];
+    payments?: SupplierPayment[];
 }
 
 export interface PurchaseOrderStats {
@@ -40,7 +53,7 @@ export const purchasesApi = {
     /**
      * Listar órdenes de compra con filtros
      */
-    getOrders: async (params?: { supplierId?: string; branchId?: string; status?: string }): Promise<PurchaseOrder[]> => {
+    getOrders: async (params?: { supplierId?: string; branchId?: string; status?: string; limit?: number }): Promise<PurchaseOrder[]> => {
         const { data } = await api.get<ApiResponse<PurchaseOrder[]>>('/purchases', { params });
         return data.data;
     },
@@ -89,6 +102,22 @@ export const purchasesApi = {
         const { data } = await api.get<ApiResponse<PurchaseOrderStats>>('/purchases/stats', {
             params: branchId ? { branchId } : undefined,
         });
+        return data.data;
+    },
+
+    /**
+     * Registrar un pago a proveedor (CxP)
+     */
+    recordPayment: async (id: string, payload: { amount: number; method?: string; reference?: string; notes?: string }): Promise<SupplierPayment> => {
+        const { data } = await api.post<ApiResponse<SupplierPayment>>(`/purchases/${id}/payments`, payload);
+        return data.data;
+    },
+
+    /**
+     * Historial de pagos de una orden
+     */
+    getOrderPayments: async (id: string): Promise<SupplierPayment[]> => {
+        const { data } = await api.get<ApiResponse<SupplierPayment[]>>(`/purchases/${id}/payments`);
         return data.data;
     },
 };

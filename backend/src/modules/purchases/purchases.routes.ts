@@ -11,7 +11,8 @@ import { idParamSchema } from '../../core/validations/common.zod';
 import { 
     createPurchaseOrderSchema, 
     updatePurchaseOrderStatusSchema, 
-    purchaseOrderFiltersSchema 
+    purchaseOrderFiltersSchema,
+    supplierPaymentSchema,
 } from '../../core/validations/purchases.zod';
 import * as ctrl from './purchases.controller';
 
@@ -27,8 +28,19 @@ router.get('/stats', ctrl.getOrderStats);
 /** GET  /api/purchases/:id — Detalle de una orden */
 router.get('/:id', validate(idParamSchema, { source: 'params' }), ctrl.getOrderById);
 
+/** GET  /api/purchases/:id/payments — Historial de pagos de la orden (CxP) */
+router.get('/:id/payments', validate(idParamSchema, { source: 'params' }), ctrl.getSupplierPayments);
+
 /** POST /api/purchases — Crear orden (Draft) */
 router.post('/', roleGuard('OWNER', 'SELLER'), validate(createPurchaseOrderSchema), ctrl.createOrder);
+
+/** POST /api/purchases/:id/payments — Registrar pago a proveedor (CxP) */
+router.post('/:id/payments', 
+    roleGuard('OWNER', 'SELLER'), 
+    validate(idParamSchema, { source: 'params' }), 
+    validate(supplierPaymentSchema), 
+    ctrl.recordSupplierPayment
+);
 
 /** PATCH /api/purchases/:id/status — Cambiar estado (Maneja stock al RECIBIR) */
 router.patch('/:id/status', 

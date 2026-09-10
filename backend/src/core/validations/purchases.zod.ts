@@ -46,8 +46,19 @@ export const purchaseOrderFiltersSchema = paginationSchema.extend({
 });
 
 /**
+ * Esquema para registrar un pago a proveedor (CxP)
+ */
+export const supplierPaymentSchema = z.object({
+    amount: z.preprocess((val) => Number(val), z.number().positive('El monto del pago debe ser mayor a 0')),
+    method: z.enum(['cash', 'transfer', 'card', 'other']).optional().default('cash'),
+    reference: z.string().max(100, 'Referencia demasiado larga').optional().or(z.literal('')),
+    notes: z.string().max(255, 'Notas demasiado largas').optional().or(z.literal('')),
+});
+
+/**
  * Tipos inferidos
  */
 export type CreatePurchaseOrderInput = z.infer<typeof createPurchaseOrderSchema>;
 export type UpdatePurchaseOrderStatusInput = z.infer<typeof updatePurchaseOrderStatusSchema>;
 export type PurchaseOrderFiltersInput = z.infer<typeof purchaseOrderFiltersSchema>;
+export type SupplierPaymentInput = z.infer<typeof supplierPaymentSchema>;
