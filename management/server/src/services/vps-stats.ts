@@ -104,7 +104,7 @@ export function getVpsStats(): VpsStats {
     const stopped = Math.max(0, allContainers - running);
 
     // Uptime
-    const uptime = safeExec('uptime -p') || 'No disponible';
+    const uptime = safeExec('uptime -s') || safeExec('uptime') || 'No disponible';
 
     cache = {
         cpu: { cores, usagePercent },
