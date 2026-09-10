@@ -97,7 +97,6 @@ async function runAddClientScript(
         throw new Error(`add-client.sh fallo (exit ${err.status}):\n${err.stdout || ''}${err.stderr || ''}`);
     }
 }
-}
 
 // ── Docker helpers ───────────────────────────────────────────────────────────
 
