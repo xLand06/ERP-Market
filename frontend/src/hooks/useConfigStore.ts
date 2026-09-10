@@ -282,7 +282,10 @@ export const useConfigStore = create<ConfigState>()(
                     const currentTheme = get().activeTheme;
                     const res = await api.get('/settings');
                     if (res.data.success) {
-                        const themeToApply = currentTheme || res.data.data.activeTheme || 'emerald';
+                        // Priorizar tema del backend sobre el default 'emerald'
+                        const themeToApply = (currentTheme && currentTheme !== 'emerald')
+                            ? currentTheme
+                            : (res.data.data.activeTheme || 'emerald');
                         set({
                             ...res.data.data,
                             activeTheme: themeToApply,
