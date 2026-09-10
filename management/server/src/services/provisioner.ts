@@ -78,11 +78,9 @@ async function runAddClientScript(
     const { execSync } = await import('child_process');
 
     // add-client.sh: add-client.sh <slug> [domain] [admin-email] [admin-user] [admin-password]
-    const args = [slug];
-    if (domain) args.push(domain);
-    if (adminEmail) args.push(adminEmail);
-    args.push(adminUser || 'admin');
-    if (adminPassword) args.push(adminPassword);
+    // IMPORTANTE: siempre pasar los 5 args en orden (aunque sean vacíos),
+    // sino los argumentos se corren de posición y el script falla.
+    const args = [slug, domain || '', adminEmail || '', adminUser || 'admin', adminPassword || ''];
 
     const cmd = `BUILD_CONTEXT=/repo /repo/deploy/scripts/add-client.sh ${args.join(' ')}`;
     console.log(`[provisioner] Ejecutando: ${cmd}`);
@@ -337,11 +335,7 @@ export async function provisionWithLogs(
 ): Promise<ProvisionResult> {
     const { spawn } = await import('child_process');
 
-    const args = [slug];
-    if (domain) args.push(domain);
-    if (adminEmail) args.push(adminEmail);
-    args.push(adminUser || 'admin');
-    if (adminPassword) args.push(adminPassword);
+    const args = [slug, domain || '', adminEmail || '', adminUser || 'admin', adminPassword || ''];
     const scriptPath = `${DEPLOY_DIR}/scripts/add-client.sh`;
 
     sendLog(`Ejecutando add-client.sh para ${slug}...`);
