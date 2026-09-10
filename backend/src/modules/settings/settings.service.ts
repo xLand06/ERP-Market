@@ -11,6 +11,7 @@ export interface SystemSettings {
     autoCloseTime: string | null;
     purgeRetentionDays: number;
     purgeLogRetentionDays: number;
+    activeTheme: string;
 
     // Negocio & Datos Fiscales
     businessName: string;
@@ -47,6 +48,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
     autoCloseTime: null,
     purgeRetentionDays: 30,
     purgeLogRetentionDays: 90,
+    activeTheme: 'emerald',
 
     businessName: 'ABASTOS SOFIMAR',
     taxId: 'J-12345678-9',
