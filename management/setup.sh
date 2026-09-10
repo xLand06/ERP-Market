@@ -40,9 +40,9 @@ for i in $(seq 1 30); do
     sleep 2
 done
 
-# 5. Migrar DB
-docker exec mgmt-api npx prisma migrate deploy --schema prisma/schema.prisma
-echo "✅ Base de datos migrada"
+# 5. Migrar DB (db push crea tablas directamente, no necesita archivos de migración)
+docker exec mgmt-api ./node_modules/.bin/prisma db push --schema prisma/schema.prisma
+echo "✅ Base de datos sincronizada"
 
 # 6. Crear operador admin
 docker exec mgmt-api node -e "
