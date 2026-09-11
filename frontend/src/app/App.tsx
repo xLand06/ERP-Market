@@ -23,13 +23,22 @@ import ConnectScreen from '@/components/loading/ConnectScreen';
 import api from '@/lib/api';
 
 export default function App() {
-    const { fetchSettings, activeTheme } = useConfigStore();
+    const { fetchSettings, activeTheme, businessName } = useConfigStore();
     const [initialSyncDone, setInitialSyncDone] = useState(true); // Por defecto: pasar directo
     const [checking, setChecking] = useState(true);
 
     useEffect(() => {
         fetchSettings();
     }, [fetchSettings]);
+
+    // Título dinámico: ALLMARKET -- <nombre de la empresa del tenant>
+    useEffect(() => {
+        if (businessName) {
+            document.title = `ALLMARKET -- ${businessName}`;
+        } else {
+            document.title = 'ALLMARKET';
+        }
+    }, [businessName]);
 
     useEffect(() => {
         const theme = activeTheme || 'emerald';
