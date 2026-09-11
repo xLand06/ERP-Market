@@ -3,26 +3,37 @@ interface HealthBadgeProps {
     size?: 'sm' | 'md';
 }
 
+const PALETTES = {
+    ok: { color: '#059669', bg: '#ecfdf5', label: 'OK' },
+    down: { color: '#dc2626', bg: '#fef2f2', label: 'Down' },
+    nodata: { color: '#d97706', bg: '#fffbeb', label: 'No data' },
+};
+
 export default function HealthBadge({ healthy, size = 'md' }: HealthBadgeProps) {
-    const color = healthy === true ? '#059669' : healthy === false ? '#dc2626' : '#d97706';
-    const label = healthy === true ? 'OK' : healthy === false ? 'Down' : 'No data';
-    const dotSize = size === 'sm' ? 8 : 12;
+    const palette = healthy === true ? PALETTES.ok : healthy === false ? PALETTES.down : PALETTES.nodata;
+    const dotSize = size === 'sm' ? 6 : 8;
 
     return (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: size === 'sm' ? '2px 10px' : '3px 12px',
+            borderRadius: 999,
+            background: palette.bg,
+            color: palette.color,
+            fontSize: size === 'sm' ? '0.7rem' : '0.78rem',
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+        }}>
             <span style={{
                 width: dotSize,
                 height: dotSize,
                 borderRadius: '50%',
-                background: color,
-                display: 'inline-block',
+                background: palette.color,
+                flexShrink: 0,
             }} />
-            <span style={{
-                fontSize: size === 'sm' ? '0.75rem' : '0.85rem',
-                color: '#64748b',
-            }}>
-                {label}
-            </span>
+            {palette.label}
         </span>
     );
 }
