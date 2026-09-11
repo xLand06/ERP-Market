@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../../core/middlewares/auth.middleware';
 import { prisma } from '../../config/prisma';
+import { ciContains } from '../../core/utils/helpers';
 
 const router = Router();
 router.use(authMiddleware);
@@ -13,10 +14,10 @@ router.get('/', async (req: Request, res: Response) => {
         prisma.product.findMany({
             where: {
                 OR: [
-                    { name: { contains: q } },
-                    { barcode: { contains: q } },
-                    { barcodes: { some: { code: { contains: q } } } },
-                    { presentations: { some: { barcode: { contains: q } } } }
+                    { name: ciContains(q) },
+                    { barcode: ciContains(q) },
+                    { barcodes: { some: { code: ciContains(q) } } },
+                    { presentations: { some: { barcode: ciContains(q) } } }
                 ]
             },
             take: 15,
@@ -27,7 +28,7 @@ router.get('/', async (req: Request, res: Response) => {
             },
         }),
         prisma.group.findMany({
-            where: { name: { contains: q } },
+            where: { name: ciContains(q) },
             take: 5,
             include: { subGroups: true },
         }),

@@ -4,6 +4,7 @@ import { PaginationParams } from '../../core/types/api.types';
 import { ProductFiltersInput, CreateProductInput, UpdateProductInput } from '../../core/validations/products.zod';
 import type { ProductDTO } from '../../core/types/dto';
 import type { ApiListResponse } from '../../core/types/responses';
+import { ciContains } from '../../core/utils/helpers';
 
 interface ProductListParams extends PaginationParams {
     subGroupId?: string;
@@ -231,11 +232,11 @@ export const getAllProducts = async (filters: ProductListParams): Promise<ApiLis
         ...(isActive !== undefined && { isActive }),
         ...(search && {
             OR: [
-                { name: { contains: search } },
-                { barcode: { contains: search } },
-                { presentations: { some: { barcode: { contains: search } } } },
+                { name: ciContains(search) },
+                { barcode: ciContains(search) },
+                { presentations: { some: { barcode: ciContains(search) } } },
                 // Buscar también en los barcodes del modelo ProductBarcode
-                { barcodes: { some: { code: { contains: search } } } },
+                { barcodes: { some: { code: ciContains(search) } } },
             ],
         }),
     };
@@ -292,8 +293,23 @@ export const getProductById = async (id: string): Promise<ProductDTO | null> => 
 export const createProduct = async (data: CreateProductInput): Promise<ProductDTO> => {
     const { presentations, barcodes, minStock, branchId, kitComponents, ...productData } = data as any;
 
-    // Validar formato de códigos de barras según su label
-    validateBarcodes(barcodes);
+    // Normalizar a MAYÚSCULAS los datos de catálogo (nombre y códigos de barras).
+    // Solo datos de negocio — no nombres propios de proveedores/clientes.
+    productData.name = productData.name ? String(productData.name).toUpperCase() : productData.name;
+    if (productData.barcode !== undefined && productData.barcode !== null) {
+        productData.barcode = String(productData.barcode).toUpperCase();
+    }
+    const presentationsNorm = (presentations ?? []).map((p: any) => ({
+        ...p,
+        name: p.name ? String(p.name).toUpperCase() : p.name,
+    }));
+    const barcodesNorm = (barcodes ?? []).map((b: any) => ({
+        ...b,
+        code: b.code ? String(b.code).toUpperCase() : b.code,
+    }));
+
+    // Validar formato de códigos de barras según su label (ya normalizados)
+    validateBarcodes(barcodesNorm);
 
     // Normalizar subGroupId: si es string vacío, convertir a null
     const subGroupId = productData.subGroupId === '' ? null : productData.subGroupId;
@@ -306,10 +322,10 @@ export const createProduct = async (data: CreateProductInput): Promise<ProductDT
                 ...productData,
                 subGroupId,
                 presentations: {
-                    create: presentations ?? [],
+                    create: presentationsNorm,
                 },
                 barcodes: {
-                    create: (barcodes ?? []).map((b: any) => ({
+                    create: barcodesNorm.map((b: any) => ({
                         code: b.code,
                         label: b.label || null,
                     })),
@@ -372,8 +388,24 @@ export const createProduct = async (data: CreateProductInput): Promise<ProductDT
 export const updateProduct = async (id: string, data: UpdateProductInput): Promise<ProductDTO> => {
     const { presentations, barcodes, minStock, branchId, kitComponents, ...productData } = data as any;
 
-    // Validar formato de códigos de barras según su label
-    validateBarcodes(barcodes);
+    // Normalizar a MAYÚSCULAS los datos de catálogo provistos (nombre y códigos de barras)
+    if (productData.name !== undefined) {
+        productData.name = String(productData.name).toUpperCase();
+    }
+    if (productData.barcode !== undefined && productData.barcode !== null) {
+        productData.barcode = String(productData.barcode).toUpperCase();
+    }
+    const presentationsNorm = (presentations ?? []).map((p: any) => ({
+        ...p,
+        name: p.name ? String(p.name).toUpperCase() : p.name,
+    }));
+    const barcodesNorm = (barcodes ?? []).map((b: any) => ({
+        ...b,
+        code: b.code ? String(b.code).toUpperCase() : b.code,
+    }));
+
+    // Validar formato de códigos de barras según su label (ya normalizados)
+    validateBarcodes(barcodesNorm);
 
     // Kits: validar ANTES de mutar (self, duplicados, existencia, circularidad)
     if (kitComponents !== undefined) {
@@ -400,12 +432,12 @@ export const updateProduct = async (id: string, data: UpdateProductInput): Promi
             subGroupId,
             ...(presentations !== undefined && {
                 presentations: {
-                    create: presentations,
+                    create: presentationsNorm,
                 },
             }),
             ...(barcodes !== undefined && {
                 barcodes: {
-                    create: barcodes.map((b: any) => ({
+                    create: barcodesNorm.map((b: any) => ({
                         code: b.code,
                         label: b.label || null,
                     })),

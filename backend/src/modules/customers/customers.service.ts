@@ -4,6 +4,7 @@
 // =============================================================================
 
 import { prisma } from '../../config/prisma';
+import { ciContains } from '../../core/utils/helpers';
 import { TransactionType, TransactionStatus } from '@prisma/client';
 
 interface CreateCustomerInput {
@@ -54,13 +55,13 @@ export const listCustomers = async (filters?: {
 }) => {
     const where: any = {};
 
-    if (filters?.name) where.name = { contains: filters.name };
-    if (filters?.cedula) where.cedula = { contains: filters.cedula };
+    if (filters?.name) where.name = ciContains(filters.name);
+    if (filters?.cedula) where.cedula = ciContains(filters.cedula);
     if (filters?.isActive !== undefined) where.isActive = filters.isActive;
     if (filters?.search) {
         where.OR = [
-            { name: { contains: filters.search } },
-            { cedula: { contains: filters.search } },
+            { name: ciContains(filters.search) },
+            { cedula: ciContains(filters.search) },
         ];
     }
 

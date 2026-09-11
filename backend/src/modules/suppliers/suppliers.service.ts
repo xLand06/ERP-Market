@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma';
+import { ciContains } from '../../core/utils/helpers';
 import { Supplier, PurchaseOrder } from '@prisma/client';
 
 interface CreateSupplierInput {
@@ -26,9 +27,9 @@ export const getAllSuppliers = async (filters?: { isActive?: boolean; search?: s
     }
     if (filters?.search) {
         where.OR = [
-            { name: { contains: filters.search } },
-            { email: { contains: filters.search } },
-            { rut: { contains: filters.search } },
+            { name: ciContains(filters.search) },
+            { email: ciContains(filters.search) },
+            { rut: ciContains(filters.search) },
         ];
     }
 

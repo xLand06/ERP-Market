@@ -1,3 +1,16 @@
+import { DEPLOY_MODE } from '../../config/env';
+
+/**
+ * Filtro `contains` con búsqueda case-insensitive.
+ * - PostgreSQL (server): `contains` es case-sensitive → requiere mode:'insensitive'.
+ * - SQLite (desktop/mobile): NO soporta `mode` (lanzaría PrismaClientValidationError,
+ *   verificado empíricamente) y su `contains` ya es case-insensitive para ASCII → se omite.
+ */
+export const ciContains = (value: string) =>
+    DEPLOY_MODE === 'server'
+        ? { contains: value, mode: 'insensitive' as const }
+        : { contains: value };
+
 /** Formats a price number to a localized currency string. */
 export const formatCurrency = (amount: number, currency: 'USD' | 'VES' = 'USD'): string =>
     new Intl.NumberFormat('es-VE', { style: 'currency', currency }).format(amount);
