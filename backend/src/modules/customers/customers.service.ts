@@ -106,7 +106,7 @@ export const getCustomerById = async (id: string) => {
  * Crear un nuevo cliente
  */
 export const createCustomer = async (data: CreateCustomerInput) => {
-    return prisma.customer.create({
+    const customer = await prisma.customer.create({
         data: {
             name: data.name,
             cedula: data.cedula || null,
@@ -116,6 +116,7 @@ export const createCustomer = async (data: CreateCustomerInput) => {
             creditLimit: data.creditLimit ?? null,
         },
     });
+    return normalizeCustomer(customer);
 };
 
 /**
@@ -123,7 +124,7 @@ export const createCustomer = async (data: CreateCustomerInput) => {
  */
 export const updateCustomer = async (id: string, data: UpdateCustomerInput) => {
     const { name, cedula, phone, email, address, creditLimit, isActive } = data;
-    return prisma.customer.update({
+    const customer = await prisma.customer.update({
         where: { id },
         data: {
             ...(name !== undefined && { name }),
@@ -135,6 +136,7 @@ export const updateCustomer = async (id: string, data: UpdateCustomerInput) => {
             ...(isActive !== undefined && { isActive }),
         },
     });
+    return normalizeCustomer(customer);
 };
 
 /**
