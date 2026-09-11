@@ -51,6 +51,13 @@ export default function App() {
                 return;
             }
 
+            // Thin client: no hay sync local, se conecta directo al servidor remoto
+            if ((window as any).erpApi?.serverUrl) {
+                setChecking(false);
+                setInitialSyncDone(true);
+                return;
+            }
+
             try {
                 const stored = await (window as any).erpApi.store.get('initialSyncDone');
 

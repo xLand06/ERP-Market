@@ -7,15 +7,48 @@ import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { useAuthStore } from '../features/auth/store/authStore';
 import toast from 'react-hot-toast';
 
-const baseURL = import.meta.env.VITE_API_URL || 
-    (window.location.protocol === 'file:' || (window as any).erpApi?.isElectron
-        ? 'http://127.0.0.1:3001/api' 
-        : '/api');
+/**
+ * Resuelve la base del API de forma síncrona.
+ *
+ * - Web (navegador): relativa a `/api` del mismo origen (sin cambios).
+ * - Electron modo thin client: usa `serverUrl` (valor inicial expuesto por
+ *   preload desde `--server-url=` de additionalArguments) → `${serverUrl}/api`.
+ *   Un cambio de tenant por deep link recrea la ventana en el main, así que el
+ *   preload se re-ejecuta con el nuevo valor y este getter lo lee ya actualizado.
+ * - Electron offline (fallback): backend embebido local en 127.0.0.1:3001.
+ */
+function getElectronBase(): string {
+    const erpApi = (window as any).erpApi;
+    // serverUrl: valor inicial inyectado por el main al crear la ventana
+    const server = erpApi?.serverUrl as string | undefined;
+    if (server) return `${server.replace(/\/+$/, '')}/api`;
+    return 'http://127.0.0.1:3001/api';
+}
 
+const isElectron = window.location.protocol === 'file:' || (window as any).erpApi?.isElectron;
+
+// VITE_API_URL anula todo si está definida (builds web con API externa)
+const envBaseURL = import.meta.env.VITE_API_URL as string | undefined;
+
+// La instancia NO define baseURL en la creación: se resuelve por request en el
+// interceptor, permitiendo modo web (relativo), offline (3001) y thin client
+// (serverUrl remoto) con la misma instancia.
 export const api = axios.create({
-    baseURL,
     timeout: 10000,
     headers: { 'Content-Type': 'application/json' },
+});
+
+// Prefijo dinámico de la base URL — preserva el comportamiento web (relativo /api).
+api.interceptors.request.use((config) => {
+    const base = envBaseURL
+        ? envBaseURL.replace(/\/+$/, '')
+        : isElectron
+            ? getElectronBase()
+            : '/api';
+    if (config.url && !/^https?:\/\//.test(config.url)) {
+        config.url = base + config.url;
+    }
+    return config;
 });
 
 const MAX_RETRIES = 2;
