@@ -17,6 +17,7 @@ const store = new Store<{
     token: string | null;
     branchId: string | null;
     schemaVersion: string | undefined;
+    serverUrl: string | null;
     windowState: {
         x: number;
         y: number;
@@ -25,7 +26,7 @@ const store = new Store<{
         isMaximized: boolean;
     } | null;
 }>({
-    defaults: { token: null, branchId: null, schemaVersion: undefined, windowState: null },
+    defaults: { token: null, branchId: null, schemaVersion: undefined, serverUrl: null, windowState: null },
 });
 
 (global as Record<string, unknown>).erpStore = store;
@@ -38,6 +39,48 @@ ipcMain.handle('store-set', (_event, key: string, value: any) => store.set(key, 
 ipcMain.handle('store-delete', (_event, key: string) => store.delete(key));
 ipcMain.handle('get-app-path', () => app.getAppPath());
 ipcMain.handle('get-user-data-path', () => app.getPath('userData'));
+
+// ── Server URL (modo thin client) ────────────────────────────────────────────
+ipcMain.handle('get-server-url', () => store.get('serverUrl') || null);
+ipcMain.handle('set-server-url', (_event, url: string) => store.set('serverUrl', url || null));
+
+/**
+ * Procesa un deep link `allmarket://connect?server=<URL>`.
+ * Guarda la URL del servidor en el store. Si la app ya está corriendo, recrea
+ * la ventana para que el nuevo serverUrl (inyectado via additionalArguments)
+ * tome efecto; en primer arranque solo persiste el valor y `whenReady` levanta
+ * la ventana con el serverUrl ya configurado (thin client).
+ */
+function handleConnectUrl(url: string): void {
+    try {
+        const parsed = new URL(url);
+        const server = parsed.searchParams.get('server');
+        if (server) {
+            store.set('serverUrl', server);
+            console.log(`[Electron] Deep link recibido — server configurado: ${server}`);
+            // La URL del servidor solo se aplica al renderer via additionalArguments,
+            // que se fijan al CREAR la ventana. Para que el cambio surta efecto hay
+            // que recrear la ventana con el nuevo serverUrl.
+            if (app.isReady() && mainWindow) {
+                mainWindow.destroy();
+                const win = createWindow();
+                createMenu();
+                win.show();
+                win.focus();
+            }
+        } else {
+            console.warn(`[Electron] Deep link sin parámetro 'server': ${url}`);
+        }
+    } catch (err) {
+        console.error('[Electron] Deep link inválido:', url, err);
+    }
+}
+
+// Deep link en primer arranque (Windows/Linux pasan la URL en process.argv)
+const startupDeepLink = process.argv.find((a) => a.startsWith('allmarket://'));
+if (startupDeepLink) {
+    handleConnectUrl(startupDeepLink);
+}
 
 
 // =============================================================================
@@ -249,7 +292,7 @@ function createMenu(): void {
 // =============================================================================
 let mainWindow: BrowserWindow | null = null;
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
     const windowState = getWindowState();
 
     mainWindow = new BrowserWindow({
@@ -268,6 +311,11 @@ function createWindow(): void {
             contextIsolation: true,
             nodeIntegration: false,
             sandbox: false,
+            // Inyecta la URL del servidor (thin client) de forma síncrona al renderer.
+            // `additionalArguments` solo se aplica al crear la ventana, por eso aquí
+            // se pasa el valor leído en el arranque; los cambios posteriores por deep
+            // link se propagan vía IPC `server-url-changed`.
+            additionalArguments: [`--server-url=${encodeURIComponent(serverUrl || '')}`],
         },
     });
 
@@ -308,11 +356,41 @@ function createWindow(): void {
     } else {
         mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
     }
+
+    return mainWindow;
 }
 
 // =============================================================================
 // APP LIFECYCLE
 // =============================================================================
+
+// ── Modo thin client: si hay serverUrl configurado, no se levanta el backend
+// local ni se restaura el schema SQLite (no se usa).
+const serverUrl = store.get('serverUrl') || null;
+
+// ── Single instance + deep link (Windows) ────────────────────────────────────
+// El cliente conecta con `allmarket://connect?server=<URL>`. Con lock de
+// instancia única, un segundo lanzamiento con deep link llega a esta instancia
+// via el evento 'second-instance' en vez de abrir una segunda app.
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+    app.quit();
+} else {
+    app.on('second-instance', (_event, argv) => {
+        const url = argv.find((a) => a.startsWith('allmarket://'));
+        if (url) handleConnectUrl(url);
+        if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+        }
+    });
+
+    // Registrar protocolo propio (solo empaquetado; en dev puede faltar el registro)
+    if (app.isPackaged) {
+        app.setAsDefaultProtocolClient('allmarket');
+    }
+}
+
 app.whenReady().then(async () => {
     const userDataPath = app.getPath('userData');
 
@@ -320,54 +398,62 @@ app.whenReady().then(async () => {
         mkdirSync(userDataPath, { recursive: true });
     }
 
-    // Configurar la URL de la base de datos local (SQLite vía Prisma en el backend)
-    const dbFileName = 'erp-market.db';
-    const fullDbPath = join(userDataPath, dbFileName).replace(/\\/g, '/');
-
-    // ── Gestión del schema local ──────────────────────────────────────────────
-    // La DB empaquetada solo tiene el schema (tablas vacías).
-    // Los datos iniciales se descargan desde Supabase en el primer inicio.
-    const SCHEMA_VERSION = '3';
-    const storedSchemaVersion = store.get('schemaVersion') as string | undefined;
-
-    const bundledDbPath = is.dev
-        ? join(app.getAppPath(), '../backend', dbFileName)
-        : join(process.resourcesPath, 'seed', dbFileName);
-
-    const needsSchemaRestore = (): boolean => {
-        if (!existsSync(fullDbPath)) return true;
-
-        const dbSize = require('fs').statSync(fullDbPath).size;
-        if (dbSize < 8192) return true;
-        // Si no hay schemaVersion guardado (primera vez/actualización)
-        // O es una versión distinta → restaurar schema fresco
-        if (!storedSchemaVersion || storedSchemaVersion !== SCHEMA_VERSION) return true;
-
-        return false;
-    };
-
-    if (needsSchemaRestore()) {
-        if (existsSync(bundledDbPath)) {
-            const fs = require('fs');
-            if (existsSync(fullDbPath)) fs.unlinkSync(fullDbPath);
-            fs.copyFileSync(bundledDbPath, fullDbPath);
-            store.set('schemaVersion', SCHEMA_VERSION);
-            console.log(`[Electron] Schema copiado a ${fullDbPath}`);
-        } else {
-            console.warn(`[Electron] Schema DB no encontrada en ${bundledDbPath}`);
-        }
+    if (serverUrl) {
+        // ── MODO THIN CLIENT ──────────────────────────────────────────────
+        // Un solo EXE sirve a todos los tenants. No se levanta el backend local
+        // ni se toca la DB SQLite: todo el tráfico va al servidor remoto.
+        console.log(`[Electron] Thin client mode — server: ${serverUrl}`);
     } else {
-        console.log(`[Electron] DB local encontrada en ${fullDbPath}`);
+        // ── MODO OFFLINE (fallback) ───────────────────────────────────────
+        // Configurar la URL de la base de datos local (SQLite vía Prisma en el backend)
+        const dbFileName = 'erp-market.db';
+        const fullDbPath = join(userDataPath, dbFileName).replace(/\\/g, '/');
+
+        // ── Gestión del schema local ──────────────────────────────────────────────
+        // La DB empaquetada solo tiene el schema (tablas vacías).
+        // Los datos iniciales se descargan desde Supabase en el primer inicio.
+        const SCHEMA_VERSION = '3';
+        const storedSchemaVersion = store.get('schemaVersion') as string | undefined;
+
+        const bundledDbPath = is.dev
+            ? join(app.getAppPath(), '../backend', dbFileName)
+            : join(process.resourcesPath, 'seed', dbFileName);
+
+        const needsSchemaRestore = (): boolean => {
+            if (!existsSync(fullDbPath)) return true;
+
+            const dbSize = require('fs').statSync(fullDbPath).size;
+            if (dbSize < 8192) return true;
+            // Si no hay schemaVersion guardado (primera vez/actualización)
+            // O es una versión distinta → restaurar schema fresco
+            if (!storedSchemaVersion || storedSchemaVersion !== SCHEMA_VERSION) return true;
+
+            return false;
+        };
+
+        if (needsSchemaRestore()) {
+            if (existsSync(bundledDbPath)) {
+                const fs = require('fs');
+                if (existsSync(fullDbPath)) fs.unlinkSync(fullDbPath);
+                fs.copyFileSync(bundledDbPath, fullDbPath);
+                store.set('schemaVersion', SCHEMA_VERSION);
+                console.log(`[Electron] Schema copiado a ${fullDbPath}`);
+            } else {
+                console.warn(`[Electron] Schema DB no encontrada en ${bundledDbPath}`);
+            }
+        } else {
+            console.log(`[Electron] DB local encontrada en ${fullDbPath}`);
+        }
+
+        process.env.LOCAL_DATABASE_URL = `file:${fullDbPath}`;
+
+        console.log(`[Electron] SQLite DB: ${fullDbPath}`);
+        console.log(`[Electron] Iniciando backend Express en puerto 3001...`);
+
+        // Levantar el backend Express embebido (puerto 3001)
+        // Toda la lógica de negocio, base de datos y sincronización vive ahí.
+        await startExpressServer();
     }
-
-    process.env.LOCAL_DATABASE_URL = `file:${fullDbPath}`;
-
-    console.log(`[Electron] SQLite DB: ${fullDbPath}`);
-    console.log(`[Electron] Iniciando backend Express en puerto 3001...`);
-
-    // Levantar el backend Express embebido (puerto 3001)
-    // Toda la lógica de negocio, base de datos y sincronización vive ahí.
-    await startExpressServer();
 
     createWindow();
     createMenu();
@@ -388,5 +474,8 @@ app.on('window-all-closed', () => {
 app.on('before-quit', async () => {
     (app as any).isQuitting = true;
     saveWindowState();
-    await stopExpressServer();
+    // Solo detener el backend si se levantó (modo offline)
+    if (!serverUrl) {
+        await stopExpressServer();
+    }
 });

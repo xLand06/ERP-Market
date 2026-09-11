@@ -15,12 +15,29 @@ import { electronAPI } from '@electron-toolkit/preload';
 // API nativa de electron-toolkit (versión segura de ipcRenderer)
 contextBridge.exposeInMainWorld('electron', electronAPI);
 
+// ── Server URL inicial (modo thin client) ────────────────────────────────────
+// El main inyecta el valor al crear la ventana via additionalArguments
+// (--server-url=). Aquí en el preload hay acceso a process.argv, así se
+// inicializa de forma síncrona sin depender de un IPC async.
+// Un cambio de tenant por deep link recrea la ventana en el main → el preload
+// se re-ejecuta y este valor queda actualizado para el nuevo renderer.
+const serverArg = (process.argv.find((a) => a.startsWith('--server-url=')) || '')
+    .split('=').slice(1).join('='); // tolera '=' dentro de la URL
+const initialServerUrl = serverArg ? decodeURIComponent(serverArg) : null;
+
 // API personalizada de ERP-Market
 contextBridge.exposeInMainWorld('erpApi', {
     // ── Info del entorno ──────────────────────────────────────
     isElectron: true,
     platform: process.platform,
     version: process.env.npm_package_version ?? '1.0.0',
+
+    // ── Server URL (modo thin client) ─────────────────────────
+    // Valor inicial (frozen por contextBridge) leído de forma síncrona por api.ts
+    // para resolver la baseURL. Se renueva al recrear la ventana (deep link).
+    serverUrl: initialServerUrl as string | null,
+    getServerUrl: (): Promise<string | null> => ipcRenderer.invoke('get-server-url'),
+    setServerUrl: (url: string): Promise<void> => ipcRenderer.invoke('set-server-url', url),
 
     // ── Store persistente (Electron Store) ─────────────────────
     // Solo para token JWT y branchId de configuración

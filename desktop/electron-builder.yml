@@ -2,6 +2,11 @@ appId: com.sofimar.erp-market
 productName: ALLMARKET -- AbastosSofimar
 copyright: Copyright © 2025 Abastos Sofimar
 
+protocols:
+  - name: ALLMARKET
+    schemes:
+      - allmarket
+
 directories:
   output: dist
   buildResources: resources
