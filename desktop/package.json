@@ -1,6 +1,9 @@
 {
     "name": "erp-market-desktop",
     "version": "1.0.0",
+    "description": "ALL MARKET — sistema de gestión para bodegas y supermercados (thin client)",
+    "author": "ALLCODE",
+    "homepage": "https://github.com/xLand06/ERP-Market",
     "private": true,
     "main": "out/main/index.js",
     "scripts": {
