@@ -6,7 +6,7 @@
 import { prisma } from '../../config/prisma';
 import { DEPLOY_MODE } from '../../config/env';
 import { Prisma } from '@prisma/client';
-import { parseDateRange } from '../../core/utils/helpers';
+import { parseDateRange, ciContains } from '../../core/utils/helpers';
 import { generarDescripcion, extraerPosicionConsolidada } from './audit.language';
 
 /**
@@ -44,7 +44,7 @@ export const getAuditLogs = async (filters: {
     const logs = await (prisma as any).auditLog.findMany({
         where: {
             ...(userId && { userId }),
-            ...(action && { action: { contains: action } }),
+            ...(action && { action: ciContains(action) }),
             ...(module && { module }),
             ...(from || to
                 ? (() => {

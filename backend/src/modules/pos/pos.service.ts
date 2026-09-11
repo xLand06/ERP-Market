@@ -1,6 +1,6 @@
 import { prisma } from '../../config/prisma';
 import { TransactionType, TransactionStatus } from '@prisma/client';
-import { parseDateRange } from '../../core/utils/helpers';
+import { parseDateRange, ciContains } from '../../core/utils/helpers';
 import { validateCreditLimit } from '../customers/customers.service';
 
 export interface TransactionItemInput {
@@ -399,8 +399,9 @@ export const getTransactions = (filters: {
                 : {}),
             ...(search ? {
                 OR: [
-                    { id: { contains: search } },
-                    { invoiceNumber: { contains: search } }
+                    // id (cuid) es case-sensitive pero inofensivo; invoiceNumber sí importa
+                    { id: ciContains(search) },
+                    { invoiceNumber: ciContains(search) }
                 ]
             } : {}),
         },

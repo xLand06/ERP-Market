@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { PackagePlus, Plus, Trash2, ChevronDown, AlertCircle, Loader2, ReceiptText, Tag, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { PackagePlus, Plus, Trash2, ChevronDown, AlertCircle, Loader2, ReceiptText, Tag, RefreshCw, Barcode } from 'lucide-react';
 import {
     Dialog, DialogContent, DialogHeader,
     DialogTitle, DialogDescription, DialogFooter,
@@ -69,6 +69,18 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
     const [catalogResults, setCatalogResults] = useState<any[]>([]);
     const [isSearching, setIsSearching]     = useState(false);
 
+    // ── Escáner de código de barras (input dedicado) ─────────────────────────
+    const [scanCode, setScanCode] = useState('');
+    const scanInputRef = useRef<HTMLInputElement>(null);
+
+    // Auto-foco en el input de escaneo al abrir el modal
+    useEffect(() => {
+        if (open) {
+            const t = setTimeout(() => scanInputRef.current?.focus(), 50);
+            return () => clearTimeout(t);
+        }
+    }, [open]);
+
     useEffect(() => {
         if (currency === 'COP') setCustomRate('1');
         else if (currency === 'USD') setCustomRate(String(defaultUSDRate));
@@ -83,6 +95,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
             setInvoiceNumber('');
             setNotes('');
             setProductSearch('');
+            setScanCode('');
             setCurrency('COP');
             return;
         }
@@ -150,6 +163,41 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
         }
         setProductSearch('');
         setSearchFocused(false);
+    };
+
+    /**
+     * Busca un producto por código de barras escaneado.
+     * El scanner actúa como teclado: escribe rápido + Enter → keydown natural.
+     * Se usa /search (contains, ahora case-insensitive) y se matchea el código exacto
+     * contra barcode principal, barcodes[] y presentations[].barcode.
+     */
+    const handleScanSubmit = async () => {
+        const code = scanCode.trim().toUpperCase();
+        if (!code) return;
+        setIsSearching(true);
+        try {
+            const res = await api.get('/search', { params: { q: code } });
+            const products = res.data.products || [];
+            const found = products.find((p: any) =>
+                (p.barcode || '').toUpperCase() === code ||
+                (p.barcodes || []).some((b: any) => (b.code || '').toUpperCase() === code) ||
+                (p.presentations || []).some((pr: any) => (pr.barcode || '').toUpperCase() === code)
+            );
+            if (found) {
+                addProduct(found);
+                setScanCode('');
+                scanInputRef.current?.focus();
+            } else {
+                toast.error(`Código no encontrado: ${code}`);
+                setScanCode('');
+                scanInputRef.current?.focus();
+            }
+        } catch {
+            toast.error('Error al buscar el código escaneado');
+            setScanCode('');
+        } finally {
+            setIsSearching(false);
+        }
     };
 
     const updateItem = (idx: number, changes: Partial<StockEntryItem>) => {
@@ -269,6 +317,35 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                                 </div>
                             </div>
                         )}
+                    </div>
+
+                    {/* Barcode scanner */}
+                    <div>
+                        <label className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 block">
+                            Escanear código
+                        </label>
+                        <div className="relative">
+                            <div className="flex gap-2 items-center border border-indigo-200 rounded-xl bg-indigo-50/40 px-3 py-2 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/10">
+                                <Barcode className="w-4 h-4 text-indigo-500 shrink-0" />
+                                <input
+                                    ref={scanInputRef}
+                                    type="text"
+                                    autoFocus
+                                    autoComplete="off"
+                                    placeholder="Escaneá o escribí el código y presioná Enter..."
+                                    value={scanCode}
+                                    onChange={e => setScanCode(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleScanSubmit();
+                                        }
+                                    }}
+                                    className="flex-1 text-sm outline-none bg-transparent uppercase tracking-wide"
+                                />
+                                {isSearching && <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />}
+                            </div>
+                        </div>
                     </div>
 
                     {/* Product search */}
@@ -409,7 +486,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                                                         type="text"
                                                         placeholder="ej. LOTE-2026-001"
                                                         value={item.batchCode || ''}
-                                                        onChange={e => updateItem(idx, { batchCode: e.target.value })}
+                                                        onChange={e => updateItem(idx, { batchCode: e.target.value.toUpperCase() })}
                                                         className="w-full h-8 border border-amber-200 rounded-lg pl-2 pr-8 text-sm bg-white outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-200"
                                                     />
                                                     <button 

@@ -47,7 +47,7 @@ export const getGroupById = async (id: string) => {
  */
 export const createGroup = async (data: CreateGroupInput) => {
     return prisma.group.create({
-        data,
+        data: { ...data, name: String(data.name).toUpperCase() },
     });
 };
 
@@ -57,7 +57,11 @@ export const createGroup = async (data: CreateGroupInput) => {
 export const updateGroup = async (id: string, data: UpdateGroupInput) => {
     return prisma.group.update({
         where: { id },
-        data,
+        data: {
+            ...data,
+            // Normalizar a MAYÚSCULAS solo si se provee el nombre
+            ...(data.name !== undefined && { name: String(data.name).toUpperCase() }),
+        },
     });
 };
 
@@ -123,7 +127,7 @@ export const getSubGroupById = async (id: string) => {
  */
 export const createSubGroup = async (data: CreateSubGroupInput) => {
     return prisma.subGroup.create({
-        data,
+        data: { ...data, name: String(data.name).toUpperCase() },
     });
 };
 
@@ -133,7 +137,11 @@ export const createSubGroup = async (data: CreateSubGroupInput) => {
 export const updateSubGroup = async (id: string, data: UpdateSubGroupInput) => {
     return prisma.subGroup.update({
         where: { id },
-        data,
+        data: {
+            ...data,
+            // Normalizar a MAYÚSCULAS solo si se provee el nombre
+            ...(data.name !== undefined && { name: String(data.name).toUpperCase() }),
+        },
     });
 };
 

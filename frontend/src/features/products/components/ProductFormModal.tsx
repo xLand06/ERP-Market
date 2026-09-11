@@ -447,7 +447,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                     ref={initialFocusRef}
                                     type="text"
                                     value={name}
-                                    onChange={(e) => setName(e.target.value)}
+                                    onChange={(e) => setName(e.target.value.toUpperCase())}
                                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm transition-all"
                                     required
                                     placeholder="Ej: Coca-Cola 350ml"
@@ -636,7 +636,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                     <input
                                                         type="text"
                                                         value={b.code}
-                                                        onChange={(e) => updateBarcode(idx, 'code', e.target.value)}
+                                                        onChange={(e) => updateBarcode(idx, 'code', e.target.value.toUpperCase())}
                                                         className={`w-full px-3 py-2 border rounded-lg text-sm font-mono outline-none focus:ring-1 transition-colors ${inputBorder}`}
                                                         placeholder={getBarcodePlaceholder(labelVal)}
                                                     />
@@ -737,7 +737,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                     <input
                                                         type="text"
                                                         value={p.name}
-                                                        onChange={(e) => updatePresentation(idx, 'name', e.target.value)}
+                                                        onChange={(e) => updatePresentation(idx, 'name', e.target.value.toUpperCase())}
                                                         className="w-full px-3 py-1.5 border border-slate-100 rounded-lg text-xs outline-none focus:border-indigo-300"
                                                         placeholder="Ej: Caja x24"
                                                         required
@@ -760,7 +760,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                     <input
                                                         type="text"
                                                         value={p.barcode || ''}
-                                                        onChange={(e) => updatePresentation(idx, 'barcode', e.target.value)}
+                                                        onChange={(e) => updatePresentation(idx, 'barcode', e.target.value.toUpperCase())}
                                                         className="w-full px-3 py-1.5 border border-slate-100 rounded-lg text-xs outline-none focus:border-indigo-300 font-mono"
                                                         placeholder="Código de barras"
                                                     />

@@ -4,6 +4,7 @@
 // =============================================================================
 
 import { prisma } from '../../config/prisma';
+import { ciContains } from '../../core/utils/helpers';
 import bcrypt from 'bcryptjs';
 import { RegisterInput, UpdateUserInput } from '../../core/validations/auth.zod';
 
@@ -20,9 +21,9 @@ export const getAllUsers = (filters: {
             ...(isActive !== undefined && { isActive: isActive === 'true' }),
             ...(search && {
                 OR: [
-                    { nombre: { contains: search } },
-                    { username: { contains: search } },
-                    { email: { contains: search } },
+                    { nombre: ciContains(search) },
+                    { username: ciContains(search) },
+                    { email: ciContains(search) },
                 ]
             })
         },
