@@ -28,6 +28,10 @@ for CLIENT_DIR in "$CLIENTS_DIR"/*/; do
     [[ -f "$CLIENT_DIR/docker-compose.yml" ]] || continue
 
     echo "▶ Actualizando tenant: $SLUG"
+    # Normalizar build context: el management server puede haber dejado
+    # 'context: /repo' (path del contenedor) horneado en el compose.
+    # Desde el host, el repo está en /opt/erp-market.
+    sed -i "s|context: /repo|context: /opt/erp-market|g" "$CLIENT_DIR/docker-compose.yml"
     docker compose -f "$CLIENT_DIR/docker-compose.yml" up -d --build api 2>&1 | sed 's/^/  /'
     COUNT=$((COUNT + 1))
 done
