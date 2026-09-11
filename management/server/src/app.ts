@@ -64,6 +64,19 @@ app.get('/api/vps/stats', authMiddleware, (_req, res) => {
 const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
 app.use(express.static(frontendDist));
 
+// ── Descargas de installers (EXE / AppImage) ────────────────────────────────
+// Sirve /repo/deploy/downloads (montado desde el host). Los installers son
+// compartidos (UN solo EXE/AppImage para todos los tenants).
+const downloadsDir = process.env.DEPLOY_DIR
+    ? path.join(process.env.DEPLOY_DIR, 'downloads')
+    : '/repo/deploy/downloads';
+app.use('/downloads', express.static(downloadsDir, {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.exe')) res.setHeader('Content-Type', 'application/x-msdownload');
+        if (filePath.endsWith('.AppImage')) res.setHeader('Content-Type', 'application/octet-stream');
+    },
+}));
+
 // SPA fallback — rutas no-API sirven index.html
 app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/')) {

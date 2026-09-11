@@ -8,9 +8,9 @@ import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
 // ── Descargas de escritorio ────────────────────────────────────────────────
-// Una vez publicados los installers en GitHub Releases, actualizá estas URLs.
-const DESKTOP_WINDOWS_URL = 'https://github.com/xLand06/ERP-Market/releases/latest';
-const DESKTOP_LINUX_URL = 'https://github.com/xLand06/ERP-Market/releases/latest';
+// Se sirven desde el management server del VPS (repo privado, no GitHub).
+const DESKTOP_WINDOWS_URL = 'https://mgmt.89.167.46.144.sslip.io/downloads/ALL-MARKET-Setup-Windows.exe';
+const DESKTOP_LINUX_URL = 'https://mgmt.89.167.46.144.sslip.io/downloads/ALL-MARKET-Linux.AppImage';
 
 export default function LoginPage() {
     const [showPw, setShowPw] = useState(false);
