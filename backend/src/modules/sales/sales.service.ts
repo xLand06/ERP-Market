@@ -1,6 +1,23 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 
+/**
+ * Normaliza campos Decimal de una venta (Prisma los serializa como string en JSON).
+ * Sin esto, el frontend rompe al llamar .toFixed() sobre un string.
+ */
+const normalizeSale = (t: any) => ({
+    ...t,
+    total: Number(t.total),
+    exchangeRate: t.exchangeRate != null ? Number(t.exchangeRate) : null,
+    items: (t.items || []).map((i: any) => ({
+        ...i,
+        quantity: Number(i.quantity),
+        unitPrice: Number(i.unitPrice),
+        subtotal: Number(i.subtotal),
+        multiplierUsed: Number(i.multiplierUsed),
+    })),
+});
+
 interface SalePayload {
     userId: string;
     branchId: string;
@@ -63,7 +80,7 @@ interface GetSalesFilters {
 }
 
 export const getSales = async (filters: GetSalesFilters) => {
-    return prisma.transaction.findMany({
+    const sales = await prisma.transaction.findMany({
         where: {
             type: filters.type || 'SALE',
             userId: filters.userId,
@@ -81,10 +98,11 @@ export const getSales = async (filters: GetSalesFilters) => {
         },
         orderBy: { createdAt: 'desc' },
     });
+    return sales.map(normalizeSale);
 };
 
 export const getSaleById = async (id: string) => {
-    return prisma.transaction.findUnique({
+    const sale = await prisma.transaction.findUnique({
         where: { id },
         include: {
             items: { include: { product: true } },
@@ -93,6 +111,7 @@ export const getSaleById = async (id: string) => {
             cashRegister: true,
         },
     });
+    return sale ? normalizeSale(sale) : null;
 };
 
 export const voidSale = async (id: string, reason: string) => {

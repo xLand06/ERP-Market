@@ -1,6 +1,22 @@
 import { prisma } from '../../config/prisma';
 import { parseDateRange } from '../../core/utils/helpers';
 
+/**
+ * Normaliza campos Decimal de una caja (Prisma los serializa como string en JSON).
+ * Sin esto, el frontend rompe al llamar .toFixed() sobre un string.
+ */
+const normalizeRegister = (r: any) => ({
+    ...r,
+    openingAmount: Number(r.openingAmount),
+    closingAmount: r.closingAmount != null ? Number(r.closingAmount) : null,
+    expectedAmount: r.expectedAmount != null ? Number(r.expectedAmount) : null,
+    difference: r.difference != null ? Number(r.difference) : null,
+    transactions: (r.transactions || []).map((t: any) => ({
+        ...t,
+        total: Number(t.total),
+    })),
+});
+
 export const openCashRegister = async (data: {
     branchId: string;
     userId: string;
@@ -68,18 +84,20 @@ export const closeCashRegister = async (
 };
 
 export const getCurrentOpenRegister = (branchId: string) =>
-    prisma.cashRegister.findFirst({
-        where: { branchId, status: 'OPEN' },
-        include: {
-            user: { select: { id: true, nombre: true, username: true } },
-            branch: { select: { id: true, name: true } },
-            _count: { select: { transactions: true } },
-            transactions: {
-                where: { status: 'COMPLETED' },
-                orderBy: { createdAt: 'desc' }
-            }
-        },
-    });
+    prisma.cashRegister
+        .findFirst({
+            where: { branchId, status: 'OPEN' },
+            include: {
+                user: { select: { id: true, nombre: true, username: true } },
+                branch: { select: { id: true, name: true } },
+                _count: { select: { transactions: true } },
+                transactions: {
+                    where: { status: 'COMPLETED' },
+                    orderBy: { createdAt: 'desc' }
+                }
+            },
+        })
+        .then((r) => (r ? normalizeRegister(r) : null));
 
 export const getCashRegisterHistory = async (filters: {
     branchId?: string;
@@ -123,7 +141,7 @@ export const getCashRegisterHistory = async (filters: {
     ]);
 
     return {
-        registers,
+        registers: registers.map(normalizeRegister),
         total,
         totalPages: Math.ceil(total / limit),
         currentPage: page
@@ -131,10 +149,11 @@ export const getCashRegisterHistory = async (filters: {
 };
 
 export const getCashRegisterById = (id: string) =>
-    prisma.cashRegister.findUnique({
-        where: { id },
-        include: {
-            user: { select: { id: true, nombre: true, username: true } },
+    prisma.cashRegister
+        .findUnique({
+            where: { id },
+            include: {
+                user: { select: { id: true, nombre: true, username: true } },
             branch: { select: { id: true, name: true } },
             transactions: {
                 where: { status: 'COMPLETED' },
@@ -144,7 +163,8 @@ export const getCashRegisterById = (id: string) =>
                 orderBy: { createdAt: 'desc' },
             },
         },
-    });
+    })
+        .then((r) => (r ? normalizeRegister(r) : null));
 
 export const getDailySalesSummary = async (branchId: string, date?: string) => {
     const targetDate = date ? new Date(date) : new Date();
