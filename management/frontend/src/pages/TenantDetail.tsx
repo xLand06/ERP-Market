@@ -43,8 +43,21 @@ interface TenantDetail {
     plan: string;
     product?: string;
     adminEmail: string | null;
+    lastPaymentAt: string | null;
+    nextPaymentDue: string | null;
     createdAt: string;
-    payments: { id: string; amountCents: number; status: string; createdAt: string }[];
+    payments: {
+        id: string;
+        amountCents: number;
+        currency: string;
+        status: string;
+        provider: string | null;
+        paymentCode: string | null;
+        externalId: string | null;
+        dueDate: string | null;
+        paidAt: string | null;
+        createdAt: string;
+    }[];
     healthChecks: { id: string; apiHealthy: boolean; dbHealthy: boolean; containerUp: boolean; memoryMb: number | null; checkedAt: string }[];
 }
 
@@ -66,6 +79,26 @@ const COLORS = {
     dark: '#1a1a2e',
     muted: '#64748b',
     border: '#e2e8f0',
+};
+
+// Metodos de pago disponibles
+const PAYMENT_PROVIDERS = ['zelle', 'pago_movil', 'binance', 'cash', 'other'] as const;
+
+const PAYMENT_PROVIDER_LABELS: Record<string, string> = {
+    zelle: 'Zelle',
+    pago_movil: 'Pago Movil',
+    binance: 'Binance',
+    cash: 'Efectivo',
+    other: 'Otro',
+};
+
+const PAYMENT_STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
+    PAID: { bg: '#ecfdf5', text: '#065f46', dot: '#059669' },
+    PENDING: { bg: '#fffbeb', text: '#92400e', dot: '#d97706' },
+    OVERDUE: { bg: '#fef2f2', text: '#991b1b', dot: '#dc2626' },
+    FAILED: { bg: '#fef2f2', text: '#991b1b', dot: '#dc2626' },
+    REFUNDED: { bg: '#f5f3ff', text: '#6d28d9', dot: '#8b5cf6' },
+    CANCELLED: { bg: '#f1f5f9', text: '#64748b', dot: '#94a3b8' },
 };
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
@@ -112,6 +145,19 @@ export default function TenantDetailPage() {
     const [consoleLoading, setConsoleLoading] = useState(false);
     const [activeConsoleTab, setActiveConsoleTab] = useState<'api' | 'db'>('api');
     const [provisionLogs, setProvisionLogs] = useState<TerminalLine[]>([]);
+
+    // Estado del registro de pagos
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+    const [paymentError, setPaymentError] = useState<string | null>(null);
+    const [paymentForm, setPaymentForm] = useState({
+        amount: '',
+        provider: 'zelle' as string,
+        externalId: '',
+        dueDate: '',
+    });
+    const [lastPaymentCode, setLastPaymentCode] = useState<string | null>(null);
+    const [confirmingPaymentId, setConfirmingPaymentId] = useState<string | null>(null);
 
     const token = localStorage.getItem('mgmt_token');
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -288,6 +334,74 @@ export default function TenantDetailPage() {
             addToast(err instanceof Error ? err.message : 'Error desconocido', 'error');
         } finally {
             setActionLoading(false);
+        }
+    }
+
+    /* ── Pagos ─────────────────────────────────────────────────────────── */
+
+    async function handleRegisterPayment() {
+        setPaymentError(null);
+        if (!tenant) return;
+
+        const amount = parseFloat(paymentForm.amount);
+        if (!amount || amount <= 0) {
+            setPaymentError('Ingresa un monto mayor a 0');
+            return;
+        }
+
+        const amountCents = Math.round(amount * 100);
+        setPaymentSubmitting(true);
+        try {
+            const res = await fetch('/api/payments', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    tenantId: tenant.id,
+                    amountCents,
+                    provider: paymentForm.provider,
+                    externalId: paymentForm.externalId || undefined,
+                    dueDate: paymentForm.dueDate
+                        ? new Date(paymentForm.dueDate + 'T12:00:00').toISOString()
+                        : undefined,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Error al registrar pago');
+
+            setLastPaymentCode(data.paymentCode || null);
+            addToast('Pago registrado', 'success');
+            setPaymentForm({ amount: '', provider: 'zelle', externalId: '', dueDate: '' });
+            fetchTenant();
+        } catch (err) {
+            setPaymentError(err instanceof Error ? err.message : 'Error de conexion');
+        } finally {
+            setPaymentSubmitting(false);
+        }
+    }
+
+    async function handleConfirmPayment(paymentId: string) {
+        setConfirmingPaymentId(paymentId);
+        try {
+            const res = await fetch(`/api/payments/${paymentId}/confirm`, {
+                method: 'POST',
+                headers,
+            });
+            if (!res.ok) throw new Error('Error al confirmar pago');
+            addToast('Pago confirmado', 'success');
+            fetchTenant();
+        } catch (err) {
+            addToast(err instanceof Error ? err.message : 'Error desconocido', 'error');
+        } finally {
+            setConfirmingPaymentId(null);
+        }
+    }
+
+    async function copyPaymentCode(code: string) {
+        try {
+            await navigator.clipboard.writeText(code);
+            addToast('Codigo copiado al portapapeles', 'success');
+        } catch {
+            addToast('No se pudo copiar el codigo', 'error');
         }
     }
 
@@ -588,49 +702,139 @@ export default function TenantDetailPage() {
 
             {/* Payments */}
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginBottom: '1.5rem' }}>
-                <h3 style={{ margin: '0 0 1rem', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ width: 4, height: 16, borderRadius: 2, background: '#059669', flexShrink: 0 }} />
-                    Pagos Recientes
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 4, height: 16, borderRadius: 2, background: '#059669', flexShrink: 0 }} />
+                        Pagos
+                    </h3>
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {tenant.nextPaymentDue && (
+                            <span style={{ fontSize: '0.75rem', color: COLORS.muted }}>
+                                Proximo vencimiento: <strong>{new Date(tenant.nextPaymentDue).toLocaleDateString('es-AR')}</strong>
+                            </span>
+                        )}
+                        <button
+                            onClick={() => { setPaymentError(null); setLastPaymentCode(null); setShowPaymentModal(true); }}
+                            style={{
+                                padding: '0.4rem 0.9rem',
+                                borderRadius: 8,
+                                border: 'none',
+                                background: COLORS.primary,
+                                color: '#fff',
+                                cursor: 'pointer',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                minHeight: 44,
+                                transition: 'background 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = COLORS.primaryHover; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = COLORS.primary; }}
+                        >
+                            + Registrar Pago
+                        </button>
+                    </div>
+                </div>
+
                 {tenant.payments.length === 0 ? (
                     <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Sin pagos registrados</p>
                 ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                        <thead>
-                            <tr style={{ borderBottom: `1px solid ${COLORS.border}`, textAlign: 'left' }}>
-                                <th style={{ padding: '0.5rem 0', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Fecha</th>
-                                <th style={{ fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Monto</th>
-                                <th style={{ fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Estado</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {tenant.payments.map((p) => (
-                                <tr key={p.id} className="tdetail-row" style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.1s ease' }}>
-                                    <td style={{ padding: '0.5rem 0', color: '#475569' }}>
-                                        {new Date(p.createdAt).toLocaleDateString('es-AR')}
-                                    </td>
-                                    <td style={{ color: '#1e293b', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>${(p.amountCents / 100).toFixed(2)}</td>
-                                    <td>
-                                        <span style={{
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: 6,
-                                            padding: '2px 10px',
-                                            borderRadius: 999,
-                                            fontSize: '0.7rem',
-                                            fontWeight: 600,
-                                            background: p.status === 'PAID' ? '#ecfdf5' : p.status === 'PENDING' ? '#fffbeb' : '#fef2f2',
-                                            color: p.status === 'PAID' ? '#065f46' : p.status === 'PENDING' ? '#92400e' : '#991b1b',
-                                            whiteSpace: 'nowrap',
-                                        }}>
-                                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: p.status === 'PAID' ? '#059669' : p.status === 'PENDING' ? '#d97706' : '#dc2626', flexShrink: 0 }} />
-                                            {p.status}
-                                        </span>
-                                    </td>
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                            <thead>
+                                <tr style={{ borderBottom: `1px solid ${COLORS.border}`, textAlign: 'left' }}>
+                                    <th style={{ padding: '0.5rem 0', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Fecha</th>
+                                    <th style={{ fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Monto</th>
+                                    <th style={{ fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Metodo</th>
+                                    <th style={{ fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Codigo</th>
+                                    <th style={{ fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Vencimiento</th>
+                                    <th style={{ fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Estado</th>
+                                    <th style={{ fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', textAlign: 'right' }}>Accion</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {tenant.payments.map((p) => {
+                                    const pst = PAYMENT_STATUS_STYLES[p.status] || PAYMENT_STATUS_STYLES.PENDING;
+                                    return (
+                                        <tr key={p.id} className="tdetail-row" style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.1s ease' }}>
+                                            <td style={{ padding: '0.5rem 0', color: '#475569' }}>
+                                                {new Date(p.createdAt).toLocaleDateString('es-AR')}
+                                            </td>
+                                            <td style={{ color: '#1e293b', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                                                ${(p.amountCents / 100).toFixed(2)} {p.currency || 'USD'}
+                                            </td>
+                                            <td style={{ color: '#475569' }}>
+                                                {PAYMENT_PROVIDER_LABELS[p.provider || ''] || p.provider || '---'}
+                                            </td>
+                                            <td style={{ color: '#475569' }}>
+                                                {p.paymentCode ? (
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.75rem', fontWeight: 600 }}>{p.paymentCode}</span>
+                                                        <button
+                                                            onClick={() => copyPaymentCode(p.paymentCode!)}
+                                                            title="Copiar codigo"
+                                                            style={{
+                                                                padding: '2px 8px',
+                                                                borderRadius: 4,
+                                                                border: '1px solid #e2e8f0',
+                                                                background: '#fff',
+                                                                color: COLORS.info,
+                                                                cursor: 'pointer',
+                                                                fontSize: '0.7rem',
+                                                                minHeight: 28,
+                                                            }}
+                                                        >
+                                                            Copiar
+                                                        </button>
+                                                    </span>
+                                                ) : '---'}
+                                            </td>
+                                            <td style={{ color: '#475569' }}>
+                                                {p.dueDate ? new Date(p.dueDate).toLocaleDateString('es-AR') : '---'}
+                                            </td>
+                                            <td>
+                                                <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: 6,
+                                                    padding: '2px 10px',
+                                                    borderRadius: 999,
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 600,
+                                                    background: pst.bg,
+                                                    color: pst.text,
+                                                    whiteSpace: 'nowrap',
+                                                }}>
+                                                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: pst.dot, flexShrink: 0 }} />
+                                                    {p.status}
+                                                </span>
+                                            </td>
+                                            <td style={{ textAlign: 'right' }}>
+                                                {p.status === 'PENDING' && (
+                                                    <button
+                                                        onClick={() => handleConfirmPayment(p.id)}
+                                                        disabled={confirmingPaymentId === p.id}
+                                                        style={{
+                                                            padding: '0.35rem 0.8rem',
+                                                            borderRadius: 6,
+                                                            border: '1px solid #a7f3d0',
+                                                            background: '#ecfdf5',
+                                                            color: '#065f46',
+                                                            cursor: confirmingPaymentId === p.id ? 'not-allowed' : 'pointer',
+                                                            fontSize: '0.75rem',
+                                                            fontWeight: 600,
+                                                            minHeight: 36,
+                                                        }}
+                                                    >
+                                                        {confirmingPaymentId === p.id ? 'Confirmando...' : 'Confirmar pago'}
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </div>
 
@@ -832,6 +1036,224 @@ export default function TenantDetailPage() {
                                     }} />
                                 )}
                                 {confirmLoading ? 'Procesando...' : 'Confirmar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Modal: Registrar pago ──────────────────────────────────── */}
+            {showPaymentModal && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                    }}
+                    onClick={(e) => { if (e.target === e.currentTarget && !paymentSubmitting) setShowPaymentModal(false); }}
+                >
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: 12,
+                        padding: '2rem',
+                        width: '100%',
+                        maxWidth: 440,
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                        animation: 'fadeIn 0.2s ease',
+                    }}>
+                        <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>
+                            Registrar Pago
+                        </h2>
+
+                        {paymentError && (
+                            <div style={{
+                                padding: '0.75rem 1rem',
+                                borderRadius: 8,
+                                background: '#fef2f2',
+                                color: '#991b1b',
+                                fontSize: '0.85rem',
+                                marginBottom: '1rem',
+                                border: '1px solid #fecaca',
+                            }}>
+                                {paymentError}
+                            </div>
+                        )}
+
+                        {lastPaymentCode && (
+                            <div style={{
+                                padding: '1rem',
+                                borderRadius: 8,
+                                background: '#ecfdf5',
+                                border: '1px solid #a7f3d0',
+                                marginBottom: '1rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '0.75rem',
+                                flexWrap: 'wrap',
+                            }}>
+                                <div>
+                                    <div style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#065f46' }}>
+                                        Codigo de pago generado
+                                    </div>
+                                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: '1rem', color: '#065f46' }}>
+                                        {lastPaymentCode}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => copyPaymentCode(lastPaymentCode)}
+                                    style={{
+                                        padding: '0.4rem 0.9rem',
+                                        borderRadius: 8,
+                                        border: '1px solid #059669',
+                                        background: '#fff',
+                                        color: COLORS.primary,
+                                        cursor: 'pointer',
+                                        fontSize: '0.8rem',
+                                        fontWeight: 600,
+                                        minHeight: 44,
+                                    }}
+                                >
+                                    Copiar
+                                </button>
+                            </div>
+                        )}
+
+                        <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                                Monto (USD) *
+                            </label>
+                            <input
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                value={paymentForm.amount}
+                                onChange={(e) => setPaymentForm((f) => ({ ...f, amount: e.target.value }))}
+                                placeholder="99.99"
+                                disabled={paymentSubmitting}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.6rem 0.75rem',
+                                    borderRadius: 8,
+                                    border: '1px solid #e2e8f0',
+                                    fontSize: '0.9rem',
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                    minHeight: 44,
+                                }}
+                            />
+                        </div>
+
+                        <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                                Metodo
+                            </label>
+                            <select
+                                value={paymentForm.provider}
+                                onChange={(e) => setPaymentForm((f) => ({ ...f, provider: e.target.value }))}
+                                disabled={paymentSubmitting}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.6rem 0.75rem',
+                                    borderRadius: 8,
+                                    border: '1px solid #e2e8f0',
+                                    fontSize: '0.9rem',
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                    minHeight: 44,
+                                    background: '#fff',
+                                }}
+                            >
+                                {PAYMENT_PROVIDERS.map((p) => (
+                                    <option key={p} value={p}>{PAYMENT_PROVIDER_LABELS[p]}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                                Referencia (opcional)
+                            </label>
+                            <input
+                                type="text"
+                                maxLength={200}
+                                value={paymentForm.externalId}
+                                onChange={(e) => setPaymentForm((f) => ({ ...f, externalId: e.target.value }))}
+                                placeholder="Ref Zelle, TXID, etc."
+                                disabled={paymentSubmitting}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.6rem 0.75rem',
+                                    borderRadius: 8,
+                                    border: '1px solid #e2e8f0',
+                                    fontSize: '0.9rem',
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                    minHeight: 44,
+                                }}
+                            />
+                        </div>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                                Vencimiento (opcional)
+                            </label>
+                            <input
+                                type="date"
+                                value={paymentForm.dueDate}
+                                onChange={(e) => setPaymentForm((f) => ({ ...f, dueDate: e.target.value }))}
+                                disabled={paymentSubmitting}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.6rem 0.75rem',
+                                    borderRadius: 8,
+                                    border: '1px solid #e2e8f0',
+                                    fontSize: '0.9rem',
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                    minHeight: 44,
+                                }}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={() => setShowPaymentModal(false)}
+                                disabled={paymentSubmitting}
+                                style={{
+                                    padding: '0.5rem 1.25rem',
+                                    borderRadius: 8,
+                                    border: '1px solid #e2e8f0',
+                                    background: '#fff',
+                                    color: '#475569',
+                                    cursor: paymentSubmitting ? 'not-allowed' : 'pointer',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 500,
+                                    minHeight: 44,
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleRegisterPayment}
+                                disabled={paymentSubmitting || !paymentForm.amount}
+                                style={{
+                                    padding: '0.5rem 1.25rem',
+                                    borderRadius: 8,
+                                    border: 'none',
+                                    background: paymentSubmitting || !paymentForm.amount ? '#94a3b8' : COLORS.primary,
+                                    color: '#fff',
+                                    cursor: paymentSubmitting || !paymentForm.amount ? 'not-allowed' : 'pointer',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 600,
+                                    minHeight: 44,
+                                }}
+                            >
+                                {paymentSubmitting ? 'Registrando...' : 'Registrar'}
                             </button>
                         </div>
                     </div>

@@ -21,6 +21,7 @@ enum PaymentStatus {
     OVERDUE
     FAILED
     REFUNDED
+    CANCELLED
 }
 
 model Tenant {
@@ -35,6 +36,8 @@ model Tenant {
     adminPassword String?
     dbPassword    String?
     jwtSecret     String?
+    lastPaymentAt DateTime?    // ultimo pago registrado (denormalizado para listados)
+    nextPaymentDue DateTime?   // proximo vencimiento (denormalizado para listados)
     createdAt     DateTime     @default(now())
     updatedAt     DateTime     @updatedAt
     payments      Payment[]
@@ -49,9 +52,12 @@ model Payment {
     amountCents Int
     currency    String        @default("USD")
     status      PaymentStatus @default(PENDING)
-    provider    String?
-    externalId  String?
+    provider    String?       // zelle | pago_movil | binance | cash | other
+    externalId  String?       // referencia del pago (Zelle ref, TXID, etc.)
+    paymentCode String?       @unique // codigo generado: ALLCODE-XXXX
     notes       String?
+    dueDate     DateTime?     // vencimiento
+    paidAt      DateTime?
     createdAt   DateTime      @default(now())
 }
 

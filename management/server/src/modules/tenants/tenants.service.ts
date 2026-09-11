@@ -39,7 +39,7 @@ export async function getTenantBySlug(slug: string) {
     return prisma.tenant.findUnique({
         where: { slug },
         include: {
-            payments: { orderBy: { createdAt: 'desc' }, take: 5 },
+            payments: { orderBy: { createdAt: 'desc' }, take: 10 },
             healthChecks: { orderBy: { checkedAt: 'desc' }, take: 5 },
         },
     });
