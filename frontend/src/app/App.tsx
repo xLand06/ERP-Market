@@ -19,6 +19,7 @@ import './global.css';
 
 import { useConfigStore } from '@/hooks/useConfigStore';
 import InitialSyncScreen from '@/components/loading/InitialSyncScreen';
+import ConnectScreen from '@/components/loading/ConnectScreen';
 import api from '@/lib/api';
 
 export default function App() {
@@ -102,6 +103,11 @@ export default function App() {
                 <div className="animate-spin w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full" />
             </div>
         );
+    }
+
+    // Thin client sin servidor configurado: mostrar pantalla de conexión
+    if ((window as any).erpApi?.isElectron && !(window as any).erpApi?.serverUrl) {
+        return <ConnectScreen />;
     }
 
     // Primer inicio en Electron: mostrar pantalla de sync

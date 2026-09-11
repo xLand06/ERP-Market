@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('erpApi', {
     serverUrl: initialServerUrl as string | null,
     getServerUrl: (): Promise<string | null> => ipcRenderer.invoke('get-server-url'),
     setServerUrl: (url: string): Promise<void> => ipcRenderer.invoke('set-server-url', url),
+    connectServer: (url: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('connect-server', url),
 
     // ── Store persistente (Electron Store) ─────────────────────
     // Solo para token JWT y branchId de configuración
