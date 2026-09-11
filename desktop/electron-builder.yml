@@ -1,6 +1,6 @@
-appId: com.sofimar.erp-market
-productName: ALLMARKET -- AbastosSofimar
-copyright: Copyright © 2025 Abastos Sofimar
+appId: com.allcode.allmarket
+productName: ALL MARKET
+copyright: Copyright © 2026 ALLCODE
 
 protocols:
   - name: ALLMARKET
@@ -19,19 +19,8 @@ files:
   - "!node_modules/electron-vite/**"
   - "!node_modules/ts-node/**"
 
-extraFiles:
-  - from: "../backend/.env"
-    to: "resources/backend/.env"
-  - from: "../backend/erp-market.db"
-    to: "resources/seed/erp-market.db"
-  - from: "../backend/dist"
-    to: "resources/backend"
-    filter:
-      - "**/*"
-  - from: "../temp-backend/node_modules"
-    to: "resources/backend/node_modules"
-    filter:
-      - "**/*"
+# Thin client: el EXE se conecta al servidor del tenant (deep link).
+# NO empaqueta el backend local — por eso el EXE es liviano (~60MB).
 
 win:
   target:
