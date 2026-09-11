@@ -235,9 +235,14 @@ app.use('/api/banks',       banksRouter);
 const frontendDist = path.join(__dirname, '../public');
 app.use(express.static(frontendDist, {
     setHeaders: (res, filePath) => {
+        // index.html SIEMPRE sin cache: debe referenciar los hashes actuales.
+        // Si el navegador lo cachea, pide chunks viejos que ya no existen → error.
+        if (filePath.endsWith('index.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        }
         // Archivos hasheados por Vite (index-ABC123.js) → cache indefinido
         // porque el hash cambia en cada build
-        if (filePath.includes('/assets/') && /\.[a-f0-9]{8,}\.(js|css)$/.test(filePath)) {
+        else if (filePath.includes('/assets/') && /\.[a-f0-9]{8,}\.(js|css)$/.test(filePath)) {
             res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         }
         // Otros assets estáticos (imágenes, fonts) → cache 1 hora
