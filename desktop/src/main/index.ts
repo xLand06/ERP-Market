@@ -44,6 +44,24 @@ ipcMain.handle('get-user-data-path', () => app.getPath('userData'));
 ipcMain.handle('get-server-url', () => store.get('serverUrl') || null);
 ipcMain.handle('set-server-url', (_event, url: string) => store.set('serverUrl', url || null));
 
+// Conecta desde la pantalla de conexión del renderer: guarda la URL y recrea
+// la ventana para que el nuevo --server-url se inyecte (misma lógica del deep link).
+ipcMain.handle('connect-server', (_event, url: string) => {
+    const clean = (url || '').trim().replace(/\/$/, '');
+    if (!clean) return { ok: false, error: 'URL vacía' };
+    if (!/^https?:\/\//.test(clean)) return { ok: false, error: 'La URL debe empezar con http:// o https://' };
+    store.set('serverUrl', clean);
+    console.log(`[Electron] Conectado al servidor: ${clean}`);
+    if (app.isReady() && mainWindow) {
+        mainWindow.destroy();
+        const win = createWindow();
+        createMenu();
+        win.show();
+        win.focus();
+    }
+    return { ok: true };
+});
+
 /**
  * Procesa un deep link `allmarket://connect?server=<URL>`.
  * Guarda la URL del servidor en el store. Si la app ya está corriendo, recrea
@@ -398,61 +416,14 @@ app.whenReady().then(async () => {
         mkdirSync(userDataPath, { recursive: true });
     }
 
+    // ── MODO THIN CLIENT (siempre) ─────────────────────────────────────────
+    // El EXE es un cliente que se conecta al servidor del tenant. Si aún no
+    // hay serverUrl, el renderer muestra la pantalla de conexión (ConnectScreen).
+    // NO se levanta el backend local ni se toca SQLite (el thin EXE no lo empaca).
     if (serverUrl) {
-        // ── MODO THIN CLIENT ──────────────────────────────────────────────
-        // Un solo EXE sirve a todos los tenants. No se levanta el backend local
-        // ni se toca la DB SQLite: todo el tráfico va al servidor remoto.
         console.log(`[Electron] Thin client mode — server: ${serverUrl}`);
     } else {
-        // ── MODO OFFLINE (fallback) ───────────────────────────────────────
-        // Configurar la URL de la base de datos local (SQLite vía Prisma en el backend)
-        const dbFileName = 'erp-market.db';
-        const fullDbPath = join(userDataPath, dbFileName).replace(/\\/g, '/');
-
-        // ── Gestión del schema local ──────────────────────────────────────────────
-        // La DB empaquetada solo tiene el schema (tablas vacías).
-        // Los datos iniciales se descargan desde Supabase en el primer inicio.
-        const SCHEMA_VERSION = '3';
-        const storedSchemaVersion = store.get('schemaVersion') as string | undefined;
-
-        const bundledDbPath = is.dev
-            ? join(app.getAppPath(), '../backend', dbFileName)
-            : join(process.resourcesPath, 'seed', dbFileName);
-
-        const needsSchemaRestore = (): boolean => {
-            if (!existsSync(fullDbPath)) return true;
-
-            const dbSize = require('fs').statSync(fullDbPath).size;
-            if (dbSize < 8192) return true;
-            // Si no hay schemaVersion guardado (primera vez/actualización)
-            // O es una versión distinta → restaurar schema fresco
-            if (!storedSchemaVersion || storedSchemaVersion !== SCHEMA_VERSION) return true;
-
-            return false;
-        };
-
-        if (needsSchemaRestore()) {
-            if (existsSync(bundledDbPath)) {
-                const fs = require('fs');
-                if (existsSync(fullDbPath)) fs.unlinkSync(fullDbPath);
-                fs.copyFileSync(bundledDbPath, fullDbPath);
-                store.set('schemaVersion', SCHEMA_VERSION);
-                console.log(`[Electron] Schema copiado a ${fullDbPath}`);
-            } else {
-                console.warn(`[Electron] Schema DB no encontrada en ${bundledDbPath}`);
-            }
-        } else {
-            console.log(`[Electron] DB local encontrada en ${fullDbPath}`);
-        }
-
-        process.env.LOCAL_DATABASE_URL = `file:${fullDbPath}`;
-
-        console.log(`[Electron] SQLite DB: ${fullDbPath}`);
-        console.log(`[Electron] Iniciando backend Express en puerto 3001...`);
-
-        // Levantar el backend Express embebido (puerto 3001)
-        // Toda la lógica de negocio, base de datos y sincronización vive ahí.
-        await startExpressServer();
+        console.log('[Electron] Thin client — sin serverUrl, esperando conexión...');
     }
 
     createWindow();
