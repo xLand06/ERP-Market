@@ -10,6 +10,7 @@ import paymentsRoutes from './modules/payments/payments.routes';
 import auditRoutes from './modules/audit/audit.routes';
 import healthRoutes from './modules/health/health.routes';
 import { startHealthCron, startAuditRetention } from './services/health-cron';
+import { startPaymentCron } from './services/payment-cron';
 import { getVpsStats } from './services/vps-stats';
 import { ensureNetwork } from './services/provisioner';
 
@@ -43,10 +44,11 @@ app.get('/api/health', async (_req, res) => {
 });
 
 // Rutas API
+// /api/auth y /api/health son publicos; el resto exige JWT (authMiddleware)
 app.use('/api/auth', authRoutes);
-app.use('/api/tenants', tenantsRoutes);
-app.use('/api/payments', paymentsRoutes);
-app.use('/api/audit', auditRoutes);
+app.use('/api/tenants', authMiddleware, tenantsRoutes);
+app.use('/api/payments', authMiddleware, paymentsRoutes);
+app.use('/api/audit', authMiddleware, auditRoutes);
 app.use('/api/health', healthRoutes);
 
 // GET /api/vps/stats — estadísticas del servidor VPS
@@ -106,6 +108,7 @@ app.listen(env.PORT, async () => {
     // Iniciar crons solo en producción o desarrollo (no en tests)
     startHealthCron();
     startAuditRetention();
+    startPaymentCron();
 });
 
 export default app;

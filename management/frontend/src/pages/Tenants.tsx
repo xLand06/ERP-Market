@@ -72,6 +72,8 @@ interface Tenant {
     plan: string;
     product?: string;
     adminEmail: string | null;
+    lastPaymentAt: string | null;
+    nextPaymentDue: string | null;
     createdAt: string;
 }
 
@@ -131,6 +133,33 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> =
     SUSPENDED: { bg: '#fffbeb', text: '#92400e', dot: '#d97706' },
     DELETED: { bg: '#f1f5f9', text: '#64748b', dot: '#94a3b8' },
 };
+
+// Badges de estado de pago por tenant
+const PAYMENT_STYLES: Record<'PAGADO' | 'PENDIENTE' | 'VENCIDO', { label: string; bg: string; text: string; dot: string }> = {
+    PAGADO: { label: 'PAGADO', bg: '#ecfdf5', text: '#065f46', dot: '#059669' },
+    PENDIENTE: { label: 'PENDIENTE', bg: '#fffbeb', text: '#92400e', dot: '#d97706' },
+    VENCIDO: { label: 'VENCIDO', bg: '#fef2f2', text: '#991b1b', dot: '#dc2626' },
+};
+
+// Dias de gracia antes de considerar un pago vencido (coincide con el cron del server)
+const PAYMENT_GRACE_DAYS = 7;
+
+/**
+ * Deriva el estado de pago de un tenant a partir de nextPaymentDue:
+ * - Sin vencimiento → sin badge (nunca pago / sin plan facturado)
+ * - Vencimiento futuro → PAGADO
+ * - Vencido hace mas de 7 dias → VENCIDO
+ * - Dentro de la gracia → PENDIENTE
+ */
+function getPaymentBadge(t: Tenant): { label: string; bg: string; text: string; dot: string } | null {
+    if (!t.nextPaymentDue) return null;
+    const due = new Date(t.nextPaymentDue);
+    const now = new Date();
+    if (due >= now) return PAYMENT_STYLES.PAGADO;
+    const cutoff = new Date(now);
+    cutoff.setDate(cutoff.getDate() - PAYMENT_GRACE_DAYS);
+    return due < cutoff ? PAYMENT_STYLES.VENCIDO : PAYMENT_STYLES.PENDIENTE;
+}
 
 const HEALTH_STATUS = {
     running: { label: 'Running', color: '#059669', bg: '#ecfdf5' },
@@ -710,6 +739,7 @@ export default function Tenants() {
                             <tr style={{ borderBottom: `2px solid ${COLORS.border}`, textAlign: 'left' }}>
                                 <th style={{ padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Tenant</th>
                                 <th style={{ padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Estado</th>
+                                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Pago</th>
                                 <th style={{ padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Plan</th>
                                 <th style={{ padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Docker</th>
                                 <th style={{ padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>API</th>
@@ -725,6 +755,7 @@ export default function Tenants() {
                                 const dockerStatus = getHealthStatus(lastCheck);
                                 const colors = STATUS_STYLES[t.status] || STATUS_STYLES.ACTIVE;
                                 const hs = HEALTH_STATUS[dockerStatus];
+                                const payBadge = getPaymentBadge(t);
 
                                 return (
                                     <tr
@@ -789,6 +820,34 @@ export default function Tenants() {
                                                     {t.status}
                                                 </span>
                                             </div>
+                                        </td>
+
+                                        <td style={{ padding: '0.85rem 1rem' }}>
+                                            {payBadge ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                    <span style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: 6,
+                                                        padding: '3px 10px',
+                                                        borderRadius: 999,
+                                                        fontSize: '0.72rem',
+                                                        fontWeight: 600,
+                                                        background: payBadge.bg,
+                                                        color: payBadge.text,
+                                                        alignSelf: 'flex-start',
+                                                        whiteSpace: 'nowrap',
+                                                    }}>
+                                                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: payBadge.dot, flexShrink: 0 }} />
+                                                        {payBadge.label}
+                                                    </span>
+                                                    <span style={{ fontSize: '0.72rem', color: COLORS.muted, whiteSpace: 'nowrap' }}>
+                                                        {new Date(t.nextPaymentDue!).toLocaleDateString('es-AR')}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>---</span>
+                                            )}
                                         </td>
 
                                         <td style={{ padding: '0.85rem 1rem', textTransform: 'capitalize' }}>{t.plan}</td>
@@ -885,7 +944,7 @@ export default function Tenants() {
                             })}
                             {filtered.length === 0 && (
                                 <tr>
-                                    <td colSpan={8} style={{ padding: '3rem', textAlign: 'center' }}>
+                                    <td colSpan={9} style={{ padding: '3rem', textAlign: 'center' }}>
                                         <div style={{ color: COLORS.muted }}>
                                             <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>No se encontraron tenants</div>
                                             <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
@@ -908,6 +967,7 @@ export default function Tenants() {
                     const dockerStatus = getHealthStatus(lastCheck);
                     const colors = STATUS_STYLES[t.status] || STATUS_STYLES.ACTIVE;
                     const hs = HEALTH_STATUS[dockerStatus];
+                    const payBadge = getPaymentBadge(t);
 
                     return (
                         <div
@@ -973,10 +1033,30 @@ export default function Tenants() {
                                 <HealthBadge healthy={lastCheck?.dbHealthy ?? null} size="sm" />
                             </div>
 
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '0.75rem' }}>
                                 <div style={{ fontSize: '0.75rem', color: COLORS.muted, textTransform: 'capitalize' }}>
                                     {t.plan} · {new Date(t.createdAt).toLocaleDateString('es-AR')}
                                 </div>
+                                {payBadge && (
+                                    <span style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 4,
+                                        fontSize: '0.68rem',
+                                        fontWeight: 600,
+                                        padding: '2px 8px',
+                                        borderRadius: 999,
+                                        background: payBadge.bg,
+                                        color: payBadge.text,
+                                        whiteSpace: 'nowrap',
+                                    }}>
+                                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: payBadge.dot, flexShrink: 0 }} />
+                                        {payBadge.label} {t.nextPaymentDue ? `· ${new Date(t.nextPaymentDue).toLocaleDateString('es-AR')}` : ''}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div style={{ display: 'flex', gap: 6 }}>
                                     <ActionButton onClick={() => navigate(`/tenants/${t.slug}`)} color={COLORS.info} hoverColor="#1d4ed8" title="Ver">
                                         Ver
