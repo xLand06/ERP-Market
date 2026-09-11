@@ -129,11 +129,19 @@ export const CartPanel = React.memo(function CartPanel({
     onCheckout,
     isSubmitting,
 }: CartPanelProps) {
-    const { fmtUSD, fmtVES, fmtCOP, fromUSD, fmtMain } = useConfigStore();
+    const { fmtUSD, fmtVES, fmtCOP, fromUSD, fmtMain, mainCurrency } = useConfigStore();
 
     const totalUSD = totals.total;
     const totalVES = fromUSD(totals.total, 'VES');
     const totalCOP = fromUSD(totals.total, 'COP');
+
+    // Monedas NO principales (se muestran debajo del ticket como equivalencia)
+    const main = mainCurrency || 'USD';
+    const otherCurrencies = [
+        { code: 'USD', value: fmtUSD(totalUSD) },
+        { code: 'VES', value: fmtVES(totalVES) },
+        { code: 'COP', value: fmtCOP(totalCOP) },
+    ].filter((c) => c.code !== main);
 
     return (
         <>
@@ -175,14 +183,6 @@ export const CartPanel = React.memo(function CartPanel({
                 <div className="flex justify-between items-end">
                     <div>
                         <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase block mb-1">TOTAL A PAGAR</span>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="inline-flex items-center gap-1 bg-white border border-slate-200 shadow-2xs px-2 py-0.5 rounded-lg text-[11px] font-extrabold text-slate-700">
-                                {fmtUSD(totalUSD)} <span className="text-slate-400 text-[9px]">USD</span>
-                            </span>
-                            <span className="inline-flex items-center gap-1 bg-white border border-slate-200 shadow-2xs px-2 py-0.5 rounded-lg text-[11px] font-extrabold text-slate-700">
-                                {fmtVES(totalVES)} <span className="text-slate-400 text-[9px]">VES</span>
-                            </span>
-                        </div>
                     </div>
                     <div className="text-right">
                         <p className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-none tabular-nums">
@@ -193,6 +193,20 @@ export const CartPanel = React.memo(function CartPanel({
                         </p>
                     </div>
                 </div>
+
+                {/* Otras monedas (no principales) — equivalencia debajo del ticket */}
+                {otherCurrencies.length > 0 && (
+                    <div className="mt-3 pt-2.5 border-t border-slate-200/70 flex items-center justify-between gap-2">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 shrink-0">Equivale en</span>
+                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                            {otherCurrencies.map((c) => (
+                                <span key={c.code} className="inline-flex items-center gap-1 bg-white border border-slate-200 shadow-2xs px-2 py-0.5 rounded-lg text-[11px] font-extrabold text-slate-700">
+                                    {c.value} <span className="text-slate-400 text-[9px]">{c.code}</span>
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Checkout action button */}
