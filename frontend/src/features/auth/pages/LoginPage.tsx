@@ -1,11 +1,16 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Eye, EyeOff, Lock, User, Loader2, Cloud, CloudOff, RefreshCw, Smartphone } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, Loader2, Cloud, CloudOff, RefreshCw, Smartphone, Monitor, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLoginForm, useLogin } from '@/features/auth/hooks';
 import type { LoginPayload } from '@/features/auth/types';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+
+// ── Descargas de escritorio ────────────────────────────────────────────────
+// Una vez publicados los installers en GitHub Releases, actualizá estas URLs.
+const DESKTOP_WINDOWS_URL = 'https://github.com/xLand06/ERP-Market/releases/latest';
+const DESKTOP_LINUX_URL = 'https://github.com/xLand06/ERP-Market/releases/latest';
 
 export default function LoginPage() {
     const [showPw, setShowPw] = useState(false);
@@ -71,8 +76,6 @@ export default function LoginPage() {
                     setSyncing(false);
                     const wasOnline = lastStatus?.data?.isOnline ?? false;
                     setCloudOnline(wasOnline);
-                    // Recargar igual: el sync worker puede seguir corriendo
-                    // en background y App.tsx lo detectará al arrancar
                     toast.success('Sincronización en progreso — recargando...');
                     setTimeout(() => window.location.reload(), 1000);
                 }
@@ -103,19 +106,25 @@ export default function LoginPage() {
         }
     }, [form, validate, login, parseError]);
 
+    // Deep link del desktop: conecta la app instalada con este tenant
+    const connectDesktop = () => {
+        const server = window.location.origin;
+        window.location.href = `allmarket://connect?server=${encodeURIComponent(server)}`;
+    };
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 flex items-center justify-center p-4">
-            <div className="w-full max-w-sm">
-                <div className="text-center mb-8">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-900/40">
-                        <span className="text-xl font-black text-white">EM</span>
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 flex items-center justify-center p-3 sm:p-6">
+            <div className="w-full max-w-md">
+                <div className="text-center mb-6 sm:mb-8">
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center mx-auto mb-3 sm:mb-4 shadow-lg shadow-emerald-900/40">
+                        <span className="text-lg sm:text-xl font-black text-white tracking-tight">AM</span>
                     </div>
-                    <h1 className="text-2xl font-black text-white">ERP-Market</h1>
-                    <p className="text-slate-400 text-sm mt-1">Sistema de gestión para supermercados</p>
+                    <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">ALL MARKET</h1>
+                    <p className="text-slate-400 text-xs sm:text-sm mt-1">by ALLCODE · Sistema de gestión para bodegas y supermercados</p>
                 </div>
 
                 {/* ── Login Form ───────────────────────────────────────────── */}
-                <form onSubmit={handleSubmit} className="bg-white/[0.06] border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-2xl">
+                <form onSubmit={handleSubmit} className="bg-white/[0.06] border border-white/10 rounded-2xl p-5 sm:p-6 backdrop-blur-xl shadow-2xl">
                     <h2 className="text-base font-bold text-white mb-5">Iniciar sesión</h2>
 
                     {generalError && (
@@ -204,7 +213,6 @@ export default function LoginPage() {
 
                 {/* ── Sync / Connection Bar ────────────────────────────────── */}
                 <div className="mt-4 flex items-center justify-between bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2.5 backdrop-blur-xl">
-                    {/* Connection indicator */}
                     <div className="flex items-center gap-2">
                         {cloudOnline === null ? (
                             <Loader2 className="w-3.5 h-3.5 text-slate-500 animate-spin" />
@@ -224,7 +232,6 @@ export default function LoginPage() {
                         </span>
                     </div>
 
-                    {/* Sync button */}
                     <button
                         onClick={handleSync}
                         disabled={syncing}
@@ -239,25 +246,59 @@ export default function LoginPage() {
                     </button>
                 </div>
 
-                {/* Last sync info */}
+                {/* ── Downloads ─────────────────────────────────────────────── */}
+                <div className="mt-4 bg-white/[0.04] border border-white/10 rounded-xl p-4 backdrop-blur-xl">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Descargar aplicación</p>
+
+                    <button
+                        onClick={connectDesktop}
+                        className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-4 py-2.5 text-sm font-bold transition-colors"
+                    >
+                        <Monitor className="w-4 h-4" />
+                        Conectar app de escritorio
+                    </button>
+                    <p className="text-[10px] text-slate-500 mt-1.5 text-center">
+                        Si ya instalaste la app para PC, la abre y conecta con este negocio.
+                    </p>
+
+                    <div className="flex flex-col sm:flex-row gap-2 mt-3">
+                        <a
+                            href={DESKTOP_WINDOWS_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-slate-400 hover:text-emerald-400 transition-colors py-2 border border-white/10 rounded-lg"
+                        >
+                            <Download className="w-3.5 h-3.5" />
+                            Windows (.exe)
+                        </a>
+                        <a
+                            href={DESKTOP_LINUX_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-slate-400 hover:text-emerald-400 transition-colors py-2 border border-white/10 rounded-lg"
+                        >
+                            <Download className="w-3.5 h-3.5" />
+                            Linux (AppImage)
+                        </a>
+                        <a
+                            href="/apk/app.apk"
+                            download
+                            className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-slate-400 hover:text-emerald-400 transition-colors py-2 border border-white/10 rounded-lg"
+                        >
+                            <Smartphone className="w-3.5 h-3.5" />
+                            Android (APK)
+                        </a>
+                    </div>
+                </div>
+
                 {lastSync && (
                     <p className="text-center text-[10px] text-slate-600 mt-2">
                         Última sincronización: {new Date(lastSync).toLocaleString('es-VE')}
                     </p>
                 )}
 
-                {/* ── APK Download ─────────────────────────────────────────── */}
-                <a
-                    href="/apk/app.apk"
-                    download
-                    className="mt-3 flex items-center justify-center gap-2 text-xs font-medium text-slate-500 hover:text-emerald-400 transition-colors py-2"
-                >
-                    <Smartphone className="w-3.5 h-3.5" />
-                    Descargar APK para Android
-                </a>
-
                 <p className="text-center text-xs text-slate-600 mt-4">
-                    ERP-Market v2.0 · Gestión Supermercados
+                    ALL MARKET · ALLCODE
                 </p>
             </div>
         </div>
