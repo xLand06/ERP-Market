@@ -98,7 +98,7 @@ else
         if [[ -z "$VPS_IP" || ! "$VPS_IP" =~ ^[0-9.]+$ ]]; then
             VPS_IP="127.0.0.1"
         fi
-        CLIENT_DOMAIN="$SLUG.$VPS_IP.sslip.io"
+        CLIENT_DOMAIN="$SLUG.${BASE_DOMAIN:-allcode.site}"
     fi
 fi
 CLIENT_URL="https://$CLIENT_DOMAIN"
@@ -338,7 +338,7 @@ fi
     printf "│  Email    : %-58s │\n" "$ADMIN_EMAIL"
     printf "│  Password : %-58s │\n" "$ADMIN_PASSWORD"
     echo "│                                                                    │"
-    echo "│  Dashboard: https://mgmt.89.167.46.144.sslip.io                   │"
+    echo "│  Dashboard: https://mgmt.allcode.site                   │"
     echo "│                                                                    │"
     echo "│  Build the Android APK for this client:                           │"
     printf "│    ./deploy/scripts/build-apk.sh %-39s │\n" "$SLUG"

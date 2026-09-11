@@ -27,7 +27,7 @@ for CLIENT_DIR in "$CLIENTS_DIR"/*/; do
         DOMAIN="$(sed -n 's/^CLIENT_DOMAIN=//p' "$ENV_FILE" | head -1)"
         EMAIL="$(sed -n 's/^ADMIN_EMAIL=//p' "$ENV_FILE" | head -1)"
     else
-        DOMAIN="$SLUG.89.167.46.144.sslip.io"
+        DOMAIN="$SLUG.allcode.site"
         EMAIL="admin@$SLUG.local"
     fi
 

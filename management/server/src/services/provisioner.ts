@@ -13,6 +13,8 @@ const NETWORK_NAME = 'erp_proxy';
 const DEPLOY_DIR = process.env.DEPLOY_DIR || '/repo/deploy';
 // Path del host para volume mounts de Docker (los containers DB necesitan el path del host)
 const HOST_DEPLOY_DIR = process.env.HOST_DEPLOY_DIR || DEPLOY_DIR;
+// Dominio base de los tenants (configurable via env, default: allcode.site)
+const BASE_DOMAIN = process.env.BASE_DOMAIN || 'allcode.site';
 const SITES_DIR = path.join(HOST_DEPLOY_DIR, 'caddy/sites');
 
 // Tiempo maximo de espera para que DB este healthy (segundos)
@@ -260,7 +262,7 @@ async function registerTenantFromEnv(
         throw new Error(`No se pudo leer ${envPath} despues de add-client.sh: ${err}`);
     }
 
-    const clientDomain = envVars.CLIENT_DOMAIN || domain || `${slug}.89.167.46.144.sslip.io`;
+    const clientDomain = envVars.CLIENT_DOMAIN || domain || `${slug}.${BASE_DOMAIN}`;
     const clientUrl = envVars.CLIENT_URL || `https://${clientDomain}`;
     const finalAdminEmail = envVars.ADMIN_EMAIL || adminEmailFinal;
     const finalAdminPassword = envVars.ADMIN_PASSWORD || adminPasswordFinal || 'admin123';
@@ -413,7 +415,7 @@ export function getProvisioningState(slug: string) {
  */
 export async function startProvisioningInBackground(input: ProvisionInput): Promise<void> {
     const { slug, domain, plan } = input;
-    const tenantDomain = domain || `${slug}.89.167.46.144.sslip.io`;
+    const tenantDomain = domain || `${slug}.${BASE_DOMAIN}`;
     const product = input.product || 'market';
 
     // 1. Crear/actualizar el tenant con status PROVISIONING

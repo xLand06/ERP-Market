@@ -64,7 +64,7 @@ main();
 
 # 7. Caddy
 cat > /opt/erp-market/deploy/caddy/sites/mgmt.caddy << 'CADDYEOF'
-mgmt.89.167.46.144.sslip.io {
+mgmt.allcode.site {
     reverse_proxy mgmt-api:3001
 }
 CADDYEOF
@@ -76,6 +76,6 @@ echo ""
 echo "═══════════════════════════════════════════════════════════"
 echo "  ✅ MANAGEMENT SERVER LISTO"
 echo "═══════════════════════════════════════════════════════════"
-echo "  Dashboard: https://mgmt.89.167.46.144.sslip.io"
+echo "  Dashboard: https://mgmt.allcode.site"
 echo "  Login:     admin / admin123"
 echo "═══════════════════════════════════════════════════════════"
