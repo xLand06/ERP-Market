@@ -184,14 +184,14 @@ function ProgressBar({ percent, color }: { percent: number; color: string }) {
             width: '100%',
             height: 8,
             background: '#e2e8f0',
-            borderRadius: 4,
+            borderRadius: 999,
             overflow: 'hidden',
         }}>
             <div style={{
                 width: `${Math.min(percent, 100)}%`,
                 height: '100%',
                 background: color,
-                borderRadius: 4,
+                borderRadius: 999,
                 transition: 'width 0.3s ease',
             }} />
         </div>
@@ -224,7 +224,7 @@ function ActionButton({
             onMouseLeave={() => setHovered(false)}
             style={{
                 padding: '0.4rem 0.6rem',
-                borderRadius: 6,
+                borderRadius: 8,
                 border: 'none',
                 background: disabled ? '#e2e8f0' : hovered ? hoverColor : color,
                 color: disabled ? '#94a3b8' : '#fff',
@@ -453,9 +453,10 @@ export default function Tenants() {
                     {Array.from({ length: 4 }).map((_, i) => (
                         <div key={i} className="tenant-skeleton-pulse" style={{
                             background: '#fff',
-                            borderRadius: 8,
+                            border: '1px solid #e2e8f0',
+                            borderRadius: 12,
                             padding: '1.5rem',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                         }}>
                             <div style={{ width: '40%', height: 12, background: '#e2e8f0', borderRadius: 4, marginBottom: 12 }} />
                             <div style={{ width: '60%', height: 28, background: '#e2e8f0', borderRadius: 4, marginBottom: 8 }} />
@@ -470,14 +471,14 @@ export default function Tenants() {
                             width: 80,
                             height: 36,
                             background: '#e2e8f0',
-                            borderRadius: 6,
+                            borderRadius: 999,
                         }} />
                     ))}
                 </div>
 
                 <div style={{
                     background: '#fff',
-                    borderRadius: 8,
+                    borderRadius: 12,
                     padding: '1.5rem',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                 }}>
@@ -513,15 +514,17 @@ export default function Tenants() {
                 <div className="tenant-vps-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '1.5rem' }}>
                     <div style={{
                         background: '#fff',
-                        borderRadius: 8,
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 12,
                         padding: '1.5rem',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                             <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>CPU</h3>
                             <span style={{
                                 fontSize: '1.4rem',
                                 fontWeight: 700,
+                                fontVariantNumeric: 'tabular-nums',
                                 color: vpsStats.cpu.usagePercent > 80 ? COLORS.danger : vpsStats.cpu.usagePercent > 60 ? COLORS.warning : COLORS.primary,
                             }}>
                                 {vpsStats.cpu.usagePercent}%
@@ -538,15 +541,17 @@ export default function Tenants() {
 
                     <div style={{
                         background: '#fff',
-                        borderRadius: 8,
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 12,
                         padding: '1.5rem',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                             <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>Memoria</h3>
                             <span style={{
                                 fontSize: '1.4rem',
                                 fontWeight: 700,
+                                fontVariantNumeric: 'tabular-nums',
                                 color: vpsStats.memory.usagePercent > 80 ? COLORS.danger : vpsStats.memory.usagePercent > 60 ? COLORS.warning : COLORS.primary,
                             }}>
                                 {vpsStats.memory.usagePercent}%
@@ -563,15 +568,17 @@ export default function Tenants() {
 
                     <div style={{
                         background: '#fff',
-                        borderRadius: 8,
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 12,
                         padding: '1.5rem',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                             <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>Disco</h3>
                             <span style={{
                                 fontSize: '1.4rem',
                                 fontWeight: 700,
+                                fontVariantNumeric: 'tabular-nums',
                                 color: vpsStats.disk.usagePercent > 80 ? COLORS.danger : vpsStats.disk.usagePercent > 60 ? COLORS.warning : COLORS.primary,
                             }}>
                                 {vpsStats.disk.usagePercent}%
@@ -588,9 +595,10 @@ export default function Tenants() {
 
                     <div style={{
                         background: '#fff',
-                        borderRadius: 8,
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 12,
                         padding: '1.5rem',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                     }}>
                         <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>Docker</h3>
                         <div style={{ display: 'flex', gap: '1.25rem', marginBottom: '0.5rem' }}>
@@ -616,19 +624,19 @@ export default function Tenants() {
 
             {/* ── Resumen rapido ─────────────────────────────────────────────── */}
             <div className="tenant-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                <div style={{ background: '#fff', borderRadius: 8, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `3px solid ${COLORS.dark}` }}>
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `3px solid ${COLORS.dark}` }}>
                     <div style={{ fontSize: '0.7rem', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Total</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>{tenants.length}</div>
                 </div>
-                <div style={{ background: '#fff', borderRadius: 8, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `3px solid ${COLORS.primary}` }}>
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `3px solid ${COLORS.primary}` }}>
                     <div style={{ fontSize: '0.7rem', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Activos</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700, color: COLORS.primary }}>{tenants.filter((t) => t.status === 'ACTIVE').length}</div>
                 </div>
-                <div style={{ background: '#fff', borderRadius: 8, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `3px solid ${COLORS.warning}` }}>
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `3px solid ${COLORS.warning}` }}>
                     <div style={{ fontSize: '0.7rem', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Suspendidos</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700, color: COLORS.warning }}>{tenants.filter((t) => t.status === 'SUSPENDED').length}</div>
                 </div>
-                <div style={{ background: '#fff', borderRadius: 8, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `3px solid ${healthyTenants === tenants.filter((t) => t.status === 'ACTIVE').length && tenants.length > 0 ? COLORS.primary : COLORS.warning}` }}>
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `3px solid ${healthyTenants === tenants.filter((t) => t.status === 'ACTIVE').length && tenants.length > 0 ? COLORS.primary : COLORS.warning}` }}>
                     <div style={{ fontSize: '0.7rem', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Saludables</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700, color: healthyTenants === tenants.filter((t) => t.status === 'ACTIVE').length && tenants.length > 0 ? COLORS.primary : COLORS.warning }}>
                         {healthyTenants}/{tenants.filter((t) => t.status === 'ACTIVE').length}
@@ -651,14 +659,14 @@ export default function Tenants() {
                             key={value}
                             onClick={() => setFilter(value)}
                             style={{
-                                padding: '0.4rem 0.75rem',
-                                borderRadius: 6,
-                                border: filter === value ? `1px solid ${COLORS.dark}` : `1px solid ${COLORS.border}`,
-                                background: filter === value ? COLORS.dark : '#fff',
+                                padding: '0.4rem 0.9rem',
+                                borderRadius: 999,
+                                border: filter === value ? `1px solid ${COLORS.primary}` : `1px solid ${COLORS.border}`,
+                                background: filter === value ? COLORS.primary : '#fff',
                                 color: filter === value ? '#fff' : '#64748b',
                                 cursor: 'pointer',
                                 fontSize: '0.8rem',
-                                fontWeight: 500,
+                                fontWeight: 600,
                                 minHeight: 44,
                                 transition: 'all 0.15s ease',
                             }}
@@ -671,7 +679,7 @@ export default function Tenants() {
                     onClick={() => { resetForm(); setShowCreateModal(true); }}
                     style={{
                         padding: '0.5rem 1.25rem',
-                        borderRadius: 6,
+                        borderRadius: 8,
                         border: 'none',
                         background: COLORS.primary,
                         color: '#fff',
@@ -691,8 +699,9 @@ export default function Tenants() {
             {/* ── Tabla desktop ─────────────────────────────────────────────── */}
             <div className="tenant-desktop-table" style={{
                 background: '#fff',
-                borderRadius: 8,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                border: '1px solid #e2e8f0',
+                borderRadius: 12,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                 animation: 'fadeIn 0.3s ease',
             }}>
                 <div style={{ overflowX: 'auto' }}>
@@ -743,8 +752,8 @@ export default function Tenants() {
                                                     <span style={{
                                                         display: 'inline-flex',
                                                         alignItems: 'center',
-                                                        padding: '1px 6px',
-                                                        borderRadius: 6,
+                                                        padding: '1px 8px',
+                                                        borderRadius: 999,
                                                         fontSize: '0.65rem',
                                                         fontWeight: 600,
                                                         letterSpacing: '0.05em',
@@ -766,14 +775,15 @@ export default function Tenants() {
                                                 <span style={{
                                                     display: 'inline-flex',
                                                     alignItems: 'center',
-                                                    gap: 5,
+                                                    gap: 6,
                                                     padding: '3px 10px',
-                                                    borderRadius: 12,
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: 500,
+                                                    borderRadius: 999,
+                                                    fontSize: '0.72rem',
+                                                    fontWeight: 600,
                                                     background: colors.bg,
                                                     color: colors.text,
                                                     alignSelf: 'flex-start',
+                                                    whiteSpace: 'nowrap',
                                                 }}>
                                                     <StatusDot status={t.status} color={colors.dot} />
                                                     {t.status}
@@ -787,13 +797,14 @@ export default function Tenants() {
                                             <span style={{
                                                 display: 'inline-flex',
                                                 alignItems: 'center',
-                                                gap: 5,
-                                                padding: '2px 8px',
-                                                borderRadius: 8,
-                                                fontSize: '0.75rem',
-                                                fontWeight: 500,
+                                                gap: 6,
+                                                padding: '2px 10px',
+                                                borderRadius: 999,
+                                                fontSize: '0.72rem',
+                                                fontWeight: 600,
                                                 background: hs.bg,
                                                 color: hs.color,
+                                                whiteSpace: 'nowrap',
                                             }}>
                                                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: hs.color, flexShrink: 0 }} />
                                                 {hs.label}
@@ -903,9 +914,10 @@ export default function Tenants() {
                             key={t.id}
                             style={{
                                 background: '#fff',
-                                borderRadius: 8,
+                                border: '1px solid #e2e8f0',
+                                borderRadius: 12,
                                 padding: '1rem',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                                 animation: 'fadeIn 0.3s ease',
                             }}
                         >
@@ -921,8 +933,8 @@ export default function Tenants() {
                                         <span style={{
                                             display: 'inline-flex',
                                             alignItems: 'center',
-                                            padding: '1px 6px',
-                                            borderRadius: 6,
+                                            padding: '1px 8px',
+                                            borderRadius: 999,
                                             fontSize: '0.65rem',
                                             fontWeight: 600,
                                             letterSpacing: '0.05em',
@@ -938,13 +950,14 @@ export default function Tenants() {
                                 <span style={{
                                     display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: 4,
-                                    padding: '2px 8px',
-                                    borderRadius: 10,
+                                    gap: 6,
+                                    padding: '2px 10px',
+                                    borderRadius: 999,
                                     fontSize: '0.7rem',
-                                    fontWeight: 500,
+                                    fontWeight: 600,
                                     background: colors.bg,
                                     color: colors.text,
+                                    whiteSpace: 'nowrap',
                                 }}>
                                     <StatusDot status={t.status} color={colors.dot} />
                                     {t.status}
@@ -952,7 +965,7 @@ export default function Tenants() {
                             </div>
 
                             <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', padding: '2px 6px', borderRadius: 6, background: hs.bg, color: hs.color }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', padding: '2px 8px', borderRadius: 999, background: hs.bg, color: hs.color }}>
                                     <span style={{ width: 5, height: 5, borderRadius: '50%', background: hs.color }} />
                                     Docker: {hs.label}
                                 </span>
@@ -1020,7 +1033,7 @@ export default function Tenants() {
                 {filtered.length === 0 && (
                     <div style={{
                         background: '#fff',
-                        borderRadius: 8,
+                        borderRadius: 12,
                         padding: '3rem',
                         boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                         textAlign: 'center',
@@ -1064,7 +1077,7 @@ export default function Tenants() {
                         {formError && (
                             <div style={{
                                 padding: '0.75rem 1rem',
-                                borderRadius: 6,
+                                borderRadius: 8,
                                 background: '#fef2f2',
                                 color: '#991b1b',
                                 fontSize: '0.85rem',
@@ -1087,7 +1100,7 @@ export default function Tenants() {
                                 style={{
                                     width: '100%',
                                     padding: '0.6rem 0.75rem',
-                                    borderRadius: 6,
+                                    borderRadius: 8,
                                     border: '1px solid #e2e8f0',
                                     fontSize: '0.9rem',
                                     outline: 'none',
@@ -1112,7 +1125,7 @@ export default function Tenants() {
                                 style={{
                                     width: '100%',
                                     padding: '0.6rem 0.75rem',
-                                    borderRadius: 6,
+                                    borderRadius: 8,
                                     border: '1px solid #e2e8f0',
                                     fontSize: '0.9rem',
                                     outline: 'none',
@@ -1134,7 +1147,7 @@ export default function Tenants() {
                                 style={{
                                     width: '100%',
                                     padding: '0.6rem 0.75rem',
-                                    borderRadius: 6,
+                                    borderRadius: 8,
                                     border: '1px solid #e2e8f0',
                                     fontSize: '0.9rem',
                                     outline: 'none',
@@ -1156,7 +1169,7 @@ export default function Tenants() {
                                 style={{
                                     width: '100%',
                                     padding: '0.6rem 0.75rem',
-                                    borderRadius: 6,
+                                    borderRadius: 8,
                                     border: '1px solid #e2e8f0',
                                     fontSize: '0.9rem',
                                     outline: 'none',
@@ -1181,7 +1194,7 @@ export default function Tenants() {
                                 style={{
                                     width: '100%',
                                     padding: '0.6rem 0.75rem',
-                                    borderRadius: 6,
+                                    borderRadius: 8,
                                     border: '1px solid #e2e8f0',
                                     fontSize: '0.9rem',
                                     outline: 'none',
@@ -1201,7 +1214,7 @@ export default function Tenants() {
                                 style={{
                                     width: '100%',
                                     padding: '0.6rem 0.75rem',
-                                    borderRadius: 6,
+                                    borderRadius: 8,
                                     border: '1px solid #e2e8f0',
                                     fontSize: '0.9rem',
                                     outline: 'none',
@@ -1228,7 +1241,7 @@ export default function Tenants() {
                                 style={{
                                     width: '100%',
                                     padding: '0.6rem 0.75rem',
-                                    borderRadius: 6,
+                                    borderRadius: 8,
                                     border: '1px solid #e2e8f0',
                                     fontSize: '0.9rem',
                                     outline: 'none',
@@ -1249,7 +1262,7 @@ export default function Tenants() {
                                 onClick={() => setShowCreateModal(false)}
                                 style={{
                                     padding: '0.5rem 1.25rem',
-                                    borderRadius: 6,
+                                    borderRadius: 8,
                                     border: '1px solid #e2e8f0',
                                     background: '#fff',
                                     color: '#475569',
@@ -1266,7 +1279,7 @@ export default function Tenants() {
                                 disabled={creating || !formSlug}
                                 style={{
                                     padding: '0.5rem 1.25rem',
-                                    borderRadius: 6,
+                                    borderRadius: 8,
                                     border: 'none',
                                     background: creating || !formSlug ? '#94a3b8' : COLORS.primary,
                                     color: '#fff',
@@ -1349,7 +1362,7 @@ export default function Tenants() {
                                 disabled={confirmLoading}
                                 style={{
                                     padding: '0.5rem 1.5rem',
-                                    borderRadius: 6,
+                                    borderRadius: 8,
                                     border: '1px solid #e2e8f0',
                                     background: '#fff',
                                     color: '#475569',
@@ -1366,7 +1379,7 @@ export default function Tenants() {
                                 disabled={confirmLoading}
                                 style={{
                                     padding: '0.5rem 1.5rem',
-                                    borderRadius: 6,
+                                    borderRadius: 8,
                                     border: 'none',
                                     background: confirmAction.variant === 'danger' ? COLORS.danger : COLORS.warning,
                                     color: '#fff',
@@ -1413,7 +1426,7 @@ export default function Tenants() {
                         className="tenant-toast"
                         style={{
                             padding: '0.75rem 1.25rem',
-                            borderRadius: 8,
+                            borderRadius: 12,
                             background: toast.type === 'success' ? '#065f46' : '#991b1b',
                             color: '#fff',
                             fontSize: '0.85rem',

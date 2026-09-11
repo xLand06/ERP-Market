@@ -42,12 +42,13 @@ export default function Login({ onLogin }: LoginProps) {
         width: '100%',
         padding: '0.65rem 0.75rem',
         border: '1px solid #e2e8f0',
-        borderRadius: 6,
+        borderRadius: 8,
         fontSize: '0.9rem',
         boxSizing: 'border-box',
         outline: 'none',
-        transition: 'border-color 0.15s ease',
+        transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
         minHeight: 44,
+        background: '#fff',
     };
 
     return (
@@ -56,21 +57,43 @@ export default function Login({ onLogin }: LoginProps) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: '#1a1a2e',
+            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 55%, #064e3b 100%)',
             fontFamily: 'system-ui, -apple-system, sans-serif',
+            padding: '1.5rem',
         }}>
             <form onSubmit={handleSubmit} style={{
-                background: '#fff',
+                background: 'rgba(255,255,255,0.96)',
+                backdropFilter: 'blur(12px)',
                 padding: '2.5rem',
-                borderRadius: 12,
+                borderRadius: 14,
                 width: 380,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+                maxWidth: '100%',
+                boxShadow: '0 24px 64px rgba(0,0,0,0.35)',
+                border: '1px solid rgba(255,255,255,0.5)',
             }}>
-                <h1 style={{ margin: '0 0 0.5rem', fontSize: '1.5rem', fontWeight: 700, color: '#1e293b' }}>
-                    ALLCODE
-                </h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                    <div style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 10,
+                        background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800,
+                        fontSize: '0.8rem',
+                        color: '#fff',
+                        boxShadow: '0 4px 12px rgba(5,150,105,0.35)',
+                        flexShrink: 0,
+                    }}>
+                        AC
+                    </div>
+                    <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: '#1e293b' }}>
+                        ALLCODE
+                    </h1>
+                </div>
                 <p style={{ margin: '0 0 1.5rem', color: '#64748b', fontSize: '0.9rem' }}>
-                    ALL MARKET · Panel de Gestión
+                    ALL MARKET · Panel de Gestion
                 </p>
 
                 {error && (
@@ -78,7 +101,7 @@ export default function Login({ onLogin }: LoginProps) {
                         background: '#fef2f2',
                         color: '#991b1b',
                         padding: '0.75rem 1rem',
-                        borderRadius: 6,
+                        borderRadius: 8,
                         marginBottom: '1rem',
                         fontSize: '0.85rem',
                         border: '1px solid #fecaca',
@@ -138,12 +161,13 @@ export default function Login({ onLogin }: LoginProps) {
                         background: loading ? '#94a3b8' : '#059669',
                         color: '#fff',
                         border: 'none',
-                        borderRadius: 6,
+                        borderRadius: 8,
                         fontSize: '0.95rem',
                         fontWeight: 600,
                         cursor: loading ? 'wait' : 'pointer',
                         minHeight: 44,
-                        transition: 'background 0.15s ease',
+                        boxShadow: loading ? 'none' : '0 4px 14px rgba(5,150,105,0.3)',
+                        transition: 'background 0.15s ease, box-shadow 0.15s ease',
                     }}
                     onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#047857'; }}
                     onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#059669'; }}

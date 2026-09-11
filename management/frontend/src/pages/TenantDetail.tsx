@@ -19,6 +19,10 @@ const globalStyles = `
     to { transform: rotate(360deg); }
 }
 .toast-msg { animation: slideIn 0.3s ease; }
+.tdetail-row:hover { background: #f8fafc !important; }
+@media (max-width: 768px) {
+    .tdetail-info-grid { grid-template-columns: 1fr !important; }
+}
 `;
 
 if (typeof document !== 'undefined' && !document.getElementById('tenant-detail-styles')) {
@@ -64,12 +68,12 @@ const COLORS = {
     border: '#e2e8f0',
 };
 
-const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
-    ACTIVE: { bg: '#ecfdf5', text: '#065f46' },
-    PROVISIONING: { bg: '#eff6ff', text: '#1e40af' },
-    ERROR: { bg: '#fef2f2', text: '#991b1b' },
-    SUSPENDED: { bg: '#fffbeb', text: '#92400e' },
-    DELETED: { bg: '#f1f5f9', text: '#64748b' },
+const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
+    ACTIVE: { bg: '#ecfdf5', text: '#065f46', dot: '#059669' },
+    PROVISIONING: { bg: '#eff6ff', text: '#1e40af', dot: '#2563eb' },
+    ERROR: { bg: '#fef2f2', text: '#991b1b', dot: '#dc2626' },
+    SUSPENDED: { bg: '#fffbeb', text: '#92400e', dot: '#d97706' },
+    DELETED: { bg: '#f1f5f9', text: '#64748b', dot: '#94a3b8' },
 };
 
 // Nombres completos de producto para mostrar en el header
@@ -316,11 +320,11 @@ export default function TenantDetailPage() {
                         <span style={{
                             display: 'inline-flex',
                             alignItems: 'center',
-                            padding: '2px 8px',
-                            borderRadius: 10,
-                            fontSize: '0.7rem',
+                            padding: '2px 10px',
+                            borderRadius: 999,
+                            fontSize: '0.68rem',
                             fontWeight: 600,
-                            letterSpacing: '0.04em',
+                            letterSpacing: '0.05em',
                             background: '#f1f5f9',
                             color: '#475569',
                             border: '1px solid #e2e8f0',
@@ -345,7 +349,7 @@ export default function TenantDetailPage() {
                                 background: '#fffbeb',
                                 color: '#92400e',
                                 border: '1px solid #fde68a',
-                                borderRadius: 6,
+                                borderRadius: 8,
                                 cursor: 'pointer',
                                 fontSize: '0.85rem',
                                 fontWeight: 500,
@@ -369,7 +373,7 @@ export default function TenantDetailPage() {
                                 background: '#ecfdf5',
                                 color: '#065f46',
                                 border: '1px solid #a7f3d0',
-                                borderRadius: 6,
+                                borderRadius: 8,
                                 cursor: 'pointer',
                                 fontSize: '0.85rem',
                                 fontWeight: 500,
@@ -394,7 +398,7 @@ export default function TenantDetailPage() {
                             background: tenant.status === 'DELETED' ? '#e2e8f0' : '#fef2f2',
                             color: tenant.status === 'DELETED' ? '#94a3b8' : '#991b1b',
                             border: `1px solid ${tenant.status === 'DELETED' ? '#cbd5e1' : '#fecaca'}`,
-                            borderRadius: 6,
+                            borderRadius: 8,
                             cursor: tenant.status === 'DELETED' ? 'not-allowed' : 'pointer',
                             fontSize: '0.85rem',
                             fontWeight: 500,
@@ -411,7 +415,7 @@ export default function TenantDetailPage() {
                             padding: '0.5rem 1rem',
                             background: '#f8fafc',
                             border: '1px solid #e2e8f0',
-                            borderRadius: 6,
+                            borderRadius: 8,
                             cursor: 'pointer',
                             fontSize: '0.85rem',
                             color: '#475569',
@@ -426,21 +430,29 @@ export default function TenantDetailPage() {
             </div>
 
             {/* Info grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+            <div className="tdetail-info-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 {/* Informacion general + Plan edit */}
-                <div style={{ background: '#fff', borderRadius: 8, padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                    <h3 style={{ margin: '0 0 1rem', fontSize: '0.95rem', fontWeight: 600, color: '#1e293b' }}>Informacion General</h3>
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                    <h3 style={{ margin: '0 0 1rem', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 4, height: 16, borderRadius: 2, background: '#059669', flexShrink: 0 }} />
+                        Informacion General
+                    </h3>
                     <dl style={{ margin: 0, fontSize: '0.9rem' }}>
                         <dt style={{ color: '#64748b', marginBottom: 2, fontWeight: 600, fontSize: '0.8rem' }}>Estado</dt>
                         <dd style={{ margin: '0 0 0.75rem' }}>
                             <span style={{
-                                padding: '2px 10px',
-                                borderRadius: 12,
-                                fontSize: '0.75rem',
-                                fontWeight: 500,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                padding: '3px 10px',
+                                borderRadius: 999,
+                                fontSize: '0.72rem',
+                                fontWeight: 600,
                                 background: statusStyle.bg,
                                 color: statusStyle.text,
+                                whiteSpace: 'nowrap',
                             }}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusStyle.dot, flexShrink: 0 }} />
                                 {tenant.status}
                             </span>
                         </dd>
@@ -448,18 +460,18 @@ export default function TenantDetailPage() {
                         <dt style={{ color: '#64748b', marginBottom: 2, fontWeight: 600, fontSize: '0.8rem' }}>Plan</dt>
                         <dd style={{ margin: '0 0 0.75rem' }}>
                             {editingPlan ? (
-                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                     <select
                                         value={planValue}
                                         onChange={(e) => setPlanValue(e.target.value)}
                                         disabled={actionLoading}
                                         style={{
                                             padding: '0.4rem 0.6rem',
-                                            borderRadius: 6,
+                                            borderRadius: 8,
                                             border: '1px solid #e2e8f0',
                                             fontSize: '0.85rem',
                                             background: '#fff',
-                                            minHeight: 36,
+                                            minHeight: 44,
                                             outline: 'none',
                                         }}
                                     >
@@ -472,15 +484,15 @@ export default function TenantDetailPage() {
                                         onClick={handleSavePlan}
                                         disabled={actionLoading || planValue === tenant.plan}
                                         style={{
-                                            padding: '0.4rem 0.75rem',
-                                            borderRadius: 6,
+                                            padding: '0.4rem 0.9rem',
+                                            borderRadius: 8,
                                             border: 'none',
                                             background: actionLoading || planValue === tenant.plan ? '#94a3b8' : COLORS.primary,
                                             color: '#fff',
                                             cursor: actionLoading || planValue === tenant.plan ? 'not-allowed' : 'pointer',
                                             fontSize: '0.8rem',
                                             fontWeight: 600,
-                                            minHeight: 36,
+                                            minHeight: 44,
                                         }}
                                     >
                                         {actionLoading ? 'Guardando...' : 'Guardar'}
@@ -489,14 +501,15 @@ export default function TenantDetailPage() {
                                         onClick={() => { setEditingPlan(false); setPlanValue(tenant.plan); }}
                                         disabled={actionLoading}
                                         style={{
-                                            padding: '0.4rem 0.75rem',
-                                            borderRadius: 6,
+                                            padding: '0.4rem 0.9rem',
+                                            borderRadius: 8,
                                             border: '1px solid #e2e8f0',
                                             background: '#fff',
                                             color: '#475569',
                                             cursor: 'pointer',
                                             fontSize: '0.8rem',
-                                            minHeight: 36,
+                                            fontWeight: 500,
+                                            minHeight: 44,
                                         }}
                                     >
                                         Cancelar
@@ -537,8 +550,11 @@ export default function TenantDetailPage() {
                 </div>
 
                 {/* Health history */}
-                <div style={{ background: '#fff', borderRadius: 8, padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                    <h3 style={{ margin: '0 0 1rem', fontSize: '0.95rem', fontWeight: 600, color: '#1e293b' }}>Historial de Salud</h3>
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                    <h3 style={{ margin: '0 0 1rem', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 4, height: 16, borderRadius: 2, background: '#059669', flexShrink: 0 }} />
+                        Historial de Salud
+                    </h3>
                     {tenant.healthChecks.length === 0 ? (
                         <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Sin registros de salud</p>
                     ) : (
@@ -554,14 +570,14 @@ export default function TenantDetailPage() {
                             </thead>
                             <tbody>
                                 {tenant.healthChecks.map((hc) => (
-                                    <tr key={hc.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                    <tr key={hc.id} className="tdetail-row" style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.1s ease' }}>
                                         <td style={{ padding: '0.5rem 0', color: '#475569' }}>
                                             {new Date(hc.checkedAt).toLocaleString('es-AR')}
                                         </td>
                                         <td><HealthBadge healthy={hc.apiHealthy} size="sm" /></td>
                                         <td><HealthBadge healthy={hc.dbHealthy} size="sm" /></td>
                                         <td><HealthBadge healthy={hc.containerUp} size="sm" /></td>
-                                        <td style={{ color: '#475569' }}>{hc.memoryMb ? `${hc.memoryMb} MB` : '---'}</td>
+                                        <td style={{ color: '#475569', fontVariantNumeric: 'tabular-nums' }}>{hc.memoryMb ? `${hc.memoryMb} MB` : '---'}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -571,8 +587,11 @@ export default function TenantDetailPage() {
             </div>
 
             {/* Payments */}
-            <div style={{ background: '#fff', borderRadius: 8, padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '1.5rem' }}>
-                <h3 style={{ margin: '0 0 1rem', fontSize: '0.95rem', fontWeight: 600, color: '#1e293b' }}>Pagos Recientes</h3>
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginBottom: '1.5rem' }}>
+                <h3 style={{ margin: '0 0 1rem', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 4, height: 16, borderRadius: 2, background: '#059669', flexShrink: 0 }} />
+                    Pagos Recientes
+                </h3>
                 {tenant.payments.length === 0 ? (
                     <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Sin pagos registrados</p>
                 ) : (
@@ -586,20 +605,25 @@ export default function TenantDetailPage() {
                         </thead>
                         <tbody>
                             {tenant.payments.map((p) => (
-                                <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <tr key={p.id} className="tdetail-row" style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.1s ease' }}>
                                     <td style={{ padding: '0.5rem 0', color: '#475569' }}>
                                         {new Date(p.createdAt).toLocaleDateString('es-AR')}
                                     </td>
-                                    <td style={{ color: '#1e293b' }}>${(p.amountCents / 100).toFixed(2)}</td>
+                                    <td style={{ color: '#1e293b', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>${(p.amountCents / 100).toFixed(2)}</td>
                                     <td>
                                         <span style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 6,
                                             padding: '2px 10px',
-                                            borderRadius: 12,
-                                            fontSize: '0.75rem',
-                                            fontWeight: 500,
+                                            borderRadius: 999,
+                                            fontSize: '0.7rem',
+                                            fontWeight: 600,
                                             background: p.status === 'PAID' ? '#ecfdf5' : p.status === 'PENDING' ? '#fffbeb' : '#fef2f2',
                                             color: p.status === 'PAID' ? '#065f46' : p.status === 'PENDING' ? '#92400e' : '#991b1b',
+                                            whiteSpace: 'nowrap',
                                         }}>
+                                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: p.status === 'PAID' ? '#059669' : p.status === 'PENDING' ? '#d97706' : '#dc2626', flexShrink: 0 }} />
                                             {p.status}
                                         </span>
                                     </td>
@@ -612,22 +636,26 @@ export default function TenantDetailPage() {
 
             {/* ── Consola del contenedor ──────────────────────────────────── */}
             {(tenant.status === 'ACTIVE' || tenant.status === 'PROVISIONING' || tenant.status === 'ERROR') && (
-                <div style={{ background: '#fff', borderRadius: 8, padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: '#1e293b' }}>Consola</h3>
+                            <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ width: 4, height: 16, borderRadius: 2, background: '#059669', flexShrink: 0 }} />
+                                Consola
+                            </h3>
                             <span style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: 5,
+                                gap: 6,
                                 padding: '3px 10px',
-                                borderRadius: 12,
-                                fontSize: '0.75rem',
-                                fontWeight: 500,
+                                borderRadius: 999,
+                                fontSize: '0.72rem',
+                                fontWeight: 600,
                                 background: statusStyle.bg,
                                 color: statusStyle.text,
+                                whiteSpace: 'nowrap',
                             }}>
-                                {tenant.status === 'PROVISIONING' && (
+                                {tenant.status === 'PROVISIONING' ? (
                                     <div style={{
                                         width: 8,
                                         height: 8,
@@ -636,6 +664,8 @@ export default function TenantDetailPage() {
                                         borderRadius: '50%',
                                         animation: 'spin 1s linear infinite',
                                     }} />
+                                ) : (
+                                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusStyle.dot, flexShrink: 0 }} />
                                 )}
                                 {tenant.status}
                             </span>
@@ -653,7 +683,7 @@ export default function TenantDetailPage() {
                                             }}
                                             style={{
                                                 padding: '0.3rem 0.75rem',
-                                                borderRadius: 6,
+                                                borderRadius: 8,
                                                 border: activeConsoleTab === tab ? `1px solid ${COLORS.dark}` : `1px solid ${COLORS.border}`,
                                                 background: activeConsoleTab === tab ? COLORS.dark : '#fff',
                                                 color: activeConsoleTab === tab ? '#fff' : '#64748b',
@@ -672,7 +702,7 @@ export default function TenantDetailPage() {
                                     disabled={consoleLoading}
                                     style={{
                                         padding: '0.3rem 0.75rem',
-                                        borderRadius: 6,
+                                        borderRadius: 8,
                                         border: `1px solid ${COLORS.border}`,
                                         background: '#fff',
                                         color: COLORS.info,
@@ -693,7 +723,7 @@ export default function TenantDetailPage() {
                     ) : consoleLogs.length === 0 && !consoleLoading ? (
                         <div style={{
                             background: '#1a1a2e',
-                            borderRadius: 8,
+                            borderRadius: 12,
                             padding: '2rem',
                             textAlign: 'center',
                             color: '#64748b',
@@ -761,7 +791,7 @@ export default function TenantDetailPage() {
                                 disabled={confirmLoading}
                                 style={{
                                     padding: '0.5rem 1.5rem',
-                                    borderRadius: 6,
+                                    borderRadius: 8,
                                     border: '1px solid #e2e8f0',
                                     background: '#fff',
                                     color: '#475569',
@@ -778,7 +808,7 @@ export default function TenantDetailPage() {
                                 disabled={confirmLoading}
                                 style={{
                                     padding: '0.5rem 1.5rem',
-                                    borderRadius: 6,
+                                    borderRadius: 8,
                                     border: 'none',
                                     background: confirmAction.variant === 'danger' ? COLORS.danger : COLORS.warning,
                                     color: '#fff',
@@ -825,7 +855,7 @@ export default function TenantDetailPage() {
                         className="toast-msg"
                         style={{
                             padding: '0.75rem 1.25rem',
-                            borderRadius: 8,
+                            borderRadius: 12,
                             background: toast.type === 'success' ? '#065f46' : '#991b1b',
                             color: '#fff',
                             fontSize: '0.85rem',
