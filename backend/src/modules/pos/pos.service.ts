@@ -370,6 +370,23 @@ export const createTransaction = async (input: CreateTransactionInput) => {
     });
 };
 
+/**
+ * Normaliza campos Decimal de una transacción (Prisma los serializa como string
+ * en JSON). Sin esto, el frontend rompe al llamar .toFixed() sobre un string.
+ */
+const normalizeTransaction = (t: any) => ({
+    ...t,
+    total: Number(t.total),
+    exchangeRate: t.exchangeRate != null ? Number(t.exchangeRate) : null,
+    items: (t.items || []).map((i: any) => ({
+        ...i,
+        quantity: Number(i.quantity),
+        unitPrice: Number(i.unitPrice),
+        subtotal: Number(i.subtotal),
+        multiplierUsed: Number(i.multiplierUsed),
+    })),
+});
+
 export const getTransactions = (filters: {
     type?: TransactionType;
     branchId?: string;
@@ -381,7 +398,8 @@ export const getTransactions = (filters: {
     search?: string;
 }) => {
     const { type, branchId, userId, from, to, page = 1, limit = 50, search } = filters;
-    return prisma.transaction.findMany({
+    return prisma.transaction
+        .findMany({
         where: {
             ...(type && { type: { equals: type } }),
             ...(branchId && branchId !== 'all' && { branchId }),
@@ -414,20 +432,23 @@ export const getTransactions = (filters: {
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
-    });
+    })
+        .then((txs) => txs.map(normalizeTransaction));
 };
 
 export const getTransactionById = (id: string) =>
-    prisma.transaction.findUnique({
-        where: { id },
-        include: {
-            items: { include: { product: true, presentation: true } },
-            user: { select: { id: true, nombre: true, username: true } },
-            branch: { select: { id: true, name: true } },
-            cashRegister: true,
-            customer: { select: { id: true, name: true, cedula: true } },
-        },
-    });
+    prisma.transaction
+        .findUnique({
+            where: { id },
+            include: {
+                items: { include: { product: true, presentation: true } },
+                user: { select: { id: true, nombre: true, username: true } },
+                branch: { select: { id: true, name: true } },
+                cashRegister: true,
+                customer: { select: { id: true, name: true, cedula: true } },
+            },
+        })
+        .then(normalizeTransaction);
 
 export const cancelTransaction = async (id: string) => {
     const tx = await prisma.transaction.findUnique({
