@@ -17,7 +17,7 @@ ENV_FILE="/opt/erp-market/deploy/clients/$SLUG/.env"
 if [[ -f "$ENV_FILE" ]]; then
     DOMAIN="$(sed -n 's/^CLIENT_DOMAIN=//p' "$ENV_FILE" | head -1)"
 else
-    DOMAIN="$SLUG.89.167.46.144.sslip.io"
+    DOMAIN="$SLUG.allcode.site"
 fi
 
 echo "Registrando tenant '$SLUG' en el dashboard..."
@@ -45,5 +45,5 @@ main();
 " 2>&1
 
 echo ""
-echo "Dashboard: https://mgmt.89.167.46.144.sslip.io"
+echo "Dashboard: https://mgmt.allcode.site"
 echo "Tenant URL: https://$DOMAIN"
