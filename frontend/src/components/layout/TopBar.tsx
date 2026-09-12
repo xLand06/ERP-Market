@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
     ArrowLeftRight, ChevronDown, LogOut, Settings, User, Menu, Keyboard,
-    ShoppingCart, Package, Layers, Banknote, Store, Bell, Palette, Sun, Moon, Check
+    ShoppingCart, Package, Layers, Banknote, Store, Bell, Palette, Sun, Moon, Check, X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -9,6 +9,8 @@ import { BranchSelector } from '@/components/branch/BranchSelector';
 import { CloudSyncWidget } from './CloudSyncWidget';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useAuthStore } from '@/features/auth/store/authStore';
+import { useNotifications } from '@/features/notifications/hooks/useNotifications';
+import { AppNotification } from '@/services/notifications.service';
 import {
     Dialog, DialogContent, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -31,6 +33,26 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     const [ratePopoverOpen, setRatePopoverOpen] = useState(false);
     const [themePopoverOpen, setThemePopoverOpen] = useState(false);
     const navigate = useNavigate();
+
+    // Notificaciones: badge real + panel desplegable
+    const [notifOpen, setNotifOpen] = useState(false);
+    const notifRef = useRef<HTMLDivElement>(null);
+    const { items: notifications, dismiss: dismissNotification } = useNotifications();
+
+    // Cierra el panel al hacer clic fuera (mismo patrón que BranchSelector)
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+                setNotifOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const notificationIcon = (type: AppNotification['type']) => (
+        type === 'fiado' ? <Banknote className="w-4 h-4" /> : <Package className="w-4 h-4" />
+    );
 
     const handleLogout = () => {
         logout();
@@ -270,13 +292,67 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                     >
                         <Keyboard className="w-4 h-4" />
                     </button>
-                    <button 
-                        className="relative w-6 h-6 sm:w-8 sm:h-8 lg:w-9 lg:h-9 flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95"
-                        aria-label="Notificaciones"
-                    >
-                        <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full border border-white" />
-                    </button>
+                    <div className="relative" ref={notifRef}>
+                        <button 
+                            onClick={() => setNotifOpen(!notifOpen)}
+                            className="relative w-6 h-6 sm:w-8 sm:h-8 lg:w-9 lg:h-9 flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95"
+                            aria-label="Notificaciones"
+                        >
+                            <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            {notifications.length > 0 && (
+                                <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-red-500 text-white rounded-full flex items-center justify-center text-[9px] font-bold border border-white">
+                                    {notifications.length > 9 ? '9+' : notifications.length}
+                                </span>
+                            )}
+                        </button>
+
+                        {notifOpen && (
+                            <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 animate-slide-up overflow-hidden">
+                                <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100">
+                                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Notificaciones</span>
+                                    <span className="text-[10px] font-semibold text-slate-400">
+                                        {notifications.length} activa{notifications.length !== 1 ? 's' : ''}
+                                    </span>
+                                </div>
+
+                                <div className="max-h-80 overflow-y-auto">
+                                    {notifications.length === 0 ? (
+                                        <div className="px-3 py-8 text-center">
+                                            <Bell className="w-6 h-6 text-slate-300 mx-auto mb-2" />
+                                            <p className="text-sm font-medium text-slate-400">Sin notificaciones</p>
+                                        </div>
+                                    ) : (
+                                        <ul className="divide-y divide-slate-100">
+                                            {notifications.map((n) => (
+                                                <li key={n.key} className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-slate-50 transition-colors group">
+                                                    <span className={cn(
+                                                        'mt-0.5 w-7 h-7 shrink-0 rounded-lg flex items-center justify-center',
+                                                        n.type === 'fiado'
+                                                            ? 'bg-amber-50 text-amber-600'
+                                                            : 'bg-indigo-50 text-indigo-600'
+                                                    )}>
+                                                        {notificationIcon(n.type)}
+                                                    </span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-xs font-bold text-slate-800">{n.title}</p>
+                                                        <p className="text-xs text-slate-500 leading-snug break-words">{n.message}</p>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => dismissNotification(n.key)}
+                                                        className="shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                                                        aria-label="Descartar notificación"
+                                                        title="Descartar"
+                                                    >
+                                                        <X className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <div className="relative">
