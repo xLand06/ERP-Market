@@ -373,7 +373,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                                         <button
                                             key={p.id}
                                             onMouseDown={() => addProduct(p)}
-                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-indigo-50 transition-colors"
+                                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-indigo-50 transition-colors"
                                         >
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-semibold text-slate-800 truncate">{p.name}</p>
@@ -403,7 +403,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                             {items.map((item, idx) => (
                                 <div key={item.productId} className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
                                     {/* Main row */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_100px_130px_auto_32px] gap-2 items-center px-3 py-2.5">
+                                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_100px_130px_auto_32px] gap-2 items-center px-3 py-3">
                                         <div className="min-w-0">
                                             <p className="text-sm font-semibold text-slate-800 truncate">{item.productName}</p>
                                             <p className="text-[10px] text-slate-400">

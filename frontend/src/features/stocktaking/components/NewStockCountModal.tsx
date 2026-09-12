@@ -143,7 +143,7 @@ export function NewStockCountModal({ open, onClose }: NewStockCountModalProps) {
                             placeholder="Observaciones del conteo..."
                             value={form.notes}
                             onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
-                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm resize-none"
+                            className="w-full px-3.5 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm resize-none"
                         />
                     </div>
                 </div>

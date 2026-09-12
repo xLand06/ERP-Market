@@ -226,14 +226,14 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                 </DialogHeader>
 
                 {errors['_'] && (
-                    <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="mx-5 sm:mx-6 mt-5 sm:mt-6 p-3 bg-red-50 border border-red-100 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
                         {renderError('_')}
                     </div>
                 )}
 
                 {/* ── Pantalla de éxito con credenciales ─────────────────── */}
                 {createdResult ? (
-                    <div className="py-2">
+                    <div className="px-5 sm:px-6 py-5">
                         <div className="text-center mb-5">
                             <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
                                 <UserCheck className="w-6 h-6 text-emerald-600" />
@@ -276,14 +276,16 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                         <button
                             type="button"
                             onClick={() => { setCreatedResult(null); onSuccess(); onClose(); }}
-                            className="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors"
+                            className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors min-h-[44px]"
                         >
                             Entendido
                         </button>
                     </div>
                 ) : (
                 
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form onSubmit={handleSubmit} className="space-y-0">
+                    {/* Scrollable body with padding */}
+                    <div className="px-5 sm:px-6 py-5 space-y-5 overflow-y-auto flex-1 max-h-[calc(100dvh-14rem)]">
                     {/* ── 1. Información personal ─────────────────────────── */}
                     <div>
                         <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3">1 · Quién es</p>
@@ -296,7 +298,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                     type="text"
                                     value={nombre}
                                     onChange={(e) => setNombre(e.target.value)}
-                                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
+                                    className="w-full px-3.5 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
                                     required
                                     placeholder="Ej: María"
                                 />
@@ -309,7 +311,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                     type="text"
                                     value={apellido}
                                     onChange={(e) => setApellido(e.target.value)}
-                                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
+                                    className="w-full px-3.5 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
                                     placeholder="Ej: González"
                                 />
                                 {renderError('apellido')}
@@ -329,7 +331,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                         type="text"
                                         value={username}
                                         onChange={(e) => setUsername(e.target.value.toLowerCase())}
-                                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm font-mono"
+                                        className="w-full px-3.5 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm font-mono"
                                         required
                                         placeholder="Ej: maria"
                                         autoComplete="off"
@@ -442,7 +444,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                     id="branchId"
                                     value={branchId}
                                     onChange={(e) => setBranchId(e.target.value)}
-                                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm bg-white"
+                                    className="w-full px-3.5 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm bg-white"
                                 >
                                     <option value="">Sin asignar</option>
                                     {branches.map(b => (
@@ -458,7 +460,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
+                                    className="w-full px-3.5 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
                                     placeholder="correo@ejemplo.com"
                                 />
                                 {renderError('email')}
@@ -470,7 +472,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                         id="cedulaType"
                                         value={cedulaType}
                                         onChange={(e) => setCedulaType(e.target.value as 'V' | 'E')}
-                                        className="px-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm bg-white font-bold"
+                                        className="px-2 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm bg-white font-bold"
                                     >
                                         <option value="V">V</option>
                                         <option value="E">E</option>
@@ -480,7 +482,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                         type="text"
                                         value={cedulaNumber}
                                         onChange={(e) => setCedulaNumber(e.target.value.replace(/\D/g, ''))}
-                                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm font-mono"
+                                        className="w-full px-3.5 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm font-mono"
                                         placeholder="12345678"
                                     />
                                 </div>
@@ -493,7 +495,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                     type="text"
                                     value={telefono}
                                     onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
-                                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
+                                    className="w-full px-3.5 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
                                     placeholder="04121234567"
                                 />
                                 {renderError('telefono')}
@@ -501,22 +503,26 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                         </div>
                     </div>
 
-                    <div className="flex gap-3 pt-6 mt-2 border-t border-slate-100">
+                    </div>
+                    {/* Fixed footer — not scrollable */}
+                    <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <div className="flex gap-3">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 px-4 py-2.5 bg-slate-100/80 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300"
+                            className="flex-1 px-4 py-3 bg-slate-100/80 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300 min-h-[44px]"
                         >
                             Cancelar
                         </button>
                         <button
                             type="submit"
                             disabled={saving}
-                            className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2"
+                            className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 min-h-[44px]"
                         >
                             {user ? <Save className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
                             {saving ? 'Guardando...' : user ? 'Guardar cambios' : 'Crear usuario'}
                         </button>
+                        </div>
                     </div>
                 </form>
                 )}

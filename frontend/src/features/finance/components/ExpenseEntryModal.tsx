@@ -110,7 +110,7 @@ export function ExpenseEntryModal({ open, onClose, onSave }: ExpenseEntryModalPr
                                 type="button"
                                 onClick={() => setField('type', t)}
                                 className={cn(
-                                    'flex-1 py-2.5 text-sm font-bold transition-colors',
+                                    'flex-1 py-3 text-sm font-bold transition-colors',
                                     form.type === t
                                         ? t === 'income'
                                             ? 'bg-emerald-500 text-white'
