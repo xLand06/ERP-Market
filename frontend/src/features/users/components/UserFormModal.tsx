@@ -1,11 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, UserCheck, Check } from 'lucide-react';
+import { X, Save, UserCheck, Check, KeyRound, Eye, EyeOff, Copy, UserPlus } from 'lucide-react';
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+
+// Genera una contraseña legible pero segura (sin caracteres confusos)
+const generatePassword = () => {
+    const upper = 'ABCDEFGHJKMNPQRSTUVWXYZ';
+    const lower = 'abcdefghjkmnpqrstuvwxyz';
+    const digits = '23456789';
+    const special = '@#$%&*';
+    const pick = (set: string, n: number) => Array.from({ length: n }, () => set[Math.floor(Math.random() * set.length)]).join('');
+    return pick(upper, 2) + pick(lower, 4) + pick(digits, 2) + pick(special, 1);
+};
 
 export interface Branch {
     id: string;
@@ -65,6 +75,8 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
     
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState<Record<string, string[]>>({});
+    const [showPw, setShowPw] = useState(false);
+    const [createdResult, setCreatedResult] = useState<{ username: string; password: string } | null>(null);
     const initialFocusRef = useRef<HTMLInputElement>(null);
 
     // Auto-fill form when user changes or reset on open
@@ -165,9 +177,10 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                 data.password = password;
                 const res = await api.post('/users', data);
                 if (res.status === 201 || res.status === 200) {
-                    toast.success('Usuario creado correctamente');
-                    onSuccess();
-                    onClose();
+                    // Mostrar credenciales para que el dueño las pase al empleado
+                    setCreatedResult({ username: username.trim().toLowerCase(), password });
+                    setSaving(false);
+                    return;
                 }
             }
         } catch (error: any) {
@@ -217,130 +230,158 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                         {renderError('_')}
                     </div>
                 )}
-                
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="nombre" className="block text-sm font-semibold text-slate-700 mb-1.5">Nombre *</label>
-                            <input
-                                id="nombre"
-                                ref={initialFocusRef}
-                                type="text"
-                                value={nombre}
-                                onChange={(e) => setNombre(e.target.value)}
-                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
-                                required
-                                aria-required="true"
-                                placeholder="Ej: María"
-                            />
-                            {renderError('nombre')}
-                        </div>
-                        <div>
-                            <label htmlFor="apellido" className="block text-sm font-semibold text-slate-700 mb-1.5">Apellido</label>
-                            <input
-                                id="apellido"
-                                type="text"
-                                value={apellido}
-                                onChange={(e) => setApellido(e.target.value)}
-                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
-                                placeholder="Ej: González"
-                            />
-                            {renderError('apellido')}
-                        </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="cedulaNumber" className="block text-sm font-semibold text-slate-700 mb-1.5">Cédula *</label>
-                            <div className="flex gap-2">
-                                <select
-                                    id="cedulaType"
-                                    value={cedulaType}
-                                    onChange={(e) => setCedulaType(e.target.value as 'V' | 'E')}
-                                    className="px-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm bg-white font-bold"
-                                >
-                                    <option value="V">V</option>
-                                    <option value="E">E</option>
-                                </select>
-                                <input
-                                    id="cedulaNumber"
-                                    type="text"
-                                    value={cedulaNumber}
-                                    onChange={(e) => setCedulaNumber(e.target.value.replace(/\D/g, ''))}
-                                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm font-mono"
-                                    required
-                                    placeholder="12345678"
-                                />
+                {/* ── Pantalla de éxito con credenciales ─────────────────── */}
+                {createdResult ? (
+                    <div className="py-2">
+                        <div className="text-center mb-5">
+                            <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+                                <UserCheck className="w-6 h-6 text-emerald-600" />
                             </div>
-                            {renderError('cedula')}
+                            <h3 className="text-lg font-bold text-slate-900">Usuario creado</h3>
+                            <p className="text-sm text-slate-500 mt-1">
+                                Pasale estas credenciales al empleado. Se muestran una sola vez.
+                            </p>
                         </div>
-                        <div>
-                            <label htmlFor="telefono" className="block text-sm font-semibold text-slate-700 mb-1.5">Teléfono</label>
-                            <input
-                                id="telefono"
-                                type="text"
-                                value={telefono}
-                                onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
-                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
-                                placeholder="04121234567"
-                            />
-                            {renderError('telefono')}
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 mb-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Usuario</p>
+                                    <p className="text-sm font-mono font-bold text-slate-800">{createdResult.username}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => { navigator.clipboard.writeText(createdResult.username); toast.success('Usuario copiado'); }}
+                                    className="p-2 rounded-lg hover:bg-white border border-slate-200 text-slate-500 hover:text-emerald-600 transition-colors"
+                                    aria-label="Copiar usuario"
+                                >
+                                    <Copy className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Contraseña</p>
+                                    <p className="text-sm font-mono font-bold text-slate-800">{createdResult.password}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => { navigator.clipboard.writeText(createdResult.password); toast.success('Contraseña copiada'); }}
+                                    className="p-2 rounded-lg hover:bg-white border border-slate-200 text-slate-500 hover:text-emerald-600 transition-colors"
+                                    aria-label="Copiar contraseña"
+                                >
+                                    <Copy className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => { setCreatedResult(null); onSuccess(); onClose(); }}
+                            className="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors"
+                        >
+                            Entendido
+                        </button>
+                    </div>
+                ) : (
+                
+                <form onSubmit={handleSubmit} className="space-y-5">
+                    {/* ── 1. Información personal ─────────────────────────── */}
+                    <div>
+                        <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3">1 · Quién es</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="nombre" className="block text-sm font-semibold text-slate-700 mb-1.5">Nombre *</label>
+                                <input
+                                    id="nombre"
+                                    ref={initialFocusRef}
+                                    type="text"
+                                    value={nombre}
+                                    onChange={(e) => setNombre(e.target.value)}
+                                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
+                                    required
+                                    placeholder="Ej: María"
+                                />
+                                {renderError('nombre')}
+                            </div>
+                            <div>
+                                <label htmlFor="apellido" className="block text-sm font-semibold text-slate-700 mb-1.5">Apellido</label>
+                                <input
+                                    id="apellido"
+                                    type="text"
+                                    value={apellido}
+                                    onChange={(e) => setApellido(e.target.value)}
+                                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
+                                    placeholder="Ej: González"
+                                />
+                                {renderError('apellido')}
+                            </div>
                         </div>
                     </div>
 
-                    {!user && (
-                        <div>
-                            <label htmlFor="username" className="block text-sm font-semibold text-slate-700 mb-1.5">Nombre de Usuario *</label>
-                            <input
-                                id="username"
-                                type="text"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value.toLowerCase())}
-                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm font-mono"
-                                required
-                                aria-required="true"
-                                placeholder="Ej: mgonzalez"
-                                autoComplete="off"
-                            />
-                            {renderError('username')}
-                            <p className="text-xs text-slate-500 mt-1">Este identificador será usado para iniciar sesión.</p>
+                    {/* ── 2. Acceso ────────────────────────────────────────── */}
+                    <div>
+                        <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3">2 · Cómo va a entrar</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {!user && (
+                                <div>
+                                    <label htmlFor="username" className="block text-sm font-semibold text-slate-700 mb-1.5">Usuario *</label>
+                                    <input
+                                        id="username"
+                                        type="text"
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value.toLowerCase())}
+                                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm font-mono"
+                                        required
+                                        placeholder="Ej: maria"
+                                        autoComplete="off"
+                                    />
+                                    {renderError('username')}
+                                    <p className="text-xs text-slate-400 mt-1">Con este usuario entra al sistema (se sugiere el nombre).</p>
+                                </div>
+                            )}
+                            <div className={cn(!user && 'md:col-span-1')}>
+                                <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-1.5">
+                                    {user ? 'Nueva Contraseña (opcional)' : 'Contraseña *'}
+                                </label>
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <input
+                                            id="password"
+                                            type={showPw ? 'text' : 'password'}
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            className="w-full px-3.5 py-2.5 pr-10 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm font-mono"
+                                            required={!user}
+                                            placeholder={user ? 'Dejar en blanco' : 'Generá una o escribila'}
+                                            autoComplete="new-password"
+                                        />
+                                        <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" aria-label={showPw ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
+                                            {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                    </div>
+                                    {!user && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setPassword(generatePassword())}
+                                            className="px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 font-semibold text-xs flex items-center gap-1.5 shrink-0"
+                                            title="Generar contraseña segura"
+                                        >
+                                            <KeyRound className="w-3.5 h-3.5" /> Generar
+                                        </button>
+                                    )}
+                                </div>
+                                {renderError('password')}
+                                {!user && (
+                                    <p className="text-[10px] text-slate-400 mt-1">
+                                        Consejo: usá el botón "Generar" y se la pasás al empleado. Mín. 8 caracteres con mayúscula, número y símbolo.
+                                    </p>
+                                )}
+                            </div>
                         </div>
-                    )}
-
-                    <div>
-                        <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-1.5">Email</label>
-                        <input
-                            id="email"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
-                            placeholder="correo@ejemplo.com"
-                        />
-                        {renderError('email')}
                     </div>
 
+                    {/* ── 3. Rol ───────────────────────────────────────────── */}
                     <div>
-                        <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-1.5">
-                            {user ? 'Nueva Contraseña (opcional)' : 'Contraseña *'}
-                        </label>
-                        <input
-                            id="password"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm font-mono"
-                            required={!user}
-                            aria-required={!user}
-                            placeholder={user ? 'Dejar en blanco para no cambiar' : '••••••••'}
-                            autoComplete="new-password"
-                        />
-                        {renderError('password')}
-                        {!user && <p className="text-[10px] text-slate-400 mt-1">Mín. 8 caracteres, 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial.</p>}
-                    </div>
-
-                    <div>
-                        <span className="block text-sm font-semibold text-slate-700 mb-1.5">Rol *</span>
+                        <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3">3 · Qué puede hacer</p>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5" role="radiogroup" aria-label="Rol del usuario">
                             {ROLE_OPTIONS.map(opt => (
                                 <button
@@ -368,64 +409,117 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                             ))}
                         </div>
                         {renderError('role')}
-                    </div>
-
-                    <div>
-                        <label htmlFor="branchId" className="block text-sm font-semibold text-slate-700 mb-1.5">Sucursal</label>
-                        <select
-                            id="branchId"
-                            value={branchId}
-                            onChange={(e) => setBranchId(e.target.value)}
-                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm bg-white"
-                        >
-                            <option value="">Sin asignar</option>
-                            {branches.map(b => (
-                                <option key={b.id} value={b.id}>{b.name}</option>
-                            ))}
-                        </select>
-                        {renderError('branchId')}
-                    </div>
-
-                    {role === 'SELLER' && (
-                        <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl flex items-start gap-3">
-                            <div className="flex items-center h-5">
-                                <input
-                                    id="canManageInventory"
-                                    type="checkbox"
-                                    checked={canManageInventory}
-                                    onChange={(e) => setCanManageInventory(e.target.checked)}
-                                    className="w-4 h-4 text-emerald-600 bg-white border-slate-300 rounded focus:ring-emerald-500"
-                                />
+                        {role === 'SELLER' && (
+                            <div className="mt-3 bg-emerald-50 border border-emerald-100 p-4 rounded-xl flex items-start gap-3">
+                                <div className="flex items-center h-5">
+                                    <input
+                                        id="canManageInventory"
+                                        type="checkbox"
+                                        checked={canManageInventory}
+                                        onChange={(e) => setCanManageInventory(e.target.checked)}
+                                        className="w-4 h-4 text-emerald-600 bg-white border-slate-300 rounded focus:ring-emerald-500"
+                                    />
+                                </div>
+                                <div className="flex flex-col">
+                                    <label htmlFor="canManageInventory" className="text-sm font-bold text-emerald-900">
+                                        Este cajero también repone inventario
+                                    </label>
+                                    <p className="text-xs text-emerald-700 mt-0.5">
+                                        Si está activo, este cajero podrá registrar entradas de mercancía y hacer ajustes de recuento.
+                                    </p>
+                                </div>
                             </div>
-                            <div className="flex flex-col">
-                                <label htmlFor="canManageInventory" className="text-sm font-bold text-emerald-900">
-                                    Este cajero también repone inventario
-                                </label>
-                                <p className="text-xs text-emerald-700 mt-0.5">
-                                    Si está activo, este cajero podrá registrar entradas de mercancía y hacer ajustes de recuento.
-                                </p>
+                        )}
+                    </div>
+
+                    {/* ── 4. Sucursal y contacto (opcional) ────────────────── */}
+                    <div>
+                        <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3">4 · Detalles</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="branchId" className="block text-sm font-semibold text-slate-700 mb-1.5">Sucursal</label>
+                                <select
+                                    id="branchId"
+                                    value={branchId}
+                                    onChange={(e) => setBranchId(e.target.value)}
+                                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm bg-white"
+                                >
+                                    <option value="">Sin asignar</option>
+                                    {branches.map(b => (
+                                        <option key={b.id} value={b.id}>{b.name}</option>
+                                    ))}
+                                </select>
+                                {renderError('branchId')}
+                            </div>
+                            <div>
+                                <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-1.5">Email</label>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
+                                    placeholder="correo@ejemplo.com"
+                                />
+                                {renderError('email')}
+                            </div>
+                            <div>
+                                <label htmlFor="cedulaNumber" className="block text-sm font-semibold text-slate-700 mb-1.5">Cédula</label>
+                                <div className="flex gap-2">
+                                    <select
+                                        id="cedulaType"
+                                        value={cedulaType}
+                                        onChange={(e) => setCedulaType(e.target.value as 'V' | 'E')}
+                                        className="px-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm bg-white font-bold"
+                                    >
+                                        <option value="V">V</option>
+                                        <option value="E">E</option>
+                                    </select>
+                                    <input
+                                        id="cedulaNumber"
+                                        type="text"
+                                        value={cedulaNumber}
+                                        onChange={(e) => setCedulaNumber(e.target.value.replace(/\D/g, ''))}
+                                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm font-mono"
+                                        placeholder="12345678"
+                                    />
+                                </div>
+                                {renderError('cedula')}
+                            </div>
+                            <div>
+                                <label htmlFor="telefono" className="block text-sm font-semibold text-slate-700 mb-1.5">Teléfono</label>
+                                <input
+                                    id="telefono"
+                                    type="text"
+                                    value={telefono}
+                                    onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
+                                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
+                                    placeholder="04121234567"
+                                />
+                                {renderError('telefono')}
                             </div>
                         </div>
-                    )}
+                    </div>
 
-                    <div className="flex gap-3 pt-6 mt-6 border-t border-slate-100">
-                        <button 
-                            type="button" 
-                            onClick={onClose} 
+                    <div className="flex gap-3 pt-6 mt-2 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={onClose}
                             className="flex-1 px-4 py-2.5 bg-slate-100/80 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300"
                         >
                             Cancelar
                         </button>
-                        <button 
-                            type="submit" 
-                            disabled={saving} 
-                            className="flex-1 px-4 py-2.5 bg-slate-900 text-white font-semibold rounded-xl hover:bg-slate-800 transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2"
+                        <button
+                            type="submit"
+                            disabled={saving}
+                            className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2"
                         >
-                            <Save className="w-4 h-4" />
-                            {saving ? 'Guardando...' : 'Guardar Información'}
+                            {user ? <Save className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+                            {saving ? 'Guardando...' : user ? 'Guardar cambios' : 'Crear usuario'}
                         </button>
                     </div>
                 </form>
+                )}
             </DialogContent>
         </Dialog>
     );
