@@ -231,6 +231,9 @@ app.use('/api/catalog',     catalogRouter);
 app.use('/api/banks',       banksRouter);
 // Notificaciones calculadas en vivo (fiados + stock bajo)
 app.use('/api/notifications', notificationsRouter);
+// Facturación / billing del tenant (proxy al management server)
+import billingRouter from './modules/billing/billing.routes';
+app.use('/api/billing',     billingRouter);
 
 // ─── FRONTEND ESTÁTICO (modo standalone sin Electron) ─────────────────────
 // Sirve el frontend compilado desde backend/public/

@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Settings2, Building2, Tag, AlertTriangle, HardDrive, Printer, Globe } from 'lucide-react';
-import { SystemSettings, InvoiceSettings, BranchesTab, CategoriesTab, MaintenanceTab, CatalogSettings } from '../components';
+import { Settings2, Building2, Tag, AlertTriangle, HardDrive, Printer, Globe, CreditCard } from 'lucide-react';
+import { SystemSettings, InvoiceSettings, BranchesTab, CategoriesTab, MaintenanceTab, CatalogSettings, BillingSettings } from '../components';
 import { BackupPanel } from '@/features/backup/BackupPanel';
 import { useAuthStore } from '@/features/auth/store/authStore';
 
-type Tab = 'branches' | 'categories' | 'invoice' | 'system' | 'maintenance' | 'backup' | 'catalog';
+type Tab = 'branches' | 'categories' | 'invoice' | 'system' | 'maintenance' | 'backup' | 'catalog' | 'billing';
 
 export default function SettingsPage() {
     const user = useAuthStore(s => s.user);
@@ -37,6 +37,7 @@ export default function SettingsPage() {
         { id: 'categories' as Tab, label: 'Grupos y Subgrupos', icon: Tag, count: groups.length },
         { id: 'invoice' as Tab, label: 'Facturación e Impresora', icon: Printer },
         { id: 'catalog' as Tab, label: 'Catálogo Digital', icon: Globe },
+        { id: 'billing' as Tab, label: 'Mi Suscripción', icon: CreditCard },
         { id: 'system' as Tab, label: 'Configuración Global', icon: Settings2 },
         { id: 'maintenance' as Tab, label: 'Mantenimiento', icon: AlertTriangle },
         { id: 'backup' as Tab, label: 'Backup & Nube', icon: HardDrive },
@@ -54,6 +55,8 @@ export default function SettingsPage() {
                 return <InvoiceSettings />;
             case 'catalog':
                 return <CatalogSettings />;
+            case 'billing':
+                return <BillingSettings />;
             case 'system':
                 return <SystemSettings />;
             case 'backup':
