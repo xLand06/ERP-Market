@@ -356,17 +356,9 @@ function createWindow(): BrowserWindow {
     mainWindow.on('moved', saveWindowState);
     mainWindow.on('resized', saveWindowState);
 
-    // Al cerrar → minimizar a tray (no salir)
-    mainWindow.on('close', (event) => {
-        if (!app.isQuitting) {
-            event.preventDefault();
-            mainWindow?.hide();
-            // En macOS el comportamiento difiere, la app no se cierra al cerrar ventana
-            if (process.platform !== 'darwin') {
-                // No fazer nada especial en Windows/Linux — solo hide
-                // La app permanece en background
-            }
-        }
+    // Al cerrar → salir de verdad (no quedar en background consumiendo recursos)
+    mainWindow.on('close', () => {
+        (app as any).isQuitting = true;
     });
 
     if (is.dev && process.env.ELECTRON_RENDERER_URL) {
