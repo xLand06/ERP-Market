@@ -31,7 +31,7 @@ export const createUserSchema = {
         }
         
         const role = obj?.role as string;
-        if (role && !['OWNER', 'SELLER'].includes(role)) {
+        if (role && !['OWNER', 'MANAGER', 'SELLER'].includes(role)) {
             fieldErrors['role'] = ['Rol inválido'];
         }
         
@@ -53,7 +53,7 @@ export const createUserSchema = {
                 name, 
                 email: email.toLowerCase(), 
                 password, 
-                role: (role as 'OWNER' | 'SELLER') || 'SELLER',
+                role: (role as 'OWNER' | 'MANAGER' | 'SELLER') || 'SELLER',
                 isActive: true,
             } 
         };
@@ -68,7 +68,7 @@ export const userFiltersSchema = {
         const obj = data as Record<string, unknown>;
         const result: Record<string, unknown> = {};
         
-        if (obj?.role && ['OWNER', 'SELLER'].includes(obj.role as string)) {
+        if (obj?.role && ['OWNER', 'MANAGER', 'SELLER'].includes(obj.role as string)) {
             result.role = obj.role;
         }
         
@@ -91,14 +91,14 @@ export type CreateUserInput = {
     name: string;
     email: string;
     password: string;
-    role?: 'OWNER' | 'SELLER';
+    role?: 'OWNER' | 'MANAGER' | 'SELLER';
 };
 
 /**
  * Tipo inferido de userFiltersSchema
  */
 export type UserFiltersInput = {
-    role?: 'OWNER' | 'SELLER';
+    role?: 'OWNER' | 'MANAGER' | 'SELLER';
     isActive?: boolean;
     search?: string;
 };

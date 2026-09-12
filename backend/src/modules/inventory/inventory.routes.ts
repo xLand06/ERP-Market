@@ -16,8 +16,8 @@ router.use(authMiddleware);
 
 // ─── STOCK POR SEDE ────────────────────────────────────────────────────────
 
-/** GET  /api/inventory/stock — Stock de todas las sedes (OWNER) */
-router.get('/stock', roleGuard('OWNER'), ctrl.getAllStock);
+/** GET  /api/inventory/stock — Stock de todas las sedes (MANAGER o superior) */
+router.get('/stock', roleGuard('MANAGER'), ctrl.getAllStock);
 
 /** GET  /api/inventory/stock/branch/:branchId — Stock de una sede específica */
 router.get('/stock/branch/:branchId', 

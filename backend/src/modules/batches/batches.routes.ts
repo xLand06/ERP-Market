@@ -34,13 +34,13 @@ router.get('/:id', validate(idParamSchema, { source: 'params' }), ctrl.getBatchB
 
 // ─── CRUD ─────────────────────────────────────────────────────────────────
 
-/** POST /api/batches — Crear lote (OWNER) */
-router.post('/', roleGuard('OWNER'), validate(createBatchSchema), ctrl.createBatch);
+/** POST /api/batches — Crear lote (MANAGER o superior) */
+router.post('/', roleGuard('MANAGER'), validate(createBatchSchema), ctrl.createBatch);
 
-/** PATCH /api/batches/:id — Actualizar lote (OWNER) */
-router.patch('/:id', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), validate(updateBatchSchema), ctrl.updateBatch);
+/** PATCH /api/batches/:id — Actualizar lote (MANAGER o superior) */
+router.patch('/:id', roleGuard('MANAGER'), validate(idParamSchema, { source: 'params' }), validate(updateBatchSchema), ctrl.updateBatch);
 
-/** DELETE /api/batches/:id — Eliminar lote (OWNER) */
-router.delete('/:id', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), ctrl.deleteBatch);
+/** DELETE /api/batches/:id — Eliminar lote (MANAGER o superior) */
+router.delete('/:id', roleGuard('MANAGER'), validate(idParamSchema, { source: 'params' }), ctrl.deleteBatch);
 
 export default router;

@@ -1,6 +1,6 @@
 // =============================================================================
 // ROLE GUARD — Access Control para ERP-MARKET
-// Jerarquía: OWNER > SELLER
+// Jerarquía: OWNER > MANAGER > SELLER
 // Un rol de nivel N puede acceder a todo lo que requiera nivel <= N.
 // =============================================================================
 
@@ -8,23 +8,25 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from './auth.middleware';
 import { ForbiddenError } from './errorHandler';
 
-export type Role = 'OWNER' | 'SELLER';
+export type Role = 'OWNER' | 'MANAGER' | 'SELLER';
 
 /**
  * Jerarquía de roles. Número mayor = más privilegios.
- * OWNER puede hacer todo lo que SELLER puede hacer y más.
+ * OWNER puede hacer todo lo que MANAGER y SELLER pueden hacer y más.
  */
 const ROLE_HIERARCHY: Record<Role, number> = {
     SELLER: 0,
-    OWNER: 1,
+    MANAGER: 1,
+    OWNER: 2,
 };
 
 /**
  * Guard de rol con jerarquía implícita.
  *
- * roleGuard('SELLER')       → SELLER ✅, OWNER ✅
- * roleGuard('OWNER')        → SELLER ❌, OWNER ✅
- * roleGuard('OWNER','SELLER') → ambos ✅ (equivalente a SELLER por jerarquía)
+ * roleGuard('SELLER')         → SELLER ✅, MANAGER ✅, OWNER ✅
+ * roleGuard('MANAGER')        → SELLER ❌, MANAGER ✅, OWNER ✅
+ * roleGuard('OWNER')          → SELLER ❌, MANAGER ❌, OWNER ✅
+ * roleGuard('OWNER','SELLER') → todos ✅ (equivalente a SELLER por jerarquía)
  */
 export const roleGuard = (...roles: Role[]) => {
     return (req: AuthRequest, res: Response, next: NextFunction): void => {

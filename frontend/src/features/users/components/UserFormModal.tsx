@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, UserCheck } from 'lucide-react';
+import { X, Save, UserCheck, Check } from 'lucide-react';
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 export interface Branch {
@@ -11,13 +12,15 @@ export interface Branch {
     name: string;
 }
 
+export type UserRole = 'OWNER' | 'MANAGER' | 'SELLER';
+
 export interface User {
     id: string;
     username: string;
     nombre: string;
     apellido?: string;
     email?: string;
-    role: 'OWNER' | 'SELLER';
+    role: UserRole;
     canManageInventory?: boolean;
     branchId?: string;
     isActive: boolean;
@@ -25,6 +28,16 @@ export interface User {
     cedulaType?: 'V' | 'E';
     telefono?: string;
 }
+
+/**
+ * Opciones de rol presentadas como tarjetas seleccionables,
+ * con descripción en lenguaje simple para el dueño de la bodega.
+ */
+const ROLE_OPTIONS: { value: UserRole; label: string; description: string }[] = [
+    { value: 'OWNER',   label: 'Dueño',     description: 'Control total: usuarios, configuración, finanzas y cierre de caja' },
+    { value: 'MANAGER', label: 'Encargado', description: 'Opera el negocio: inventario, clientes, fiados, compras y bancos' },
+    { value: 'SELLER',  label: 'Cajero',    description: 'Solo vender y cobrar en caja' },
+];
 
 interface UserFormModalProps {
     open: boolean;
@@ -41,7 +54,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
     const [nombre, setNombre] = useState('');
     const [apellido, setApellido] = useState('');
     const [email, setEmail] = useState('');
-    const [role, setRole] = useState<'OWNER' | 'SELLER'>('SELLER');
+    const [role, setRole] = useState<UserRole>('SELLER');
     const [canManageInventory, setCanManageInventory] = useState(false);
     const [branchId, setBranchId] = useState('');
     
@@ -326,56 +339,70 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                         {!user && <p className="text-[10px] text-slate-400 mt-1">Mín. 8 caracteres, 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial.</p>}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="role" className="block text-sm font-semibold text-slate-700 mb-1.5">Rol *</label>
-                            <select
-                                id="role"
-                                value={role}
-                                onChange={(e) => setRole(e.target.value as 'OWNER' | 'SELLER')}
-                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm bg-white"
-                                required
-                                aria-required="true"
-                            >
-                                <option value="SELLER">Vendedor</option>
-                                <option value="OWNER">Administrador</option>
-                            </select>
-                            {renderError('role')}
+                    <div>
+                        <span className="block text-sm font-semibold text-slate-700 mb-1.5">Rol *</span>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5" role="radiogroup" aria-label="Rol del usuario">
+                            {ROLE_OPTIONS.map(opt => (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={role === opt.value}
+                                    onClick={() => setRole(opt.value)}
+                                    className={cn(
+                                        'relative text-left p-3.5 rounded-xl border-2 transition-all',
+                                        role === opt.value
+                                            ? 'border-emerald-500 bg-emerald-50/60 shadow-sm'
+                                            : 'border-slate-200 bg-white hover:border-slate-300'
+                                    )}
+                                >
+                                    <span className={cn(
+                                        'absolute top-2.5 right-2.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all',
+                                        role === opt.value ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 bg-white'
+                                    )}>
+                                        {role === opt.value && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                                    </span>
+                                    <span className="block text-sm font-bold text-slate-800">{opt.label}</span>
+                                    <span className="block text-[11px] leading-snug text-slate-500 mt-1 pr-6">{opt.description}</span>
+                                </button>
+                            ))}
                         </div>
-                        <div>
-                            <label htmlFor="branchId" className="block text-sm font-semibold text-slate-700 mb-1.5">Sucursal</label>
-                            <select
-                                id="branchId"
-                                value={branchId}
-                                onChange={(e) => setBranchId(e.target.value)}
-                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm bg-white"
-                            >
-                                <option value="">Sin asignar</option>
-                                {branches.map(b => (
-                                    <option key={b.id} value={b.id}>{b.name}</option>
-                                ))}
-                            </select>
-                            {renderError('branchId')}
-                        </div>
+                        {renderError('role')}
+                    </div>
+
+                    <div>
+                        <label htmlFor="branchId" className="block text-sm font-semibold text-slate-700 mb-1.5">Sucursal</label>
+                        <select
+                            id="branchId"
+                            value={branchId}
+                            onChange={(e) => setBranchId(e.target.value)}
+                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm bg-white"
+                        >
+                            <option value="">Sin asignar</option>
+                            {branches.map(b => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                        </select>
+                        {renderError('branchId')}
                     </div>
 
                     {role === 'SELLER' && (
-                        <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-start gap-3">
+                        <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl flex items-start gap-3">
                             <div className="flex items-center h-5">
                                 <input
                                     id="canManageInventory"
                                     type="checkbox"
                                     checked={canManageInventory}
                                     onChange={(e) => setCanManageInventory(e.target.checked)}
-                                    className="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500"
+                                    className="w-4 h-4 text-emerald-600 bg-white border-slate-300 rounded focus:ring-emerald-500"
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label htmlFor="canManageInventory" className="text-sm font-bold text-indigo-900">
-                                    Permitir gestionar inventario
+                                <label htmlFor="canManageInventory" className="text-sm font-bold text-emerald-900">
+                                    Este cajero también repone inventario
                                 </label>
-                                <p className="text-xs text-indigo-700 mt-0.5">
-                                    Si está activo, este vendedor podrá registrar entradas de mercancía y hacer ajustes de recuento.
+                                <p className="text-xs text-emerald-700 mt-0.5">
+                                    Si está activo, este cajero podrá registrar entradas de mercancía y hacer ajustes de recuento.
                                 </p>
                             </div>
                         </div>

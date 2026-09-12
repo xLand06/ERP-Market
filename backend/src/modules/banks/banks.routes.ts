@@ -28,11 +28,11 @@ router.get('/summary', ctrl.getSummary);
 router.get('/accounts/:id/transactions', validate(idParamSchema, { source: 'params' }), ctrl.getTransactions);
 
 /** POST /api/banks/accounts — Crear cuenta bancaria */
-router.post('/accounts', roleGuard('SELLER'), validate(createBankAccountSchema), ctrl.createAccount);
+router.post('/accounts', roleGuard('MANAGER'), validate(createBankAccountSchema), ctrl.createAccount);
 
 /** PUT  /api/banks/accounts/:id — Editar cuenta bancaria */
 router.put('/accounts/:id',
-    roleGuard('SELLER'),
+    roleGuard('MANAGER'),
     validate(idParamSchema, { source: 'params' }),
     validate(updateBankAccountSchema),
     ctrl.updateAccount
@@ -40,7 +40,7 @@ router.put('/accounts/:id',
 
 /** POST /api/banks/accounts/:id/transactions — Registrar movimiento */
 router.post('/accounts/:id/transactions',
-    roleGuard('SELLER'),
+    roleGuard('MANAGER'),
     validate(idParamSchema, { source: 'params' }),
     validate(bankTransactionSchema),
     ctrl.createTransaction

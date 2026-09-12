@@ -12,12 +12,14 @@ import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
 
 const ROLE_LABELS: Record<string, string> = {
-    OWNER: 'Administrador',
-    SELLER: 'Vendedor',
+    OWNER: 'Dueño',
+    MANAGER: 'Encargado',
+    SELLER: 'Cajero',
 };
 
 const ROLE_BADGES: Record<string, 'default' | 'success' | 'warning' | 'destructive'> = {
     OWNER: 'destructive',
+    MANAGER: 'warning',
     SELLER: 'success',
 };
 

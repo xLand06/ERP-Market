@@ -30,13 +30,13 @@ router.get('/:id', validate(idParamSchema, { source: 'params' }), ctrl.getStockC
 
 // ─── CREAR ─────────────────────────────────────────────────────────────────
 
-/** POST /api/stocktaking — Crear nuevo conteo (OWNER) */
-router.post('/', roleGuard('OWNER'), validate(createStockCountSchema), ctrl.createStockCount);
+/** POST /api/stocktaking — Crear nuevo conteo (MANAGER o superior) */
+router.post('/', roleGuard('MANAGER'), validate(createStockCountSchema), ctrl.createStockCount);
 
 // ─── ACTUALIZAR ESTADO ─────────────────────────────────────────────────────
 
-/** PATCH /api/stocktaking/:id/status — Cambiar estado (OWNER) */
-router.patch('/:id/status', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), validate(updateStockCountStatusSchema), ctrl.updateStockCountStatus);
+/** PATCH /api/stocktaking/:id/status — Cambiar estado (MANAGER o superior) */
+router.patch('/:id/status', roleGuard('MANAGER'), validate(idParamSchema, { source: 'params' }), validate(updateStockCountStatusSchema), ctrl.updateStockCountStatus);
 
 // ─── ACTUALIZAR ITEMS ──────────────────────────────────────────────────────
 
@@ -45,7 +45,7 @@ router.patch('/items/:itemId', validate(updateStockCountItemSchema), ctrl.update
 
 // ─── APLICAR ──────────────────────────────────────────────────────────────
 
-/** POST /api/stocktaking/:id/apply — Aplicar diferencias al inventario (OWNER) */
-router.post('/:id/apply', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), validate(applyStockCountSchema, { source: 'query' }), ctrl.applyStockCountDifferences);
+/** POST /api/stocktaking/:id/apply — Aplicar diferencias al inventario (MANAGER o superior) */
+router.post('/:id/apply', roleGuard('MANAGER'), validate(idParamSchema, { source: 'params' }), validate(applyStockCountSchema, { source: 'query' }), ctrl.applyStockCountDifferences);
 
 export default router;

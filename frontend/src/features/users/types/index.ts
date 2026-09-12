@@ -5,7 +5,7 @@ export interface User {
     apellido?: string;
     email?: string;
     telefono?: string;
-    role: 'OWNER' | 'SELLER';
+    role: 'OWNER' | 'MANAGER' | 'SELLER';
     canManageInventory?: boolean;
     branchId?: string;
     branch?: { name: string };

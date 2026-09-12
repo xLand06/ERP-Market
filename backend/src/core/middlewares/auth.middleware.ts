@@ -10,7 +10,7 @@ import logger from '../utils/logger';
 
 export interface AuthUser {
     id: string;
-    role: 'OWNER' | 'SELLER';
+    role: 'OWNER' | 'MANAGER' | 'SELLER';
     name?: string;
     email?: string;
     branchId?: string;
@@ -88,7 +88,7 @@ export const authMiddleware = asyncHandler(async (
 
         req.user = {
             id: decoded.id,
-            role: decoded.role as 'OWNER' | 'SELLER',
+            role: decoded.role as 'OWNER' | 'MANAGER' | 'SELLER',
             name: decoded.name,
             email: decoded.email,
             branchId: decoded.branchId,

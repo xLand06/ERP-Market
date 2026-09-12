@@ -32,11 +32,11 @@ router.get('/:id', validate(idParamSchema, { source: 'params' }), ctrl.getOrderB
 router.get('/:id/payments', validate(idParamSchema, { source: 'params' }), ctrl.getSupplierPayments);
 
 /** POST /api/purchases — Crear orden (Draft) */
-router.post('/', roleGuard('OWNER', 'SELLER'), validate(createPurchaseOrderSchema), ctrl.createOrder);
+router.post('/', roleGuard('MANAGER'), validate(createPurchaseOrderSchema), ctrl.createOrder);
 
 /** POST /api/purchases/:id/payments — Registrar pago a proveedor (CxP) */
 router.post('/:id/payments', 
-    roleGuard('OWNER', 'SELLER'), 
+    roleGuard('MANAGER'), 
     validate(idParamSchema, { source: 'params' }), 
     validate(supplierPaymentSchema), 
     ctrl.recordSupplierPayment
@@ -44,15 +44,15 @@ router.post('/:id/payments',
 
 /** PATCH /api/purchases/:id/status — Cambiar estado (Maneja stock al RECIBIR) */
 router.patch('/:id/status', 
-    roleGuard('OWNER'), 
+    roleGuard('MANAGER'), 
     validate(idParamSchema, { source: 'params' }), 
     validate(updatePurchaseOrderStatusSchema), 
     ctrl.updateOrderStatus
 );
 
-/** DELETE /api/purchases/:id — Anular orden (Solo OWNER) */
+/** DELETE /api/purchases/:id — Anular orden (MANAGER o superior) */
 router.delete('/:id', 
-    roleGuard('OWNER'), 
+    roleGuard('MANAGER'), 
     validate(idParamSchema, { source: 'params' }), 
     ctrl.deleteOrder
 );
