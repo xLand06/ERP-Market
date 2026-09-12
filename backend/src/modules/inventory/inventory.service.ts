@@ -123,17 +123,26 @@ export const adjustStock = async (data: AdjustStockInput) => {
  * Usa raw query porque Prisma no soporta comparación entre columnas
  */
 export const getLowStockAlerts = async (branchId?: string) => {
-    const branchFilter = branchId ? `AND bi.branchId = '${branchId}'` : '';
-    const rows = await prisma.$queryRawUnsafe<Array<Record<string, any>>>(`
-        SELECT bi.*, p.id as p_id, p.name as p_name, p.barcode as p_barcode,
-               p.cost as p_cost, p.baseUnit as p_base_unit, p.price as p_price,
-               p.imageUrl as p_image_url, p.isActive as p_is_active
-        FROM branch_inventory bi
-        JOIN products p ON p.id = bi.productId
-        WHERE bi.stock <= bi.minStock
-        ${branchFilter}
-        ORDER BY bi.stock ASC
-    `);
+    const rows = branchId
+        ? await prisma.$queryRaw<Array<Record<string, any>>>`
+            SELECT bi.*, p.id as p_id, p.name as p_name, p.barcode as p_barcode,
+                   p.cost as p_cost, p.baseUnit as p_base_unit, p.price as p_price,
+                   p.imageUrl as p_image_url, p.isActive as p_is_active
+            FROM branch_inventory bi
+            JOIN products p ON p.id = bi.productId
+            WHERE bi.stock <= bi.minStock
+              AND bi.branchId = ${branchId}
+            ORDER BY bi.stock ASC
+        `
+        : await prisma.$queryRaw<Array<Record<string, any>>>`
+            SELECT bi.*, p.id as p_id, p.name as p_name, p.barcode as p_barcode,
+                   p.cost as p_cost, p.baseUnit as p_base_unit, p.price as p_price,
+                   p.imageUrl as p_image_url, p.isActive as p_is_active
+            FROM branch_inventory bi
+            JOIN products p ON p.id = bi.productId
+            WHERE bi.stock <= bi.minStock
+            ORDER BY bi.stock ASC
+        `;
 
     return rows.map((r: any) => ({
         id: r.id,

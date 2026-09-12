@@ -30,6 +30,17 @@ export const processSale = async (payload: SalePayload) => {
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const total = payload.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
 
+        // Validar stock suficiente ANTES de crear la venta
+        for (const item of payload.items) {
+            const inventory = await tx.branchInventory.findUnique({
+                where: { productId_branchId: { productId: item.productId, branchId: payload.branchId } },
+            });
+            const currentStock = inventory ? Number(inventory.stock) : 0;
+            if (currentStock < item.quantity) {
+                throw new Error(`Stock insuficiente para producto ${item.productId}. Disponible: ${currentStock}, solicitado: ${item.quantity}`);
+            }
+        }
+
         const transaction = await tx.transaction.create({
             data: {
                 type: 'SALE',
@@ -56,15 +67,10 @@ export const processSale = async (payload: SalePayload) => {
         });
 
         for (const item of payload.items) {
-            const inventory = await tx.branchInventory.findUnique({
-                where: { productId_branchId: { productId: item.productId, branchId: payload.branchId } },
+            await tx.branchInventory.updateMany({
+                where: { productId: item.productId, branchId: payload.branchId },
+                data: { stock: { decrement: item.quantity } },
             });
-            if (inventory) {
-                await tx.branchInventory.update({
-                    where: { id: inventory.id },
-                    data: { stock: { decrement: item.quantity } },
-                });
-            }
         }
 
         return transaction;
@@ -115,8 +121,43 @@ export const getSaleById = async (id: string) => {
 };
 
 export const voidSale = async (id: string, reason: string) => {
-    return prisma.transaction.update({
-        where: { id },
-        data: { status: 'CANCELLED', notes: reason },
+    // Verificar que la venta existe y no está ya anulada
+    const sale = await prisma.transaction.findUnique({ where: { id } });
+    if (!sale) throw new Error('Venta no encontrada');
+    if (sale.status === 'CANCELLED') throw new Error('La venta ya está cancelada');
+
+    // Revertir stock y deuda del cliente usando la misma lógica que cancelTransaction del POS
+    return prisma.$transaction(async (tx) => {
+        // Marcar como cancelada
+        await tx.transaction.update({
+            where: { id },
+            data: { status: 'CANCELLED', notes: reason },
+        });
+
+        // Revertir deuda del cliente si es venta a crédito
+        if (sale.customerId) {
+            const originalDebt = Number(sale.total);
+            if (originalDebt > 0.005) {
+                await tx.customer.update({
+                    where: { id: sale.customerId },
+                    data: { balance: { decrement: originalDebt } },
+                });
+            }
+        }
+
+        // Revertir stock de cada item
+        const items = await prisma.transactionItem.findMany({
+            where: { transactionId: id },
+        });
+        for (const item of items) {
+            const realQuantity = Number(item.quantity) * Number(item.multiplierUsed || 1);
+            // En una venta, el stock fue decrementado; al cancelar, incrementamos
+            await tx.branchInventory.updateMany({
+                where: { productId: item.productId, branchId: sale.branchId },
+                data: { stock: { increment: realQuantity } },
+            });
+        }
+
+        return tx.transaction.findUnique({ where: { id } });
     });
 };

@@ -83,9 +83,8 @@ router.get('/initial-status', async (_req, res) => {
     }
 });
 
-// Endpoint público para disparar sync manual (desde login, sin token)
-// runSyncCycle tiene su propio mutex (isSyncing), múltiples llamadas son seguras
-router.post('/trigger', async (_req, res) => {
+// Endpoint protegido — solo OWNER puede disparar sync manual
+router.post('/trigger', authMiddleware, roleGuard('OWNER'), async (_req, res) => {
     try {
         if (DEPLOY_MODE === 'server') { res.json({ success: true, message: 'Sync not applicable in server mode' }); return; }
         runSyncCycle();

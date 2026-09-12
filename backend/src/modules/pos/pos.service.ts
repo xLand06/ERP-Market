@@ -143,17 +143,21 @@ export const createTransaction = async (input: CreateTransactionInput) => {
     const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
     // Validación multi-pago: convertir cada pago a la moneda de referencia de la transacción
+    // La moneda de referencia es COP (pesos colombianos).
+    // USD → COP: amount * usdRate (e.g. $10 * 3600 = 36,000 COP)
+    // VES → COP: amount / vesRate (e.g. Bs.55 / 5.5 = 10 COP)
+    // COP → COP: amount directly
     const sumaMetodosBase = paymentMethods && paymentMethods.length > 0
         ? paymentMethods.reduce((sum, pm) => {
-            if (pm.currency === 'USD') return sum + pm.amount;
+            if (pm.currency === 'USD') {
+                const rate = pm.exchangeRate || 3600;
+                return sum + (rate > 0 ? pm.amount * rate : pm.amount);
+            }
             if (pm.currency === 'VES') {
                 const rate = pm.exchangeRate || 5.5;
                 return sum + (rate > 0 ? pm.amount / rate : pm.amount);
             }
-            if (pm.currency === 'COP') {
-                const rate = pm.exchangeRate || 3600;
-                return sum + (rate > 0 ? pm.amount / rate : pm.amount);
-            }
+            // COP — moneda de referencia, sin conversión
             return sum + pm.amount;
         }, 0)
         : 0;
@@ -464,6 +468,20 @@ export const cancelTransaction = async (id: string) => {
             where: { id },
             data: { status: TransactionStatus.CANCELLED },
         });
+
+        // Revertir deuda del cliente si es venta a crédito (fiado)
+        if (tx.customerId) {
+            // Calcular cuánto debía el cliente de esta venta
+            // La deuda fue total - suma de pagos. Si no hay paymentMethods guardados,
+            // usamos el total completo como deuda original.
+            const originalDebt = Number(tx.total);
+            if (originalDebt > 0.005) {
+                await txClient.customer.update({
+                    where: { id: tx.customerId },
+                    data: { balance: { decrement: originalDebt } },
+                });
+            }
+        }
 
         // Ejecutar updates de stock en paralelo
         await Promise.all(tx.items.map(async (item) => {
