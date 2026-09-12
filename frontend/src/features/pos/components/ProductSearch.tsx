@@ -6,7 +6,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, normalizeText } from '@/lib/utils';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useProductSearch, findProductByBarcode } from '../hooks/useProductSearch';
 import { CameraBarcodeScannerModal } from '@/components/scanner/CameraBarcodeScannerModal';
@@ -271,7 +271,7 @@ export function ProductSearch({
                             ref={searchRef}
                             placeholder="Buscar producto por nombre o escanear código... [F2]"
                             value={search}
-                            onChange={e => setSearch(e.target.value)}
+                            onChange={e => setSearch(normalizeText(e.target.value))}
                             className="pl-10 pr-10 h-11 bg-white border-slate-200 shadow-2xs rounded-xl focus:border-indigo-500 text-sm font-medium"
                         />
                         <Barcode className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-indigo-500" />

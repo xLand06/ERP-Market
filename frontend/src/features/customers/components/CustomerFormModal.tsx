@@ -6,7 +6,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { cn, normalizeText } from '@/lib/utils';
 import { customersApi, Customer } from '@/services/customers.service';
 import toast from 'react-hot-toast';
 
@@ -140,7 +140,7 @@ export function CustomerFormModal({ open, onClose, onSuccess, initial, mode = 'c
                                 id="name"
                                 placeholder="María Pérez"
                                 value={form.name}
-                                onChange={e => set('name', e.target.value)}
+                                onChange={e => set('name', normalizeText(e.target.value))}
                                 className={cn(errors.name && 'border-red-400')}
                                 aria-invalid={!!errors.name}
                             />
@@ -150,7 +150,7 @@ export function CustomerFormModal({ open, onClose, onSuccess, initial, mode = 'c
                                 id="cedula"
                                 placeholder="V-12345678"
                                 value={form.cedula}
-                                onChange={e => set('cedula', e.target.value)}
+                                onChange={e => set('cedula', normalizeText(e.target.value))}
                             />
                         </Field>
                     </div>
@@ -185,7 +185,7 @@ export function CustomerFormModal({ open, onClose, onSuccess, initial, mode = 'c
                                 id="address"
                                 placeholder="Av. Principal, Caracas"
                                 value={form.address}
-                                onChange={e => set('address', e.target.value)}
+                                onChange={e => set('address', normalizeText(e.target.value))}
                             />
                         </Field>
                         <Field label="Límite de Crédito" id="creditLimit" error={errors.creditLimit}>

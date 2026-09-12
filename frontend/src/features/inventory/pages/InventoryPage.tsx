@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { DataTable, type Column } from '@/components/ui/table';
-import { cn } from '@/lib/utils';
+import { cn, normalizeText } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { ProductFormModal } from '@/features/products/components/ProductFormModal';
 import { useGroups, useSubgroups } from '@/features/products/hooks';
@@ -105,7 +105,7 @@ export default function InventoryPage() {
     }, [search, filterGroup, filterCategory]);
 
     const filtered = useMemo(() => {
-        const queryStr = search.toLowerCase().trim();
+        const queryStr = normalizeText(search);
         return inventory.filter(p => {
             const matchesGroup = filterGroup === 'all' || p.groupId === filterGroup;
             if (!matchesGroup) return false;
@@ -113,15 +113,15 @@ export default function InventoryPage() {
             const matchesCategory = filterCategory === 'all' || p.subGroupId === filterCategory;
             if (!matchesCategory) return false;
 
-            const nameMatches = p.name.toLowerCase().includes(queryStr);
-            const codeMatches = p.code.toLowerCase().includes(queryStr);
+            const nameMatches = normalizeText(p.name).includes(queryStr);
+            const codeMatches = normalizeText(p.code).includes(queryStr);
             
             const barcodesMatches = p.barcodes?.some(b => 
-                b.code.toLowerCase().includes(queryStr)
+                normalizeText(b.code).includes(queryStr)
             );
             
             const presentationBarcodesMatches = p.presentations?.some(pr => 
-                pr.barcode?.toLowerCase().includes(queryStr)
+                normalizeText(pr.barcode || '').includes(queryStr)
             );
 
             return nameMatches || codeMatches || barcodesMatches || presentationBarcodesMatches;
@@ -469,7 +469,7 @@ export default function InventoryPage() {
                         id={searchId}
                         placeholder="Buscar por nombre, código..."
                         value={search}
-                        onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+                        onChange={e => { setSearch(normalizeText(e.target.value)); setCurrentPage(1); }}
                         className="pl-9 w-full"
                         type="search"
                     />

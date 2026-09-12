@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import type { Product, ProductPresentation, InventoryItem } from '../types';
 import { useConfigStore } from '@/hooks/useConfigStore';
+import { normalizeText } from '@/lib/utils';
 
 interface UseProductSearchOptions {
     inventory: InventoryItem[];
@@ -73,15 +74,15 @@ export function useProductSearch(
     }, [products]);
 
     const filteredProducts = useMemo(() => {
-        const term = debouncedSearch.toLowerCase();
+        const term = normalizeText(debouncedSearch);
         return products.filter(p => {
             const matchesCategory = category === 'Todos' || p.category === category;
             if (!term) return matchesCategory;
 
-            const matchesName = p.name.toLowerCase().includes(term);
-            const matchesBaseCode = p.code.includes(term);
-            const matchesBarcodes = p.barcodes.some(b => b.code.includes(term));
-            const matchesPresentationCode = p.presentations.some(pr => pr.barcode?.includes(term));
+            const matchesName = normalizeText(p.name).includes(term);
+            const matchesBaseCode = normalizeText(p.code).includes(term);
+            const matchesBarcodes = p.barcodes.some(b => normalizeText(b.code).includes(term));
+            const matchesPresentationCode = p.presentations.some(pr => normalizeText(pr.barcode || '').includes(term));
 
             return matchesCategory && (matchesName || matchesBaseCode || matchesBarcodes || matchesPresentationCode);
         });
@@ -106,20 +107,21 @@ export function findProductByBarcode(
     products: Product[],
     barcode: string
 ): { product: Product; presentation?: ProductPresentation } | null {
+    const normalized = normalizeText(barcode);
     // 1. Buscar en code legacy
-    const byLegacyCode = products.find(p => p.code === barcode);
+    const byLegacyCode = products.find(p => normalizeText(p.code) === normalized);
     if (byLegacyCode) return { product: byLegacyCode };
 
     // 2. Buscar en array de barcodes (ProductBarcode)
     for (const p of products) {
-        if (p.barcodes.some(b => b.code === barcode)) {
+        if (p.barcodes.some(b => normalizeText(b.code) === normalized)) {
             return { product: p };
         }
     }
 
     // 3. Buscar en barcodes de presentaciones
     for (const p of products) {
-        const pres = p.presentations.find(pr => pr.barcode === barcode);
+        const pres = p.presentations.find(pr => normalizeText(pr.barcode || '') === normalized);
         if (pres) return { product: p, presentation: pres };
     }
 
