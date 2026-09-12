@@ -21,9 +21,9 @@ router.post('/open', roleGuard('SELLER'), validate(openCashRegisterSchema), ctrl
 router.get('/registers/:id/report-x', roleGuard('OWNER', 'SELLER'), validate(idParamSchema, { source: 'params' }), ctrl.getReportX);
 router.get('/:id/report-x', roleGuard('OWNER', 'SELLER'), validate(idParamSchema, { source: 'params' }), ctrl.getReportX);
 
-/** POST /api/cash-flow/registers/:id/report-z — Ejecutar cierre definitivo Reporte Z */
-router.post('/registers/:id/report-z', roleGuard('OWNER', 'SELLER'), validate(idParamSchema, { source: 'params' }), validate(executeReportZSchema), ctrl.executeReportZ);
-router.post('/:id/report-z', roleGuard('OWNER', 'SELLER'), validate(idParamSchema, { source: 'params' }), validate(executeReportZSchema), ctrl.executeReportZ);
+/** POST /api/cash-flow/registers/:id/report-z — Ejecutar cierre definitivo Reporte Z (solo OWNER) */
+router.post('/registers/:id/report-z', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), validate(executeReportZSchema), ctrl.executeReportZ);
+router.post('/:id/report-z', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), validate(executeReportZSchema), ctrl.executeReportZ);
 
 /** PATCH /api/cash-flow/:id/close — Cerrar arqueo (solo OWNER) */
 router.patch('/:id/close', 

@@ -39,21 +39,21 @@ router.get('/:id', validate(idParamSchema, { source: 'params' }), ctrl.getProduc
 
 /**
  * POST /api/products
- * Crear producto (SOLO OWNER)
+ * Crear producto (cualquier rol operativo)
  * Body: { name, description, barcode, price, cost, subGroupId }
  */
-router.post('/', planEnforcement('products'), roleGuard('OWNER'), validate(createProductSchema), ctrl.createProduct);
+router.post('/', planEnforcement('products'), roleGuard('SELLER'), validate(createProductSchema), ctrl.createProduct);
 
 /**
  * PUT /api/products/:id
- * Actualizar producto (SOLO OWNER)
+ * Actualizar producto (cualquier rol operativo)
  */
-router.put('/:id', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), validate(updateProductSchema), ctrl.updateProduct);
+router.put('/:id', roleGuard('SELLER'), validate(idParamSchema, { source: 'params' }), validate(updateProductSchema), ctrl.updateProduct);
 
 /**
  * DELETE /api/products/:id
- * Eliminar producto (SOLO OWNER)
+ * Eliminar producto (cualquier rol operativo)
  */
-router.delete('/:id', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), ctrl.deleteProduct);
+router.delete('/:id', roleGuard('SELLER'), validate(idParamSchema, { source: 'params' }), ctrl.deleteProduct);
 
 export default router;

@@ -18,8 +18,8 @@ router.get('/', async (_req, res: Response) => {
 router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
         let payload = req.body;
-        if (req.user!.role === 'SELLER') {
-            // Un cajero no puede cambiar estas configuraciones administrativas
+        if (req.user!.role !== 'OWNER') {
+            // Un cajero o encargado no puede cambiar estas configuraciones administrativas
             const { iva, autoCloseTime, purgeRetentionDays, purgeLogRetentionDays, ...rest } = req.body;
             payload = rest;
         }

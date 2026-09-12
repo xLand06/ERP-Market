@@ -23,13 +23,13 @@ router.get('/:id', validate(idParamSchema, { source: 'params' }), ctrl.getSuppli
 /** GET  /api/suppliers/:id/stats — Estadísticas del proveedor */
 router.get('/:id/stats', validate(idParamSchema, { source: 'params' }), ctrl.getSupplierStats);
 
-/** POST /api/suppliers — Crear proveedor (Solo OWNER) */
-router.post('/', roleGuard('OWNER'), validate(createSupplierSchema), ctrl.createSupplier);
+/** POST /api/suppliers — Crear proveedor (MANAGER o superior) */
+router.post('/', roleGuard('MANAGER'), validate(createSupplierSchema), ctrl.createSupplier);
 
-/** PATCH /api/suppliers/:id — Actualizar proveedor (Solo OWNER) */
-router.patch('/:id', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), validate(updateSupplierSchema), ctrl.updateSupplier);
+/** PATCH /api/suppliers/:id — Actualizar proveedor (MANAGER o superior) */
+router.patch('/:id', roleGuard('MANAGER'), validate(idParamSchema, { source: 'params' }), validate(updateSupplierSchema), ctrl.updateSupplier);
 
-/** DELETE /api/suppliers/:id — Desactivar proveedor (Solo OWNER) */
-router.delete('/:id', roleGuard('OWNER'), validate(idParamSchema, { source: 'params' }), ctrl.deleteSupplier);
+/** DELETE /api/suppliers/:id — Desactivar proveedor (MANAGER o superior) */
+router.delete('/:id', roleGuard('MANAGER'), validate(idParamSchema, { source: 'params' }), ctrl.deleteSupplier);
 
 export default router;

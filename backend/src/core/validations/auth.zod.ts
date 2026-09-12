@@ -51,7 +51,7 @@ export const registerSchema = z.object({
     email: z.string().email('Email inválido').optional().or(z.literal('')),
     telefono: z.string().regex(/^[0-9]{10,15}$/, 'Teléfono inválido').optional().or(z.literal('')),
     password: passwordStrengthSchema,
-    role: z.enum(['OWNER', 'SELLER']).default('SELLER'),
+    role: z.enum(['OWNER', 'MANAGER', 'SELLER']).default('SELLER'),
     canManageInventory: z.boolean().optional(),
     branchId: z.preprocess((val) => (val === '' ? null : val), z.any().optional()),
 });

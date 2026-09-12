@@ -18,8 +18,9 @@ datasource db {
 // =============================================================================
 
 enum Role {
-  OWNER
   SELLER
+  MANAGER
+  OWNER
 }
 
 enum TransactionType {
