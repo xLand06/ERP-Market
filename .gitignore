@@ -48,3 +48,7 @@ standalone/
 backend/erp-market.db*
 backend/prisma/test-*.db*
 backend/prisma/test-auth.db*
+
+# Large binaries
+deploy/downloads/
+desktop/tsconfig.node.tsbuildinfo
