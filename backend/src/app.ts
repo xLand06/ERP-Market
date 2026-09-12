@@ -35,6 +35,7 @@ import stocktakingRouter from './modules/stocktaking/stocktaking.routes';
 import batchesRouter from './modules/batches/batches.routes';
 import catalogRouter from './modules/catalog/catalog.routes';
 import banksRouter from './modules/banks/banks.routes';
+import notificationsRouter from './modules/notifications/notifications.routes';
 
 const app = express();
 
@@ -228,6 +229,8 @@ app.use('/api/batches',     batchesRouter);
 app.use('/api/catalog',     catalogRouter);
 // Bancos (F6): cuentas y movimientos bancarios
 app.use('/api/banks',       banksRouter);
+// Notificaciones calculadas en vivo (fiados + stock bajo)
+app.use('/api/notifications', notificationsRouter);
 
 // ─── FRONTEND ESTÁTICO (modo standalone sin Electron) ─────────────────────
 // Sirve el frontend compilado desde backend/public/
