@@ -104,7 +104,7 @@ function PriceField({
                             onChange(val === '' ? '' : Math.max(0, Math.round(Number(val))));
                         }
                     }}
-                    className={`w-full pl-10 sm:pl-14 pr-3 sm:pr-4 py-2.5 border rounded-xl focus:ring-2 outline-none text-sm font-bold tabular-nums ${colorClass}`}
+                    className={`w-full pl-10 sm:pl-14 pr-3 sm:pr-4 py-3 border rounded-xl focus:ring-2 outline-none text-sm font-bold tabular-nums ${colorClass}`}
                     required={required}
                     placeholder="0"
                 />
@@ -448,7 +448,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value.toUpperCase())}
-                                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm transition-all"
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm transition-all"
                                     required
                                     placeholder="Ej: Coca-Cola 350ml"
                                 />
@@ -458,7 +458,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                 <select
                                     value={baseUnit}
                                     onChange={(e) => setBaseUnit(e.target.value)}
-                                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm bg-white"
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm bg-white"
                                 >
                                     <option value="UNIDAD">UNIDAD</option>
                                     <option value="KG">KILOGRAMO (KG)</option>
@@ -481,7 +481,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                             max="100"
                                             value={expectedSpoilagePercent}
                                             onChange={(e) => setExpectedSpoilagePercent(e.target.value === '' ? '' : Number(e.target.value))}
-                                            className="w-full px-4 py-2.5 pr-8 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm"
+                                            className="w-full px-4 py-3 pr-8 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm"
                                             placeholder="0"
                                         />
                                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
@@ -497,7 +497,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                         setSelectedGroupId(e.target.value);
                                         setSubGroupId('');
                                     }}
-                                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm bg-white"
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm bg-white"
                                 >
                                     <option value="">Sin grupo</option>
                                     {groups.map((g: any) => (
@@ -512,7 +512,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                 <select
                                     value={subGroupId}
                                     onChange={(e) => setSubGroupId(e.target.value)}
-                                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm bg-white"
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm bg-white"
                                     disabled={!selectedGroupId}
                                 >
                                     <option value="">Sin subgrupo</option>
@@ -533,7 +533,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                     min="0"
                                     value={minStock}
                                     onChange={(e) => setMinStock(e.target.value === '' ? '' : Number(e.target.value))}
-                                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm bg-white"
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm bg-white"
                                     placeholder="0"
                                 />
                             </div>
@@ -836,9 +836,9 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                         {componentSearch.trim().length >= 2 && (
                                             <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">
                                                 {searchingComponents ? (
-                                                    <div className="px-3 py-2.5 text-xs text-slate-400">Buscando...</div>
+                                                    <div className="px-3 py-3 text-xs text-slate-400">Buscando...</div>
                                                 ) : availableComponentResults.length === 0 ? (
-                                                    <div className="px-3 py-2.5 text-xs text-slate-400">
+                                                    <div className="px-3 py-3 text-xs text-slate-400">
                                                         Sin resultados o producto ya agregado.
                                                     </div>
                                                 ) : (
@@ -918,7 +918,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                                 rows={2}
-                                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm resize-none"
+                                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm resize-none"
                                 placeholder="Descripción opcional del producto..."
                             />
                         </div>
@@ -929,14 +929,14 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors text-sm"
+                            className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors text-sm min-h-[44px]"
                         >
                             Cancelar
                         </button>
                         <button
                             type="submit"
                             disabled={saving}
-                            className="flex-[2] px-4 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+                            className="flex-[2] px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 text-sm min-h-[44px]"
                         >
                             <Save className="w-4 h-4" />
                             {saving ? 'Guardando...' : product ? 'Actualizar Producto' : 'Crear Producto'}

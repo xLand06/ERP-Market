@@ -82,6 +82,8 @@ export interface CreateTransactionPayload {
         currency: Currency;
         exchangeRate?: number;
     }>;
+    /** Fiados/CxC: cliente al que se registra la venta a crédito */
+    customerId?: string;
 }
 
 // ─── Inventory Item (del hook useInventory) ──────────────────────────────────

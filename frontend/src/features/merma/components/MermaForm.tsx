@@ -198,7 +198,7 @@ export function MermaForm({ open, onOpenChange }: MermaFormProps) {
                                         setForm(f => ({ ...f, branchId: e.target.value }));
                                         setErrors(eErrs => ({ ...eErrs, branchId: '' }));
                                     }}
-                                    className={`w-full px-4 py-2.5 border rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm transition-all bg-white ${
+                                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm transition-all bg-white ${
                                         errors.branchId ? 'border-red-500' : 'border-slate-200'
                                     }`}
                                 >
@@ -222,7 +222,7 @@ export function MermaForm({ open, onOpenChange }: MermaFormProps) {
 
                             {selectedProduct ? (
                                 /* Selected product pill */
-                                <div className={`flex items-center justify-between w-full px-4 py-2.5 border rounded-xl transition-all ${
+                                <div className={`flex items-center justify-between w-full px-4 py-3 border rounded-xl transition-all ${
                                     selectedProduct.expectedSpoilagePercent
                                         ? 'bg-emerald-50/50 border-emerald-200'
                                         : 'bg-amber-50/50 border-amber-200'
@@ -281,7 +281,7 @@ export function MermaForm({ open, onOpenChange }: MermaFormProps) {
                                         onFocus={() => setShowDropdown(true)}
                                         onKeyDown={handleSearchKeyDown}
                                         placeholder="Buscar por nombre, código de barras..."
-                                        className={`w-full pl-9 pr-4 py-2.5 border rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm transition-all ${
+                                        className={`w-full pl-9 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm transition-all ${
                                             errors.productId ? 'border-red-500' : 'border-slate-200'
                                         }`}
                                         autoComplete="off"
@@ -322,7 +322,7 @@ export function MermaForm({ open, onOpenChange }: MermaFormProps) {
                                                     type="button"
                                                     onClick={() => selectProduct(product)}
                                                     onMouseEnter={() => setHighlightedIndex(idx)}
-                                                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors border-b border-slate-50 last:border-0 ${
+                                                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-slate-50 last:border-0 ${
                                                         highlightedIndex === idx
                                                             ? 'bg-indigo-50'
                                                             : 'hover:bg-slate-50'
@@ -372,7 +372,7 @@ export function MermaForm({ open, onOpenChange }: MermaFormProps) {
                                         min="0.001"
                                         value={form.quantity}
                                         onChange={(e) => setForm(f => ({ ...f, quantity: e.target.value }))}
-                                        className={`w-full px-4 py-2.5 border rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm font-bold tabular-nums ${
+                                        className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm font-bold tabular-nums ${
                                             errors.quantity ? 'border-red-500' : 'border-slate-200'
                                         }`}
                                         placeholder="0.000"
@@ -398,7 +398,7 @@ export function MermaForm({ open, onOpenChange }: MermaFormProps) {
                                 <select
                                     value={form.reason}
                                     onChange={(e) => setForm(f => ({ ...f, reason: e.target.value as MermaReason }))}
-                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm appearance-none"
+                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm appearance-none"
                                 >
                                     {MERMA_REASONS.map(r => (
                                         <option key={r.value} value={r.value}>{r.label}</option>
@@ -414,7 +414,7 @@ export function MermaForm({ open, onOpenChange }: MermaFormProps) {
                                 value={form.description || ''}
                                 onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
                                 rows={3}
-                                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm resize-none"
+                                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm resize-none"
                                 placeholder="Ej: Producto llegó dañado del proveedor, se detectó vencimiento en estantería..."
                             />
                         </div>
@@ -425,14 +425,14 @@ export function MermaForm({ open, onOpenChange }: MermaFormProps) {
                         <button
                             type="button"
                             onClick={() => onOpenChange(false)}
-                            className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors text-sm"
+                            className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors text-sm min-h-[44px]"
                         >
                             Cancelar
                         </button>
                         <button
                             type="submit"
                             disabled={createMerma.isPending}
-                            className="flex-[2] px-4 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+                            className="flex-[2] px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 text-sm min-h-[44px]"
                         >
                             {createMerma.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                             {createMerma.isPending ? 'Guardando...' : 'Registrar Merma'}

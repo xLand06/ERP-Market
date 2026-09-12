@@ -69,7 +69,7 @@ export function BranchForm({ branch, open, onClose }: BranchFormProps) {
                             type="text"
                             value={name}
                             onChange={e => setName(e.target.value)}
-                            className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100 transition-all"
+                            className="w-full px-3.5 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100 transition-all"
                             required
                         />
                     </div>
@@ -79,7 +79,7 @@ export function BranchForm({ branch, open, onClose }: BranchFormProps) {
                             type="text"
                             value={address}
                             onChange={e => setAddress(e.target.value)}
-                            className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100 transition-all"
+                            className="w-full px-3.5 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100 transition-all"
                         />
                     </div>
                     <div>
@@ -88,14 +88,14 @@ export function BranchForm({ branch, open, onClose }: BranchFormProps) {
                             type="tel"
                             value={phone}
                             onChange={e => setPhone(e.target.value)}
-                            className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100 transition-all"
+                            className="w-full px-3.5 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-indigo-500 text-slate-900 dark:text-slate-100 transition-all"
                         />
                     </div>
                     <div className="flex gap-3 pt-4">
-                        <button type="button" onClick={onClose} className="flex-1 py-2.5 font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                        <button type="button" onClick={onClose} className="flex-1 py-3 font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
                             Cancelar
                         </button>
-                        <button type="submit" disabled={saving} className="flex-1 py-2.5 font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                        <button type="submit" disabled={saving} className="flex-1 py-3 font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2">
                             <Save className="w-4 h-4" />
                             {saving ? 'Guardando...' : 'Guardar'}
                         </button>
