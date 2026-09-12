@@ -45,8 +45,10 @@ router.get('/status', async (_req: Request, res: Response) => {
 
         const mgmtRes = await mgmtFetch(`/api/billing/${slug}/status`);
         if (!mgmtRes.ok) {
-            const error = await mgmtRes.json();
-            res.status(mgmtRes.status).json(error);
+            const error = await mgmtRes.json().catch(() => ({ error: 'Error del servidor de facturación' }));
+            // NUNCA propagar 401/403 — el frontend haría logout si recibe 401
+            const status = mgmtRes.status === 401 || mgmtRes.status === 403 ? 502 : mgmtRes.status;
+            res.status(status).json({ error: error.error || 'Error obteniendo estado de facturación' });
             return;
         }
 
@@ -75,8 +77,15 @@ router.post('/pay', roleGuard('OWNER'), async (req: Request, res: Response) => {
             body: JSON.stringify(req.body),
         });
 
+        if (!mgmtRes.ok) {
+            const error = await mgmtRes.json().catch(() => ({ error: 'Error del servidor de facturación' }));
+            const status = mgmtRes.status === 401 || mgmtRes.status === 403 ? 502 : mgmtRes.status;
+            res.status(status).json({ error: error.error || 'Error registrando pago' });
+            return;
+        }
+
         const data = await mgmtRes.json();
-        res.status(mgmtRes.status).json(data);
+        res.json(data);
     } catch (error: any) {
         console.error('[billing] Error registrando pago:', error.message);
         res.status(502).json({ error: 'No se pudo conectar con el servidor de facturación' });
