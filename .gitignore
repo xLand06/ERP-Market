@@ -47,4 +47,5 @@ standalone/
 *.db-wal
 backend/erp-market.db*
 backend/prisma/test-*.db*
-backend/prisma/test-auth.db*
+backend/prisma/test-auth.db*deploy/downloads/
+desktop/tsconfig.node.tsbuildinfo
