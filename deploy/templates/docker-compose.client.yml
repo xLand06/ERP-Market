@@ -98,6 +98,9 @@ services:
       # CORS allowlist (backend/src/app.ts): browser access to this client's
       # URL must be permitted or the web UI is blocked cross-origin.
       FRONTEND_URL: ${CLIENT_URL}
+      TENANT_SLUG: ${CLIENT_SLUG}
+      BILLING_SECRET: 299799f89d311f1dd5748d1afa19f88cfcbd7c68df72484a
+      MGMT_URL: http://89.167.46.144:3001
     depends_on:
       db:
         condition: service_healthy
