@@ -578,50 +578,50 @@ export function PaymentDialog({
                                 ))}
                             </div>
                         </div>
-
-                        {/* Footer Botones de Acción - Botones de Alto Impacto */}
-                        <div className="pt-4 border-t-2 border-slate-200 flex gap-3">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={onClose}
-                                disabled={isSubmitting}
-                                className="flex-1 h-14 rounded-2xl font-black text-slate-700 border-2 border-slate-300 text-xs sm:text-sm hover:bg-slate-200"
-                            >
-                                Cancelar
-                            </Button>
-                            <Button
-                                type="button"
-                                onClick={fiadoCanConfirm ? handleConfirm : undefined}
-                                disabled={!fiadoCanConfirm || isSubmitting}
-                                className={cn(
-                                    'flex-[2] h-14 rounded-2xl font-black text-sm sm:text-base text-white transition-all shadow-lg flex items-center justify-center gap-2',
-                                    fiadoCanConfirm && !isSubmitting
-                                        ? fiadoMode
-                                            ? 'bg-amber-500 hover:bg-amber-600 active:scale-[0.99] shadow-amber-500/30 ring-2 ring-amber-500/30'
-                                            : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] shadow-emerald-600/30 ring-2 ring-emerald-600/30'
-                                        : 'bg-slate-300 cursor-not-allowed shadow-none border-0'
-                                )}
-                            >
-                                {isSubmitting ? (
-                                    <>
-                                        <Loader2 className="w-5 h-5 animate-spin" />
-                                        Procesando Venta...
-                                    </>
-                                ) : fiadoMode ? (
-                                    <>
-                                        <BookOpenCheck className="w-5 h-5" />
-                                        Confirmar Fiado
-                                    </>
-                                ) : (
-                                    <>
-                                        <Printer className="w-5 h-5" />
-                                        Confirmar e Imprimir Factura
-                                    </>
-                                )}
-                            </Button>
-                        </div>
                     </div>
+                </div>
+
+                {/* Footer sticky — siempre visible en mobile */}
+                <div className="shrink-0 p-4 sm:p-5 bg-white border-t border-slate-200 flex gap-3">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={onClose}
+                        disabled={isSubmitting}
+                        className="flex-1 h-14 rounded-2xl font-black text-slate-700 border-2 border-slate-300 text-xs sm:text-sm hover:bg-slate-200"
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        type="button"
+                        onClick={fiadoCanConfirm ? handleConfirm : undefined}
+                        disabled={!fiadoCanConfirm || isSubmitting}
+                        className={cn(
+                            'flex-[2] h-14 rounded-2xl font-black text-sm sm:text-base text-white transition-all shadow-lg flex items-center justify-center gap-2',
+                            fiadoCanConfirm && !isSubmitting
+                                ? fiadoMode
+                                    ? 'bg-amber-500 hover:bg-amber-600 active:scale-[0.99] shadow-amber-500/30 ring-2 ring-amber-500/30'
+                                    : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] shadow-emerald-600/30 ring-2 ring-emerald-600/30'
+                                : 'bg-slate-300 cursor-not-allowed shadow-none border-0'
+                        )}
+                    >
+                        {isSubmitting ? (
+                            <>
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                                Procesando Venta...
+                            </>
+                        ) : fiadoMode ? (
+                            <>
+                                <BookOpenCheck className="w-5 h-5" />
+                                Confirmar Fiado
+                            </>
+                        ) : (
+                            <>
+                                <Printer className="w-5 h-5" />
+                                Confirmar e Imprimir Factura
+                            </>
+                        )}
+                    </Button>
                 </div>
             </DialogContent>
         </Dialog>

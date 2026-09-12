@@ -5,7 +5,7 @@ import { TopBar } from './TopBar';
 import { cn } from '@/lib/utils';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useSyncStore } from '@/services/sync.service';
-import { ShoppingCart, Package, LayoutDashboard, Banknote, Settings } from 'lucide-react';
+import { ShoppingCart, Package, LayoutDashboard, Banknote, Warehouse } from 'lucide-react';
 
 export function AppShellLayout() {
     const { fetchRates } = useConfigStore();
@@ -136,13 +136,13 @@ export function AppShellLayout() {
                 </main>
 
                 {/* Mobile / Tablet Bottom Navigation Bar (visible < lg) */}
-                <nav aria-label="Navegación móvil" className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex items-center justify-around pt-2 px-2 pb-safe lg:hidden text-white shadow-2xl">
+                <nav aria-label="Navegación móvil" className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex items-center justify-around pt-1.5 px-1 pb-safe lg:hidden text-white shadow-2xl">
                     {[
                         { path: '/pos', label: 'POS', icon: ShoppingCart },
                         { path: '/products', label: 'Productos', icon: Package },
                         { path: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
+                        { path: '/inventory', label: 'Inventario', icon: Warehouse },
                         { path: '/finance/cash-register', label: 'Cajas', icon: Banknote },
-                        { path: '/settings', label: 'Ajustes', icon: Settings },
                     ].map((navItem) => {
                         const isActive = location.pathname === navItem.path || (navItem.path !== '/dashboard' && location.pathname.startsWith(navItem.path));
                         const Icon = navItem.icon;
@@ -151,12 +151,12 @@ export function AppShellLayout() {
                                 key={navItem.path}
                                 onClick={() => navigate(navItem.path)}
                                 className={cn(
-                                    "flex flex-col items-center justify-center gap-1 px-3 py-1 rounded-xl transition-all text-center",
+                                    "flex flex-col items-center justify-center gap-0.5 min-w-[52px] min-h-[48px] px-2 py-1.5 rounded-xl transition-all text-center",
                                     isActive ? "text-emerald-400 font-extrabold bg-slate-800 scale-105" : "text-slate-400 hover:text-slate-200"
                                 )}
                             >
-                                <Icon className="w-4 h-4 shrink-0" />
-                                <span className="text-[10px] font-bold">{navItem.label}</span>
+                                <Icon className="w-5 h-5 shrink-0" />
+                                <span className="text-[9px] font-bold leading-tight truncate max-w-[52px]">{navItem.label}</span>
                             </button>
                         );
                     })}

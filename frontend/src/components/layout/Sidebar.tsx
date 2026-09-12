@@ -272,8 +272,8 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                             onFocus={() => prefetchFor(item.path)}
                             className={({ isActive }) =>
                                 cn(
-                                    "group flex items-center gap-3 py-2.5 lg:py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 relative overflow-hidden",
-                                    collapsed ? "px-0 justify-center h-11 lg:h-10 min-h-11" : "px-3",
+                                    "group flex items-center gap-3 py-3 lg:py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 relative overflow-hidden",
+                                    collapsed ? "px-0 justify-center h-11 lg:h-10 min-h-[44px]" : "px-3 min-h-[44px]",
                                     isActive
                                         ? themeStyles.activeBg
                                         : themeStyles.inactiveText

@@ -96,7 +96,7 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
                                 </div>
                             </div>
 
-                            <div className="border border-slate-200 rounded-xl overflow-hidden flex flex-col h-64 bg-slate-50">
+                            <div className="border border-slate-200 rounded-xl overflow-hidden flex flex-col max-h-[40vh] sm:h-64 bg-slate-50">
                                 {isLoading ? (
                                     <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
                                         Cargando catálogo...
