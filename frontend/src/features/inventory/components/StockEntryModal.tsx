@@ -6,7 +6,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { cn, normalizeText } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
 import { useConfigStore } from '@/hooks/useConfigStore';
@@ -172,16 +172,16 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
      * contra barcode principal, barcodes[] y presentations[].barcode.
      */
     const handleScanSubmit = async () => {
-        const code = scanCode.trim().toUpperCase();
+        const code = normalizeText(scanCode.trim());
         if (!code) return;
         setIsSearching(true);
         try {
             const res = await api.get('/search', { params: { q: code } });
             const products = res.data.products || [];
             const found = products.find((p: any) =>
-                (p.barcode || '').toUpperCase() === code ||
-                (p.barcodes || []).some((b: any) => (b.code || '').toUpperCase() === code) ||
-                (p.presentations || []).some((pr: any) => (pr.barcode || '').toUpperCase() === code)
+                normalizeText(p.barcode || '') === code ||
+                (p.barcodes || []).some((b: any) => normalizeText(b.code || '') === code) ||
+                (p.presentations || []).some((pr: any) => normalizeText(pr.barcode || '') === code)
             );
             if (found) {
                 addProduct(found);
@@ -334,7 +334,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                                     autoComplete="off"
                                     placeholder="Escaneá o escribí el código y presioná Enter..."
                                     value={scanCode}
-                                    onChange={e => setScanCode(e.target.value)}
+                                    onChange={e => setScanCode(normalizeText(e.target.value))}
                                     onKeyDown={e => {
                                         if (e.key === 'Enter') {
                                             e.preventDefault();
@@ -486,7 +486,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                                                         type="text"
                                                         placeholder="ej. LOTE-2026-001"
                                                         value={item.batchCode || ''}
-                                                        onChange={e => updateItem(idx, { batchCode: e.target.value.toUpperCase() })}
+                                                        onChange={e => updateItem(idx, { batchCode: normalizeText(e.target.value) })}
                                                         className="w-full h-8 border border-amber-200 rounded-lg pl-2 pr-8 text-sm bg-white outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-200"
                                                     />
                                                     <button 

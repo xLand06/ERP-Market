@@ -3,7 +3,7 @@ import { Search, Plus, Phone, Mail, MapPin, ChevronRight, Check, Loader2, AlertC
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { cn, normalizeText } from '@/lib/utils';
 import { SupplierFormModal } from '../components/SupplierFormModal';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { suppliersApi } from '@/services/suppliers.service';
@@ -31,7 +31,7 @@ export default function SuppliersPage() {
         enabled: !!selectedId,
     });
 
-    const filtered = suppliers.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
+    const filtered = suppliers.filter(s => normalizeText(s.name).includes(search));
     
     // Auto-select first if none selected
     useEffect(() => {
@@ -103,7 +103,7 @@ export default function SuppliersPage() {
                 <div className="w-full md:w-85 shrink-0 flex flex-col gap-3">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <Input placeholder="Buscar proveedor..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+                        <Input placeholder="Buscar proveedor..." value={search} onChange={e => setSearch(normalizeText(e.target.value))} className="pl-9" />
                     </div>
                     <div className="flex flex-col gap-1.5 max-h-[600px] overflow-y-auto pr-1">
                         {filtered.map(s => (

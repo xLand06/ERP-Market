@@ -4,7 +4,7 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { cn, normalizeText } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 // Genera una contraseña legible pero segura (sin caracteres confusos)
@@ -297,7 +297,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                     ref={initialFocusRef}
                                     type="text"
                                     value={nombre}
-                                    onChange={(e) => setNombre(e.target.value)}
+                                    onChange={(e) => setNombre(normalizeText(e.target.value))}
                                     className="w-full px-3.5 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
                                     required
                                     placeholder="Ej: María"
@@ -310,7 +310,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                                     id="apellido"
                                     type="text"
                                     value={apellido}
-                                    onChange={(e) => setApellido(e.target.value)}
+                                    onChange={(e) => setApellido(normalizeText(e.target.value))}
                                     className="w-full px-3.5 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-sm"
                                     placeholder="Ej: González"
                                 />

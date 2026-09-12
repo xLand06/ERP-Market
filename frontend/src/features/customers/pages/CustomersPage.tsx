@@ -4,6 +4,7 @@ import { Search, Plus, Users, AlertCircle, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { normalizeText } from '@/lib/utils';
 import { DataTable, type Column } from '@/components/ui/table';
 import { CustomerFormModal } from '../components/CustomerFormModal';
 import { useCustomers } from '../hooks/useCustomers';
@@ -32,8 +33,8 @@ export default function CustomersPage() {
     const { data: customers = [], isLoading, isError } = useCustomers();
 
     const filtered = customers.filter(c =>
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        (c.cedula || '').toLowerCase().includes(search.toLowerCase())
+        normalizeText(c.name).includes(search) ||
+        normalizeText(c.cedula || '').includes(search)
     );
 
     const renderActions = (row: Customer) => (
@@ -124,7 +125,7 @@ export default function CustomersPage() {
                         <Input
                             placeholder="Buscar por nombre o cédula..."
                             value={search}
-                            onChange={e => setSearch(e.target.value)}
+                            onChange={e => setSearch(normalizeText(e.target.value))}
                             className="pl-9"
                             aria-label="Buscar clientes"
                         />

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { DataTable, type Column } from '@/components/ui/table';
-import { cn } from '@/lib/utils';
+import { cn, normalizeText } from '@/lib/utils';
 import { ProductFormModal } from '../components/ProductFormModal';
 import type { Product, Category, Group } from '../types';
 import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
@@ -291,7 +291,7 @@ export default function ProductsPage() {
                         <Input
                             placeholder="Buscar por nombre o código de barras..."
                             value={search}
-                            onChange={e => { setSearch(e.target.value); setPage(1); }}
+                            onChange={e => { setSearch(normalizeText(e.target.value)); setPage(1); }}
                             className="pl-9 w-full"
                             aria-label="Buscar productos"
                         />
