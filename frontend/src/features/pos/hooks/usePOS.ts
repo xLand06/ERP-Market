@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { enqueueSale, drainQueue, countPending } from '@/lib/offline-queue';
 import toast from 'react-hot-toast';
 import type { CartItem, Product, ProductPresentation, CreateTransactionPayload } from '../types';
 
@@ -70,16 +71,71 @@ export function useCheckout() {
 
     return useMutation({
         mutationFn: async (payload: CreateTransactionPayload) => {
-            const res = await api.post('/pos/transactions', payload);
-            return res.data;
+            // Intentar enviar al backend
+            try {
+                const res = await api.post('/pos/transactions', payload, { timeout: 10000 });
+                return { ...res.data, offline: false };
+            } catch (error: any) {
+                // Si es error de red y no tenemos backend local, guardar offline
+                const isNetworkError = !error.response && (
+                    error.code === 'ECONNABORTED' ||
+                    error.message?.includes('Network Error') ||
+                    error.message?.includes('timeout') ||
+                    !navigator.onLine
+                );
+
+                if (isNetworkError) {
+                    const saleId = await enqueueSale(payload);
+                    const pendingCount = await countPending();
+                    toast.success(
+                        `Venta guardada offline (${pendingCount} pendiente${pendingCount > 1 ? 's' : ''}). Se sincronizará al reconectar.`,
+                        { duration: 5000, icon: '📶' }
+                    );
+                    return { id: saleId, offline: true };
+                }
+
+                // Otro tipo de error — re-lanzar
+                throw error;
+            }
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['inventory'] });
-            toast.success('Venta registrada correctamente');
+        onSuccess: (result) => {
+            if (!result?.offline) {
+                queryClient.invalidateQueries({ queryKey: ['inventory'] });
+                toast.success('Venta registrada correctamente');
+            }
         },
         onError: (error: unknown) => {
             const err = error as { response?: { data?: { message?: string } } };
             toast.error(err?.response?.data?.message || 'Error al procesar la venta');
+        },
+    });
+}
+
+/**
+ * Sincroniza ventas offline pendientes con el backend
+ * Llamar cuando la conexión vuelve
+ */
+export function useDrainOfflineQueue() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async () => {
+            const result = await drainQueue(async (payload) => {
+                await api.post('/pos/transactions', payload, { timeout: 15000 });
+            });
+            return result;
+        },
+        onSuccess: (result) => {
+            if (result.sent > 0) {
+                queryClient.invalidateQueries({ queryKey: ['inventory'] });
+                toast.success(
+                    `${result.sent} venta${result.sent > 1 ? 's' : ''} sincronizada${result.sent > 1 ? 's' : ''} ✓`,
+                    { icon: '🔄' }
+                );
+            }
+            if (result.failed > 0) {
+                toast.error(`${result.failed} venta${result.failed > 1 ? 's' : ''} no se pudo sincronizar`);
+            }
         },
     });
 }

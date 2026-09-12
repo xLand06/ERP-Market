@@ -90,9 +90,28 @@ export const useSyncStore = create<SyncState & SyncActions>((set, get) => ({
 }));
 
 if (typeof window !== 'undefined') {
-    window.addEventListener('online', () => {
+    window.addEventListener('online', async () => {
         const { setOnline, syncPending, pendingSyncCount } = useSyncStore.getState();
         setOnline(true);
+
+        // 1. Primero drenar la cola de ventas offline
+        try {
+            const { drainQueue } = await import('@/lib/offline-queue');
+            const { api: axiosApi } = await import('@/lib/api');
+            const result = await drainQueue(async (payload) => {
+                await axiosApi.post('/pos/transactions', payload, { timeout: 15000 });
+            });
+            if (result.sent > 0) {
+                toast.success(`${result.sent} venta${result.sent > 1 ? 's' : ''} offline sincronizada${result.sent > 1 ? 's' : ''}`, { icon: '🔄' });
+                // Invalidate queries to refresh data
+                const { queryClient } = await import('@/app/queryClient');
+                queryClient.invalidateQueries({ queryKey: ['inventory'] });
+            }
+        } catch (error) {
+            console.error('[sync] Error draining offline queue:', error);
+        }
+
+        // 2. Luego sincronizar el backend normal
         if (pendingSyncCount > 0) {
             syncPending();
         }
