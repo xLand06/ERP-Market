@@ -239,10 +239,10 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                     <div className="relative">
                         <button 
                             onClick={() => setThemePopoverOpen(!themePopoverOpen)}
-                            className="w-6 h-6 sm:w-8 sm:h-8 lg:w-9 lg:h-9 flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 cursor-pointer"
+                            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 cursor-pointer"
                             title="Cambiar Tema de Interfaz"
                         >
-                            <Palette className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <Palette className="w-5 h-5" />
                         </button>
 
                         {themePopoverOpen && (
@@ -287,18 +287,18 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
 
                     <button 
                         onClick={() => setShortcutsOpen(true)}
-                        className="hidden sm:flex w-8 h-8 lg:w-9 lg:h-9 items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95" 
+                        className="hidden sm:flex min-w-[44px] min-h-[44px] items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95" 
                         title="Atajos de teclado (K)"
                     >
-                        <Keyboard className="w-4 h-4" />
+                        <Keyboard className="w-5 h-5" />
                     </button>
                     <div className="relative" ref={notifRef}>
                         <button 
                             onClick={() => setNotifOpen(!notifOpen)}
-                            className="relative w-6 h-6 sm:w-8 sm:h-8 lg:w-9 lg:h-9 flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95"
+                            className="relative min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95"
                             aria-label="Notificaciones"
                         >
-                            <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <Bell className="w-5 h-5" />
                             {notifications.length > 0 && (
                                 <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-red-500 text-white rounded-full flex items-center justify-center text-[9px] font-bold border border-white">
                                     {notifications.length > 9 ? '9+' : notifications.length}
@@ -339,11 +339,11 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                                                     </div>
                                                     <button
                                                         onClick={() => dismissNotification(n.key)}
-                                                        className="shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                                                        className="shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                                                         aria-label="Descartar notificación"
                                                         title="Descartar"
                                                     >
-                                                        <X className="w-3.5 h-3.5" />
+                                                        <X className="w-4 h-4" />
                                                     </button>
                                                 </li>
                                             ))}
@@ -393,7 +393,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
             {/* Monochromatic Minimalist Keyboard Shortcuts Dialog */}
             <Dialog open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
                 <DialogContent className="max-w-md p-0 overflow-hidden border-none bg-transparent shadow-none">
-                    <div className="bg-white rounded-3xl overflow-hidden shadow-[0_32px_64px_-12px_rgba(0,0,0,0.2)] border border-slate-100">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-[0_32px_64px_-12px_rgba(0,0,0,0.2)] border border-slate-100 dark:border-slate-800">
                         <div className="bg-emerald-600 p-8 text-white relative">
                             {/* Decorative elements */}
                             <div className="absolute top-0 right-0 p-4 opacity-10">
@@ -416,10 +416,10 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                                             };
                                             navigate(paths[s.key]);
                                         }}
-                                        className="w-full flex items-center justify-between p-4 rounded-2xl bg-white border border-slate-100 hover:border-emerald-300 hover:bg-emerald-50/30 transition-all group"
+                                        className="w-full flex items-center justify-between p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 hover:border-emerald-300 hover:bg-emerald-50/30 transition-all group"
                                     >
                                         <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                                            <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
                                                 <s.icon className="w-6 h-6 text-emerald-600" />
                                             </div>
                                             <div className="text-left">
@@ -438,12 +438,12 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                             </div>
                         </div>
 
-                        <div className="p-5 flex justify-center border-t border-slate-100 bg-white">
+                        <div className="p-5 flex justify-center border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
                             <button 
                                 onClick={() => setShortcutsOpen(false)}
                                 className="text-xs font-black text-slate-400 hover:text-emerald-600 uppercase tracking-widest transition-colors flex items-center gap-2"
                             >
-                                Presiona <kbd className="bg-slate-100 px-1.5 py-0.5 rounded border-b-2 border-slate-300">ESC</kbd> para salir
+                                Presiona <kbd className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border-b-2 border-slate-300 dark:border-slate-600">ESC</kbd> para salir
                             </button>
                         </div>
                     </div>

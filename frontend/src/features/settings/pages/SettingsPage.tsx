@@ -78,7 +78,7 @@ export default function SettingsPage() {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 cursor-pointer text-xs sm:text-sm font-bold border-b-[3px] transition-colors rounded-t-xl hover:bg-slate-50 ${activeTab === tab.id
+                            className={`flex items-center gap-2 px-3.5 sm:px-5 min-h-[44px] py-3 sm:py-3 cursor-pointer text-xs sm:text-sm font-bold border-b-[3px] transition-colors rounded-t-xl hover:bg-slate-50 ${activeTab === tab.id
                                     ? 'border-indigo-600 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-50/50'
                                     : 'border-transparent text-slate-500 hover:text-slate-800'
                                 }`}

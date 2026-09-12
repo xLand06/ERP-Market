@@ -1,4 +1,4 @@
-import { useState, useId, useMemo, useEffect } from 'react';
+import { useState, useId, useMemo, useEffect, useRef } from 'react';
 import { Search, Plus, Download, Pencil, Check, X, Package, Loader2, ClipboardList, PackageX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -88,8 +88,10 @@ export default function InventoryPage() {
         setSearch(barcode);
     });
 
+    const firstLoadRef = useRef(true);
     useEffect(() => {
-        if (inventory.length > 0) {
+        if (inventory.length > 0 && firstLoadRef.current) {
+            firstLoadRef.current = false;
             toast.success(`${inventory.length} productos cargados`, { duration: 2000 });
         }
     }, [inventory.length]);

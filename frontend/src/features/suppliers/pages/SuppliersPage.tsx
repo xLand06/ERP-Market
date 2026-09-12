@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Plus, Phone, Mail, MapPin, ChevronRight, Check, Loader2, AlertCircle, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,7 +34,7 @@ export default function SuppliersPage() {
     const filtered = suppliers.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
     
     // Auto-select first if none selected
-    useMemo(() => {
+    useEffect(() => {
         if (!selectedId && filtered.length > 0) {
             setSelectedId(filtered[0].id);
         }
