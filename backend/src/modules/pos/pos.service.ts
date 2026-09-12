@@ -321,6 +321,32 @@ export const createTransaction = async (input: CreateTransactionInput) => {
             },
         });
 
+        // ── Outbox: encolar para sync atómica ──────────────────────────────
+        // La venta se encola en la misma transacción que la creación.
+        // Si la transacción falla, la venta no se crea Y la cola no se encola.
+        // Si la transacción éxito, la venta está lista para sync.
+        try {
+            const { enqueueOutbox } = await import('../sync/outbox-sync.service');
+            await enqueueOutbox(tx, {
+                entityName: 'Transaction',
+                entityId: txRecord.id,
+                operation: 'CREATE',
+                payload: {
+                    id: txRecord.id,
+                    type,
+                    status: 'COMPLETED',
+                    total,
+                    branchId,
+                    userId,
+                    createdAt: txRecord.createdAt,
+                },
+            });
+        } catch (outboxError) {
+            // Si el outbox falla, la venta ya existe pero no se syncronizará
+            // automáticamente. El sync worker la picks up por syncStatus='PENDING'.
+            console.error('[pos] Outbox enqueue failed (fallback to syncStatus):', outboxError);
+        }
+
         // Afectar stock: SALE descuenta, INVENTORY_IN suma (inmediatamente)
         for (const item of processedItems) {
             const delta = type === TransactionType.SALE ? -item.totalUnitsToDeduct : item.totalUnitsToDeduct;
@@ -506,6 +532,19 @@ export const cancelTransaction = async (id: string) => {
                 }
             }
         }));
+
+        // ── Outbox: encolar cancelación para sync ──────────────────────────
+        try {
+            const { enqueueOutbox } = await import('../sync/outbox-sync.service');
+            await enqueueOutbox(txClient, {
+                entityName: 'Transaction',
+                entityId: id,
+                operation: 'UPDATE',
+                payload: { id, status: 'CANCELLED' },
+            });
+        } catch (outboxError) {
+            console.error('[pos] Outbox enqueue for cancel failed:', outboxError);
+        }
 
         return txClient.transaction.findUnique({ where: { id } });
     });
