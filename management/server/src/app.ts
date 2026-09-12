@@ -13,14 +13,25 @@ import { startHealthCron, startAuditRetention } from './services/health-cron';
 import { startPaymentCron } from './services/payment-cron';
 import { getVpsStats } from './services/vps-stats';
 import { ensureNetwork } from './services/provisioner';
+import billingRoutes from './modules/billing/billing.routes';
 
 const app = express();
 
 // Middleware global
 app.use(cors({
-    origin: env.NODE_ENV === 'production'
-        ? ['https://admin.erpmarket.com', 'https://mgmt.erpmarket.com']
-        : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'],
+    origin: (origin, callback) => {
+        // Permitir requests sin origin (Electron, server-to-server)
+        if (!origin) return callback(null, true);
+        // Permitir cualquier subdominio de allcode.site
+        if (/\.allcode\.site$/.test(origin) || origin === 'https://allcode.site') {
+            return callback(null, true);
+        }
+        // Permitir origins de desarrollo
+        if (env.NODE_ENV !== 'production') {
+            return callback(null, true);
+        }
+        callback(null, false);
+    },
     credentials: true,
 }));
 app.use(express.json());
@@ -44,8 +55,9 @@ app.get('/api/health', async (_req, res) => {
 });
 
 // Rutas API
-// /api/auth y /api/health son publicos; el resto exige JWT (authMiddleware)
+// /api/auth y /api/health son publicos; /api/billing valida por tenant secret
 app.use('/api/auth', authRoutes);
+app.use('/api/billing', billingRoutes);
 app.use('/api/tenants', authMiddleware, tenantsRoutes);
 app.use('/api/payments', authMiddleware, paymentsRoutes);
 app.use('/api/audit', authMiddleware, auditRoutes);

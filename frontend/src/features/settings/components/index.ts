@@ -1,6 +1,7 @@
 export { SystemSettings } from './SystemSettings';
 export { InvoiceSettings } from './InvoiceSettings';
 export { CatalogSettings } from './CatalogSettings';
+export { BillingSettings } from './BillingSettings';
 export { BranchesTab } from './BranchesTab';
 export { BranchForm } from './BranchForm';
 export { CategoriesTab } from './CategoriesTab';
