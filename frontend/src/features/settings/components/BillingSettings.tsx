@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import toast from 'react-hot-toast';
 import {
     CreditCard, Wallet, AlertTriangle, CheckCircle2, Clock,
-    Loader2, Copy, Send, History, DollarSign, Calendar
+    Loader2, Copy, Send, History, DollarSign, Calendar,
+    Banknote, Smartphone, Coins, BanknoteIcon, FileText
 } from 'lucide-react';
 
 interface BillingStatus {
@@ -33,11 +34,11 @@ interface BillingStatus {
 }
 
 const PAYMENT_METHODS = [
-    { value: 'zelle', label: 'Zelle', icon: '💳' },
-    { value: 'pago_movil', label: 'Pago Móvil', icon: '📱' },
-    { value: 'binance', label: 'Binance', icon: '🪙' },
-    { value: 'cash', label: 'Efectivo', icon: '💵' },
-    { value: 'other', label: 'Otro', icon: '📋' },
+    { value: 'zelle', label: 'Zelle', Icon: CreditCard },
+    { value: 'pago_movil', label: 'Pago Móvil', Icon: Smartphone },
+    { value: 'binance', label: 'Binance', Icon: Coins },
+    { value: 'cash', label: 'Efectivo', Icon: Banknote },
+    { value: 'other', label: 'Otro', Icon: FileText },
 ];
 
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
@@ -140,16 +141,19 @@ export function BillingSettings() {
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Plan Actual</p>
                         <p className="text-2xl font-black mt-0.5">{subscription.plan.name}</p>
                     </div>
-                    <div className={`px-3 py-1.5 rounded-full text-xs font-bold ${
+                    <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 ${
                         subscription.paymentStatus === 'current' ? 'bg-emerald-500/20 text-emerald-300' :
                         subscription.paymentStatus === 'due_soon' ? 'bg-amber-500/20 text-amber-300' :
                         subscription.paymentStatus === 'overdue' ? 'bg-red-500/20 text-red-300' :
                         'bg-slate-500/20 text-slate-300'
                     }`}>
-                        {subscription.paymentStatus === 'current' && '✅ Al día'}
-                        {subscription.paymentStatus === 'due_soon' && `⚠️ Vence en ${subscription.daysUntilDue} días`}
-                        {subscription.paymentStatus === 'overdue' && '🚨 Vencido'}
-                        {subscription.paymentStatus === 'unknown' && '❓ Sin datos'}
+                        {subscription.paymentStatus === 'current' && <CheckCircle2 className="w-3.5 h-3.5" />}
+                        {subscription.paymentStatus === 'due_soon' && <Clock className="w-3.5 h-3.5" />}
+                        {subscription.paymentStatus === 'overdue' && <AlertTriangle className="w-3.5 h-3.5" />}
+                        {subscription.paymentStatus === 'current' && 'Al día'}
+                        {subscription.paymentStatus === 'due_soon' && `Vence en ${subscription.daysUntilDue} días`}
+                        {subscription.paymentStatus === 'overdue' && 'Vencido'}
+                        {subscription.paymentStatus === 'unknown' && 'Sin datos'}
                     </div>
                 </div>
 
@@ -203,13 +207,13 @@ export function BillingSettings() {
                                     key={m.value}
                                     type="button"
                                     onClick={() => setProvider(m.value)}
-                                    className={`flex flex-col items-center gap-0.5 p-2 rounded-xl border-2 transition-all text-center min-h-[44px] ${
+                                    className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 transition-all text-center min-h-[56px] ${
                                         provider === m.value
                                             ? 'border-emerald-500 bg-emerald-50 shadow-sm'
                                             : 'border-slate-200 hover:border-slate-300'
                                     }`}
                                 >
-                                    <span className="text-lg">{m.icon}</span>
+                                    <m.Icon className={`w-5 h-5 ${provider === m.value ? 'text-emerald-600' : 'text-slate-500'}`} />
                                     <span className="text-[10px] font-bold text-slate-600">{m.label}</span>
                                 </button>
                             ))}
