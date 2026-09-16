@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './app/App';
+import './i18n'; // initialize i18next before rendering
 
 // ── Auto-recovery de chunks viejos ──────────────────────────────────────────
 // Si un lazy chunk falla (build nuevo con hashes distintos + pestaña vieja),

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings2, DollarSign, Percent, Clock, Save, RefreshCw, Palette, Globe, Check, Plus, Search, ChevronDown, Star } from 'lucide-react';
+import { Settings2, DollarSign, Percent, Clock, Save, RefreshCw, Palette, Globe, Check, Plus, Search, Star, Languages } from 'lucide-react';
 import { useConfigStore, UITheme } from '@/hooks/useConfigStore';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { GLOBAL_CURRENCIES, getCurrencyInfo, getCurrenciesByRegion, CURRENCY_REGIONS } from '@/constants/currencies';
@@ -7,6 +7,8 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import type { CurrencyInfo } from '@/constants/currencies';
+import { useTranslation } from 'react-i18next';
+import { SUPPORTED_LANGUAGES, type AppLanguage } from '@/i18n';
 
 // ── Shared currency row used in the catalog grid ───────────────────────────────
 function CurrencyRow({ c, isActive, isMain, onToggle }: {
@@ -56,6 +58,7 @@ function CurrencyRow({ c, isActive, isMain, onToggle }: {
 export function SystemSettings() {
     const { user } = useAuthStore();
     const isOwner = user?.role === 'OWNER';
+    const { t, i18n } = useTranslation();
 
     const { 
         rates, iva, mainCurrency, activeCurrencies, autoOpenTime, autoCloseTime, purgeRetentionDays, purgeLogRetentionDays,
@@ -74,6 +77,9 @@ export function SystemSettings() {
     const [localLogDays, setLocalLogDays] = useState(purgeLogRetentionDays.toString());
     const [selectedProvider, setSelectedProvider] = useState<string>('ve_dolar_oficial');
     const [saving, setSaving] = useState(false);
+
+    const currentLanguage = i18n.language?.slice(0, 2) as AppLanguage;
+
 
     useEffect(() => {
         fetchSettings();
@@ -214,6 +220,46 @@ export function SystemSettings() {
                                 </div>
                                 <p className="text-[11px] text-slate-500 font-bold leading-tight">{t.desc}</p>
                                 <div className={cn('h-2 rounded-full w-full', t.primaryBg)} />
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* LANGUAGE & REGION */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+                    <div className="p-2 bg-violet-50 rounded-lg text-violet-600">
+                        <Languages className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">
+                            {t('settings.language.title')}
+                        </h3>
+                        <p className="text-xs text-slate-500 font-medium">
+                            {t('settings.language.selectLanguage')}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex gap-3">
+                    {SUPPORTED_LANGUAGES.map((lang) => {
+                        const isSel = currentLanguage === lang.code;
+                        return (
+                            <button
+                                key={lang.code}
+                                type="button"
+                                onClick={() => i18n.changeLanguage(lang.code)}
+                                className={cn(
+                                    'flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border-2 transition-all font-bold text-sm',
+                                    isSel
+                                        ? 'bg-violet-50 border-violet-600 text-violet-950 shadow-xs ring-2 ring-violet-600/20'
+                                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                                )}
+                            >
+                                <span className="text-xl">{lang.flag}</span>
+                                <span>{lang.label}</span>
+                                {isSel && <span className="w-2 h-2 rounded-full bg-violet-600 animate-pulse ml-1" />}
                             </button>
                         );
                     })}
