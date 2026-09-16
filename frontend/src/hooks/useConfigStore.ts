@@ -293,7 +293,14 @@ export const useConfigStore = create<ConfigState>()(
                             activeTheme: themeToApply,
                             iva: res.data.data.ivaPercent ?? res.data.data.iva ?? 16,
                             mainCurrency: res.data.data.mainCurrency || 'USD',
-                            activeCurrencies: res.data.data.activeCurrencies || get().activeCurrencies || ['USD', 'COP', 'VES'],
+                            activeCurrencies: (() => {
+                                const raw = res.data.data.activeCurrencies;
+                                if (Array.isArray(raw) && raw.length > 0) return raw;
+                                if (typeof raw === 'string' && raw.length > 0) {
+                                    return raw.split(',').map((s: string) => s.trim()).filter(Boolean);
+                                }
+                                return get().activeCurrencies?.length ? get().activeCurrencies : ['USD', 'COP', 'VES'];
+                            })(),
                         });
                         if (typeof document !== 'undefined') {
                             document.documentElement.setAttribute('data-theme', themeToApply);
@@ -421,6 +428,16 @@ export const useConfigStore = create<ConfigState>()(
                 }
                 if (version < 2 && persistedState?.ivaPercent > 100) {
                     persistedState.ivaPercent = persistedState.ivaPercent / 100;
+                }
+                // Fix activeCurrencies stored as comma-separated string instead of array
+                if (typeof persistedState?.activeCurrencies === 'string') {
+                    persistedState.activeCurrencies = (persistedState.activeCurrencies as string)
+                        .split(',')
+                        .map((s: string) => s.trim())
+                        .filter(Boolean);
+                }
+                if (!Array.isArray(persistedState?.activeCurrencies) || persistedState.activeCurrencies.length === 0) {
+                    persistedState.activeCurrencies = ['USD', 'COP', 'VES'];
                 }
                 return persistedState;
             },

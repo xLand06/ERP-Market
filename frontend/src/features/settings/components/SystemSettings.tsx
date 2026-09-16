@@ -2,10 +2,56 @@ import { useState, useEffect } from 'react';
 import { Settings2, DollarSign, Percent, Clock, Save, RefreshCw, Palette, Globe, Check, Plus, Search, ChevronDown, Star } from 'lucide-react';
 import { useConfigStore, UITheme } from '@/hooks/useConfigStore';
 import { useAuthStore } from '@/features/auth/store/authStore';
-import { GLOBAL_CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
+import { GLOBAL_CURRENCIES, getCurrencyInfo, getCurrenciesByRegion, CURRENCY_REGIONS } from '@/constants/currencies';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import type { CurrencyInfo } from '@/constants/currencies';
+
+// ── Shared currency row used in the catalog grid ───────────────────────────────
+function CurrencyRow({ c, isActive, isMain, onToggle }: {
+    c: CurrencyInfo;
+    isActive: boolean;
+    isMain: boolean;
+    onToggle: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onToggle}
+            className={cn(
+                'p-2 rounded-xl border text-left flex items-center justify-between transition-all text-xs',
+                isActive
+                    ? 'bg-indigo-50/80 border-indigo-400 text-indigo-950 font-bold'
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 font-medium',
+            )}
+        >
+            <div className="flex items-center gap-2 truncate">
+                <span className="text-base">{c.flag}</span>
+                <div className="truncate">
+                    <div className="flex items-center gap-1">
+                        <span className="font-mono font-black">{c.code}</span>
+                        <span className="text-[10px] text-slate-400 font-bold">({c.symbol})</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 truncate">{c.name}</p>
+                </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+                {isMain && (
+                    <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
+                        Base
+                    </span>
+                )}
+                <div className={cn(
+                    'w-4 h-4 rounded flex items-center justify-center border',
+                    isActive ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 bg-white',
+                )}>
+                    {isActive && <Check className="w-3 h-3" />}
+                </div>
+            </div>
+        </button>
+    );
+}
 
 export function SystemSettings() {
     const { user } = useAuthStore();
@@ -205,83 +251,83 @@ export function SystemSettings() {
                         </div>
 
                         {/* Selector Expandible del Catálogo Mundial */}
-                        {showCatalogSelector && (
-                            <div className="p-4 bg-slate-50 border-2 border-indigo-100 rounded-2xl space-y-3 animate-fade-in shadow-xs">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-xs font-black text-slate-800 uppercase tracking-wide">
-                                            Catálogo de Monedas Internacionales (ISO 4217)
-                                        </p>
-                                        <p className="text-[11px] text-slate-500 font-medium">
-                                            Activa las monedas que tu negocio acepta para cobros y conversiones.
-                                        </p>
+                        {showCatalogSelector && (() => {
+                            const byRegion = getCurrenciesByRegion();
+                            const regionOrder: (keyof typeof CURRENCY_REGIONS)[] = ['americas', 'europe', 'asia', 'middle_east', 'africa', 'oceania'];
+                            const q = catalogSearch.toLowerCase();
+                            const filtered = q
+                                ? GLOBAL_CURRENCIES.filter(c => c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q))
+                                : null;
+
+                            return (
+                                <div className="p-4 bg-slate-50 border-2 border-indigo-100 rounded-2xl space-y-3 animate-fade-in shadow-xs">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-xs font-black text-slate-800 uppercase tracking-wide">
+                                                ISO 4217 — Global Currency Catalog
+                                            </p>
+                                            <p className="text-[11px] text-slate-500 font-medium">
+                                                Activate the currencies your business accepts.
+                                            </p>
+                                        </div>
+                                        <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">
+                                            {localActiveCurrencies.length} active
+                                        </span>
                                     </div>
-                                    <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">
-                                        {localActiveCurrencies.length} activas
-                                    </span>
-                                </div>
 
-                                <div className="relative">
-                                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar por código (USD, EUR, MXN...) o país..."
-                                        value={catalogSearch}
-                                        onChange={(e) => setCatalogSearch(e.target.value)}
-                                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg outline-none focus:border-indigo-500"
-                                    />
-                                </div>
+                                    {/* Search */}
+                                    <div className="relative">
+                                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search by code (USD, EUR, JPY…) or name…"
+                                            value={catalogSearch}
+                                            onChange={(e) => setCatalogSearch(e.target.value)}
+                                            className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg outline-none focus:border-indigo-500"
+                                        />
+                                    </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
-                                    {GLOBAL_CURRENCIES
-                                        .filter(c => 
-                                            c.code.toLowerCase().includes(catalogSearch.toLowerCase()) || 
-                                            c.name.toLowerCase().includes(catalogSearch.toLowerCase())
-                                        )
-                                        .map((c) => {
-                                            const isActive = localActiveCurrencies.includes(c.code);
-                                            const isMain = localMainCurrency === c.code;
-                                            return (
-                                                <button
-                                                    key={c.code}
-                                                    type="button"
-                                                    onClick={() => toggleCurrency(c.code)}
-                                                    className={cn(
-                                                        "p-2 rounded-xl border text-left flex items-center justify-between transition-all text-xs",
-                                                        isActive
-                                                            ? "bg-indigo-50/80 border-indigo-400 text-indigo-950 font-bold"
-                                                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100 font-medium"
-                                                    )}
-                                                >
-                                                    <div className="flex items-center gap-2 truncate">
-                                                        <span className="text-base">{c.flag}</span>
-                                                        <div className="truncate">
-                                                            <div className="flex items-center gap-1">
-                                                                <span className="font-mono font-black">{c.code}</span>
-                                                                <span className="text-[10px] text-slate-400 font-bold">({c.symbol})</span>
-                                                            </div>
-                                                            <p className="text-[10px] text-slate-500 truncate">{c.name}</p>
+                                    {/* Currency list: flat when searching, grouped by region otherwise */}
+                                    <div className="max-h-72 overflow-y-auto pr-1 space-y-3">
+                                        {filtered ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                                {filtered.map((c) => {
+                                                    const isActive = localActiveCurrencies.includes(c.code);
+                                                    const isMain = localMainCurrency === c.code;
+                                                    return (
+                                                        <CurrencyRow key={c.code} c={c} isActive={isActive} isMain={isMain} onToggle={() => toggleCurrency(c.code)} />
+                                                    );
+                                                })}
+                                                {filtered.length === 0 && (
+                                                    <p className="text-xs text-slate-400 col-span-2 py-4 text-center">No currencies match your search.</p>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            regionOrder.map((region) => {
+                                                const currencies = byRegion[region];
+                                                if (!currencies?.length) return null;
+                                                return (
+                                                    <div key={region}>
+                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-0.5">
+                                                            {CURRENCY_REGIONS[region]}
+                                                        </p>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                                            {currencies.map((c) => {
+                                                                const isActive = localActiveCurrencies.includes(c.code);
+                                                                const isMain = localMainCurrency === c.code;
+                                                                return (
+                                                                    <CurrencyRow key={c.code} c={c} isActive={isActive} isMain={isMain} onToggle={() => toggleCurrency(c.code)} />
+                                                                );
+                                                            })}
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-1 shrink-0">
-                                                        {isMain && (
-                                                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
-                                                                Principal
-                                                            </span>
-                                                        )}
-                                                        <div className={cn(
-                                                            "w-4 h-4 rounded flex items-center justify-center border",
-                                                            isActive ? "bg-indigo-600 border-indigo-600 text-white" : "border-slate-300 bg-white"
-                                                        )}>
-                                                            {isActive && <Check className="w-3 h-3" />}
-                                                        </div>
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
+                                                );
+                                            })
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })()}
 
                         {/* Moneda Principal (Base de Precios y Costos) */}
                         <div className="space-y-2">
