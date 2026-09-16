@@ -412,6 +412,18 @@ export const useConfigStore = create<ConfigState>()(
         }),
         {
             name: 'erp-config-storage',
+            version: 2,
+            migrate: (persistedState: any, version: number) => {
+                // v1 → v2: UI bug stored iva as percentage×100 (e.g. 1600 instead of 16).
+                // Auto-correct any value clearly out of range.
+                if (version < 2 && persistedState?.iva > 100) {
+                    persistedState.iva = persistedState.iva / 100;
+                }
+                if (version < 2 && persistedState?.ivaPercent > 100) {
+                    persistedState.ivaPercent = persistedState.ivaPercent / 100;
+                }
+                return persistedState;
+            },
         }
     )
 );
