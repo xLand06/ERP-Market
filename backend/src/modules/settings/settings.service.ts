@@ -107,6 +107,10 @@ export async function getSettings(): Promise<SystemSettings> {
                 config[s.key] = s.value === 'null' ? null : s.value;
             }
         }
+        // Guard: auto-correct corrupted iva values stored by the old UI (e.g. 1600 instead of 16)
+        if (config.iva > 100) config.iva = config.iva / 100;
+        if (config.ivaPercent > 100) config.ivaPercent = config.ivaPercent / 100;
+
         return config as SystemSettings;
     } catch (error: any) {
         logger.error('[Settings] Error leyendo configuración desde BD:', { error: error.message || error });
