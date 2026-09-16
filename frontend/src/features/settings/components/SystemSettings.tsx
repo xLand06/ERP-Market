@@ -22,7 +22,7 @@ export function SystemSettings() {
     const [showCatalogSelector, setShowCatalogSelector] = useState(false);
     const [catalogSearch, setCatalogSearch] = useState('');
 
-    const [localIva, setLocalIva] = useState((iva * 100).toString());
+    const [localIva, setLocalIva] = useState(iva.toString());
     const [localCloseTime, setLocalCloseTime] = useState(autoCloseTime || '');
     const [localPurgeDays, setLocalPurgeDays] = useState(purgeRetentionDays.toString());
     const [localLogDays, setLocalLogDays] = useState(purgeLogRetentionDays.toString());
@@ -77,7 +77,7 @@ export function SystemSettings() {
             
             // 2. Configuración general (JSON backend + Store)
             await updateSettings({
-                iva: (parseFloat(localIva) || 0) / 100,
+                iva: parseFloat(localIva) || 0,
                 mainCurrency: localMainCurrency,
                 activeCurrencies: localActiveCurrencies,
                 autoCloseTime: localCloseTime.trim() || null,
