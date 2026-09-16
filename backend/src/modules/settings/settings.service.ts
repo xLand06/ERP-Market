@@ -7,6 +7,7 @@ export interface SystemSettings {
     ivaPercent: number;
     ivaMode: 'included' | 'added';
     mainCurrency: string;
+    activeCurrencies: string[];
     autoOpenTime: string | null;
     autoCloseTime: string | null;
     purgeRetentionDays: number;
@@ -53,6 +54,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
     ivaPercent: 16,
     ivaMode: 'added',
     mainCurrency: 'USD',
+    activeCurrencies: ['USD', 'COP', 'VES'],
     autoOpenTime: null,
     autoCloseTime: null,
     purgeRetentionDays: 30,

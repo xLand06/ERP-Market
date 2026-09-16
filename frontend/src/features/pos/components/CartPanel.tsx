@@ -129,19 +129,17 @@ export const CartPanel = React.memo(function CartPanel({
     onCheckout,
     isSubmitting,
 }: CartPanelProps) {
-    const { fmtUSD, fmtVES, fmtCOP, fromUSD, fmtMain, mainCurrency } = useConfigStore();
-
-    const totalUSD = totals.total;
-    const totalVES = fromUSD(totals.total, 'VES');
-    const totalCOP = fromUSD(totals.total, 'COP');
+    const { convert, formatCurrency, fmtMain, mainCurrency, activeCurrencies } = useConfigStore();
 
     // Monedas NO principales (se muestran debajo del ticket como equivalencia)
     const main = mainCurrency || 'USD';
-    const otherCurrencies = [
-        { code: 'USD', value: fmtUSD(totalUSD) },
-        { code: 'VES', value: fmtVES(totalVES) },
-        { code: 'COP', value: fmtCOP(totalCOP) },
-    ].filter((c) => c.code !== main);
+    const active = activeCurrencies?.length ? activeCurrencies : ['USD', 'COP', 'VES'];
+    const otherCurrencies = active
+        .filter((code) => code !== main)
+        .map((code) => ({
+            code,
+            value: formatCurrency(convert(totals.total, main, code), code),
+        }));
 
     return (
         <>
