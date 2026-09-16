@@ -103,11 +103,20 @@ export async function getSettings(): Promise<SystemSettings> {
                 config[s.key] = Number(s.value);
             } else if (s.key === 'ivaEnabled' || s.key === 'autoCut' || s.key === 'openCashDrawer' || s.key === 'autoPrintOnCheckout' || s.key === 'catalogActive' || s.key.startsWith('show')) {
                 config[s.key] = s.value === 'true';
+            } else if (s.key === 'activeCurrencies') {
+                // Stored as JSON array; fall back to comma-split for legacy rows
+                try {
+                    const parsed = JSON.parse(s.value);
+                    config[s.key] = Array.isArray(parsed) ? parsed : s.value.split(',').map((c: string) => c.trim()).filter(Boolean);
+                } catch {
+                    config[s.key] = s.value.split(',').map((c: string) => c.trim()).filter(Boolean);
+                }
             } else {
                 config[s.key] = s.value === 'null' ? null : s.value;
             }
         }
-        // Guard: auto-correct corrupted iva values stored by the old UI (e.g. 1600 instead of 16)
+
+        // Guard: auto-correct corrupted iva values (e.g. 1600 stored instead of 16)
         if (config.iva > 100) config.iva = config.iva / 100;
         if (config.ivaPercent > 100) config.ivaPercent = config.ivaPercent / 100;
 
@@ -123,9 +132,22 @@ export async function saveSettings(settings: Partial<SystemSettings>): Promise<S
         const current = await getSettings();
         const updated = { ...current, ...settings };
 
+        // Guard: never persist a corrupted iva value
+        if (typeof updated.iva === 'number' && updated.iva > 100) updated.iva = updated.iva / 100;
+        if (typeof updated.ivaPercent === 'number' && updated.ivaPercent > 100) updated.ivaPercent = updated.ivaPercent / 100;
+        // Keep ivaPercent in sync with iva
+        if (typeof updated.iva === 'number') updated.ivaPercent = updated.iva;
+
         // Guardar cada clave en la base de datos de manera atómica/upsert
         for (const [key, val] of Object.entries(updated)) {
-            const strVal = val === null ? 'null' : String(val);
+            let strVal: string;
+            if (val === null) {
+                strVal = 'null';
+            } else if (Array.isArray(val)) {
+                strVal = JSON.stringify(val);
+            } else {
+                strVal = String(val);
+            }
             await prisma.systemSetting.upsert({
                 where: { key },
                 update: { value: strVal },
@@ -137,6 +159,7 @@ export async function saveSettings(settings: Partial<SystemSettings>): Promise<S
         return updated;
     } catch (error: any) {
         logger.error('[Settings] Error guardando configuración en BD:', { error: error.message || error });
+
         throw error;
     }
 }
