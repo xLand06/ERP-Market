@@ -19,7 +19,7 @@ export function SystemSettings() {
     const [localMainCurrency, setLocalMainCurrency] = useState(mainCurrency || 'USD');
     const [localActiveCurrencies, setLocalActiveCurrencies] = useState<string[]>(activeCurrencies || ['USD', 'COP', 'VES']);
     const [localRates, setLocalRates] = useState<Record<string, string>>({});
-    const [showCatalogSelector, setShowCatalogSelector] = useState(false);
+    const [showCatalogSelector, setShowCatalogSelector] = useState(true);
     const [catalogSearch, setCatalogSearch] = useState('');
 
     const [localIva, setLocalIva] = useState(iva.toString());
@@ -44,7 +44,7 @@ export function SystemSettings() {
         if (!initialRates['VES']) initialRates['VES'] = '5.5';
         if (!initialRates['USD'] && !initialRates['COP']) initialRates['COP'] = '3600';
         setLocalRates(initialRates);
-        setLocalIva((iva * 100).toString());
+        setLocalIva(iva.toString());
         setLocalCloseTime(autoCloseTime || '');
         setLocalPurgeDays(purgeRetentionDays.toString());
         setLocalLogDays(purgeLogRetentionDays.toString());
