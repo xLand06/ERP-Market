@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { api } from '@/lib/api';
+import { getCurrencyInfo } from '@/constants/currencies';
 
 interface ExchangeRate {
     code: string;
@@ -13,6 +14,8 @@ export interface ThermalPrinterConfig {
     connectionType: 'thermal_usb' | 'thermal_network' | 'thermal_serial' | 'browser';
     ipAddress?: string;
     port?: number;
+    usbVendorId?: number;
+    usbProductId?: number;
     paperWidth: '80mm' | '58mm';
     autoCut: boolean;
     openCashDrawer: boolean;
@@ -25,6 +28,7 @@ export type UITheme = 'emerald' | 'indigo' | 'amber' | 'rose' | 'dark';
 export interface ConfigState {
     // Monedas & Tasas
     mainCurrency: string;
+    activeCurrencies: string[];
     rates: Record<string, number>;
     updatedAt: string | null;
 
@@ -87,6 +91,7 @@ export interface ConfigState {
     setTheme: (theme: UITheme) => void;
     setIva: (iva: number) => void;
     setMainCurrency: (currency: string) => void;
+    setActiveCurrencies: (currencies: string[]) => void;
     setAutoOpenTime: (time: string | null) => void;
     setAutoCloseTime: (time: string | null) => void;
     setPurgeRetention: (days: number) => void;
@@ -98,7 +103,11 @@ export interface ConfigState {
     deletePrinter: (id: string) => void;
     setPrimaryPrinter: (id: string) => void;
 
-    // Helpers de conversión
+    // Helpers de conversión dinámicos
+    convert: (amount: number, fromCurrency: string, toCurrency: string) => number;
+    formatCurrency: (amount: number, currencyCode?: string) => string;
+
+    // Helpers de compatibilidad retrocompatible
     toUSD: (amount: number, currency: string) => number;
     fromUSD: (usdAmount: number, targetCurrency: string) => number;
     /** Convierte desde cualquier moneda a COP */
@@ -131,6 +140,7 @@ export const useConfigStore = create<ConfigState>()(
             ivaPercent: 16,
             ivaMode: 'added',
             mainCurrency: 'USD',
+            activeCurrencies: ['USD', 'COP', 'VES'],
             autoOpenTime: null,
             autoCloseTime: null,
             purgeRetentionDays: 30,
@@ -168,87 +178,69 @@ export const useConfigStore = create<ConfigState>()(
             get vesRate() { return get().rates['VES'] || 5.5; },
             get copRate() { return get().rates['USD'] || get().rates['COP'] || 3600; },
 
-            // ── Conversiones ────────────────────────────────────────────────
-            toUSD: (amount: number, currency: string) => {
-                const r = get().rates;
-                const usdRate = r['USD'] || r['COP'] || 3600;
-                const vesRate = r['VES'] || 5.5;
+            // ── Conversión Universal ────────────────────────────────────────
+            convert: (amount: number, fromCurrency: string, toCurrency: string) => {
+                if (!amount || fromCurrency === toCurrency) return amount;
+                const main = get().mainCurrency || 'USD';
+                const rates = get().rates;
 
-                if (currency === 'USD') return amount;
-                if (currency === 'VES') return vesRate > 0 ? amount / vesRate : amount;
-                if (currency === 'COP') return usdRate > 0 ? amount / usdRate : amount;
-                return amount;
+                const getRate = (code: string) => {
+                    if (code === main) return 1;
+                    if (main === 'USD') {
+                        if (code === 'VES') return rates['VES'] || 5.5;
+                        if (code === 'COP') return rates['USD'] || rates['COP'] || 3600;
+                    }
+                    return rates[code] || 1;
+                };
+
+                let amountInMain = amount;
+                if (fromCurrency !== main) {
+                    const rFrom = getRate(fromCurrency);
+                    amountInMain = rFrom > 0 ? amount / rFrom : amount;
+                }
+
+                if (toCurrency === main) return amountInMain;
+                const rTo = getRate(toCurrency);
+                return amountInMain * rTo;
             },
 
-            fromUSD: (usdAmount: number, targetCurrency: string) => {
-                const r = get().rates;
-                const usdRate = r['USD'] || r['COP'] || 3600;
-                const vesRate = r['VES'] || 5.5;
-
-                if (targetCurrency === 'USD') return usdAmount;
-                if (targetCurrency === 'VES') return usdAmount * vesRate;
-                if (targetCurrency === 'COP') return usdAmount * usdRate;
-                return usdAmount;
+            formatCurrency: (amount: number, currencyCode?: string) => {
+                const code = (currencyCode || get().mainCurrency || 'USD').toUpperCase();
+                const info = getCurrencyInfo(code);
+                try {
+                    return new Intl.NumberFormat('es-CO', {
+                        style: 'currency',
+                        currency: code,
+                        minimumFractionDigits: info.decimals,
+                        maximumFractionDigits: info.decimals,
+                    }).format(amount);
+                } catch (_) {
+                    return `${info.symbol} ${amount.toFixed(info.decimals)}`;
+                }
             },
 
-            toCOP: (amount: number, currency: string) => {
-                const r = get().rates;
-                const usdRate = r['USD'] || r['COP'] || 3600;
-                const vesRate = r['VES'] || 5.5;
-
-                if (currency === 'COP') return amount;
-                if (currency === 'USD') return amount * usdRate;
-                if (currency === 'VES') return (amount / vesRate) * usdRate;
-                return amount;
-            },
-
-            fromCOP: (copAmount: number, targetCurrency: string) => {
-                const r = get().rates;
-                const usdRate = r['USD'] || r['COP'] || 3600;
-                const vesRate = r['VES'] || 5.5;
-
-                if (targetCurrency === 'COP') return copAmount;
-                if (targetCurrency === 'USD') return copAmount / usdRate;
-                if (targetCurrency === 'VES') return (copAmount / usdRate) * vesRate;
-                return copAmount;
-            },
+            // ── Conversiones Retrocompatibles ──────────────────────────────
+            toUSD: (amount: number, currency: string) => get().convert(amount, currency, 'USD'),
+            fromUSD: (usdAmount: number, targetCurrency: string) => get().convert(usdAmount, 'USD', targetCurrency),
+            toCOP: (amount: number, currency: string) => get().convert(amount, currency, 'COP'),
+            fromCOP: (copAmount: number, targetCurrency: string) => get().convert(copAmount, 'COP', targetCurrency),
 
             // ── Formateadores ────────────────────────────────────────────────
-            fmtCOP: (amount: number) =>
-                new Intl.NumberFormat('es-CO', {
-                    style: 'currency',
-                    currency: 'COP',
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                }).format(amount),
-
-            fmtUSD: (amount: number) =>
-                new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'USD',
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                }).format(amount),
-
+            fmtCOP: (amount: number) => get().formatCurrency(amount, 'COP'),
+            fmtUSD: (amount: number) => get().formatCurrency(amount, 'USD'),
             fmtVES: (amount: number) =>
                 `Bs. ${new Intl.NumberFormat('es-VE', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                 }).format(amount)}`,
 
-            fmtMain: (usdAmount: number) => {
+            fmtMain: (amount: number) => {
                 const main = get().mainCurrency || 'USD';
-                if (main === 'USD') return get().fmtUSD(usdAmount);
-                if (main === 'VES') return get().fmtVES(get().fromUSD(usdAmount, 'VES'));
-                if (main === 'COP') return get().fmtCOP(get().fromUSD(usdAmount, 'COP'));
-                return get().fmtUSD(usdAmount);
+                return get().formatCurrency(amount, main);
             },
 
             currencySymbol: (currency: string) => {
-                if (currency === 'COP') return '$';
-                if (currency === 'USD') return '$';
-                if (currency === 'VES') return 'Bs.';
-                return '$';
+                return getCurrencyInfo(currency).symbol;
             },
 
             // ── Actions ──────────────────────────────────────────────────────
@@ -281,6 +273,7 @@ export const useConfigStore = create<ConfigState>()(
 
             setIva: (iva) => set({ iva }),
             setMainCurrency: (mainCurrency) => set({ mainCurrency }),
+            setActiveCurrencies: (activeCurrencies) => set({ activeCurrencies }),
             setAutoOpenTime: (time) => set({ autoOpenTime: time }),
             setAutoCloseTime: (time) => set({ autoCloseTime: time }),
             setPurgeRetention: (days) => set({ purgeRetentionDays: days }),
@@ -300,6 +293,7 @@ export const useConfigStore = create<ConfigState>()(
                             activeTheme: themeToApply,
                             iva: res.data.data.ivaPercent ?? res.data.data.iva ?? 16,
                             mainCurrency: res.data.data.mainCurrency || 'USD',
+                            activeCurrencies: res.data.data.activeCurrencies || get().activeCurrencies || ['USD', 'COP', 'VES'],
                         });
                         if (typeof document !== 'undefined') {
                             document.documentElement.setAttribute('data-theme', themeToApply);
@@ -418,6 +412,18 @@ export const useConfigStore = create<ConfigState>()(
         }),
         {
             name: 'erp-config-storage',
+            version: 2,
+            migrate: (persistedState: any, version: number) => {
+                // v1 → v2: UI bug stored iva as percentage×100 (e.g. 1600 instead of 16).
+                // Auto-correct any value clearly out of range.
+                if (version < 2 && persistedState?.iva > 100) {
+                    persistedState.iva = persistedState.iva / 100;
+                }
+                if (version < 2 && persistedState?.ivaPercent > 100) {
+                    persistedState.ivaPercent = persistedState.ivaPercent / 100;
+                }
+                return persistedState;
+            },
         }
     )
 );

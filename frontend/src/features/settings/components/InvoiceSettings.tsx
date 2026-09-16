@@ -17,9 +17,18 @@ async function testWebUSBDeviceReal(vendorId?: number, productId?: number): Prom
     if (!('usb' in navigator)) {
         return { success: false, message: 'WebUSB no es compatible en este navegador.' };
     }
+    let device: any = null;
     try {
         const devices = await (navigator as any).usb.getDevices();
-        let device = devices.find((d: any) => vendorId && d.vendorId === vendorId);
+        device = devices.find((d: any) => {
+            if (vendorId != null && productId != null) {
+                return d.vendorId === vendorId && d.productId === productId;
+            }
+            if (vendorId != null) {
+                return d.vendorId === vendorId;
+            }
+            return false;
+        });
         if (!device && devices.length > 0) {
             device = devices[0];
         }
@@ -28,32 +37,66 @@ async function testWebUSBDeviceReal(vendorId?: number, productId?: number): Prom
         }
 
         await device.open();
-        if (device.configuration === null) {
-            await device.selectConfiguration(1);
+        try {
+            if (device.configuration === null) {
+                await device.selectConfiguration(1);
+            }
+
+            // Detección robusta de interfaz y endpoint de salida
+            let targetInterfaceNumber = 0;
+            let outEndpointNumber: number | null = null;
+
+            if (device.configuration?.interfaces) {
+                for (const iface of device.configuration.interfaces) {
+                    const ep = iface.alternate?.endpoints?.find((e: any) => e.direction === 'out')
+                        || iface.alternates?.flatMap((a: any) => a.endpoints || []).find((e: any) => e.direction === 'out');
+                    if (ep) {
+                        targetInterfaceNumber = iface.interfaceNumber;
+                        outEndpointNumber = ep.endpointNumber;
+                        break;
+                    }
+                }
+            }
+
+            await device.claimInterface(targetInterfaceNumber);
+
+            // Bytes ESC/POS reales: Init (1B 40) + Text + Cut (1D 56 00)
+            const encoder = new TextEncoder();
+            const escInit = new Uint8Array([0x1B, 0x40]);
+            const text = encoder.encode('\n--- ERP-MARKET PRINTER TEST ---\nESTADO: CONECTADO OK\n--------------------------------\n\n\n');
+            const escCut = new Uint8Array([0x1D, 0x56, 0x00]);
+
+            // Unir buffers
+            const fullData = new Uint8Array(escInit.length + text.length + escCut.length);
+            fullData.set(escInit, 0);
+            fullData.set(text, escInit.length);
+            fullData.set(escCut, escInit.length + text.length);
+
+            if (outEndpointNumber !== null) {
+                await device.transferOut(outEndpointNumber, fullData);
+            } else {
+                throw new Error('No se encontró un endpoint de salida (OUT) en la interfaz USB.');
+            }
+
+            return { success: true, message: `Conexión física exitosa con ${device.productName || 'Impresora USB'}` };
+        } finally {
+            if (device.opened) {
+                try {
+                    await device.close();
+                } catch (closeErr) {
+                    console.warn('Error al cerrar dispositivo USB:', closeErr);
+                }
+            }
         }
-        await device.claimInterface(0);
-
-        // Bytes ESC/POS reales: Init (1B 40) + Text + Cut (1D 56 00)
-        const encoder = new TextEncoder();
-        const escInit = new Uint8Array([0x1B, 0x40]);
-        const text = encoder.encode('\n--- ERP-MARKET PRINTER TEST ---\nESTADO: CONECTADO OK\n--------------------------------\n\n\n');
-        const escCut = new Uint8Array([0x1D, 0x56, 0x00]);
-
-        // Unir buffers
-        const fullData = new Uint8Array(escInit.length + text.length + escCut.length);
-        fullData.set(escInit, 0);
-        fullData.set(text, escInit.length);
-        fullData.set(escCut, escInit.length + text.length);
-
-        // Enviar al Endpoint Out (generalmente EP 1 o 2)
-        const endpoint = device.configuration.interfaces[0].alternate.endpoints.find((e: any) => e.direction === 'out');
-        if (endpoint) {
-            await device.transferOut(endpoint.endpointNumber, fullData);
-        }
-
-        return { success: true, message: `Conexión física exitosa con ${device.productName || 'Impresora USB'}` };
     } catch (err: any) {
-        return { success: false, message: err?.message || 'Error al comunicarse con la impresora USB.' };
+        const errMsg = err?.message || String(err);
+        if (err?.name === 'SecurityError' || errMsg.includes('Access denied') || errMsg.includes('SecurityError')) {
+            return {
+                success: false,
+                message: "Acceso denegado por Windows: la impresora está bloqueada por el driver de Windows. En Windows se requiere asociar el driver WinUSB (usando Zadig) para permitir WebUSB directo, o usar 'Impresora del Sistema'."
+            };
+        }
+        return { success: false, message: errMsg || 'Error al comunicarse con la impresora USB.' };
     }
 }
 
@@ -96,6 +139,15 @@ function PrinterFormModal({
             setOpenCashDrawer(printerToEdit.openCashDrawer);
             setIsPrimary(printerToEdit.isPrimary);
             setRole(printerToEdit.role);
+            if (printerToEdit.usbVendorId != null || printerToEdit.connectionType === 'thermal_usb') {
+                setPairedUsbDevice({
+                    name: printerToEdit.name,
+                    vendorId: printerToEdit.usbVendorId,
+                    productId: printerToEdit.usbProductId,
+                });
+            } else {
+                setPairedUsbDevice(null);
+            }
             setConnectionVerified(true);
         } else {
             setName('');
@@ -207,6 +259,8 @@ function PrinterFormModal({
             connectionType,
             ipAddress: connectionType === 'thermal_network' ? ipAddress : undefined,
             port: connectionType === 'thermal_network' ? port : undefined,
+            usbVendorId: pairedUsbDevice?.vendorId,
+            usbProductId: pairedUsbDevice?.productId,
             paperWidth,
             autoCut,
             openCashDrawer,
@@ -517,7 +571,7 @@ export function InvoiceSettings() {
         setTestingPrinterId(printer.id);
         try {
             if (printer.connectionType === 'thermal_usb') {
-                const res = await testWebUSBDeviceReal();
+                const res = await testWebUSBDeviceReal(printer.usbVendorId, printer.usbProductId);
                 if (res.success) {
                     toast.success(res.message);
                 } else {

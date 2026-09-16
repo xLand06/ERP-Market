@@ -50,6 +50,13 @@ export function usePayment(
     const usdRate = rates['USD'] || rates['COP'] || 3600;
     const vesRate = rates['VES'] || 5.5;
 
+    const getRate = useCallback((code: string) => {
+        if (code === 'USD') return 1;
+        if (code === 'VES') return rates['VES'] || 5.5;
+        if (code === 'COP') return rates['USD'] || rates['COP'] || 3600;
+        return rates[code] || 1;
+    }, [rates]);
+
     const [totalInUSD, setTotalInUSD] = useState(0);
     const [rows, setRows] = useState<PaymentMethodRow[]>([]);
 
@@ -70,10 +77,8 @@ export function usePayment(
         setRows(prev => {
             if (prev.length === 1) {
                 const firstRow = prev[0];
-                let newAmount = newTotalUSD;
-                if (firstRow.currency === 'USD') newAmount = newTotalUSD;
-                if (firstRow.currency === 'VES') newAmount = newTotalUSD * vesRate;
-                if (firstRow.currency === 'COP') newAmount = newTotalUSD * usdRate;
+                const r = getRate(firstRow.currency);
+                const newAmount = newTotalUSD * r;
                 return [{
                     ...firstRow,
                     amount: Number(newAmount.toFixed(2))
@@ -81,15 +86,13 @@ export function usePayment(
             }
             return prev;
         });
-    }, [usdRate, vesRate]);
+    }, [getRate]);
 
     // Convertir una fila a USD (referencia base)
     const toUSD = useCallback((row: PaymentMethodRow): number => {
-        if (row.currency === 'USD') return row.amount;
-        if (row.currency === 'VES') return vesRate > 0 ? row.amount / vesRate : 0;
-        if (row.currency === 'COP') return usdRate > 0 ? row.amount / usdRate : 0;
-        return row.amount;
-    }, [usdRate, vesRate]);
+        const r = getRate(row.currency);
+        return r > 0 ? row.amount / r : row.amount;
+    }, [getRate]);
 
     // paidTotal en USD y COP
     const paidTotalInUSD = useMemo(() =>
@@ -191,17 +194,15 @@ export function usePayment(
                 }
 
                 if (updates.type || updates.currency) {
-                    let newAmount = remainingUSD;
-                    if (next.currency === 'USD') newAmount = remainingUSD;
-                    if (next.currency === 'VES') newAmount = remainingUSD * vesRate;
-                    if (next.currency === 'COP') newAmount = remainingUSD * usdRate;
+                    const r = getRate(next.currency);
+                    const newAmount = remainingUSD * r;
                     next.amount = Number(newAmount.toFixed(2));
                 }
 
                 return next;
             });
         });
-    }, [totalInUSD, toUSD, usdRate, vesRate]);
+    }, [totalInUSD, toUSD, getRate]);
 
     const removeRow = useCallback((key: string) => {
         setRows(prev => {
@@ -218,9 +219,9 @@ export function usePayment(
                 type: r.type,
                 amount: r.amount,
                 currency: r.currency,
-                exchangeRate: r.currency === 'USD' ? usdRate : r.currency === 'VES' ? vesRate : undefined,
+                exchangeRate: getRate(r.currency),
             })),
-    [rows, usdRate, vesRate]);
+    [rows, getRate]);
 
     return {
         rows,

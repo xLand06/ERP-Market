@@ -39,7 +39,7 @@ export interface CartItem {
 // ─── Payment Types ─────────────────────────────────────────────────────────────
 
 export type PaymentMethodType = 'cash' | 'transfer' | 'card' | 'usd' | 'other';
-export type Currency = 'COP' | 'USD' | 'VES';
+export type Currency = string;
 
 export interface PaymentMethodRow {
     /** unique key for React list */

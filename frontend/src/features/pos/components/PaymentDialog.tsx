@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { usePayment } from '../hooks/usePayment';
 import { customersApi, type Customer } from '@/services/customers.service';
+import { getCurrencyInfo } from '@/constants/currencies';
 import type { PaymentMethodType, Currency, CartItem } from '../types';
 
 interface PaymentDialogProps {
@@ -86,7 +87,8 @@ export function PaymentDialog({
     onConfirm,
     isSubmitting,
 }: PaymentDialogProps) {
-    const { rates, fmtCOP, fmtUSD, fmtVES, fromCOP, fromUSD, mainCurrency } = useConfigStore();
+    const { rates, fmtCOP, fmtUSD, fmtVES, fromCOP, fromUSD, mainCurrency, activeCurrencies, convert, formatCurrency } = useConfigStore();
+    const active = activeCurrencies?.length ? activeCurrencies : ['USD', 'COP', 'VES'];
 
     const {
         rows,
@@ -266,31 +268,38 @@ export function PaymentDialog({
                         <div className="p-5 bg-gradient-to-br from-slate-950 to-slate-900 text-white rounded-2xl shadow-md border border-slate-800 space-y-1.5">
                             <span className="text-[11px] font-black text-slate-300 uppercase tracking-wider block">Monto Total a Cobrar</span>
                             <p className="text-3xl font-black text-emerald-400 tabular-nums leading-none">
-                                {mainCurrency === 'VES' ? fmtVES(totalVES) : mainCurrency === 'USD' ? fmtUSD(totalUSD) : fmtCOP(totalCOP)}
+                                {formatCurrency(total, mainCurrency)}
                             </p>
                             <span className="text-xs text-slate-300 font-bold block pt-1">
                                 {cartItems.length} {cartItems.length === 1 ? 'producto' : 'productos'} en el ticket
                             </span>
                         </div>
 
-                        {/* Equivalencias en otras monedas - Alto Contraste */}
-                        <div className="bg-slate-100/80 border-2 border-slate-200/90 rounded-2xl p-4 space-y-3">
-                            <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">Equivalencia en Monedas</span>
-                            <div className="space-y-2.5 text-xs">
-                                <div className="flex justify-between items-center pb-2 border-b border-slate-200">
-                                    <span className="font-bold text-slate-700">Dólares (USD)</span>
-                                    <span className="font-black text-slate-950 text-sm">{fmtUSD(totalUSD)}</span>
-                                </div>
-                                <div className="flex justify-between items-center pb-2 border-b border-slate-200">
-                                    <span className="font-bold text-slate-700">Bolívares (VES)</span>
-                                    <span className="font-black text-slate-950 text-sm">Bs. {totalVES.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="font-bold text-slate-700">Pesos (COP)</span>
-                                    <span className="font-black text-slate-950 text-sm">{fmtCOP(totalCOP)}</span>
+                        {/* Equivalencias en otras monedas activas - Alto Contraste */}
+                        {active.filter(c => c !== (mainCurrency || 'USD')).length > 0 && (
+                            <div className="bg-slate-100/80 border-2 border-slate-200/90 rounded-2xl p-4 space-y-3">
+                                <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">Equivalencia en Monedas</span>
+                                <div className="space-y-2.5 text-xs">
+                                    {active
+                                        .filter(c => c !== (mainCurrency || 'USD'))
+                                        .map(c => {
+                                            const info = getCurrencyInfo(c);
+                                            const convertedVal = convert(total, mainCurrency || 'USD', c);
+                                            return (
+                                                <div key={c} className="flex justify-between items-center pb-2 border-b border-slate-200 last:border-0 last:pb-0">
+                                                    <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                                                        <span>{info.flag}</span>
+                                                        <span>{info.name} ({c})</span>
+                                                    </span>
+                                                    <span className="font-black text-slate-950 text-sm">
+                                                        {formatCurrency(convertedVal, c)}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
                                 </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Accesos para Dividir Pago - Tamaño Mayor y Alto Contraste */}
                         <div className="space-y-2">
@@ -489,26 +498,27 @@ export function PaymentDialog({
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <div className="space-y-1.5">
                                                 <span className="text-xs font-black text-slate-700 uppercase tracking-wider block">Moneda</span>
-                                                <div className="grid grid-cols-3 gap-2">
-                                                    {[
-                                                        { code: 'USD', label: 'USD ($)' },
-                                                        { code: 'VES', label: 'VES (Bs.)' },
-                                                        { code: 'COP', label: 'COP ($)' },
-                                                    ].map(c => (
-                                                        <button
-                                                            key={c.code}
-                                                            type="button"
-                                                            onClick={() => updateRow(row.key, { currency: c.code as Currency })}
-                                                            className={cn(
-                                                                'h-11 rounded-xl font-black text-xs transition-all border-2 active:scale-95 shadow-2xs',
-                                                                row.currency === c.code
-                                                                    ? 'bg-slate-950 text-white border-slate-950 shadow-md ring-2 ring-slate-950/20'
-                                                                    : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 hover:bg-slate-100'
-                                                            )}
-                                                        >
-                                                            {c.label}
-                                                        </button>
-                                                    ))}
+                                                <div className="flex flex-wrap gap-2">
+                                                    {active.map(c => {
+                                                        const info = getCurrencyInfo(c);
+                                                        const isSelected = row.currency === c;
+                                                        return (
+                                                            <button
+                                                                key={c}
+                                                                type="button"
+                                                                onClick={() => updateRow(row.key, { currency: c })}
+                                                                className={cn(
+                                                                    'h-11 px-3 rounded-xl font-black text-xs transition-all border-2 active:scale-95 shadow-2xs flex items-center gap-1.5',
+                                                                    isSelected
+                                                                        ? 'bg-slate-950 text-white border-slate-950 shadow-md ring-2 ring-slate-950/20'
+                                                                        : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 hover:bg-slate-100'
+                                                                )}
+                                                            >
+                                                                <span>{info.flag}</span>
+                                                                <span>{c} ({info.symbol})</span>
+                                                            </button>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
 
@@ -547,7 +557,7 @@ export function PaymentDialog({
                                         <div className="space-y-2 pt-1">
                                             <div className="relative">
                                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-slate-500">
-                                                    {row.currency === 'VES' ? 'Bs.' : '$'}
+                                                    {getCurrencyInfo(row.currency).symbol}
                                                 </span>
                                                 <Input
                                                     type="number"
