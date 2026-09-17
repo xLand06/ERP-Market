@@ -121,7 +121,7 @@ export default function ProductsPage() {
             cell: prod => (
                 <div className="min-w-0">
                     <p className="text-sm font-bold text-slate-800">{prod.name}</p>
-                    <p className="text-xs text-slate-400 truncate max-w-[200px]" title={prod.description}>
+                    <p className="text-xs text-slate-400 truncate max-w-full" title={prod.description}>
                         {prod.description || 'Sin descripción'}
                     </p>
                 </div>
@@ -273,7 +273,7 @@ export default function ProductsPage() {
                             {products.filter((p: Product) => p.isActive).length} productos activos en catálogo maestro
                         </p>
                     </div>
-                    <div className="flex gap-2.5">
+                    <div className="flex flex-col sm:flex-row gap-2.5">
                         <Button onClick={() => handleExportExcel()} variant="outline" size="lg" className="h-10 font-bold text-slate-700">
                             <Download className="w-4.5 h-4.5 mr-2" /> Exportar Excel
                         </Button>
@@ -306,7 +306,7 @@ export default function ProductsPage() {
                                 setPage(1); 
                             }}
                             aria-label="Filtrar por Grupo"
-                            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-[140px]"
+                            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[44px]"
                         >
                             <option value="all">Todos los Grupos</option>
                             {groups.map((g: any) => (
@@ -318,7 +318,7 @@ export default function ProductsPage() {
                             value={filterCategory}
                             onChange={(e) => { setFilterCategory(e.target.value); setPage(1); }}
                             aria-label="Filtrar por Subgrupo"
-                            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-[140px]"
+                            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[44px]"
                         >
                             <option value="all">Todos los Subgrupos</option>
                             {(filterGroup === 'all' ? subgroups : subgroups.filter((s: any) => s.groupId === filterGroup)).map((s: any) => (
@@ -332,7 +332,7 @@ export default function ProductsPage() {
                                     onClick={() => { setFilterStatus(s); setPage(1); }}
                                     aria-label={`Mostrar productos ${s}`}
                                     className={cn(
-                                        'px-3 py-1.5 rounded-md text-xs font-semibold transition-all',
+                                        'px-3 py-2 rounded-md text-xs font-semibold transition-all min-h-[44px]',
                                         filterStatus === s
                                             ? 'bg-white text-slate-800 shadow-sm'
                                             : 'text-slate-500 hover:text-slate-700'
@@ -367,15 +367,15 @@ export default function ProductsPage() {
                         actions={isOwner ? renderActions : undefined}
                     />
 
-                    <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50 mt-auto">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-5 py-3 border-t border-slate-100 bg-slate-50 mt-auto">
                         <p className="text-xs text-slate-500">
                             Mostrando {((page - 1) * limit) + 1}–{Math.min(page * limit, data?.meta?.total || 0)} de {data?.meta?.total || 0} productos
                         </p>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <select 
                                 value={limit} 
                                 onChange={e => { setLimit(Number(e.target.value)); setPage(1); }} 
-                                className="h-11 rounded-lg border border-slate-200 px-2 text-xs text-slate-600 bg-white"
+                                className="h-11 rounded-lg border border-slate-200 px-2 text-xs text-slate-600 bg-white min-h-[44px]"
                             >
                                 <option value={10}>10</option>
                                 <option value={25}>25</option>

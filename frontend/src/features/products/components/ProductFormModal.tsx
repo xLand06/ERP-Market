@@ -116,7 +116,7 @@ function PriceField({
                 </div>
             )}
             {/* USD y VES — campos secundarios de referencia/entrada */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="relative">
                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 bg-slate-50 px-1 rounded">USD</span>
                     <input
@@ -426,7 +426,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
 
     return (
         <Dialog open={open} onOpenChange={o => !o && onClose()}>
-            <DialogContent className="sm:max-w-2xl">
+            <DialogContent className="sm:max-w-2xl w-full h-full sm:h-auto sm:w-[calc(100vw-2rem)] sm:rounded-3xl max-h-none sm:max-h-[calc(100dvh-3rem)] p-0">
                 {/* Header */}
                 <DialogHeader className="border-b border-slate-100 dark:border-slate-800 pb-3">
                     <DialogTitle className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-slate-100">
@@ -603,7 +603,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                 <button
                                     type="button"
                                     onClick={addBarcode}
-                                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-lg transition-all"
+                                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 px-3 py-2.5 min-h-[44px] rounded-lg transition-all"
                                 >
                                     <Plus className="w-3.5 h-3.5" /> Agregar
                                 </button>
@@ -638,7 +638,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                         type="text"
                                                         value={b.code}
                                                         onChange={(e) => updateBarcode(idx, 'code', normalizeText(e.target.value))}
-                                                        className={`w-full px-3 py-2 border rounded-lg text-sm font-mono outline-none focus:ring-1 transition-colors ${inputBorder}`}
+                                                        className={`w-full px-3 py-2 border rounded-lg text-sm font-mono outline-none focus:ring-1 transition-colors min-h-[44px] ${inputBorder}`}
                                                         placeholder={getBarcodePlaceholder(labelVal)}
                                                     />
                                                     {/* Validation feedback */}
@@ -667,7 +667,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                     <select
                                                         value={b.label || ''}
                                                         onChange={(e) => handleLabelChange(idx, e.target.value)}
-                                                        className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-1 transition-colors ${
+                                                        className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-1 transition-colors min-h-[44px] ${
                                                             !b.label ? 'text-slate-400' : 'text-slate-700'
                                                         } border-slate-200 focus:border-indigo-300 focus:ring-indigo-200`}
                                                     >
@@ -695,7 +695,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                     <button
                                                         type="button"
                                                         onClick={() => removeBarcode(idx)}
-                                                        className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"
+                                                        className="p-2.5 min-w-[44px] min-h-[44px] text-slate-300 hover:text-red-500 transition-colors flex items-center justify-center"
                                                         title="Eliminar código de barras"
                                                     >
                                                         <Trash2 className="w-4 h-4" />
@@ -718,7 +718,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                 <button
                                     type="button"
                                     onClick={addPresentation}
-                                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-lg transition-all"
+                                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 px-3 py-2.5 min-h-[44px] rounded-lg transition-all"
                                 >
                                     <Plus className="w-3.5 h-3.5" /> Agregar
                                 </button>
@@ -739,7 +739,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                         type="text"
                                                         value={p.name}
                                                         onChange={(e) => updatePresentation(idx, 'name', normalizeText(e.target.value))}
-                                                        className="w-full px-3 py-1.5 border border-slate-100 rounded-lg text-xs outline-none focus:border-indigo-300"
+                                                        className="w-full px-3 py-2 border border-slate-100 rounded-lg text-xs outline-none focus:border-indigo-300 min-h-[44px]"
                                                         placeholder="Ej: Caja x24"
                                                         required
                                                     />
@@ -752,7 +752,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                         min="0.001"
                                                         value={p.multiplier}
                                                         onChange={(e) => updatePresentation(idx, 'multiplier', Number(e.target.value))}
-                                                        className="w-full px-3 py-1.5 border border-slate-100 rounded-lg text-xs outline-none focus:border-indigo-300 font-bold"
+                                                        className="w-full px-3 py-2 border border-slate-100 rounded-lg text-xs outline-none focus:border-indigo-300 font-bold min-h-[44px]"
                                                         required
                                                     />
                                                 </div>
@@ -762,7 +762,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                         type="text"
                                                         value={p.barcode || ''}
                                                         onChange={(e) => updatePresentation(idx, 'barcode', normalizeText(e.target.value))}
-                                                        className="w-full px-3 py-1.5 border border-slate-100 rounded-lg text-xs outline-none focus:border-indigo-300 font-mono"
+                                                        className="w-full px-3 py-2 border border-slate-100 rounded-lg text-xs outline-none focus:border-indigo-300 font-mono min-h-[44px]"
                                                         placeholder="Código de barras"
                                                     />
                                                 </div>
@@ -770,7 +770,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                     <button
                                                         type="button"
                                                         onClick={() => removePresentation(idx)}
-                                                        className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"
+                                                        className="p-2.5 min-w-[44px] min-h-[44px] text-slate-300 hover:text-red-500 transition-colors flex items-center justify-center"
                                                     >
                                                         <Trash2 className="w-3.5 h-3.5" />
                                                     </button>
@@ -808,7 +808,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                 <button
                                     type="button"
                                     onClick={() => setIsKit(v => !v)}
-                                    className={`text-xs font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+                                    className={`text-xs font-bold flex items-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-lg transition-all ${
                                         isKit
                                             ? 'bg-amber-100 text-amber-700'
                                             : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -831,7 +831,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                             type="text"
                                             value={componentSearch}
                                             onChange={(e) => setComponentSearch(e.target.value)}
-                                            className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500/40 outline-none text-sm"
+                                            className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500/40 outline-none text-sm min-h-[44px]"
                                             placeholder="Buscar producto para agregar como componente..."
                                         />
                                         {componentSearch.trim().length >= 2 && (
@@ -848,7 +848,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                             key={p.id}
                                                             type="button"
                                                             onClick={() => addKitComponent(p)}
-                                                            className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-amber-50 transition-colors"
+                                                            className="w-full flex items-center justify-between gap-2 px-3 py-3 min-h-[44px] text-left hover:bg-amber-50 transition-colors"
                                                         >
                                                             <span className="text-xs font-semibold text-slate-700 truncate">{p.name}</span>
                                                             <span className="text-[11px] font-bold text-emerald-600 shrink-0">{fmtCOP(Number(p.price || 0))}</span>
@@ -868,11 +868,11 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                         <div className="space-y-2">
                                             {kitRows.map((row, idx) => (
                                                 <div key={idx} className="grid grid-cols-12 gap-2 items-center p-2.5 bg-white border border-slate-200 rounded-xl">
-                                                    <div className="col-span-6 min-w-0">
+                                                    <div className="col-span-5 sm:col-span-6 min-w-0">
                                                         <p className="text-xs font-bold text-slate-700 truncate">{row.product?.name || 'Producto desconocido'}</p>
                                                         <p className="text-[10px] text-slate-400">{fmtCOP(Number(row.product?.price || 0))} c/u</p>
                                                     </div>
-                                                    <div className="col-span-4">
+                                                    <div className="col-span-5 sm:col-span-4">
                                                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">Cantidad</label>
                                                         <input
                                                             type="number"
@@ -880,7 +880,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                             min="0.001"
                                                             value={row.quantity}
                                                             onChange={(e) => updateKitComponentQty(idx, e.target.value === '' ? '' : Number(e.target.value))}
-                                                            className="w-full px-2 py-1 border border-slate-100 rounded-lg text-xs outline-none focus:border-amber-300 font-bold"
+                                                            className="w-full px-2 py-2 border border-slate-100 rounded-lg text-xs outline-none focus:border-amber-300 font-bold min-h-[44px]"
                                                             required
                                                         />
                                                     </div>
@@ -888,7 +888,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                         <button
                                                             type="button"
                                                             onClick={() => removeKitComponent(idx)}
-                                                            className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"
+                                                            className="p-2.5 min-w-[44px] min-h-[44px] text-slate-300 hover:text-red-500 transition-colors flex items-center justify-center"
                                                             title="Quitar componente"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
