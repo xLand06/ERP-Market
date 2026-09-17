@@ -199,7 +199,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                     </button>
 
                     {ratePopoverOpen && (
-                        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 animate-slide-up">
+                        <div className="absolute right-0 sm:left-1/2 sm:-translate-x-1/2 top-full mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 animate-slide-up">
                             <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2">
                                 <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Moneda Base</span>
                                 <div className="flex bg-slate-100 p-0.5 rounded-lg">
@@ -242,20 +242,20 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                 </div>
                 <BranchSelector />
 
-                <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-100/80 p-0.5 sm:p-1 rounded-xl border border-slate-200/50">
+                <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-100/80 p-0.5 sm:p-1 rounded-xl border border-slate-200/50 overflow-x-auto max-w-full">
                     {/* Quick Language Toggle */}
                     <button
                         onClick={toggleLanguage}
-                        className="min-w-[40px] sm:min-w-[44px] min-h-[40px] sm:min-h-[44px] flex items-center justify-center gap-1 text-slate-600 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 cursor-pointer font-bold text-xs"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 text-slate-600 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 cursor-pointer font-bold text-xs shrink-0"
                         title={currentLanguage === 'es' ? 'Switch to English' : 'Cambiar a Español'}
                         aria-label={t('topbar.language', 'Idioma')}
                     >
                         <span className="text-sm leading-none">{currentLanguage === 'es' ? '🇪🇸' : '🇺🇸'}</span>
-                        <span className="font-mono text-[11px] font-black">{currentLanguage.toUpperCase()}</span>
+                        <span className="font-mono text-[11px] font-black hidden sm:inline">{currentLanguage.toUpperCase()}</span>
                     </button>
 
                     {/* Theme Selector Trigger */}
-                    <div className="relative">
+                    <div className="relative shrink-0">
                         <button 
                             onClick={() => setThemePopoverOpen(!themePopoverOpen)}
                             className="min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 cursor-pointer"
@@ -265,7 +265,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                         </button>
 
                         {themePopoverOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-2 z-50 animate-slide-up">
+                            <div className="absolute right-0 top-full mt-2 w-52 sm:w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-2 z-50 animate-slide-up">
                                 <div className="px-2 py-1.5 border-b border-slate-100 dark:border-slate-800 mb-1">
                                     <p className="text-[11px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">Tema de Interfaz</p>
                                 </div>
@@ -306,12 +306,12 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
 
                     <button 
                         onClick={() => setShortcutsOpen(true)}
-                        className="hidden sm:flex min-w-[44px] min-h-[44px] items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95" 
+                        className="hidden sm:flex min-w-[44px] min-h-[44px] items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 shrink-0" 
                         title="Atajos de teclado (K)"
                     >
                         <Keyboard className="w-5 h-5" />
                     </button>
-                    <div className="relative" ref={notifRef}>
+                    <div className="relative shrink-0" ref={notifRef}>
                         <button 
                             onClick={() => setNotifOpen(!notifOpen)}
                             className="relative min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95"
@@ -326,7 +326,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                         </button>
 
                         {notifOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 animate-slide-up overflow-hidden">
+                            <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 animate-slide-up overflow-hidden">
                                 <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100">
                                     <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Notificaciones</span>
                                     <span className="text-[10px] font-semibold text-slate-400">
@@ -374,7 +374,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                     </div>
                 </div>
 
-                <div className="relative">
+                <div className="relative shrink-0">
                     <button
                         onClick={() => setProfileOpen(!profileOpen)}
                         className="flex items-center gap-1.5 py-1 px-1 sm:px-2 rounded-xl hover:bg-slate-100 transition-all active:scale-95"
@@ -391,16 +391,16 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
 
                     {profileOpen && (
                         <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl py-1 z-50 animate-slide-up">
-                            <button className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+                            <button className="w-full flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
                                 <User className="w-4 h-4" /> {t('topbar.myProfile', 'Mi Perfil')}
                             </button>
-                            <button onClick={() => { setProfileOpen(false); navigate('/settings'); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+                            <button onClick={() => { setProfileOpen(false); navigate('/settings'); }} className="w-full flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
                                 <Settings className="w-4 h-4" /> {t('topbar.settings', 'Configuración')}
                             </button>
                             <div className="my-1 border-t border-slate-100" />
                             <button 
                                 onClick={handleLogout}
-                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors"
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] text-sm font-bold text-red-600 hover:bg-red-50 transition-colors"
                             >
                                 <LogOut className="w-4 h-4" /> {t('topbar.logout', 'Cerrar Sesión')}
                             </button>
