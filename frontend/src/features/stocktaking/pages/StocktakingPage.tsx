@@ -80,75 +80,111 @@ export default function StocktakingPage() {
                             <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full erp-table" aria-label="Tabla de conteos">
-                                <thead>
-                                    <tr>
-                                        <th className="hidden md:table-cell">Fecha</th>
-                                        <th>Sucursal</th>
-                                        <th>Estado</th>
-                                        <th className="text-center">Productos</th>
-                                        <th className="hidden md:table-cell">Notas</th>
-                                        <th className="w-24">Acc.</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filtered.map(row => {
-                                        const config = STATUS_CONFIG[row.status] || STATUS_CONFIG.DRAFT;
-                                        return (
-                                            <tr key={row.id}>
-                                                <td className="hidden md:table-cell text-sm text-slate-500 tabular-nums whitespace-nowrap">
-                                                    {new Date(row.createdAt).toLocaleDateString('es-VE')}
-                                                </td>
-                                                <td>
-                                                    <p className="text-sm font-semibold text-slate-800">{row.branch?.name}</p>
-                                                </td>
-                                                <td>
-                                                    <span className={cn('inline-flex items-center text-xs font-bold px-2 py-0.5 rounded-full border', config.bg)}>
-                                                        {config.label}
-                                                    </span>
-                                                </td>
-                                                <td className="text-center text-sm tabular-nums text-slate-600">
-                                                    {row.items?.length ?? 0}
-                                                </td>
-                                                <td className="hidden md:table-cell text-sm text-slate-500 max-w-[200px] truncate">
-                                                    {row.notes || '—'}
-                                                </td>
-                                                <td>
-                                                    <div className="flex gap-2">
-                                                        <Link
-                                                            to={`/inventory/stocktaking/${row.id}`}
-                                                            className="p-1.5 touch-target rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors inline-flex items-center"
-                                                            aria-label="Ver detalle del conteo"
-                                                        >
-                                                            <Eye className="w-4 h-4" />
-                                                        </Link>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    {filtered.length === 0 && (
+                        <>
+                            {/* Desktop table */}
+                            <div className="hidden md:block overflow-x-auto">
+                                <table className="w-full erp-table" aria-label="Tabla de conteos">
+                                    <thead>
                                         <tr>
-                                            <td colSpan={6} className="text-center py-12">
-                                                <div className="flex flex-col items-center gap-3 text-slate-400">
-                                                    <ClipboardList className="w-10 h-10" />
-                                                    <p className="text-sm font-medium">No hay conteos registrados</p>
-                                                    {isOwner && (
-                                                        <Button
-                                                            variant="outline"
-                                                            onClick={() => setModalOpen(true)}
-                                                        >
-                                                            Crear el primero
-                                                        </Button>
+                                            <th>Fecha</th>
+                                            <th>Sucursal</th>
+                                            <th>Estado</th>
+                                            <th className="text-center">Productos</th>
+                                            <th>Notas</th>
+                                            <th className="w-24">Acc.</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filtered.map(row => {
+                                            const config = STATUS_CONFIG[row.status] || STATUS_CONFIG.DRAFT;
+                                            return (
+                                                <tr key={row.id}>
+                                                    <td className="text-sm text-slate-500 tabular-nums whitespace-nowrap">
+                                                        {new Date(row.createdAt).toLocaleDateString('es-VE')}
+                                                    </td>
+                                                    <td>
+                                                        <p className="text-sm font-semibold text-slate-800">{row.branch?.name}</p>
+                                                    </td>
+                                                    <td>
+                                                        <span className={cn('inline-flex items-center text-xs font-bold px-2 py-0.5 rounded-full border', config.bg)}>
+                                                            {config.label}
+                                                        </span>
+                                                    </td>
+                                                    <td className="text-center text-sm tabular-nums text-slate-600">
+                                                        {row.items?.length ?? 0}
+                                                    </td>
+                                                    <td className="text-sm text-slate-500 max-w-[200px] truncate">
+                                                        {row.notes || '—'}
+                                                    </td>
+                                                    <td>
+                                                        <div className="flex gap-2">
+                                                            <Link
+                                                                to={`/inventory/stocktaking/${row.id}`}
+                                                                className="p-1.5 touch-target rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors inline-flex items-center"
+                                                                aria-label="Ver detalle del conteo"
+                                                            >
+                                                                <Eye className="w-4 h-4" />
+                                                            </Link>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Mobile card view */}
+                            <div className="md:hidden divide-y divide-slate-100">
+                                {filtered.map(row => {
+                                    const config = STATUS_CONFIG[row.status] || STATUS_CONFIG.DRAFT;
+                                    return (
+                                        <Link
+                                            key={row.id}
+                                            to={`/inventory/stocktaking/${row.id}`}
+                                            className="block p-4 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <p className="text-sm font-bold text-slate-800 truncate">{row.branch?.name}</p>
+                                                        <span className={cn('inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0', config.bg)}>
+                                                            {config.label}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3 text-xs text-slate-500">
+                                                        <span>{new Date(row.createdAt).toLocaleDateString('es-VE')}</span>
+                                                        <span>·</span>
+                                                        <span>{row.items?.length ?? 0} productos</span>
+                                                    </div>
+                                                    {row.notes && (
+                                                        <p className="text-xs text-slate-400 mt-1 truncate">{row.notes}</p>
                                                     )}
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                                <Eye className="w-4 h-4 text-slate-300 shrink-0 mt-1" />
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+
+                            {filtered.length === 0 && (
+                                <div className="text-center py-12">
+                                    <div className="flex flex-col items-center gap-3 text-slate-400">
+                                        <ClipboardList className="w-10 h-10" />
+                                        <p className="text-sm font-medium">No hay conteos registrados</p>
+                                        {isOwner && (
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => setModalOpen(true)}
+                                            >
+                                                Crear el primero
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </>
                     )}
 
                     {/* Footer */}

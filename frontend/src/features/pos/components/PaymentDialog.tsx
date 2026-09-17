@@ -403,7 +403,7 @@ export function PaymentDialog({
                                                         key={c.id}
                                                         type="button"
                                                         onClick={() => setCustomer(c)}
-                                                        className="w-full text-left flex items-center justify-between gap-2 bg-white hover:bg-amber-100 border border-slate-200 hover:border-amber-400 rounded-lg px-2.5 py-1.5 transition-colors"
+                                                        className="w-full text-left flex items-center justify-between gap-2 bg-white hover:bg-amber-100 border border-slate-200 hover:border-amber-400 rounded-lg px-2.5 py-2.5 min-h-[44px] transition-colors"
                                                     >
                                                         <span className="text-xs font-semibold text-slate-800 truncate">{c.name}</span>
                                                         <span className="text-[10px] tabular-nums font-bold shrink-0">
@@ -429,7 +429,7 @@ export function PaymentDialog({
                                                     size="sm"
                                                     onClick={handleQuickCreateCustomer}
                                                     disabled={creatingCustomer || !newCustomerName.trim()}
-                                                    className="h-9 shrink-0 border-amber-400 text-amber-900 hover:bg-amber-100 font-black text-[11px] rounded-lg"
+                                                    className="h-11 shrink-0 border-amber-400 text-amber-900 hover:bg-amber-100 font-black text-[11px] rounded-lg"
                                                 >
                                                     {creatingCustomer
                                                         ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -524,7 +524,7 @@ export function PaymentDialog({
 
                                             <div className="space-y-1.5">
                                                 <span className="text-xs font-black text-slate-700 uppercase tracking-wider block">Forma de Pago</span>
-                                                <div className="grid grid-cols-3 gap-2">
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                                     {[
                                                         { type: 'cash', label: 'Efectivo', icon: Wallet },
                                                         { type: 'transfer', label: 'Pago Móvil', icon: Send },
@@ -577,7 +577,7 @@ export function PaymentDialog({
                                                         key={idx}
                                                         type="button"
                                                         onClick={() => updateRow(row.key, { amount: b.val })}
-                                                        className="h-10 px-3.5 bg-white hover:bg-emerald-50 hover:text-emerald-950 border-2 border-slate-300 hover:border-emerald-500 rounded-xl text-xs font-black text-slate-950 transition-all active:scale-95 shadow-2xs cursor-pointer"
+                                                        className="h-11 px-3.5 bg-white hover:bg-emerald-50 hover:text-emerald-950 border-2 border-slate-300 hover:border-emerald-500 rounded-xl text-xs font-black text-slate-950 transition-all active:scale-95 shadow-2xs cursor-pointer"
                                                     >
                                                         {b.label}
                                                     </button>

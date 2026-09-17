@@ -6,6 +6,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useConfigStore } from '@/hooks/useConfigStore';
+import { useTranslation } from 'react-i18next';
 import type { CartItem, Product } from '../types';
 
 function getCartCategoryIcon(categoryName?: string, productName?: string) {
@@ -65,7 +66,7 @@ const CartItemRow = React.memo(function CartItemRow({
                             <select
                                 value={item.presentationId || 'base'}
                                 onChange={(e) => onUpdatePresentation(item.id, item.presentationId, e.target.value)}
-                                className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 hover:bg-slate-200 transition-colors border-none outline-none cursor-pointer"
+                                className="text-[10px] bg-slate-100 px-2 py-1.5 min-h-[32px] rounded text-slate-600 hover:bg-slate-200 transition-colors border-none outline-none cursor-pointer"
                             >
                                 <option value="base">{product.baseUnit} (UMB)</option>
                                 {product.presentations.map(pres => (
@@ -90,7 +91,7 @@ const CartItemRow = React.memo(function CartItemRow({
                 <div className="flex items-center border rounded-lg h-11 overflow-hidden">
                     <button
                         onClick={() => onUpdateQty(item.id, item.presentationId, Math.max(0, item.qty - 1))}
-                        className="px-2 bg-slate-50 hover:bg-slate-100 text-slate-600 border-r"
+                        className="px-3 min-h-[44px] bg-slate-50 hover:bg-slate-100 text-slate-600 border-r flex items-center justify-center"
                     >
                         −
                     </button>
@@ -99,11 +100,11 @@ const CartItemRow = React.memo(function CartItemRow({
                         step={item.baseUnit === 'UNIDAD' ? '1' : '0.01'}
                         value={item.qty}
                         onChange={(e) => onUpdateQty(item.id, item.presentationId, parseFloat(e.target.value) || 0)}
-                        className="w-12 text-center text-xs font-bold outline-none"
+                        className="w-12 text-center text-xs font-bold outline-none min-h-[44px]"
                     />
                     <button
                         onClick={() => onUpdateQty(item.id, item.presentationId, item.qty + 1)}
-                        className="px-2 bg-slate-50 hover:bg-slate-100 text-slate-600 border-l"
+                        className="px-3 min-h-[44px] bg-slate-50 hover:bg-slate-100 text-slate-600 border-l flex items-center justify-center"
                     >
                         +
                     </button>
@@ -130,6 +131,7 @@ export const CartPanel = React.memo(function CartPanel({
     isSubmitting,
 }: CartPanelProps) {
     const { convert, formatCurrency, fmtMain, mainCurrency, activeCurrencies } = useConfigStore();
+    const { t } = useTranslation();
 
     // Monedas NO principales (se muestran debajo del ticket como equivalencia)
     const main = mainCurrency || 'USD';
@@ -144,10 +146,10 @@ export const CartPanel = React.memo(function CartPanel({
     return (
         <>
             <div className="px-5 py-5 border-b flex justify-between items-center">
-                <p className="font-bold">Ticket de {isSaleMode ? 'Venta' : 'Entrada'}</p>
+                <p className="font-bold">{isSaleMode ? t('pos.ticketSale', 'Ticket de Venta') : t('pos.ticketEntry', 'Ticket de Entrada')}</p>
                 {items.length > 0 && (
                     <button onClick={onClearCart} className="text-xs text-red-500">
-                        Limpiar
+                        {t('pos.clearCart', 'Limpiar')}
                     </button>
                 )}
             </div>
@@ -156,7 +158,7 @@ export const CartPanel = React.memo(function CartPanel({
                 {items.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-3">
                         <Package className="w-12 h-12" />
-                        <p className="text-sm">Carrito vacío</p>
+                        <p className="text-sm">{t('pos.emptyCart', 'Carrito vacío')}</p>
                     </div>
                 ) : (
                     items.map(item => {
@@ -180,14 +182,16 @@ export const CartPanel = React.memo(function CartPanel({
             <div className="px-5 py-4 bg-gradient-to-b from-slate-50 to-slate-100/80 border-t border-slate-200">
                 <div className="flex justify-between items-end">
                     <div>
-                        <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase block mb-1">TOTAL A PAGAR</span>
+                        <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase block mb-1">
+                            {t('pos.totalToPay', 'TOTAL A PAGAR')}
+                        </span>
                     </div>
                     <div className="text-right">
                         <p className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-none tabular-nums">
                             {fmtMain(totals.total)}
                         </p>
                         <p className="text-[10px] font-medium text-slate-400 mt-1">
-                            {totals.itemCount} {totals.itemCount === 1 ? 'producto' : 'productos'} en ticket
+                            {totals.itemCount} {totals.itemCount === 1 ? t('pos.itemsInTicket_one', 'producto en ticket') : t('pos.itemsInTicket_other', 'productos en ticket')}
                         </p>
                     </div>
                 </div>
@@ -195,7 +199,9 @@ export const CartPanel = React.memo(function CartPanel({
                 {/* Otras monedas (no principales) — equivalencia debajo del ticket */}
                 {otherCurrencies.length > 0 && (
                     <div className="mt-3 pt-2.5 border-t border-slate-200/70 flex items-center justify-between gap-2">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 shrink-0">Equivale en</span>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 shrink-0">
+                            {t('pos.equivalentIn', 'Equivale en')}
+                        </span>
                         <div className="flex items-center gap-1.5 flex-wrap justify-end">
                             {otherCurrencies.map((c) => (
                                 <span key={c.code} className="inline-flex items-center gap-1 bg-white border border-slate-200 shadow-2xs px-2 py-0.5 rounded-lg text-[11px] font-extrabold text-slate-700">
@@ -223,19 +229,19 @@ export const CartPanel = React.memo(function CartPanel({
                     {isSubmitting ? (
                         <span className="flex items-center gap-2 mx-auto">
                             <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            Procesando Venta...
+                            {t('pos.processingSale', 'Procesando Venta...')}
                         </span>
                     ) : isSaleMode ? (
                         <>
                             <span className="flex items-center gap-2">
-                                <CreditCard className="w-5 h-5" /> PAGAR AHORA
+                                <CreditCard className="w-5 h-5" /> {t('pos.payNow', 'PAGAR AHORA')}
                             </span>
                             <kbd className="bg-black/20 text-white text-[11px] px-2.5 py-1 rounded-lg font-bold font-mono tracking-tight">
                                 Ctrl + Enter
                             </kbd>
                         </>
                     ) : (
-                        <span className="mx-auto">Registrar Entrada de Inventario</span>
+                        <span className="mx-auto">{t('pos.registerStockEntry', 'Registrar Entrada de Inventario')}</span>
                     )}
                 </Button>
             </div>

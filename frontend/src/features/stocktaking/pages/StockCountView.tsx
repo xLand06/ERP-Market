@@ -344,7 +344,7 @@ export default function StockCountView() {
 
             {/* Actions */}
             {canEdit && isOwner && (
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                     <Button variant="outline" onClick={handleCancel} className="text-slate-500">
                         <XCircle className="w-4 h-4 mr-2" /> Cancelar
                     </Button>

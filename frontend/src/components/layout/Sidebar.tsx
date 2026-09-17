@@ -14,28 +14,30 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isPathAllowed } from '@/lib/planConfig';
+import { useTranslation } from 'react-i18next';
 
 interface NavItem {
-    name: string;
+    nameKey: string;
+    fallbackName: string;
     path: string;
     icon: React.ElementType;
     roles?: string[];
 }
 
 const navItems: NavItem[] = [
-    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'Punto de Venta', path: '/pos', icon: ShoppingCart },
-    { name: 'Flujo de Caja', path: '/finance/cash-register', icon: Coins },
-    { name: 'Productos', path: '/products', icon: Tag },
-    { name: 'Inventario', path: '/inventory', icon: Package },
-    { name: 'Lotes y Vencimientos', path: '/inventory/batches', icon: CalendarClock },
-    { name: 'Merma', path: '/merma', icon: TrendingDown },
-    { name: 'Compras', path: '/purchases', icon: Truck },
-    { name: 'Proveedores', path: '/suppliers', icon: Users },
-    { name: 'Reportes', path: '/reports', icon: BarChart2 },
-    { name: 'Usuarios', path: '/users', icon: Users, roles: ['OWNER'] },
-    { name: 'Auditoría', path: '/audit', icon: ShieldCheck, roles: ['OWNER'] },
-    { name: 'Configuración', path: '/settings', icon: Settings, roles: ['OWNER', 'SELLER'] },
+    { nameKey: 'nav.dashboard', fallbackName: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { nameKey: 'nav.pos', fallbackName: 'Punto de Venta', path: '/pos', icon: ShoppingCart },
+    { nameKey: 'nav.cashRegisterFlow', fallbackName: 'Flujo de Caja', path: '/finance/cash-register', icon: Coins },
+    { nameKey: 'nav.products', fallbackName: 'Productos', path: '/products', icon: Tag },
+    { nameKey: 'nav.inventory', fallbackName: 'Inventario', path: '/inventory', icon: Package },
+    { nameKey: 'nav.batchesAndExpiry', fallbackName: 'Lotes y Vencimientos', path: '/inventory/batches', icon: CalendarClock },
+    { nameKey: 'nav.merma', fallbackName: 'Merma', path: '/merma', icon: TrendingDown },
+    { nameKey: 'nav.purchases', fallbackName: 'Compras', path: '/purchases', icon: Truck },
+    { nameKey: 'nav.suppliers', fallbackName: 'Proveedores', path: '/suppliers', icon: Users },
+    { nameKey: 'nav.reports', fallbackName: 'Reportes', path: '/reports', icon: BarChart2 },
+    { nameKey: 'nav.users', fallbackName: 'Usuarios', path: '/users', icon: Users, roles: ['OWNER'] },
+    { nameKey: 'nav.audit', fallbackName: 'Auditoría', path: '/audit', icon: ShieldCheck, roles: ['OWNER'] },
+    { nameKey: 'nav.settings', fallbackName: 'Configuración', path: '/settings', icon: Settings, roles: ['OWNER', 'SELLER'] },
 ];
 
 export interface SidebarProps {
@@ -128,6 +130,7 @@ const getSidebarTheme = (theme: UITheme = 'emerald') => {
 export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: SidebarProps) {
     const { user, selectedBranch } = useAuthStore();
     const { activeTheme } = useConfigStore();
+    const { t } = useTranslation();
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
     const queryClient = useQueryClient();
 
@@ -224,7 +227,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                     <button
                         onClick={onToggleDesktop || onCloseMobile}
                         className="p-1.5 lg:p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors hidden lg:block min-w-10 min-h-10 cursor-pointer"
-                        aria-label="Colapsar sidebar"
+                        aria-label={t('nav.collapse', 'Colapsar sidebar')}
                     >
                         <PanelLeftClose className="w-5 h-5" />
                     </button>
@@ -233,7 +236,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                     <button
                         onClick={onCloseMobile}
                         className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors lg:hidden min-w-11 min-h-11 cursor-pointer"
-                        aria-label="Cerrar menú"
+                        aria-label={t('nav.closeMenu', 'Cerrar menú')}
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -244,15 +247,15 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
             <div className="px-2 lg:px-3 flex-1 overflow-y-auto override-scrollbar overflow-x-hidden pb-4">
                 {!collapsed ? (
                     <div className="px-2 lg:px-3 mb-3 mt-2 text-[11px] font-black uppercase tracking-widest text-slate-500 whitespace-nowrap">
-                        Principal
+                        {t('nav.main', 'Principal')}
                     </div>
                 ) : (
                     <div className="w-full h-12 mb-3 flex items-center justify-center">
                         <button
                             onClick={onToggleDesktop}
                             className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors shrink-0 hidden lg:flex min-w-11 min-h-11 cursor-pointer"
-                            aria-label="Expandir sidebar"
-                            title="Expandir"
+                            aria-label={t('nav.expand', 'Expandir sidebar')}
+                            title={t('nav.expand', 'Expandir')}
                         >
                             <PanelLeftOpen className="w-5 h-5" />
                         </button>
@@ -262,11 +265,13 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                 <nav className="flex flex-col space-y-1.5">
                     {navItems
                         .filter(item => isPathAllowed(item.path, user?.role))
-                        .map((item) => (
+                        .map((item) => {
+                        const itemName = t(item.nameKey, item.fallbackName);
+                        return (
                         <NavLink
                             key={item.path}
                             to={item.path}
-                            title={collapsed && !hoveredItem ? item.name : undefined}
+                            title={collapsed && !hoveredItem ? itemName : undefined}
                             onMouseEnter={() => { setHoveredItem(item.path); prefetchFor(item.path); }}
                             onMouseLeave={() => setHoveredItem(null)}
                             onFocus={() => prefetchFor(item.path)}
@@ -296,12 +301,13 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                                     />
 
                                     {!collapsed && (
-                                        <span className="tracking-wide relative z-10 whitespace-nowrap">{item.name}</span>
+                                        <span className="tracking-wide relative z-10 whitespace-nowrap">{itemName}</span>
                                     )}
                                 </>
                             )}
                         </NavLink>
-                    ))}
+                    );
+                    })}
                 </nav>
             </div>
 

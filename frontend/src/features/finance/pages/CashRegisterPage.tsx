@@ -580,36 +580,36 @@ export default function CashRegisterPage() {
                             Por Mes y Año
                         </button>
                     </div>
-                    <div className="flex flex-wrap items-end gap-4">
+                    <div className="flex flex-wrap items-end gap-3 sm:gap-4">
                         {filterMode === 'range' ? (
                             <>
-                                <div>
+                                <div className="w-full sm:w-auto">
                                     <label className="block text-xs font-medium text-slate-500 mb-1">Desde</label>
-                                    <Input type="date" value={historyFilters.from} onChange={(e) => setHistoryFilters(prev => ({ ...prev, from: e.target.value }))} className="w-40" />
+                                    <Input type="date" value={historyFilters.from} onChange={(e) => setHistoryFilters(prev => ({ ...prev, from: e.target.value }))} className="w-full sm:w-40" />
                                 </div>
-                                <div>
+                                <div className="w-full sm:w-auto">
                                     <label className="block text-xs font-medium text-slate-500 mb-1">Hasta</label>
-                                    <Input type="date" value={historyFilters.to} onChange={(e) => setHistoryFilters(prev => ({ ...prev, to: e.target.value }))} className="w-40" />
+                                    <Input type="date" value={historyFilters.to} onChange={(e) => setHistoryFilters(prev => ({ ...prev, to: e.target.value }))} className="w-full sm:w-40" />
                                 </div>
                             </>
                         ) : (
                             <>
-                                <div>
+                                <div className="w-full sm:w-auto">
                                     <label className="block text-xs font-medium text-slate-500 mb-1">Mes</label>
                                     <select 
                                         value={selectedMonth} 
                                         onChange={(e) => setSelectedMonth(e.target.value)} 
-                                        className="w-40 h-10 px-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                        className="w-full sm:w-40 h-10 px-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                                     >
                                         {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                                     </select>
                                 </div>
-                                <div>
+                                <div className="w-full sm:w-auto">
                                     <label className="block text-xs font-medium text-slate-500 mb-1">Año</label>
                                     <select 
                                         value={selectedYear} 
                                         onChange={(e) => setSelectedYear(e.target.value)} 
-                                        className="w-40 h-10 px-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                        className="w-full sm:w-40 h-10 px-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                                     >
                                         {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                                     </select>

@@ -14,6 +14,7 @@ import { AppNotification } from '@/services/notifications.service';
 import {
     Dialog, DialogContent, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
+import { useTranslation } from 'react-i18next';
 
 const SYMBOLS: Record<string, string> = { USD: '$', VES: 'Bs.', COP: '$' };
 type Currency = 'USD' | 'VES' | 'COP';
@@ -27,12 +28,19 @@ interface TopBarProps {
 export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     const { toUSD, fromUSD, activeTheme, setTheme } = useConfigStore();
     const { user, logout } = useAuthStore();
+    const { t, i18n } = useTranslation();
     const [base, setBase] = useState<Currency>('USD');
     const [profileOpen, setProfileOpen] = useState(false);
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
     const [ratePopoverOpen, setRatePopoverOpen] = useState(false);
     const [themePopoverOpen, setThemePopoverOpen] = useState(false);
     const navigate = useNavigate();
+
+    const currentLanguage = i18n.language?.slice(0, 2) === 'en' ? 'en' : 'es';
+    const toggleLanguage = () => {
+        const nextLang = currentLanguage === 'es' ? 'en' : 'es';
+        void i18n.changeLanguage(nextLang);
+    };
 
     // Notificaciones: badge real + panel desplegable
     const [notifOpen, setNotifOpen] = useState(false);
@@ -111,11 +119,11 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     const others = CURRENCIES.filter(c => c !== base);
 
     const navigationShortcuts = [
-        { key: 'V', label: 'PUNTO DE VENTA', icon: ShoppingCart },
-        { key: 'P', label: 'PRODUCTOS', icon: Package },
-        { key: 'I', label: 'INVENTARIO', icon: Layers },
-        { key: 'F', label: 'FINANZAS', icon: Banknote },
-        { key: 'C', label: 'CONFIGURACIÓN', icon: Settings },
+        { key: 'V', label: t('nav.pos', 'PUNTO DE VENTA').toUpperCase(), icon: ShoppingCart },
+        { key: 'P', label: t('nav.products', 'PRODUCTOS').toUpperCase(), icon: Package },
+        { key: 'I', label: t('nav.inventory', 'INVENTARIO').toUpperCase(), icon: Layers },
+        { key: 'F', label: t('nav.finance', 'FINANZAS').toUpperCase(), icon: Banknote },
+        { key: 'C', label: t('nav.settings', 'CONFIGURACIÓN').toUpperCase(), icon: Settings },
     ];
 
     return (
@@ -235,6 +243,17 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                 <BranchSelector />
 
                 <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-100/80 p-0.5 sm:p-1 rounded-xl border border-slate-200/50">
+                    {/* Quick Language Toggle */}
+                    <button
+                        onClick={toggleLanguage}
+                        className="min-w-[40px] sm:min-w-[44px] min-h-[40px] sm:min-h-[44px] flex items-center justify-center gap-1 text-slate-600 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 cursor-pointer font-bold text-xs"
+                        title={currentLanguage === 'es' ? 'Switch to English' : 'Cambiar a Español'}
+                        aria-label={t('topbar.language', 'Idioma')}
+                    >
+                        <span className="text-sm leading-none">{currentLanguage === 'es' ? '🇪🇸' : '🇺🇸'}</span>
+                        <span className="font-mono text-[11px] font-black">{currentLanguage.toUpperCase()}</span>
+                    </button>
+
                     {/* Theme Selector Trigger */}
                     <div className="relative">
                         <button 
@@ -373,17 +392,17 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                     {profileOpen && (
                         <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl py-1 z-50 animate-slide-up">
                             <button className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
-                                <User className="w-4 h-4" /> Mi Perfil
+                                <User className="w-4 h-4" /> {t('topbar.myProfile', 'Mi Perfil')}
                             </button>
                             <button onClick={() => { setProfileOpen(false); navigate('/settings'); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
-                                <Settings className="w-4 h-4" /> Configuración
+                                <Settings className="w-4 h-4" /> {t('topbar.settings', 'Configuración')}
                             </button>
                             <div className="my-1 border-t border-slate-100" />
                             <button 
                                 onClick={handleLogout}
                                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors"
                             >
-                                <LogOut className="w-4 h-4" /> Cerrar Sesión
+                                <LogOut className="w-4 h-4" /> {t('topbar.logout', 'Cerrar Sesión')}
                             </button>
                         </div>
                     )}
@@ -400,8 +419,8 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                                 <Keyboard className="w-24 h-24 rotate-12" />
                             </div>
                             
-                            <DialogTitle className="text-2xl font-black tracking-tight mb-1 text-white">ACCESO RÁPIDO</DialogTitle>
-                            <DialogDescription className="text-emerald-100 text-sm font-medium">Atajos de teclado para expertos</DialogDescription>
+                            <DialogTitle className="text-2xl font-black tracking-tight mb-1 text-white">{t('topbar.quickAccess', 'ACCESO RÁPIDO')}</DialogTitle>
+                            <DialogDescription className="text-emerald-100 text-sm font-medium">{t('topbar.shortcutsDesc', 'Atajos de teclado para expertos')}</DialogDescription>
                         </div>
                         
                         <div className="p-4 bg-slate-50/50">
@@ -425,7 +444,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                                             <div className="text-left">
                                                 <p className="text-xs font-black text-slate-400 tracking-wider mb-0.5 uppercase">{s.label}</p>
                                                 <p className="text-sm font-bold text-emerald-600 leading-none">
-                                                    CON TECLA <span className="bg-emerald-600 text-white px-2 py-0.5 rounded-md ml-1">{s.key}</span>
+                                                    {t('topbar.withKey', 'CON TECLA')} <span className="bg-emerald-600 text-white px-2 py-0.5 rounded-md ml-1">{s.key}</span>
                                                 </p>
                                             </div>
                                         </div>
@@ -443,7 +462,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                                 onClick={() => setShortcutsOpen(false)}
                                 className="text-xs font-black text-slate-400 hover:text-emerald-600 uppercase tracking-widest transition-colors flex items-center gap-2"
                             >
-                                Presiona <kbd className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border-b-2 border-slate-300 dark:border-slate-600">ESC</kbd> para salir
+                                {currentLanguage === 'es' ? 'Presiona' : 'Press'} <kbd className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border-b-2 border-slate-300 dark:border-slate-600">ESC</kbd> {currentLanguage === 'es' ? 'para salir' : 'to close'}
                             </button>
                         </div>
                     </div>

@@ -165,7 +165,7 @@ export function MermaTable({ mermas, isLoading, meta, onPageChange }: MermaTable
                     title: 'Sin registros',
                     description: 'No se encontraron mermas con los filtros aplicados.',
                 }}
-                minWidth="min-w-[800px]"
+                minWidth="min-w-[640px]"
                 pagination={meta ? {
                     page: meta.page,
                     totalPages: meta.totalPages,

@@ -136,7 +136,7 @@ export function AppShellLayout() {
                 </main>
 
                 {/* Mobile / Tablet Bottom Navigation Bar (visible < lg) */}
-                <nav aria-label="Navegación móvil" className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex items-center justify-around pt-1.5 px-1 pb-safe lg:hidden text-white shadow-2xl">
+                <nav aria-label="Navegación móvil" className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex items-center justify-around pt-1.5 px-1 pb-safe lg:hidden text-white shadow-2xl safe-area-bottom">
                     {[
                         { path: '/pos', label: 'POS', icon: ShoppingCart },
                         { path: '/products', label: 'Productos', icon: Package },

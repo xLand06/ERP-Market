@@ -105,7 +105,7 @@ export default function SuppliersPage() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <Input placeholder="Buscar proveedor..." value={search} onChange={e => setSearch(normalizeText(e.target.value))} className="pl-9" />
                     </div>
-                    <div className="flex flex-col gap-1.5 max-h-[600px] overflow-y-auto pr-1">
+                    <div className="flex flex-col gap-1.5 max-h-[40vh] md:max-h-[600px] overflow-y-auto pr-1">
                         {filtered.map(s => (
                             <button
                                 key={s.id}
