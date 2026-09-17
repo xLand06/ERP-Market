@@ -162,7 +162,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
     const [presentations, setPresentations] = useState<ProductPresentation[]>([]);
     const [saving, setSaving] = useState(false);
     const [minStock, setMinStock] = useState<number | ''>('');
-    // ── Kits / Combos ──────────────────────────────────────────────────────
+    const [trackStock, setTrackStock] = useState(true);    // ── Kits / Combos ──────────────────────────────────────────────────────
     const [isKit, setIsKit] = useState(false);
     const [kitRows, setKitRows] = useState<KitComponentRow[]>([]);
     const [componentSearch, setComponentSearch] = useState('');
@@ -193,6 +193,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                 setCost(product.cost ?? '');
                 setPrice(product.price ?? '');
                 setSubGroupId(product.subGroupId || '');
+                setTrackStock(product.trackStock !== false);
                 const sg = subgroups.find((s: any) => s.id === product.subGroupId);
                 setSelectedGroupId(sg?.groupId || '');
                 const bcs = product.barcodes?.length > 0 ? product.barcodes : [];
@@ -249,6 +250,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                 setBarcodeKeys([]);
                 manualLabelKeys.current.clear();
                 setPresentations([]);
+                setTrackStock(true);
                 setMinStock('');
                 // Kits: resetear editor
                 setIsKit(false);
@@ -373,6 +375,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                 name,
                 description: description || null,
                 baseUnit,
+                trackStock,
                 expectedSpoilagePercent: (isWeighable && expectedSpoilagePercent !== '') ? Number(expectedSpoilagePercent) : null,
                 cost: cost ? Number(cost) : null,
                 price: Number(price) || 0,
@@ -468,6 +471,30 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                     <option value="ML">MILILITRO (ML)</option>
                                     <option value="M">METRO (M)</option>
                                 </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Control de Inventario</label>
+                                <button
+                                    type="button"
+                                    onClick={() => setTrackStock(v => !v)}
+                                    className={`w-full flex items-center justify-between px-4 py-3 border rounded-xl transition-all text-sm ${
+                                        trackStock
+                                            ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                                            : 'border-slate-200 bg-slate-50 text-slate-600'
+                                    }`}
+                                >
+                                    <span className="font-medium">
+                                        {trackStock ? 'Con control de stock' : 'Stock ilimitado'}
+                                    </span>
+                                    <span className={`w-10 h-6 rounded-full relative transition-colors ${trackStock ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                                        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${trackStock ? 'left-4.5' : 'left-0.5'}`} />
+                                    </span>
+                                </button>
+                                <p className="text-xs text-slate-400 mt-1">
+                                    {trackStock
+                                        ? 'Se descuenta stock al vender. Aparece en inventario.'
+                                        : 'Se vende sin validar stock. Ideal para café preparado, servicios, etc.'}
+                                </p>
                             </div>
                             {(baseUnit === 'KG' || baseUnit === 'GR') && (
                                 <div>

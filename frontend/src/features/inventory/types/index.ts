@@ -11,6 +11,7 @@ export interface InventoryProduct {
     minStock: number;
     baseUnit: string;
     isActive?: boolean;
+    trackStock?: boolean;
     presentations?: Array<{
         id?: string;
         name: string;

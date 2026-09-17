@@ -11,7 +11,8 @@ interface InventoryItem {
         cost?: number;
         price?: number;
         baseUnit?: string;
-        subGroup?: { id: string; name: string };
+        trackStock?: boolean;
+        subGroup?: { id: string; name: string; groupId?: string };
         presentations?: Array<{
             id?: string;
             name: string;
@@ -46,23 +47,26 @@ export function useInventory(branchId: string) {
     });
 
     const products: InventoryProduct[] = useMemo(() => {
-        return (query.data || []).map(item => ({
-            id: item.product.id,
-            code: item.product.barcode || '',
-            name: item.product.name,
-            cost: Number(item.product.cost || 0),
-            price: Number(item.product.price || 0),
-            stock: Number(item.stock || 0),
-            minStock: Number(item.minStock || 0),
-            baseUnit: item.product.baseUnit || 'UNIDAD',
-            category: typeof item.product.subGroup === 'object' 
-                ? (item.product.subGroup as any)?.name || 'Varios' 
-                : (item.product.subGroup || 'Varios'),
-            subGroupId: typeof item.product.subGroup === 'object' ? (item.product.subGroup as any)?.id || null : null,
-            groupId: typeof item.product.subGroup === 'object' ? (item.product.subGroup as any)?.groupId || null : null,
-            presentations: item.product.presentations || [],
-            barcodes: item.product.barcodes || [],
-        }));
+        return (query.data || [])
+            .filter(item => item.product.trackStock !== false)
+            .map(item => ({
+                id: item.product.id,
+                code: item.product.barcode || '',
+                name: item.product.name,
+                cost: Number(item.product.cost || 0),
+                price: Number(item.product.price || 0),
+                stock: Number(item.stock || 0),
+                minStock: Number(item.minStock || 0),
+                baseUnit: item.product.baseUnit || 'UNIDAD',
+                trackStock: item.product.trackStock !== false,
+                category: typeof item.product.subGroup === 'object' 
+                    ? (item.product.subGroup as any)?.name || 'Varios' 
+                    : (item.product.subGroup || 'Varios'),
+                subGroupId: typeof item.product.subGroup === 'object' ? (item.product.subGroup as any)?.id || null : null,
+                groupId: typeof item.product.subGroup === 'object' ? (item.product.subGroup as any)?.groupId || null : null,
+                presentations: item.product.presentations || [],
+                barcodes: item.product.barcodes || [],
+            }));
     }, [query.data]);
 
     const categories = useMemo(() => {

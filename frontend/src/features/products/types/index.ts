@@ -54,6 +54,7 @@ export interface Product {
     imageUrl?: string;
     subGroupId?: string;
     isActive: boolean;
+    trackStock: boolean;
     expectedSpoilagePercent?: number;
     barcodes: ProductBarcode[];
     presentations: ProductPresentation[];
@@ -76,6 +77,7 @@ export interface CreateProductPayload {
     cost?: number | null;
     price: number;
     subGroupId?: string | null;
+    trackStock?: boolean;
     barcodes?: Array<{ code: string; label?: string | null }>;
     presentations?: Array<{
         name: string;

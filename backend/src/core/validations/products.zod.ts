@@ -21,6 +21,7 @@ export const createProductSchema = z.object({
     imageUrl: z.string().nullable().optional().or(z.literal('')),
     subGroupId: z.string().nullable().optional().or(z.literal('')),
     isActive: z.boolean().default(true),
+    trackStock: z.boolean().default(true),
     expectedSpoilagePercent: z.preprocess((val) => (val === '' || val === null || val === undefined) ? null : Number(val), z.number().min(0).max(100).nullable().optional()),
     minStock: z.preprocess((val) => (val === '' || val === null || val === undefined) ? 0 : Number(val), z.number().min(0).optional().default(0)),
     branchId: z.string().nullable().optional(),

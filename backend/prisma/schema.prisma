@@ -187,6 +187,7 @@ model Product {
   baseUnit    String   @default("UNIDAD")
 imageUrl    String?
   isActive    Boolean  @default(true)
+  trackStock  Boolean  @default(true)   // false = stock ilimitado (café preparado, servicios, etc.)
   expectedSpoilagePercent Decimal? @db.Decimal(5, 2) // % merma esperada (ej: 5.00 = 5%)
   createdAt   DateTime @default(now()) @db.Timestamptz
   updatedAt   DateTime @updatedAt @db.Timestamptz

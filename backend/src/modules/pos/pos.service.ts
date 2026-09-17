@@ -230,10 +230,14 @@ export const createTransaction = async (input: CreateTransactionInput) => {
         const products = type === TransactionType.SALE
             ? await tx.product.findMany({
                 where: { id: { in: productIds } },
-                select: { id: true, name: true, baseUnit: true },
+                select: { id: true, name: true, baseUnit: true, trackStock: true },
               })
             : [];
         const productMap = new Map(products.map(p => [p.id, p]));
+        // Set de productos con stock ilimitado (trackStock: false)
+        const skipStockProducts = new Set(
+            products.filter(p => p.trackStock === false).map(p => p.id)
+        );
 
         // ── Kits (F3): expandir cada kit en sus componentes ─────────────
         // Solo para SALE y solo un nivel: los componentes se tratan como
@@ -261,17 +265,20 @@ export const createTransaction = async (input: CreateTransactionInput) => {
             const totalUnitsToDeduct = item.quantity * multiplier;
 
             if (type === TransactionType.SALE) {
-                const availableStock = invMap.get(item.productId) ?? 0;
-                if (availableStock < totalUnitsToDeduct) {
-                    // Para componentes de kit el nombre/baseUnit vienen de la
-                    // expansión; para productos normales, del pre-fetch.
-                    const expanded = item as KitExpandedItem;
-                    const prod = productMap.get(item.productId);
-                    const name = expanded.productName || prod?.name || item.productId;
-                    const unit = expanded.baseUnit || prod?.baseUnit || 'UNIDAD';
-                    throw new Error(
-                        `Stock insuficiente para "${name}". Requerido: ${totalUnitsToDeduct} ${unit}. Disponible: ${availableStock}`
-                    );
+                // Productos con trackStock=false no validan stock (ilimitados)
+                if (!skipStockProducts.has(item.productId)) {
+                    const availableStock = invMap.get(item.productId) ?? 0;
+                    if (availableStock < totalUnitsToDeduct) {
+                        // Para componentes de kit el nombre/baseUnit vienen de la
+                        // expansión; para productos normales, del pre-fetch.
+                        const expanded = item as KitExpandedItem;
+                        const prod = productMap.get(item.productId);
+                        const name = expanded.productName || prod?.name || item.productId;
+                        const unit = expanded.baseUnit || prod?.baseUnit || 'UNIDAD';
+                        throw new Error(
+                            `Stock insuficiente para "${name}". Requerido: ${totalUnitsToDeduct} ${unit}. Disponible: ${availableStock}`
+                        );
+                    }
                 }
             }
 
@@ -349,6 +356,11 @@ export const createTransaction = async (input: CreateTransactionInput) => {
 
         // Afectar stock: SALE descuenta, INVENTORY_IN suma (inmediatamente)
         for (const item of processedItems) {
+            // Productos con trackStock=false no descuentan stock (ilimitados)
+            if (type === TransactionType.SALE && skipStockProducts.has(item.productId)) {
+                continue;
+            }
+
             const delta = type === TransactionType.SALE ? -item.totalUnitsToDeduct : item.totalUnitsToDeduct;
             await tx.branchInventory.upsert({
                 where: { productId_branchId: { productId: item.productId, branchId } },
@@ -359,6 +371,31 @@ export const createTransaction = async (input: CreateTransactionInput) => {
                     stock: type === TransactionType.INVENTORY_IN ? item.totalUnitsToDeduct : 0,
                 },
             });
+
+            // ── FEFO: descontar del lote con vencimiento más cercano ──
+            // Solo para ventas (SALE) y productos con trackStock
+            if (type === TransactionType.SALE) {
+                let remaining = item.totalUnitsToDeduct;
+                const batches = await (tx as any).productBatch.findMany({
+                    where: {
+                        productId: item.productId,
+                        branchId,
+                        quantity: { gt: 0 },
+                    },
+                    orderBy: { expiryDate: 'asc' }, // FEFO: primero el que vence primero
+                });
+
+                for (const batch of batches) {
+                    if (remaining <= 0) break;
+                    const batchQty = Number(batch.quantity);
+                    const deduct = Math.min(batchQty, remaining);
+                    await (tx as any).productBatch.update({
+                        where: { id: batch.id },
+                        data: { quantity: { decrement: deduct } },
+                    });
+                    remaining -= deduct;
+                }
+            }
 
             // Para INVENTORY_IN: actualizar costo del producto en catálogo maestro
             if (type === TransactionType.INVENTORY_IN) {

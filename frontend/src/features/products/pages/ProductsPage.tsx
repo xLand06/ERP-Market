@@ -120,7 +120,14 @@ export default function ProductsPage() {
             header: 'Producto',
             cell: prod => (
                 <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-800">{prod.name}</p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold text-slate-800">{prod.name}</p>
+                        {prod.trackStock === false && (
+                            <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 border border-violet-200 shrink-0">
+                                SIN STOCK
+                            </span>
+                        )}
+                    </div>
                     <p className="text-xs text-slate-400 truncate max-w-full" title={prod.description}>
                         {prod.description || 'Sin descripción'}
                     </p>

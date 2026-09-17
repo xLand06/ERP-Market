@@ -201,6 +201,7 @@ model Product {
   baseUnit    String   @default("UNIDAD")
   imageUrl    String?
   isActive    Boolean  @default(true)
+  trackStock  Boolean  @default(true)   // false = stock ilimitado (café preparado, servicios, etc.)
   expectedSpoilagePercent Float?  // % merma esperada
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
