@@ -242,7 +242,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                 </div>
                 <BranchSelector />
 
-                <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-100/80 p-0.5 sm:p-1 rounded-xl border border-slate-200/50 overflow-x-auto max-w-full">
+                <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-100/80 p-0.5 sm:p-1 rounded-xl border border-slate-200/50 max-w-full">
                     {/* Quick Language Toggle */}
                     <button
                         onClick={toggleLanguage}
