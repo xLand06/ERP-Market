@@ -75,11 +75,12 @@ router.get('/:slug/status', async (req: Request, res: Response) => {
             else paymentStatus = 'overdue';
         }
 
-        // Planes y precios
+        // Planes y precios ($10 Básico, $20 Pro, $30 Premium)
         const plans: Record<string, { name: string; priceCents: number; currency: string }> = {
             free: { name: 'Free', priceCents: 0, currency: 'USD' },
-            basic: { name: 'Básico', priceCents: 1500, currency: 'USD' },
-            pro: { name: 'Pro', priceCents: 2500, currency: 'USD' },
+            basic: { name: 'Básico', priceCents: 1000, currency: 'USD' },
+            pro: { name: 'Pro', priceCents: 2000, currency: 'USD' },
+            premium: { name: 'Premium', priceCents: 3000, currency: 'USD' },
         };
 
         const plan = plans[tenant.plan] || plans.free;

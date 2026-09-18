@@ -1,0 +1,40 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Execute Remote Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST || secrets.SSH_HOST }}
+          username: ${{ secrets.USER || secrets.SSH_USER }}
+          key: ${{ secrets.KEY || secrets.SSH_KEY }}
+          port: ${{ secrets.PORT || secrets.SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+            echo "🚀 [Deploy] Conectado al VPS. Actualizando repositorio en /opt/erp-market..."
+            cd /opt/erp-market
+            
+            # Sincronizar con la rama activa
+            CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+            echo "🌿 [Deploy] Rama activa en el servidor: $CURRENT_BRANCH"
+            git pull origin "$CURRENT_BRANCH"
+
+            # Reconstruir imágenes y refrescar contenedores
+            chmod +x deploy/scripts/update-all-tenants.sh
+            ./deploy/scripts/update-all-tenants.sh
+            
+            echo "✅ [Deploy] Despliegue completado con éxito."

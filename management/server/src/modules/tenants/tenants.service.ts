@@ -9,7 +9,7 @@ import {
 
 export interface CreateTenantInput {
     slug: string;
-    domain: string;
+    domain?: string;
     url?: string;
     plan?: string;
     product?: string;

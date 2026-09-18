@@ -68,4 +68,4 @@ COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
 EXPOSE 3001
 
-CMD ["node", "dist/app.js"]
+CMD ["sh", "-c", "./node_modules/.bin/prisma db push --schema prisma/schema.prisma && node dist/app.js"]

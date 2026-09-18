@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Tenants from './pages/Tenants';
 import TenantDetail from './pages/TenantDetail';
 import Payments from './pages/Payments';
+import Registrations from './pages/Registrations';
 
 interface AuthState {
     token: string;
@@ -52,6 +53,7 @@ export default function App() {
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/tenants" element={<Tenants />} />
                     <Route path="/tenants/:slug" element={<TenantDetail />} />
+                    <Route path="/registrations" element={<Registrations />} />
                     <Route path="/payments" element={<Payments />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

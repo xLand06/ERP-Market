@@ -1,4 +1,4 @@
-export type PlanType = 'BASICO' | 'FULL';
+export type PlanType = 'BASICO' | 'PRO' | 'PREMIUM';
 export type RoleType = 'OWNER' | 'SELLER';
 
 export interface PlanConfig {
@@ -10,8 +10,9 @@ export interface RoleConfig {
 }
 
 const getActivePlanFromEnv = (): PlanType => {
-    const envPlan = import.meta.env.VITE_PLAN_MODE;
-    if (envPlan === 'FULL') return 'FULL';
+    const envPlan = (import.meta.env.VITE_PLAN_MODE || '').toUpperCase();
+    if (envPlan === 'PREMIUM') return 'PREMIUM';
+    if (envPlan === 'PRO' || envPlan === 'FULL') return 'PRO';
     return 'BASICO';
 };
 
@@ -27,31 +28,62 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             '/products',
             '/sales',
             '/finance/cash-register',
+            '/cash-registers',
+            '/cash-register',
             '/audit',
             '/users',
             '/settings',
             '/merma'
         ]
     },
-    FULL: {
+    PRO: {
         allowedPaths: [
             '/dashboard',
             '/pos',
             '/inventory',
             '/inventory/batches',
-            '/finance',
-            '/finance/cash-register',
+            '/inventory/stocktaking',
             '/products',
-            '/products/categories',
+            '/sales',
+            '/finance/cash-register',
+            '/cash-registers',
+            '/cash-register',
+            '/audit',
             '/users',
             '/settings',
+            '/merma',
+            '/customers',
             '/suppliers',
-            '/reports',
             '/purchases',
-            '/directory',
-            '/audit',
+            '/reports'
+        ]
+    },
+    PREMIUM: {
+        allowedPaths: [
+            '/dashboard',
+            '/pos',
+            '/inventory',
+            '/inventory/batches',
+            '/inventory/stocktaking',
+            '/products',
+            '/products/categories',
             '/sales',
-            '/merma'
+            '/finance',
+            '/finance/cash-register',
+            '/cash-registers',
+            '/cash-register',
+            '/audit',
+            '/users',
+            '/settings',
+            '/merma',
+            '/customers',
+            '/suppliers',
+            '/purchases',
+            '/reports',
+            '/quotes',
+            '/banks',
+            '/catalogo',
+            '/catalog'
         ]
     }
 };
@@ -63,15 +95,26 @@ export const ROLE_CONFIG: Record<RoleType, RoleConfig> = {
             '/pos',
             '/inventory',
             '/inventory/batches',
+            '/inventory/stocktaking',
             '/products',
             '/products/categories',
             '/sales',
             '/finance',
             '/finance/cash-register',
+            '/cash-registers',
+            '/cash-register',
             '/audit',
             '/users',
             '/settings',
-            '/merma'
+            '/merma',
+            '/customers',
+            '/suppliers',
+            '/purchases',
+            '/reports',
+            '/quotes',
+            '/banks',
+            '/catalogo',
+            '/catalog'
         ]
     },
     SELLER: {
@@ -82,18 +125,26 @@ export const ROLE_CONFIG: Record<RoleType, RoleConfig> = {
             '/products',
             '/sales',
             '/finance/cash-register',
-            '/directory',
+            '/cash-registers',
+            '/cash-register',
             '/merma',
             '/settings'
         ]
     }
 };
 
-export const isPathAllowed = (path: string, userRole?: RoleType): boolean => {
+export const isPathAllowed = (path: string, userRole?: RoleType, planType: PlanType = ACTIVE_PLAN): boolean => {
     if (!userRole) return false;
     
     const roleConfig = ROLE_CONFIG[userRole];
     if (!roleConfig) return false;
     
-    return roleConfig.allowedPaths.some(p => path.startsWith(p));
+    const isRoleAllowed = roleConfig.allowedPaths.some(p => path.startsWith(p));
+    if (!isRoleAllowed) return false;
+
+    // Verificar además contra el plan activo
+    const planConfig = PLANS[planType];
+    if (!planConfig) return true;
+
+    return planConfig.allowedPaths.some(p => path.startsWith(p));
 };

@@ -81,3 +81,24 @@ model AuditLog {
     details   Json?
     createdAt DateTime @default(now())
 }
+
+enum RegistrationStatus {
+    PENDING
+    APPROVED
+    REJECTED
+}
+
+model TrialRegistration {
+    id           String             @id @default(uuid())
+    businessName String
+    ownerName    String
+    phone        String
+    email        String
+    plan         String             @default("pro")
+    status       RegistrationStatus @default(PENDING)
+    tenantSlug   String?
+    notes        String?
+    createdAt    DateTime           @default(now())
+    updatedAt    DateTime           @updatedAt
+}
+

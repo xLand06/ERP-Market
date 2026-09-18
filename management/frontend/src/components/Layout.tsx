@@ -74,6 +74,15 @@ function CardIcon({ color }: { color: string }) {
     );
 }
 
+function UserIcon({ color }: { color: string }) {
+    return (
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <circle cx="9" cy="5" r="3.5" fill={color} />
+            <path d="M2 15C2 11.5 5 10 9 10C13 10 16 11.5 16 15" stroke={color} strokeWidth="2" strokeLinecap="round" />
+        </svg>
+    );
+}
+
 function MenuIcon({ color }: { color: string }) {
     return (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -89,6 +98,7 @@ function MenuIcon({ color }: { color: string }) {
 const NAV_ITEMS = [
     { path: '/', label: 'Dashboard', Icon: GridIcon },
     { path: '/tenants', label: 'Tenants', Icon: BuildingIcon },
+    { path: '/registrations', label: 'Solicitudes', Icon: UserIcon },
     { path: '/payments', label: 'Pagos', Icon: CardIcon },
 ];
 

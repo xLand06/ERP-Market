@@ -10,7 +10,8 @@ import { suppliersApi } from '@/services/suppliers.service';
 import {
     LayoutDashboard, Package, ShoppingCart,
     Coins, Users, Truck, BarChart2, ShieldCheck, Store, PanelLeftClose, PanelLeftOpen, X,
-    Settings, Tag, TrendingDown, CalendarClock, Coffee, ShoppingBag
+    Settings, Tag, TrendingDown, CalendarClock, Coffee, ShoppingBag,
+    ClipboardList, FileText, Landmark, UserCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isPathAllowed } from '@/lib/planConfig';
@@ -32,8 +33,12 @@ const navItems: NavItem[] = [
     { nameKey: 'nav.inventory', fallbackName: 'Inventario', path: '/inventory', icon: Package },
     { nameKey: 'nav.batchesAndExpiry', fallbackName: 'Lotes y Vencimientos', path: '/inventory/batches', icon: CalendarClock },
     { nameKey: 'nav.merma', fallbackName: 'Merma', path: '/merma', icon: TrendingDown },
+    { nameKey: 'nav.customers', fallbackName: 'Clientes y Fiados', path: '/customers', icon: UserCheck },
+    { nameKey: 'nav.stocktaking', fallbackName: 'Toma de Inventario', path: '/inventory/stocktaking', icon: ClipboardList },
     { nameKey: 'nav.purchases', fallbackName: 'Compras', path: '/purchases', icon: Truck },
     { nameKey: 'nav.suppliers', fallbackName: 'Proveedores', path: '/suppliers', icon: Users },
+    { nameKey: 'nav.quotes', fallbackName: 'Cotizaciones', path: '/quotes', icon: FileText },
+    { nameKey: 'nav.banks', fallbackName: 'Bancos', path: '/banks', icon: Landmark },
     { nameKey: 'nav.reports', fallbackName: 'Reportes', path: '/reports', icon: BarChart2 },
     { nameKey: 'nav.users', fallbackName: 'Usuarios', path: '/users', icon: Users, roles: ['OWNER'] },
     { nameKey: 'nav.audit', fallbackName: 'Auditoría', path: '/audit', icon: ShieldCheck, roles: ['OWNER'] },
