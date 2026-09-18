@@ -242,136 +242,139 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                 </div>
                 <BranchSelector />
 
-                <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-100/80 p-0.5 sm:p-1 rounded-xl border border-slate-200/50 max-w-full">
-                    {/* Quick Language Toggle */}
-                    <button
-                        onClick={toggleLanguage}
-                        className="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 text-slate-600 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 cursor-pointer font-bold text-xs shrink-0"
-                        title={currentLanguage === 'es' ? 'Switch to English' : 'Cambiar a Español'}
-                        aria-label={t('topbar.language', 'Idioma')}
-                    >
-                        <span className="text-sm leading-none">{currentLanguage === 'es' ? '🇪🇸' : '🇺🇸'}</span>
-                        <span className="font-mono text-[11px] font-black hidden sm:inline">{currentLanguage.toUpperCase()}</span>
-                    </button>
+                <div className="relative shrink-0">
+                    <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-100/80 p-0.5 sm:p-1 rounded-xl border border-slate-200/50 max-w-full">
+                        {/* Quick Language Toggle */}
+                        <button
+                            onClick={toggleLanguage}
+                            className="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 text-slate-600 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 cursor-pointer font-bold text-xs shrink-0"
+                            title={currentLanguage === 'es' ? 'Switch to English' : 'Cambiar a Español'}
+                            aria-label={t('topbar.language', 'Idioma')}
+                        >
+                            <span className="text-sm leading-none">{currentLanguage === 'es' ? '🇪🇸' : '🇺🇸'}</span>
+                            <span className="font-mono text-[11px] font-black hidden sm:inline">{currentLanguage.toUpperCase()}</span>
+                        </button>
 
-                    {/* Theme Selector Trigger */}
-                    <div className="relative shrink-0">
+                        {/* Theme Selector Trigger */}
                         <button 
                             onClick={() => setThemePopoverOpen(!themePopoverOpen)}
-                            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 cursor-pointer"
+                            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 cursor-pointer shrink-0"
                             title="Cambiar Tema de Interfaz"
                         >
                             <Palette className="w-5 h-5" />
                         </button>
 
-                        {themePopoverOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-52 sm:w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-2 z-50 animate-slide-up">
-                                <div className="px-2 py-1.5 border-b border-slate-100 dark:border-slate-800 mb-1">
-                                    <p className="text-[11px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">Tema de Interfaz</p>
-                                </div>
-                                {[
-                                    { id: 'emerald', name: 'Esmeralda', color: 'bg-emerald-500' },
-                                    { id: 'indigo', name: 'Índigo Royal', color: 'bg-indigo-600' },
-                                    { id: 'amber', name: 'Espresso / Ámbar', color: 'bg-amber-600' },
-                                    { id: 'rose', name: 'Bordó / Rosa', color: 'bg-rose-600' },
-                                    { id: 'dark', name: 'Modo Oscuro Total', color: 'bg-slate-900 border border-slate-700' },
-                                ].map((t) => {
-                                    const isSel = (activeTheme || 'emerald') === t.id;
-                                    return (
-                                        <button
-                                            key={t.id}
-                                            type="button"
-                                            onClick={() => {
-                                                setTheme(t.id as any);
-                                                setThemePopoverOpen(false);
-                                            }}
-                                            className={cn(
-                                                'w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all text-left cursor-pointer mb-0.5',
-                                                isSel
-                                                    ? 'bg-indigo-50 dark:bg-slate-800 text-indigo-700 dark:text-indigo-300'
-                                                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                                            )}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <span className={cn('w-3 h-3 rounded-full shrink-0', t.color)} />
-                                                <span className="truncate">{t.name}</span>
-                                            </div>
-                                            {isSel && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-
-                    <button 
-                        onClick={() => setShortcutsOpen(true)}
-                        className="hidden sm:flex min-w-[44px] min-h-[44px] items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 shrink-0" 
-                        title="Atajos de teclado (K)"
-                    >
-                        <Keyboard className="w-5 h-5" />
-                    </button>
-                    <div className="relative shrink-0" ref={notifRef}>
                         <button 
-                            onClick={() => setNotifOpen(!notifOpen)}
-                            className="relative min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95"
-                            aria-label="Notificaciones"
+                            onClick={() => setShortcutsOpen(true)}
+                            className="hidden sm:flex min-w-[44px] min-h-[44px] items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 shrink-0" 
+                            title="Atajos de teclado (K)"
                         >
-                            <Bell className="w-5 h-5" />
-                            {notifications.length > 0 && (
-                                <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-red-500 text-white rounded-full flex items-center justify-center text-[9px] font-bold border border-white">
-                                    {notifications.length > 9 ? '9+' : notifications.length}
-                                </span>
-                            )}
+                            <Keyboard className="w-5 h-5" />
                         </button>
 
-                        {notifOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 animate-slide-up overflow-hidden">
-                                <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100">
-                                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Notificaciones</span>
-                                    <span className="text-[10px] font-semibold text-slate-400">
-                                        {notifications.length} activa{notifications.length !== 1 ? 's' : ''}
+                        <div ref={notifRef}>
+                            <button 
+                                onClick={() => setNotifOpen(!notifOpen)}
+                                className="relative min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95"
+                                aria-label="Notificaciones"
+                            >
+                                <Bell className="w-5 h-5" />
+                                {notifications.length > 0 && (
+                                    <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-red-500 text-white rounded-full flex items-center justify-center text-[9px] font-bold border border-white">
+                                        {notifications.length > 9 ? '9+' : notifications.length}
                                     </span>
-                                </div>
-
-                                <div className="max-h-80 overflow-y-auto">
-                                    {notifications.length === 0 ? (
-                                        <div className="px-3 py-8 text-center">
-                                            <Bell className="w-6 h-6 text-slate-300 mx-auto mb-2" />
-                                            <p className="text-sm font-medium text-slate-400">Sin notificaciones</p>
-                                        </div>
-                                    ) : (
-                                        <ul className="divide-y divide-slate-100">
-                                            {notifications.map((n) => (
-                                                <li key={n.key} className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-slate-50 transition-colors group">
-                                                    <span className={cn(
-                                                        'mt-0.5 w-7 h-7 shrink-0 rounded-lg flex items-center justify-center',
-                                                        n.type === 'fiado'
-                                                            ? 'bg-amber-50 text-amber-600'
-                                                            : 'bg-indigo-50 text-indigo-600'
-                                                    )}>
-                                                        {notificationIcon(n.type)}
-                                                    </span>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-xs font-bold text-slate-800">{n.title}</p>
-                                                        <p className="text-xs text-slate-500 leading-snug break-words">{n.message}</p>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => dismissNotification(n.key)}
-                                                        className="shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                                                        aria-label="Descartar notificación"
-                                                        title="Descartar"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </div>
-                            </div>
-                        )}
+                                )}
+                            </button>
+                        </div>
                     </div>
+
+                    {/* ── Theme Popover (fuera del contenedor de iconos) ── */}
+                    {themePopoverOpen && (
+                        <div className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-2 z-50 animate-slide-up">
+                            <div className="px-2 py-1.5 border-b border-slate-100 dark:border-slate-800 mb-1">
+                                <p className="text-[11px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">Tema de Interfaz</p>
+                            </div>
+                            {[
+                                { id: 'emerald', name: 'Esmeralda', color: 'bg-emerald-500' },
+                                { id: 'indigo', name: 'Índigo Royal', color: 'bg-indigo-600' },
+                                { id: 'amber', name: 'Espresso / Ámbar', color: 'bg-amber-600' },
+                                { id: 'rose', name: 'Bordó / Rosa', color: 'bg-rose-600' },
+                                { id: 'dark', name: 'Modo Oscuro Total', color: 'bg-slate-900 border border-slate-700' },
+                            ].map((t) => {
+                                const isSel = (activeTheme || 'emerald') === t.id;
+                                return (
+                                    <button
+                                        key={t.id}
+                                        type="button"
+                                        onClick={() => {
+                                            setTheme(t.id as any);
+                                            setThemePopoverOpen(false);
+                                        }}
+                                        className={cn(
+                                            'w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all text-left cursor-pointer mb-0.5',
+                                            isSel
+                                                ? 'bg-indigo-50 dark:bg-slate-800 text-indigo-700 dark:text-indigo-300'
+                                                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <span className={cn('w-3 h-3 rounded-full shrink-0', t.color)} />
+                                            <span className="truncate">{t.name}</span>
+                                        </div>
+                                        {isSel && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* ── Notifications Popover (fuera del contenedor de iconos) ── */}
+                    {notifOpen && (
+                        <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 animate-slide-up overflow-hidden">
+                            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100">
+                                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Notificaciones</span>
+                                <span className="text-[10px] font-semibold text-slate-400">
+                                    {notifications.length} activa{notifications.length !== 1 ? 's' : ''}
+                                </span>
+                            </div>
+
+                            <div className="max-h-80 overflow-y-auto">
+                                {notifications.length === 0 ? (
+                                    <div className="px-3 py-8 text-center">
+                                        <Bell className="w-6 h-6 text-slate-300 mx-auto mb-2" />
+                                        <p className="text-sm font-medium text-slate-400">Sin notificaciones</p>
+                                    </div>
+                                ) : (
+                                    <ul className="divide-y divide-slate-100">
+                                        {notifications.map((n) => (
+                                            <li key={n.key} className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-slate-50 transition-colors group">
+                                                <span className={cn(
+                                                    'mt-0.5 w-7 h-7 shrink-0 rounded-lg flex items-center justify-center',
+                                                    n.type === 'fiado'
+                                                        ? 'bg-amber-50 text-amber-600'
+                                                        : 'bg-indigo-50 text-indigo-600'
+                                                )}>
+                                                    {notificationIcon(n.type)}
+                                                </span>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-bold text-slate-800">{n.title}</p>
+                                                    <p className="text-xs text-slate-500 leading-snug break-words">{n.message}</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => dismissNotification(n.key)}
+                                                    className="shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                                                    aria-label="Descartar notificación"
+                                                    title="Descartar"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="relative shrink-0">
