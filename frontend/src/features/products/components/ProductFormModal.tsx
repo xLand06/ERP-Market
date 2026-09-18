@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Barcode, PackageOpen, Plus, Trash2, Layers, DollarSign, RefreshCw, AlertTriangle, CheckCircle2, Search } from 'lucide-react';
+import { X, Save, Barcode, PackageOpen, Plus, Trash2, Layers, DollarSign, RefreshCw, AlertTriangle, CheckCircle2, Search, Camera } from 'lucide-react';
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
+import { CameraBarcodeScannerModal } from '@/components/scanner/CameraBarcodeScannerModal';
 import { api } from '@/lib/api';
 import { normalizeText } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -176,6 +177,10 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
     /** Índices cuyos labels fueron cambiados manualmente (no auto-detectar) */
     const manualLabelKeys = useRef(new Set<number>());
 
+    // ── Camera Scanner ────────────────────────────────────────────────────────
+    const [cameraScanOpen, setCameraScanOpen] = useState(false);
+    const [cameraScanIndex, setCameraScanIndex] = useState<number | null>(null);
+
     // Margen calculado
     const costNum = cost === '' ? 0 : Number(cost);
     const priceNum = price === '' ? 0 : Number(price);
@@ -293,6 +298,25 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
         const key = barcodeKeys[idx];
         manualLabelKeys.current.add(key);
         setBarcodes(prev => prev.map((b, i) => i === idx ? { ...b, label } : b));
+    };
+
+    /** Abre la cámara para escanear un código de barras en la posición idx */
+    const openCameraScan = (idx: number) => {
+        setCameraScanIndex(idx);
+        setCameraScanOpen(true);
+    };
+
+    /** Callback cuando la cámara detecta un código */
+    const handleCameraScan = (code: string) => {
+        if (cameraScanIndex === null) return;
+        const normalized = normalizeText(code);
+        // Auto-detectar formato y actualizar
+        const detected = detectBarcodeFormat(normalized);
+        setBarcodes(prev => prev.map((b, i) => {
+            if (i !== cameraScanIndex) return b;
+            return { ...b, code: normalized, label: detected || b.label || '' };
+        }));
+        toast.success(`Código escaneado: ${normalized}`);
     };
 
     // ── Presentaciones ───────────────────────────────────────────────────────
@@ -428,6 +452,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
     };
 
     return (
+        <>
         <Dialog open={open} onOpenChange={o => !o && onClose()}>
             <DialogContent className="sm:max-w-2xl w-full h-full sm:h-auto sm:w-[calc(100vw-2rem)] sm:rounded-3xl max-h-none sm:max-h-[calc(100dvh-3rem)] p-0">
                 {/* Header */}
@@ -627,18 +652,51 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                     <Barcode className="w-4 h-4 text-slate-500" />
                                     Códigos de Barras
                                 </h3>
-                                <button
-                                    type="button"
-                                    onClick={addBarcode}
-                                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 px-3 py-2.5 min-h-[44px] rounded-lg transition-all"
-                                >
-                                    <Plus className="w-3.5 h-3.5" /> Agregar
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            // Agregar uno nuevo y abrir cámara directo
+                                            const key = ++barcodeKeyRef.current;
+                                            const newIdx = barcodes.length;
+                                            setBarcodeKeys(prev => [...prev, key]);
+                                            setBarcodes(prev => [...prev, { code: '', label: '' }]);
+                                            setTimeout(() => openCameraScan(newIdx), 100);
+                                        }}
+                                        className="text-xs font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-1.5 bg-emerald-50 px-3 py-2.5 min-h-[44px] rounded-lg transition-all active:scale-95"
+                                    >
+                                        <Camera className="w-4 h-4" /> Escanear
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={addBarcode}
+                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 px-3 py-2.5 min-h-[44px] rounded-lg transition-all active:scale-95"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" /> Agregar
+                                    </button>
+                                </div>
                             </div>
 
                             {barcodes.length === 0 ? (
-                                <div className="text-center py-4 border-2 border-dashed border-slate-100 rounded-xl text-slate-400 text-xs italic">
-                                    Sin códigos de barras. Agregá EAN-13, UPC-A, código interno o de proveedor.
+                                <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 space-y-3">
+                                    <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-100 flex items-center justify-center">
+                                        <Barcode className="w-6 h-6 text-slate-300" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-500 mb-1">Sin códigos de barras</p>
+                                        <p className="text-[11px] text-slate-400">Escanéalo con la cámara o escribelo manualmente.</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const key = ++barcodeKeyRef.current;
+                                            setBarcodeKeys(prev => [...prev, key]);
+                                            setBarcodes(prev => [...prev, { code: '', label: '' }]);
+                                        }}
+                                        className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-3 min-h-[44px] rounded-xl transition-all active:scale-95 shadow-sm"
+                                    >
+                                        <Camera className="w-4 h-4" /> Escanear con Cámara
+                                    </button>
                                 </div>
                             ) : (
                                 <div className="space-y-2">
@@ -658,75 +716,73 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                             : 'border-slate-200 focus:border-indigo-300 focus:ring-indigo-200';
 
                                         return (
-                                            <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
-                                                {/* Code input */}
-                                                <div className="sm:col-span-6">
+                                            <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3 space-y-2.5">
+                                                {/* Fila principal: código + cámara + eliminar */}
+                                                <div className="flex items-center gap-2">
                                                     <input
                                                         type="text"
                                                         value={b.code}
                                                         onChange={(e) => updateBarcode(idx, 'code', normalizeText(e.target.value))}
-                                                        className={`w-full px-3 py-2 border rounded-lg text-sm font-mono outline-none focus:ring-1 transition-colors min-h-[44px] ${inputBorder}`}
+                                                        className={`flex-1 px-3 py-2.5 border rounded-lg text-sm font-mono outline-none focus:ring-1 transition-colors min-h-[44px] ${inputBorder}`}
                                                         placeholder={getBarcodePlaceholder(labelVal)}
                                                     />
-                                                    {/* Validation feedback */}
-                                                    {b.code.trim() && !isDuplicate && validation.message && validation.severity !== 'success' && (
-                                                        <p className={`text-[10px] mt-0.5 flex items-center gap-1 ${validation.severity === 'error' ? 'text-red-500' : 'text-amber-500'}`}>
-                                                            <AlertTriangle className="w-3 h-3" />
-                                                            {validation.message}
-                                                        </p>
-                                                    )}
-                                                    {isDuplicate && (
-                                                        <p className="text-[10px] mt-0.5 text-red-500 flex items-center gap-1">
-                                                            <AlertTriangle className="w-3 h-3" />
-                                                            Este código ya está en uso en este producto
-                                                        </p>
-                                                    )}
-                                                    {validation.severity === 'success' && validation.message && (
-                                                        <p className="text-[10px] mt-0.5 text-emerald-600 flex items-center gap-1">
-                                                            <CheckCircle2 className="w-3 h-3" />
-                                                            {validation.message}
-                                                        </p>
-                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openCameraScan(idx)}
+                                                        className="shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 active:bg-emerald-200 transition-all active:scale-90 border border-emerald-200"
+                                                        title="Escanear con cámara"
+                                                    >
+                                                        <Camera className="w-5 h-5" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeBarcode(idx)}
+                                                        className="shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-500 active:bg-red-100 transition-all active:scale-90 border border-slate-200"
+                                                        title="Eliminar código"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
                                                 </div>
 
-                                                {/* Label select */}
-                                                <div className="sm:col-span-5">
+                                                {/* Feedback de validación */}
+                                                {b.code.trim() && !isDuplicate && validation.message && validation.severity !== 'success' && (
+                                                    <p className={`text-[11px] flex items-center gap-1 ${validation.severity === 'error' ? 'text-red-500' : 'text-amber-500'}`}>
+                                                        <AlertTriangle className="w-3 h-3" />
+                                                        {validation.message}
+                                                    </p>
+                                                )}
+                                                {isDuplicate && (
+                                                    <p className="text-[11px] text-red-500 flex items-center gap-1">
+                                                        <AlertTriangle className="w-3 h-3" />
+                                                        Este código ya está en uso en este producto
+                                                    </p>
+                                                )}
+                                                {validation.severity === 'success' && validation.message && (
+                                                    <p className="text-[11px] text-emerald-600 flex items-center gap-1">
+                                                        <CheckCircle2 className="w-3 h-3" />
+                                                        {validation.message}
+                                                    </p>
+                                                )}
+
+                                                {/* Selector de tipo */}
+                                                <div className="flex items-center gap-2">
                                                     <select
                                                         value={b.label || ''}
                                                         onChange={(e) => handleLabelChange(idx, e.target.value)}
-                                                        className={`w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-1 transition-colors min-h-[44px] ${
+                                                        className={`flex-1 px-3 py-2 border rounded-lg text-xs outline-none focus:ring-1 transition-colors min-h-[40px] ${
                                                             !b.label ? 'text-slate-400' : 'text-slate-700'
                                                         } border-slate-200 focus:border-indigo-300 focus:ring-indigo-200`}
                                                     >
-                                                        <option value="" disabled>Seleccionar tipo...</option>
+                                                        <option value="" disabled>Tipo de código...</option>
                                                         {BARCODE_LABELS.map(opt => (
                                                             <option key={opt.value} value={opt.value}>
                                                                 {opt.label}
                                                             </option>
                                                         ))}
                                                     </select>
-                                                    {/* Hint: se autodetecta si no lo tocaste */}
                                                     {!manualLabelKeys.current.has(barcodeKeys[idx]) && b.code.trim() && (
-                                                        <p className="text-[10px] text-slate-400 mt-0.5">
-                                                            Auto-detectado al escribir
-                                                        </p>
+                                                        <span className="text-[10px] text-slate-400 shrink-0">Auto-detectado</span>
                                                     )}
-                                                    {manualLabelKeys.current.has(barcodeKeys[idx]) && (
-                                                        <p className="text-[10px] text-indigo-400 mt-0.5">
-                                                            Selección manual
-                                                        </p>
-                                                    )}
-                                                </div>
-
-                                                <div className="sm:col-span-1 flex justify-center pt-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeBarcode(idx)}
-                                                        className="p-2.5 min-w-[44px] min-h-[44px] text-slate-300 hover:text-red-500 transition-colors flex items-center justify-center"
-                                                        title="Eliminar código de barras"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
                                                 </div>
                                             </div>
                                         );
@@ -973,5 +1029,13 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                 </form>
             </DialogContent>
         </Dialog>
+
+        {/* Camera Barcode Scanner */}
+        <CameraBarcodeScannerModal
+            open={cameraScanOpen}
+            onClose={() => { setCameraScanOpen(false); setCameraScanIndex(null); }}
+            onScan={handleCameraScan}
+        />
+        </>
     );
 }
