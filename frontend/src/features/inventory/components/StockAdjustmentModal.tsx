@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PackageOpen, X, Search, Check, Save, Info } from 'lucide-react';
+import { PackageOpen, X, Search, Check, Save, Info, Camera, Barcode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -7,6 +7,9 @@ import {
 } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { normalizeText } from '@/lib/utils';
+import { CameraBarcodeScannerModal } from '@/components/scanner/CameraBarcodeScannerModal';
+import toast from 'react-hot-toast';
 
 export interface ProductCatalog {
     id: string;
@@ -27,6 +30,7 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
     const [stock, setStock] = useState<number | ''>('');
     const [minStock, setMinStock] = useState<number | ''>('');
     const [reason, setReason] = useState('');
+    const [cameraScanOpen, setCameraScanOpen] = useState(false);
 
     // Reset when opened
     useEffect(() => {
@@ -67,7 +71,38 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
         onClose();
     };
 
+    /** Busca un producto por código de barras escaneado con la cámara */
+    const handleCameraScan = (code: string) => {
+        const normalized = normalizeText(code.trim());
+        if (!normalized) return;
+        // Buscar en la lista ya cargada
+        const found = (globalProducts as ProductCatalog[]).find(p =>
+            normalizeText(p.barcode || '') === normalized
+        );
+        if (found) {
+            setSelectedProduct(found);
+            toast.success(`Producto encontrado: ${found.name}`);
+        } else {
+            // Si no está en la caché, buscar por API
+            api.get('/search', { params: { q: normalized } })
+                .then(res => {
+                    const products = res.data.products || [];
+                    const match = products.find((p: any) =>
+                        normalizeText(p.barcode || '') === normalized
+                    );
+                    if (match) {
+                        setSelectedProduct({ id: match.id, name: match.name, barcode: match.barcode, price: match.price });
+                        toast.success(`Producto encontrado: ${match.name}`);
+                    } else {
+                        toast.error(`Código no encontrado: ${normalized}`);
+                    }
+                })
+                .catch(() => toast.error('Error al buscar el código'));
+        }
+    };
+
     return (
+        <>
         <Dialog open={open} onOpenChange={o => !o && onClose()}>
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader className="border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -85,14 +120,24 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">Buscar Producto en Catálogo *</label>
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                    <Input
-                                        value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
-                                        className="pl-9 bg-slate-50 border-slate-200 focus:bg-white"
-                                        placeholder="Buscar por nombre o código..."
-                                    />
+                                <div className="flex gap-2 items-center">
+                                    <div className="relative flex-1">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                        <Input
+                                            value={search}
+                                            onChange={(e) => setSearch(e.target.value)}
+                                            className="pl-9 bg-slate-50 border-slate-200 focus:bg-white min-h-[48px]"
+                                            placeholder="Buscar por nombre o código..."
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCameraScanOpen(true)}
+                                        className="shrink-0 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 active:bg-emerald-200 transition-all active:scale-90 border border-emerald-200"
+                                        title="Escanear código de barras con cámara"
+                                    >
+                                        <Camera className="w-5 h-5" />
+                                    </button>
                                 </div>
                             </div>
 
@@ -102,8 +147,12 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
                                         Cargando catálogo...
                                     </div>
                                 ) : filteredProducts.length === 0 ? (
-                                    <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
-                                        No se encontraron productos. Crea uno en el Menú "Productos".
+                                    <div className="flex-1 flex items-center justify-center text-slate-500 text-sm px-4 text-center">
+                                        <div>
+                                            <PackageOpen className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                                            <p>No se encontraron productos.</p>
+                                            <p className="text-xs text-slate-400 mt-1">Crea uno en el Menú "Productos" o escaneá un código.</p>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
@@ -112,16 +161,16 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
                                                 key={p.id}
                                                 type="button"
                                                 onClick={() => setSelectedProduct(p)}
-                                                className="w-full text-left p-3 hover:bg-indigo-50 transition-colors flex items-center justify-between group"
+                                                className="w-full text-left p-3 hover:bg-indigo-50 active:bg-indigo-100 transition-colors flex items-center justify-between group min-h-[56px]"
                                             >
-                                                <div>
-                                                    <div className="font-semibold text-sm text-slate-900">{p.name}</div>
+                                                <div className="min-w-0">
+                                                    <div className="font-semibold text-sm text-slate-900 truncate">{p.name}</div>
                                                     <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
-                                                        {p.barcode && <span>{p.barcode}</span>}
+                                                        {p.barcode && <span className="font-mono">{p.barcode}</span>}
                                                         <span className="text-emerald-600 font-medium">${p.price.toFixed(2)}</span>
                                                     </div>
                                                 </div>
-                                                <div className="w-6 h-6 rounded-full border border-slate-300 flex items-center justify-center group-hover:border-indigo-400 group-hover:bg-indigo-50">
+                                                <div className="w-6 h-6 rounded-full border border-slate-300 flex items-center justify-center group-hover:border-indigo-400 group-hover:bg-indigo-50 shrink-0">
                                                     <Check className="w-3.5 h-3.5 text-transparent group-hover:text-indigo-600 transition-colors" />
                                                 </div>
                                             </button>
@@ -221,5 +270,13 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
                 </div>
             </DialogContent>
         </Dialog>
+
+        {/* Camera Barcode Scanner */}
+        <CameraBarcodeScannerModal
+            open={cameraScanOpen}
+            onClose={() => setCameraScanOpen(false)}
+            onScan={handleCameraScan}
+        />
+        </>
     );
 }

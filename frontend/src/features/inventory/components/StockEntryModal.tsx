@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { PackagePlus, Plus, Trash2, ChevronDown, AlertCircle, Loader2, ReceiptText, Tag, RefreshCw, Barcode } from 'lucide-react';
+import { PackagePlus, Plus, Trash2, ChevronDown, AlertCircle, Loader2, ReceiptText, Tag, RefreshCw, Barcode, Camera } from 'lucide-react';
 import {
     Dialog, DialogContent, DialogHeader,
     DialogTitle, DialogDescription, DialogFooter,
@@ -11,6 +11,7 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '../../auth/store/authStore';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useInventory } from '@/hooks/useInventory';
+import { CameraBarcodeScannerModal } from '@/components/scanner/CameraBarcodeScannerModal';
 import toast from 'react-hot-toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -72,6 +73,9 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
     // ── Escáner de código de barras (input dedicado) ─────────────────────────
     const [scanCode, setScanCode] = useState('');
     const scanInputRef = useRef<HTMLInputElement>(null);
+
+    // ── Camera Scanner ────────────────────────────────────────────────────────
+    const [cameraScanOpen, setCameraScanOpen] = useState(false);
 
     // Auto-foco en el input de escaneo al abrir el modal
     useEffect(() => {
@@ -204,6 +208,32 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
         setItems(prev => prev.map((item, i) => i !== idx ? item : { ...item, ...changes }));
     };
 
+    /** Callback cuando la cámara detecta un código de barras */
+    const handleCameraScan = async (code: string) => {
+        const normalized = normalizeText(code.trim());
+        if (!normalized) return;
+        setIsSearching(true);
+        try {
+            const res = await api.get('/search', { params: { q: normalized } });
+            const products = res.data.products || [];
+            const found = products.find((p: any) =>
+                normalizeText(p.barcode || '') === normalized ||
+                (p.barcodes || []).some((b: any) => normalizeText(b.code || '') === normalized) ||
+                (p.presentations || []).some((pr: any) => normalizeText(pr.barcode || '') === normalized)
+            );
+            if (found) {
+                addProduct(found);
+                toast.success(`Producto escaneado: ${found.name}`);
+            } else {
+                toast.error(`Código no encontrado: ${normalized}`);
+            }
+        } catch {
+            toast.error('Error al buscar el código escaneado');
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
     const removeItem = (idx: number) => {
         setItems(prev => prev.filter((_, i) => i !== idx));
     };
@@ -260,6 +290,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
     };
 
     return (
+        <>
         <Dialog open={open} onOpenChange={o => !o && onClose()}>
             <DialogContent className="sm:max-w-2xl">
                 {/* Header */}
@@ -324,27 +355,37 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                         <label className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 block">
                             Escanear código
                         </label>
-                        <div className="relative">
-                            <div className="flex gap-2 items-center border border-indigo-200 rounded-xl bg-indigo-50/40 px-3 py-2 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/10">
-                                <Barcode className="w-4 h-4 text-indigo-500 shrink-0" />
-                                <input
-                                    ref={scanInputRef}
-                                    type="text"
-                                    autoFocus
-                                    autoComplete="off"
-                                    placeholder="Escaneá o escribí el código y presioná Enter..."
-                                    value={scanCode}
-                                    onChange={e => setScanCode(normalizeText(e.target.value))}
-                                    onKeyDown={e => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            handleScanSubmit();
-                                        }
-                                    }}
-                                    className="flex-1 text-sm outline-none bg-transparent uppercase tracking-wide"
-                                />
-                                {isSearching && <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />}
+                        <div className="flex gap-2 items-center">
+                            <div className="relative flex-1">
+                                <div className="flex gap-2 items-center border border-indigo-200 rounded-xl bg-indigo-50/40 px-3 py-2 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/10">
+                                    <Barcode className="w-4 h-4 text-indigo-500 shrink-0" />
+                                    <input
+                                        ref={scanInputRef}
+                                        type="text"
+                                        autoFocus
+                                        autoComplete="off"
+                                        placeholder="Escaneá o escribí el código..."
+                                        value={scanCode}
+                                        onChange={e => setScanCode(normalizeText(e.target.value))}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                handleScanSubmit();
+                                            }
+                                        }}
+                                        className="flex-1 text-sm outline-none bg-transparent uppercase tracking-wide min-h-[44px]"
+                                    />
+                                    {isSearching && <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />}
+                                </div>
                             </div>
+                            <button
+                                type="button"
+                                onClick={() => setCameraScanOpen(true)}
+                                className="shrink-0 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 active:bg-emerald-200 transition-all active:scale-90 border border-emerald-200"
+                                title="Escanear con cámara del teléfono"
+                            >
+                                <Camera className="w-5 h-5" />
+                            </button>
                         </div>
                     </div>
 
@@ -587,5 +628,13 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        {/* Camera Barcode Scanner */}
+        <CameraBarcodeScannerModal
+            open={cameraScanOpen}
+            onClose={() => setCameraScanOpen(false)}
+            onScan={handleCameraScan}
+        />
+        </>
     );
 }
