@@ -273,8 +273,9 @@ export default function StockCountView() {
                 </Card>
             )}
 
-            {/* Items Table */}
+            {/* Items — Cards (mobile) + Table (desktop) */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                {/* Search header */}
                 <div className="flex items-center gap-3 p-4 border-b border-slate-100">
                     <div className="relative flex-1 min-w-[200px]">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -282,19 +283,23 @@ export default function StockCountView() {
                             placeholder="Buscar producto..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
-                            className="pl-9"
+                            className="pl-9 min-h-[44px]"
                         />
                     </div>
+                    <span className="text-xs text-slate-400 shrink-0 hidden sm:block">
+                        {filteredItems.length} producto{filteredItems.length !== 1 ? 's' : ''}
+                    </span>
                 </div>
 
-                <div className="overflow-x-auto">
+                {/* Desktop table */}
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full erp-table" aria-label="Tabla de productos a contar">
                         <thead>
                             <tr>
                                 <th>Producto</th>
-                                <th className="hidden md:table-cell text-right">Stock Esperado</th>
-                                <th className="text-center w-40">Conteo Real</th>
-                                <th className="text-right">Diferencia</th>
+                                <th className="text-right">Stock Esperado</th>
+                                <th className="text-center w-44">Conteo Real</th>
+                                <th className="text-right w-28">Diferencia</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -303,16 +308,20 @@ export default function StockCountView() {
                                     ? item.countedStock - item.expectedStock
                                     : null;
                                 return (
-                                    <tr key={item.id} className={item.countedStock !== null && diff !== 0 ? 'bg-amber-50/40' : ''}>
+                                    <tr key={item.id} className={cn(
+                                        'transition-colors',
+                                        item.countedStock !== null && diff !== 0 ? 'bg-amber-50/60' : '',
+                                        item.countedStock !== null && diff === 0 ? 'bg-emerald-50/30' : ''
+                                    )}>
                                         <td>
                                             <div className="flex flex-col gap-0.5">
                                                 <span className="text-sm font-semibold text-slate-800">{item.productName}</span>
                                                 {item.barcode && (
-                                                    <span className="hidden md:block text-xs text-slate-400 font-mono">{item.barcode}</span>
+                                                    <span className="text-xs text-slate-400 font-mono">{item.barcode}</span>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="hidden md:table-cell text-right text-sm tabular-nums text-slate-600">
+                                        <td className="text-right text-sm tabular-nums text-slate-600 font-medium">
                                             {item.expectedStock}
                                         </td>
                                         <td className="text-center">
@@ -338,7 +347,7 @@ export default function StockCountView() {
                                                     'text-sm font-bold tabular-nums',
                                                     item.countedStock !== null ? 'text-slate-800' : 'text-slate-300'
                                                 )}>
-                                                    {item.countedStock ?? '—'}
+                                                    {item.countedStock ?? '--'}
                                                 </span>
                                             )}
                                         </td>
@@ -351,7 +360,7 @@ export default function StockCountView() {
                                                     {diff > 0 ? '+' : ''}{diff}
                                                 </span>
                                             ) : (
-                                                <span className="text-slate-300">—</span>
+                                                <span className="text-slate-300">--</span>
                                             )}
                                         </td>
                                     </tr>
@@ -359,7 +368,8 @@ export default function StockCountView() {
                             })}
                             {filteredItems.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="text-center py-8 text-sm text-slate-400">
+                                    <td colSpan={4} className="text-center py-12 text-sm text-slate-400">
+                                        <Package className="w-8 h-8 mx-auto mb-2 text-slate-200" />
                                         No se encontraron productos
                                     </td>
                                 </tr>
@@ -367,75 +377,211 @@ export default function StockCountView() {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Mobile cards */}
+                <div className="md:hidden divide-y divide-slate-100 max-h-[60vh] overflow-y-auto">
+                    {filteredItems.map(item => {
+                        const diff = item.countedStock !== null
+                            ? item.countedStock - item.expectedStock
+                            : null;
+                        return (
+                            <div key={item.id} className={cn(
+                                'p-3 space-y-2 transition-colors',
+                                item.countedStock !== null && diff !== 0 ? 'bg-amber-50/60' : '',
+                                item.countedStock !== null && diff === 0 ? 'bg-emerald-50/30' : ''
+                            )}>
+                                {/* Product name + barcode */}
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-slate-800 truncate">{item.productName}</p>
+                                        {item.barcode && (
+                                            <p className="text-[11px] text-slate-400 font-mono">{item.barcode}</p>
+                                        )}
+                                    </div>
+                                    {diff !== null && diff !== 0 && (
+                                        <span className={cn(
+                                            'text-xs font-bold tabular-nums px-2 py-0.5 rounded-full shrink-0',
+                                            diff > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                                        )}>
+                                            {diff > 0 ? '+' : ''}{diff}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Stock labels */}
+                                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                                    <span>Esperado: <strong className="text-slate-600">{item.expectedStock}</strong></span>
+                                    {item.countedStock !== null && diff === 0 && (
+                                        <span className="text-emerald-600 font-bold">Coincide</span>
+                                    )}
+                                </div>
+
+                                {/* Count input */}
+                                {canEdit && (
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={item.countedStock ?? ''}
+                                        onChange={e => handleCountChange(item.productId, e.target.value)}
+                                        placeholder="Conteo real..."
+                                        className={cn(
+                                            'w-full h-12 rounded-xl border px-4 text-center text-sm tabular-nums font-bold',
+                                            'focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all',
+                                            item.countedStock !== null && diff !== 0
+                                                ? 'border-amber-400 bg-amber-50'
+                                                : item.countedStock !== null
+                                                    ? 'border-emerald-400 bg-emerald-50'
+                                                    : 'border-slate-200 bg-white'
+                                        )}
+                                    />
+                                )}
+                                {!canEdit && (
+                                    <div className="text-center py-2">
+                                        <span className={cn(
+                                            'text-lg font-bold tabular-nums',
+                                            item.countedStock !== null ? 'text-slate-800' : 'text-slate-300'
+                                        )}>
+                                            {item.countedStock ?? '--'}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                    {filteredItems.length === 0 && (
+                        <div className="py-12 text-center text-sm text-slate-400">
+                            <Package className="w-8 h-8 mx-auto mb-2 text-slate-200" />
+                            No se encontraron productos
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* Actions */}
+            {/* Floating Action Bar (mobile) / inline actions (desktop) */}
             {canEdit && isOwner && (
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                    <Button variant="outline" onClick={handleCancel} className="text-slate-500">
-                        <XCircle className="w-4 h-4 mr-2" /> Cancelar
-                    </Button>
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={handleSaveItems}
-                            disabled={itemsMutation.isPending}
-                        >
-                            <CheckSquare className="w-4 h-4 mr-2" />
-                            {itemsMutation.isPending ? 'Guardando...' : 'Guardar Conteo'}
+                <>
+                    {/* Desktop: inline */}
+                    <div className="hidden sm:flex items-center justify-between gap-3">
+                        <Button variant="outline" onClick={handleCancel} className="text-slate-500 min-h-[44px]">
+                            <XCircle className="w-4 h-4 mr-2" /> Cancelar
                         </Button>
-                        <Button
-                            variant="outline"
-                            onClick={handleComplete}
-                            disabled={statusMutation.isPending}
-                            className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                        >
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Completar Sin Aplicar
-                        </Button>
-                        {differenceStats.count > 0 && (
+                        <div className="flex gap-2">
                             <Button
-                                onClick={() => setApplyDialogOpen(true)}
-                                className="shadow-sm shadow-emerald-500/20 bg-emerald-600 hover:bg-emerald-700"
+                                variant="outline"
+                                onClick={handleSaveItems}
+                                disabled={itemsMutation.isPending}
+                                className="min-h-[44px]"
                             >
-                                Aplicar {differenceStats.count} Diferencias
+                                <CheckSquare className="w-4 h-4 mr-2" />
+                                {itemsMutation.isPending ? 'Guardando...' : 'Guardar'}
                             </Button>
-                        )}
+                            <Button
+                                variant="outline"
+                                onClick={handleComplete}
+                                disabled={statusMutation.isPending}
+                                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 min-h-[44px]"
+                            >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Completar
+                            </Button>
+                            {differenceStats.count > 0 && (
+                                <Button
+                                    onClick={() => setApplyDialogOpen(true)}
+                                    className="shadow-sm shadow-emerald-500/20 bg-emerald-600 hover:bg-emerald-700 min-h-[44px] font-bold"
+                                >
+                                    Aplicar {differenceStats.count} Diferencias
+                                </Button>
+                            )}
+                        </div>
                     </div>
-                </div>
+
+                    {/* Mobile: floating bottom bar */}
+                    <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3 z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleSaveItems}
+                                disabled={itemsMutation.isPending}
+                                className="flex-1 h-12 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                            >
+                                <CheckSquare className="w-4 h-4" />
+                                Guardar
+                            </button>
+                            <button
+                                onClick={handleComplete}
+                                disabled={statusMutation.isPending}
+                                className="flex-1 h-12 rounded-xl border border-emerald-200 bg-emerald-50 text-sm font-bold text-emerald-700 flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                            >
+                                <CheckCircle className="w-4 h-4" />
+                                Completar
+                            </button>
+                            {differenceStats.count > 0 && (
+                                <button
+                                    onClick={() => setApplyDialogOpen(true)}
+                                    className="flex-[1.5] h-12 rounded-xl bg-emerald-600 text-sm font-bold text-white flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-sm"
+                                >
+                                    Aplicar ({differenceStats.count})
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </>
             )}
 
             {/* Apply Dialog */}
             <Dialog open={applyDialogOpen} onOpenChange={setApplyDialogOpen}>
                 <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Aplicar diferencias al inventario</DialogTitle>
-                        <DialogDescription>
-                            Se ajustará el stock de {differenceStats.count} productos según el conteo realizado.
-                            Esta acción no se puede deshacer.
+                    <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
+                        <DialogTitle className="flex items-center gap-2.5 text-lg font-black">
+                            <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center shrink-0">
+                                <AlertTriangle className="w-5 h-5 text-amber-600" />
+                            </div>
+                            Aplicar Diferencias
+                        </DialogTitle>
+                        <DialogDescription className="text-sm text-slate-400">
+                            Se ajustara el stock real de tu inventario. Esta accion no se puede deshacer.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="py-4">
-                        <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 space-y-1">
-                            <p className="text-sm font-semibold text-amber-800">
-                                Resumen de ajustes
-                            </p>
-                            <p className="text-xs text-amber-700">
-                                {differenceStats.count} productos con diferencias
-                            </p>
-                            <p className="text-xs text-amber-700">
-                                Diferencia total: {differenceStats.total > 0 ? '+' : ''}{differenceStats.total} unidades
-                            </p>
+                    <div className="px-6 py-5 space-y-3">
+                        {/* Summary stats */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                                <p className="text-2xl font-black text-slate-800 tabular-nums">{differenceStats.count}</p>
+                                <p className="text-[11px] text-slate-500 font-medium">Productos</p>
+                            </div>
+                            <div className={cn(
+                                'p-3 rounded-xl border text-center',
+                                differenceStats.total >= 0
+                                    ? 'bg-emerald-50 border-emerald-200'
+                                    : 'bg-red-50 border-red-200'
+                            )}>
+                                <p className={cn(
+                                    'text-2xl font-black tabular-nums',
+                                    differenceStats.total >= 0 ? 'text-emerald-700' : 'text-red-700'
+                                )}>
+                                    {differenceStats.total > 0 ? '+' : ''}{differenceStats.total}
+                                </p>
+                                <p className="text-[11px] text-slate-500 font-medium">Unidades</p>
+                            </div>
+                        </div>
+
+                        {/* Warning */}
+                        <div className="flex gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                            <p>El stock de <strong>{differenceStats.count} productos</strong> sera ajustado automaticamente segun el conteo realizado.</p>
                         </div>
                     </div>
-                    <DialogFooter gap-2>
-                        <Button variant="outline" onClick={() => setApplyDialogOpen(false)}>Cancelar</Button>
+                    <DialogFooter className="px-6 py-4 border-t border-slate-100 gap-3">
+                        <Button variant="outline" onClick={() => setApplyDialogOpen(false)} className="flex-1 min-h-[44px]">Cancelar</Button>
                         <Button
                             onClick={handleApplyDifferences}
                             disabled={applyMutation.isPending}
-                            className="bg-emerald-600 hover:bg-emerald-700"
+                            className="flex-[2] min-h-[44px] bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 font-bold"
                         >
-                            {applyMutation.isPending ? 'Aplicando...' : 'Confirmar y Aplicar'}
+                            {applyMutation.isPending ? (
+                                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Aplicando...</>
+                            ) : (
+                                <><CheckCircle className="w-4 h-4 mr-2" /> Confirmar y Aplicar</>
+                            )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
