@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Eye, EyeOff, Lock, User, Loader2, Cloud, CloudOff, RefreshCw, Smartphone, Monitor, Download } from 'lucide-react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { Eye, EyeOff, Lock, User, Loader2, Cloud, CloudOff, RefreshCw, Smartphone, Monitor, Download, QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLoginForm, useLogin } from '@/features/auth/hooks';
@@ -7,6 +7,7 @@ import { useConfigStore } from '@/hooks/useConfigStore';
 import type { LoginPayload } from '@/features/auth/types';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import QRCode from 'qrcode';
 
 // ── Descargas de escritorio ────────────────────────────────────────────────
 // Se sirven desde el management server del VPS (repo privado, no GitHub).
@@ -113,6 +114,22 @@ export default function LoginPage() {
         const server = window.location.origin;
         window.location.href = `allmarket://connect?server=${encodeURIComponent(server)}`;
     };
+
+    // ── QR Code para APK ────────────────────────────────────────────────────
+    const [qrDataUrl, setQrDataUrl] = useState<string>('');
+    const [showQr, setShowQr] = useState(false);
+
+    useEffect(() => {
+        if (showQr && !qrDataUrl) {
+            const server = window.location.origin;
+            const deepLink = `allmarket://connect?server=${encodeURIComponent(server)}`;
+            QRCode.toDataURL(deepLink, {
+                width: 200,
+                margin: 2,
+                color: { dark: '#1e293b', light: '#ffffff' },
+            }).then(setQrDataUrl);
+        }
+    }, [showQr, qrDataUrl]);
 
     return (
         <div className={`min-h-screen flex items-center justify-center p-3 sm:p-6 ${
@@ -272,25 +289,51 @@ export default function LoginPage() {
                     </button>
                 </div>
 
-                {/* ── Downloads ─────────────────────────────────────────────── */}
+                {/* ── Downloads + QR ──────────────────────────────────────────── */}
                 <div className={`mt-4 rounded-xl p-4 backdrop-blur-xl ${
                     isDark
                         ? 'bg-white/[0.04] border border-white/10'
                         : 'bg-white/60 border border-slate-200'
                 }`}>
-                    <p className={`text-[10px] font-black uppercase tracking-widest mb-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Descargar aplicación</p>
+                    <p className={`text-[10px] font-black uppercase tracking-widest mb-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Conectar aplicación</p>
 
                     <button
                         onClick={connectDesktop}
-                        className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-4 py-2.5 text-sm font-bold transition-colors"
+                        className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-4 py-2.5 text-sm font-bold transition-colors active:scale-95"
                     >
                         <Monitor className="w-4 h-4" />
                         Conectar app de escritorio
                     </button>
                     <p className={`text-[10px] mt-1.5 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                        Si ya instalaste la app para PC, la abre y conecta con este negocio.
+                        Si ya instalaste la app, hacé clic para conectar con este negocio.
                     </p>
 
+                    {/* QR Toggle */}
+                    <button
+                        onClick={() => setShowQr(!showQr)}
+                        className={`w-full flex items-center justify-center gap-2 mt-3 rounded-lg px-4 py-2.5 text-sm font-bold transition-all active:scale-95 border ${
+                            showQr
+                                ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                                : isDark
+                                    ? 'bg-white/5 border-white/10 text-slate-300 hover:border-indigo-400 hover:text-indigo-400'
+                                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-indigo-400 hover:text-indigo-600'
+                        }`}
+                    >
+                        <QrCode className="w-4 h-4" />
+                        {showQr ? 'Ocultar QR' : 'Escanear QR para conectar APK'}
+                    </button>
+
+                    {showQr && qrDataUrl && (
+                        <div className="mt-4 flex flex-col items-center gap-3 p-4 bg-white rounded-xl border border-slate-200">
+                            <p className="text-xs font-bold text-slate-700">Escaneá con la APK para conectarte</p>
+                            <img src={qrDataUrl} alt="QR Code para conectar APK" className="w-48 h-48 rounded-lg" />
+                            <p className="text-[10px] text-slate-400 text-center">
+                                Abrí ALL MARKET en tu celular → "Escanear QR" → apuntá a este código
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Download links */}
                     <div className="flex flex-col sm:flex-row gap-2 mt-3">
                         <a
                             href={DESKTOP_WINDOWS_URL}

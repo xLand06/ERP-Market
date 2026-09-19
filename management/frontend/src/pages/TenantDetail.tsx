@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import HealthBadge from '../components/HealthBadge';
 import Terminal, { TerminalLine } from '../components/Terminal';
+import { apiFetch } from '../api';
 
 /* ── Estilos inyectados ─────────────────────────────────────────────────── */
 
@@ -41,6 +42,7 @@ interface TenantDetail {
     url: string;
     status: string;
     plan: string;
+    billingCycle?: string;
     product?: string;
     adminEmail: string | null;
     lastPaymentAt: string | null;
@@ -52,6 +54,8 @@ interface TenantDetail {
         currency: string;
         status: string;
         provider: string | null;
+        billingCycle?: string | null;
+        periodMonths?: number | null;
         paymentCode: string | null;
         externalId: string | null;
         dueDate: string | null;
@@ -131,6 +135,7 @@ export default function TenantDetailPage() {
 
     const [editingPlan, setEditingPlan] = useState(false);
     const [planValue, setPlanValue] = useState('');
+    const [cycleValue, setCycleValue] = useState<'MONTHLY' | 'ANNUAL'>('MONTHLY');
 
     const [confirmAction, setConfirmAction] = useState<{
         title: string;
@@ -153,14 +158,12 @@ export default function TenantDetailPage() {
     const [paymentForm, setPaymentForm] = useState({
         amount: '',
         provider: 'zelle' as string,
+        billingCycle: 'MONTHLY' as 'MONTHLY' | 'ANNUAL',
         externalId: '',
         dueDate: '',
     });
     const [lastPaymentCode, setLastPaymentCode] = useState<string | null>(null);
     const [confirmingPaymentId, setConfirmingPaymentId] = useState<string | null>(null);
-
-    const token = localStorage.getItem('mgmt_token');
-    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
     const addToast = useCallback((message: string, type: 'success' | 'error') => {
         const id = Date.now();
@@ -169,11 +172,11 @@ export default function TenantDetailPage() {
     }, []);
 
     const fetchTenant = useCallback(() => {
-        fetch(`/api/tenants/${slug}`, { headers })
-            .then((r) => r.json())
+        apiFetch<TenantDetail>(`/api/tenants/${slug}`)
             .then((data) => {
                 setTenant(data);
                 setPlanValue(data.plan);
+                setCycleValue(data.billingCycle === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY');
             })
             .catch(console.error)
             .finally(() => setLoading(false));
@@ -189,12 +192,7 @@ export default function TenantDetailPage() {
         if (!slug) return;
         setConsoleLoading(true);
         try {
-            const token = localStorage.getItem('mgmt_token');
-            const res = await fetch(`/api/tenants/${slug}/logs?tail=50`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!res.ok) throw new Error('Error al obtener logs');
-            const data = await res.json();
+            const data = await apiFetch<{ api?: string[] }>(`/api/tenants/${slug}/logs?tail=50`);
 
             const buildLines = (rawLogs: string[]): TerminalLine[] =>
                 rawLogs.map((line) => ({
@@ -243,12 +241,7 @@ export default function TenantDetailPage() {
     const fetchProvisioningLogs = useCallback(async () => {
         if (!slug) return;
         try {
-            const token = localStorage.getItem('mgmt_token');
-            const res = await fetch(`/api/tenants/${slug}/logs`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!res.ok) throw new Error('Error al obtener logs');
-            const data = await res.json();
+            const data = await apiFetch<{ logs?: string[] }>(`/api/tenants/${slug}/logs`);
 
             if (Array.isArray(data.logs)) {
                 setProvisionLogs(buildTerminalLines(data.logs));
@@ -283,8 +276,7 @@ export default function TenantDetailPage() {
     async function handleAction(action: 'suspend' | 'resume') {
         setActionLoading(true);
         try {
-            const res = await fetch(`/api/tenants/${slug}/${action}`, { method: 'POST', headers });
-            if (!res.ok) throw new Error(`Error al ${action === 'suspend' ? 'suspender' : 'reactivar'}`);
+            await apiFetch(`/api/tenants/${slug}/${action}`, { method: 'POST' });
             addToast(
                 action === 'suspend' ? 'Tenant suspendido' : 'Tenant reactivado',
                 'success'
@@ -298,19 +290,17 @@ export default function TenantDetailPage() {
     }
 
     async function handleSavePlan() {
-        if (!planValue || planValue === tenant?.plan) {
+        if (!planValue || (planValue === tenant?.plan && cycleValue === (tenant?.billingCycle || 'MONTHLY'))) {
             setEditingPlan(false);
             return;
         }
         setActionLoading(true);
         try {
-            const res = await fetch(`/api/tenants/${slug}`, {
+            await apiFetch(`/api/tenants/${slug}`, {
                 method: 'PATCH',
-                headers,
-                body: JSON.stringify({ plan: planValue }),
+                body: { plan: planValue, billingCycle: cycleValue },
             });
-            if (!res.ok) throw new Error('Error al actualizar plan');
-            addToast('Plan actualizado', 'success');
+            addToast('Plan y ciclo actualizados', 'success');
             setEditingPlan(false);
             fetchTenant();
         } catch (err) {
@@ -323,11 +313,9 @@ export default function TenantDetailPage() {
     async function handleDelete() {
         setActionLoading(true);
         try {
-            const res = await fetch(`/api/tenants/${slug}`, {
+            await apiFetch(`/api/tenants/${slug}`, {
                 method: 'DELETE',
-                headers,
             });
-            if (!res.ok) throw new Error('Error al eliminar tenant');
             addToast('Tenant eliminado', 'success');
             setTimeout(() => navigate('/tenants'), 1500);
         } catch (err) {
@@ -352,25 +340,24 @@ export default function TenantDetailPage() {
         const amountCents = Math.round(amount * 100);
         setPaymentSubmitting(true);
         try {
-            const res = await fetch('/api/payments', {
+            const data = await apiFetch<any>('/api/payments', {
                 method: 'POST',
-                headers,
-                body: JSON.stringify({
+                body: {
                     tenantId: tenant.id,
                     amountCents,
                     provider: paymentForm.provider,
+                    billingCycle: paymentForm.billingCycle,
+                    periodMonths: paymentForm.billingCycle === 'ANNUAL' ? 12 : 1,
                     externalId: paymentForm.externalId || undefined,
                     dueDate: paymentForm.dueDate
                         ? new Date(paymentForm.dueDate + 'T12:00:00').toISOString()
                         : undefined,
-                }),
+                },
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Error al registrar pago');
 
             setLastPaymentCode(data.paymentCode || null);
             addToast('Pago registrado', 'success');
-            setPaymentForm({ amount: '', provider: 'zelle', externalId: '', dueDate: '' });
+            setPaymentForm({ amount: '', provider: 'zelle', billingCycle: 'MONTHLY', externalId: '', dueDate: '' });
             fetchTenant();
         } catch (err) {
             setPaymentError(err instanceof Error ? err.message : 'Error de conexion');
@@ -382,11 +369,9 @@ export default function TenantDetailPage() {
     async function handleConfirmPayment(paymentId: string) {
         setConfirmingPaymentId(paymentId);
         try {
-            const res = await fetch(`/api/payments/${paymentId}/confirm`, {
+            await apiFetch(`/api/payments/${paymentId}/confirm`, {
                 method: 'POST',
-                headers,
             });
-            if (!res.ok) throw new Error('Error al confirmar pago');
             addToast('Pago confirmado', 'success');
             fetchTenant();
         } catch (err) {
@@ -571,7 +556,7 @@ export default function TenantDetailPage() {
                             </span>
                         </dd>
 
-                        <dt style={{ color: '#64748b', marginBottom: 2, fontWeight: 600, fontSize: '0.8rem' }}>Plan</dt>
+                        <dt style={{ color: '#64748b', marginBottom: 2, fontWeight: 600, fontSize: '0.8rem' }}>Plan y Facturación</dt>
                         <dd style={{ margin: '0 0 0.75rem' }}>
                             {editingPlan ? (
                                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -590,20 +575,37 @@ export default function TenantDetailPage() {
                                         }}
                                     >
                                         <option value="free">Free</option>
-                                        <option value="basic">Basic</option>
-                                        <option value="pro">Pro</option>
-                                        <option value="enterprise">Enterprise</option>
+                                        <option value="basic">Basic ($10/m | $100/a)</option>
+                                        <option value="pro">Pro ($20/m | $200/a)</option>
+                                        <option value="premium">Premium ($30/m | $300/a)</option>
+                                    </select>
+                                    <select
+                                        value={cycleValue}
+                                        onChange={(e) => setCycleValue(e.target.value as 'MONTHLY' | 'ANNUAL')}
+                                        disabled={actionLoading}
+                                        style={{
+                                            padding: '0.4rem 0.6rem',
+                                            borderRadius: 8,
+                                            border: '1px solid #e2e8f0',
+                                            fontSize: '0.85rem',
+                                            background: '#fff',
+                                            minHeight: 44,
+                                            outline: 'none',
+                                        }}
+                                    >
+                                        <option value="MONTHLY">Mensual (30 días)</option>
+                                        <option value="ANNUAL">Anual (365 días)</option>
                                     </select>
                                     <button
                                         onClick={handleSavePlan}
-                                        disabled={actionLoading || planValue === tenant.plan}
+                                        disabled={actionLoading || (planValue === tenant.plan && cycleValue === (tenant.billingCycle || 'MONTHLY'))}
                                         style={{
                                             padding: '0.4rem 0.9rem',
                                             borderRadius: 8,
                                             border: 'none',
-                                            background: actionLoading || planValue === tenant.plan ? '#94a3b8' : COLORS.primary,
+                                            background: actionLoading || (planValue === tenant.plan && cycleValue === (tenant.billingCycle || 'MONTHLY')) ? '#94a3b8' : COLORS.primary,
                                             color: '#fff',
-                                            cursor: actionLoading || planValue === tenant.plan ? 'not-allowed' : 'pointer',
+                                            cursor: actionLoading || (planValue === tenant.plan && cycleValue === (tenant.billingCycle || 'MONTHLY')) ? 'not-allowed' : 'pointer',
                                             fontSize: '0.8rem',
                                             fontWeight: 600,
                                             minHeight: 44,
@@ -612,7 +614,11 @@ export default function TenantDetailPage() {
                                         {actionLoading ? 'Guardando...' : 'Guardar'}
                                     </button>
                                     <button
-                                        onClick={() => { setEditingPlan(false); setPlanValue(tenant.plan); }}
+                                        onClick={() => {
+                                            setEditingPlan(false);
+                                            setPlanValue(tenant.plan);
+                                            setCycleValue(tenant.billingCycle === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY');
+                                        }}
                                         disabled={actionLoading}
                                         style={{
                                             padding: '0.4rem 0.9rem',
@@ -631,9 +637,23 @@ export default function TenantDetailPage() {
                                 </div>
                             ) : (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <span style={{ textTransform: 'capitalize', fontWeight: 500, color: '#1e293b' }}>{tenant.plan}</span>
+                                    <span style={{ textTransform: 'capitalize', fontWeight: 600, color: '#1e293b' }}>{tenant.plan}</span>
+                                    <span style={{
+                                        fontSize: '0.72rem',
+                                        padding: '0.15rem 0.45rem',
+                                        borderRadius: 4,
+                                        background: tenant.billingCycle === 'ANNUAL' ? '#ede9fe' : '#e0f2fe',
+                                        color: tenant.billingCycle === 'ANNUAL' ? '#6d28d9' : '#0369a1',
+                                        fontWeight: 600,
+                                    }}>
+                                        {tenant.billingCycle === 'ANNUAL' ? 'Anual' : 'Mensual'}
+                                    </span>
                                     <button
-                                        onClick={() => { setEditingPlan(true); setPlanValue(tenant.plan); }}
+                                        onClick={() => {
+                                            setEditingPlan(true);
+                                            setPlanValue(tenant.plan);
+                                            setCycleValue(tenant.billingCycle === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY');
+                                        }}
                                         style={{
                                             padding: '0.25rem 0.5rem',
                                             borderRadius: 4,
@@ -699,6 +719,74 @@ export default function TenantDetailPage() {
                     )}
                 </div>
             </div>
+
+            {/* QR Code for APK Connection */}
+            {tenant.url && (
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginBottom: '1.5rem' }}>
+                    <h3 style={{ margin: '0 0 1rem', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 4, height: 16, borderRadius: 2, background: '#059669', flexShrink: 0 }} />
+                        Conexion APK
+                    </h3>
+                    <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ textAlign: 'center' }}>
+                            <img
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`allmarket://connect?server=${encodeURIComponent(tenant.url)}`)}&color=1e293b&bgcolor=ffffff`}
+                                alt={`QR para conectar ${tenant.slug}`}
+                                style={{ width: 180, height: 180, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                            />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 200 }}>
+                            <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e293b', marginBottom: '0.5rem' }}>
+                                Escaneá con la APK para conectar
+                            </p>
+                            <p style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.5, marginBottom: '0.75rem' }}>
+                                Mostrale este QR al usuario para que conecte su celular con este negocio. La APK se descarga desde el link de abajo.
+                            </p>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <a
+                                    href={tenant.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        padding: '0.35rem 0.75rem',
+                                        borderRadius: 6,
+                                        border: '1px solid #e2e8f0',
+                                        background: '#fff',
+                                        color: COLORS.info,
+                                        fontSize: '0.75rem',
+                                        fontWeight: 600,
+                                        textDecoration: 'none',
+                                        minHeight: 36,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                    }}
+                                >
+                                    Abrir panel web
+                                </a>
+                                <a
+                                    href={`${tenant.url}/apk/app.apk`}
+                                    download
+                                    style={{
+                                        padding: '0.35rem 0.75rem',
+                                        borderRadius: 6,
+                                        border: '1px solid #a7f3d0',
+                                        background: '#ecfdf5',
+                                        color: '#065f46',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 600,
+                                        textDecoration: 'none',
+                                        minHeight: 36,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                    }}
+                                >
+                                    Descargar APK
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Payments */}
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginBottom: '1.5rem' }}>
@@ -1122,6 +1210,54 @@ export default function TenantDetailPage() {
                                 </button>
                             </div>
                         )}
+
+                        <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                                Ciclo de Facturación *
+                            </label>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const defaultAmount = tenant.plan === 'pro' ? '20' : tenant.plan === 'premium' ? '30' : '10';
+                                        setPaymentForm((f) => ({ ...f, billingCycle: 'MONTHLY', amount: f.amount ? f.amount : defaultAmount }));
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        padding: '0.5rem',
+                                        borderRadius: 8,
+                                        border: paymentForm.billingCycle === 'MONTHLY' ? `2px solid ${COLORS.primary}` : '1px solid #e2e8f0',
+                                        background: paymentForm.billingCycle === 'MONTHLY' ? '#ecfdf5' : '#fff',
+                                        color: paymentForm.billingCycle === 'MONTHLY' ? COLORS.primary : '#475569',
+                                        fontWeight: 600,
+                                        fontSize: '0.85rem',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    Mensual (1 mes)
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const defaultAmount = tenant.plan === 'pro' ? '200' : tenant.plan === 'premium' ? '300' : '100';
+                                        setPaymentForm((f) => ({ ...f, billingCycle: 'ANNUAL', amount: f.amount ? f.amount : defaultAmount }));
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        padding: '0.5rem',
+                                        borderRadius: 8,
+                                        border: paymentForm.billingCycle === 'ANNUAL' ? `2px solid ${COLORS.primary}` : '1px solid #e2e8f0',
+                                        background: paymentForm.billingCycle === 'ANNUAL' ? '#ecfdf5' : '#fff',
+                                        color: paymentForm.billingCycle === 'ANNUAL' ? COLORS.primary : '#475569',
+                                        fontWeight: 600,
+                                        fontSize: '0.85rem',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    Anual (1 año)
+                                </button>
+                            </div>
+                        </div>
 
                         <div style={{ marginBottom: '1rem' }}>
                             <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: 4 }}>
