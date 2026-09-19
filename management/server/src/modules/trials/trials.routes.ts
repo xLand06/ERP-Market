@@ -16,6 +16,7 @@ const router = Router();
 const createTrialSchema = z.object({
     businessName: z.string().min(2, 'El nombre del negocio debe tener al menos 2 caracteres'),
     ownerName: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
+    taxId: z.string().min(5, 'El RIF o documento de identidad debe tener al menos 5 caracteres'),
     phone: z.string().min(5, 'El teléfono debe tener al menos 5 caracteres'),
     email: z.string().email('Email inválido'),
     plan: z.string().optional(),
