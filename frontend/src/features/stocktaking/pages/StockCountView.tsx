@@ -6,7 +6,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     CheckCircle, XCircle, Search, Package, ChevronLeft,
-    Barcode, Loader2, CheckSquare, AlertTriangle
+    Barcode, Loader2, CheckSquare, AlertTriangle, Camera
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { useStockCount, useUpdateStockCountStatus, useUpdateStockCountItems, useApplyDifferences } from '../hooks/useStocktaking';
 import { useAuthStore } from '@/features/auth/store/authStore';
+import { CameraBarcodeScannerModal } from '@/components/scanner/CameraBarcodeScannerModal';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -42,6 +43,7 @@ export default function StockCountView() {
     const [search, setSearch] = useState('');
     const [scannerInput, setScannerInput] = useState('');
     const [applyDialogOpen, setApplyDialogOpen] = useState(false);
+    const [cameraScanOpen, setCameraScanOpen] = useState(false);
 
     // Local state for counted values (optimistic updates)
     const [localItems, setLocalItems] = useState<Record<string, number | null>>({});
@@ -87,6 +89,23 @@ export default function StockCountView() {
         setSearch(scannerInput.trim());
         setScannerInput('');
     }, [scannerInput]);
+
+    /** Busca producto por barcode escaneado con la camara */
+    const handleCameraScan = useCallback((code: string) => {
+        const normalized = code.trim().toLowerCase();
+        if (!normalized) return;
+        // Buscar en los items del conteo por barcode
+        const found = items.find(i =>
+            i.barcode?.toLowerCase() === normalized ||
+            i.productName.toLowerCase().includes(normalized)
+        );
+        if (found) {
+            setSearch(found.productName);
+            toast.success(`Producto encontrado: ${found.productName}`);
+        } else {
+            toast.error(`Codigo no encontrado en este conteo: ${normalized}`);
+        }
+    }, [items]);
 
     const handleSaveItems = async () => {
         if (!id) return;
@@ -229,18 +248,26 @@ export default function StockCountView() {
             {canEdit && (
                 <Card>
                     <CardContent className="pt-4">
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
                             <div className="relative flex-1">
                                 <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                 <Input
-                                    placeholder="Escanea o escribe código de barras..."
+                                    placeholder="Escanea o escribe codigo de barras..."
                                     value={scannerInput}
                                     onChange={e => setScannerInput(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && handleScannerSearch()}
-                                    className="pl-9"
+                                    className="pl-9 min-h-[48px]"
                                 />
                             </div>
-                            <Button variant="outline" onClick={handleScannerSearch}>Buscar</Button>
+                            <button
+                                type="button"
+                                onClick={() => setCameraScanOpen(true)}
+                                className="shrink-0 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 active:bg-emerald-200 transition-all active:scale-90 border border-emerald-200"
+                                title="Escanear con camara"
+                            >
+                                <Camera className="w-5 h-5" />
+                            </button>
+                            <Button variant="outline" onClick={handleScannerSearch} className="min-h-[48px] shrink-0">Buscar</Button>
                         </div>
                     </CardContent>
                 </Card>
@@ -295,10 +322,10 @@ export default function StockCountView() {
                                                     min="0"
                                                     value={item.countedStock ?? ''}
                                                     onChange={e => handleCountChange(item.productId, e.target.value)}
-                                                    placeholder="—"
+                                                    placeholder="--"
                                                     className={cn(
-                                                        'w-24 h-9 rounded-lg border text-center text-sm tabular-nums font-medium',
-                                                        'focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500',
+                                                        'w-28 h-11 rounded-xl border text-center text-sm tabular-nums font-bold min-h-[44px]',
+                                                        'focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all',
                                                         item.countedStock !== null && diff !== 0
                                                             ? 'border-amber-400 bg-amber-50'
                                                             : item.countedStock !== null
@@ -413,6 +440,13 @@ export default function StockCountView() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Camera Barcode Scanner */}
+            <CameraBarcodeScannerModal
+                open={cameraScanOpen}
+                onClose={() => setCameraScanOpen(false)}
+                onScan={handleCameraScan}
+            />
         </div>
     );
 }
