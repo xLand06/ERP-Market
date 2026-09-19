@@ -690,8 +690,7 @@ export async function syncTenantPlan(slug: string, plan: string): Promise<void> 
                 'node',
                 '-e',
                 `
-                const { PrismaClient } = require('@prisma/client');
-                const prisma = new PrismaClient();
+                const { prisma } = require('/app/dist/config/prisma.js');
                 async function sync() {
                     try {
                         await prisma.systemSetting.upsert({
@@ -708,7 +707,7 @@ export async function syncTenantPlan(slug: string, plan: string): Promise<void> 
                     } catch (e) {
                         console.error('sync error:', e);
                     } finally {
-                        await prisma.$disconnect();
+                        process.exit(0);
                     }
                 }
                 sync();
