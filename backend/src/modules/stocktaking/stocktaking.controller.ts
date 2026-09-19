@@ -101,6 +101,30 @@ export const updateStockCountItem = async (req: AuthRequest, res: Response) => {
 };
 
 /**
+ * Actualizar múltiples items de golpe (bulk)
+ */
+export const updateStockCountItemsBulk = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = validatedData(req, 'params');
+        const { items } = req.body;
+
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ success: false, error: 'Se requiere un array de items' });
+        }
+
+        const results = await Promise.all(
+            items.map((item: { productId: string; countedStock: number }) =>
+                stocktakingService.updateStockCountItemByProductId(id, item.productId, item.countedStock)
+            )
+        );
+
+        res.json({ success: true, data: { updated: results.length } });
+    } catch (error: any) {
+        res.status(422).json({ success: false, error: error.message });
+    }
+};
+
+/**
  * Aplicar diferencias del conteo al inventario (OWNER only)
  */
 export const applyStockCountDifferences = async (req: AuthRequest, res: Response) => {

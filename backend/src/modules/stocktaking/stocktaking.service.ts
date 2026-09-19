@@ -183,7 +183,7 @@ export const updateStockCountStatus = async (id: string, data: UpdateStockCountS
 };
 
 /**
- * Actualizar stock contado de un item
+ * Actualizar stock contado de un item (por itemId)
  */
 export const updateStockCountItem = async (itemId: string, countedStock: number) => {
     const item = await prisma.stockCountItem.findUnique({
@@ -198,6 +198,30 @@ export const updateStockCountItem = async (itemId: string, countedStock: number)
 
     return prisma.stockCountItem.update({
         where: { id: itemId },
+        data: {
+            countedStock,
+            difference: countedStock - Number(item.expectedStock),
+        },
+        include: { product: { select: { id: true, name: true, barcode: true } } },
+    });
+};
+
+/**
+ * Actualizar stock contado de un item (por stockCountId + productId)
+ */
+export const updateStockCountItemByProductId = async (stockCountId: string, productId: string, countedStock: number) => {
+    const item = await prisma.stockCountItem.findUnique({
+        where: { stockCountId_productId: { stockCountId, productId } },
+        include: { stockCount: true },
+    });
+
+    if (!item) throw new Error(`Item no encontrado para producto ${productId}`);
+    if (item.stockCount.status !== 'DRAFT' && item.stockCount.status !== 'IN_PROGRESS') {
+        throw new Error('No se puede modificar un conteo que no está activo');
+    }
+
+    return prisma.stockCountItem.update({
+        where: { id: item.id },
         data: {
             countedStock,
             difference: countedStock - Number(item.expectedStock),

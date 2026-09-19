@@ -40,8 +40,11 @@ router.patch('/:id/status', roleGuard('MANAGER'), validate(idParamSchema, { sour
 
 // ─── ACTUALIZAR ITEMS ──────────────────────────────────────────────────────
 
-/** PATCH /api/stocktaking/items/:itemId — Actualizar stock contado de un item */
+/** PATCH /api/stocktaking/items/:itemId — Actualizar stock contado de un item individual */
 router.patch('/items/:itemId', validate(updateStockCountItemSchema), ctrl.updateStockCountItem);
+
+/** PATCH /api/stocktaking/:id/items — Actualizar múltiples items de golpe (bulk) */
+router.patch('/:id/items', roleGuard('MANAGER'), validate(idParamSchema, { source: 'params' }), ctrl.updateStockCountItemsBulk);
 
 // ─── APLICAR ──────────────────────────────────────────────────────────────
 
