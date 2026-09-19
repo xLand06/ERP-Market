@@ -297,6 +297,7 @@ async function registerTenantFromEnv(
             jwtSecret,
             dbPassword,
             status: 'ACTIVE',
+            nextPaymentDue: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 días de prueba gratis
         },
     });
 
@@ -666,4 +667,59 @@ export async function deleteTenant(slug: string): Promise<void> {
 
 function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Sincroniza el plan comercial en tiempo real en la base de datos del tenant (SystemSetting)
+ * sin downtime ni necesidad de reiniciar contenedores Docker.
+ */
+export async function syncTenantPlan(slug: string, plan: string): Promise<void> {
+    const rawPlan = plan.toLowerCase();
+    const normalizedTier = (rawPlan === 'premium') ? 'premium' : (rawPlan === 'basic' || rawPlan === 'basico') ? 'basic' : 'pro';
+    const planConfigMap: Record<string, { maxUsers: number; maxBranches: number; maxProducts: number }> = {
+        basic: { maxUsers: 2, maxBranches: 1, maxProducts: 500 },
+        pro: { maxUsers: 6, maxBranches: 2, maxProducts: 99999 },
+        premium: { maxUsers: 999, maxBranches: 5, maxProducts: 99999 },
+    };
+    const configObj = planConfigMap[normalizedTier] || planConfigMap.pro;
+
+    try {
+        const container = docker.getContainer(`api-${slug}`);
+        const exec = await container.exec({
+            Cmd: [
+                'node',
+                '-e',
+                `
+                const { PrismaClient } = require('@prisma/client');
+                const prisma = new PrismaClient();
+                async function sync() {
+                    try {
+                        await prisma.systemSetting.upsert({
+                            where: { key: 'planTier' },
+                            update: { value: '${normalizedTier}' },
+                            create: { key: 'planTier', value: '${normalizedTier}' }
+                        });
+                        await prisma.systemSetting.upsert({
+                            where: { key: 'planConfig' },
+                            update: { value: JSON.stringify(${JSON.stringify(configObj)}) },
+                            create: { key: 'planConfig', value: JSON.stringify(${JSON.stringify(configObj)}) }
+                        });
+                        console.log('plan synced in tenant DB: ${normalizedTier}');
+                    } catch (e) {
+                        console.error('sync error:', e);
+                    } finally {
+                        await prisma.$disconnect();
+                    }
+                }
+                sync();
+                `
+            ],
+            AttachStdout: true,
+            AttachStderr: true,
+        });
+        await exec.start({});
+        console.log(`[provisioner] Plan sincronizado en tenant ${slug}: ${normalizedTier}`);
+    } catch (err) {
+        console.warn(`[provisioner] No se pudo sincronizar plan en contenedor api-${slug}:`, err);
+    }
 }

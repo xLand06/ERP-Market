@@ -20,6 +20,15 @@ interface BillingStatus {
         daysUntilDue: number | null;
         lastPaymentAt: string | null;
         nextPaymentDue: string | null;
+        canPay?: boolean;
+        hasPendingPayment?: boolean;
+        pendingPayment?: {
+            id: string;
+            paymentCode: string;
+            amount: number;
+            provider: string;
+            createdAt: string;
+        } | null;
     };
     recentPayments: {
         id: string;
@@ -123,6 +132,10 @@ export function BillingSettings() {
 
     const { subscription, recentPayments } = billing;
     const price = (subscription.plan.priceCents / 100).toFixed(2);
+    const isCurrent = subscription.paymentStatus === 'current';
+    const pendingPaymentItem = subscription.pendingPayment || recentPayments.find(p => p.status === 'PENDING') || null;
+    const hasPending = Boolean(subscription.hasPendingPayment || pendingPaymentItem);
+    const canMakePayment = subscription.canPay !== undefined ? subscription.canPay : (!isCurrent && !hasPending);
 
     return (
         <div className="space-y-6">
@@ -173,94 +186,153 @@ export function BillingSettings() {
                 </div>
             </div>
 
-            {/* Register Payment */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
-                <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <Send className="w-4 h-4 text-emerald-600" /> Registrar Pago
-                </h4>
+            {/* Register Payment or Status Card */}
+            {!canMakePayment ? (
+                hasPending ? (
+                    <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-5 space-y-3">
+                        <div className="flex items-start gap-3">
+                            <div className="p-2 bg-amber-100 rounded-lg text-amber-700 shrink-0 mt-0.5">
+                                <Clock className="w-5 h-5" />
+                            </div>
+                            <div className="space-y-1">
+                                <h4 className="text-sm font-bold text-amber-900">
+                                    Pago en Proceso de Verificación
+                                </h4>
+                                <p className="text-xs text-amber-700 leading-relaxed">
+                                    Tenés un reporte de pago registrado que está siendo revisado por el equipo de administración. Mientras se procesa la confirmación, no es necesario registrar otro pago.
+                                </p>
+                            </div>
+                        </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Amount */}
+                        {pendingPaymentItem && (
+                            <div className="bg-white/80 border border-amber-200/60 rounded-lg p-3 text-xs flex flex-wrap items-center justify-between gap-2 text-slate-700">
+                                <div>
+                                    <span className="font-semibold text-slate-500 block text-[10px] uppercase">Referencia / Código</span>
+                                    <span className="font-mono font-bold text-slate-900">{pendingPaymentItem.paymentCode || pendingPaymentItem.id.slice(0, 8)}</span>
+                                </div>
+                                <div>
+                                    <span className="font-semibold text-slate-500 block text-[10px] uppercase">Monto Reportado</span>
+                                    <span className="font-bold text-emerald-600">${(pendingPaymentItem.amount / 100).toFixed(2)} USD</span>
+                                </div>
+                                <div>
+                                    <span className="font-semibold text-slate-500 block text-[10px] uppercase">Fecha de Envío</span>
+                                    <span>{new Date(pendingPaymentItem.createdAt).toLocaleDateString('es-VE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-5 space-y-2">
+                        <div className="flex items-start gap-3">
+                            <div className="p-2 bg-emerald-100 rounded-lg text-emerald-700 shrink-0 mt-0.5">
+                                <CheckCircle2 className="w-5 h-5" />
+                            </div>
+                            <div className="space-y-1">
+                                <h4 className="text-sm font-bold text-emerald-900">
+                                    Tu suscripción está al día
+                                </h4>
+                                <p className="text-xs text-emerald-700 leading-relaxed">
+                                    No presentás deudas pendientes. El próximo ciclo vence el{' '}
+                                    <strong className="font-semibold">
+                                        {subscription.nextPaymentDue
+                                            ? new Date(subscription.nextPaymentDue).toLocaleDateString('es-VE', { day: 'numeric', month: 'long', year: 'numeric' })
+                                            : 'próximo ciclo'}
+                                    </strong>
+                                    {subscription.daysUntilDue !== null && ` (en ${subscription.daysUntilDue} días)`}. Podrás registrar tu siguiente pago a partir de los 7 días previos a la fecha de corte.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )
+            ) : (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
+                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <Send className="w-4 h-4 text-emerald-600" /> Registrar Pago
+                    </h4>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Amount */}
+                        <div>
+                            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-1.5">
+                                Monto (USD) *
+                            </label>
+                            <Input
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                placeholder="25.00"
+                                value={amount}
+                                onChange={e => setAmount(e.target.value)}
+                                className="text-lg font-bold"
+                            />
+                        </div>
+
+                        {/* Method */}
+                        <div>
+                            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-1.5">
+                                Método de Pago *
+                            </label>
+                            <div className="grid grid-cols-3 gap-1.5">
+                                {PAYMENT_METHODS.map(m => (
+                                    <button
+                                        key={m.value}
+                                        type="button"
+                                        onClick={() => setProvider(m.value)}
+                                        className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 transition-all text-center min-h-[56px] ${
+                                            provider === m.value
+                                                ? 'border-emerald-500 bg-emerald-50 shadow-sm'
+                                                : 'border-slate-200 hover:border-slate-300'
+                                        }`}
+                                    >
+                                        <m.Icon className={`w-5 h-5 ${provider === m.value ? 'text-emerald-600' : 'text-slate-500'}`} />
+                                        <span className="text-[10px] font-bold text-slate-600">{m.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Reference */}
                     <div>
                         <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-1.5">
-                            Monto (USD) *
+                            Referencia / Nro. de Operación
                         </label>
                         <Input
-                            type="number"
-                            min="0.01"
-                            step="0.01"
-                            placeholder="25.00"
-                            value={amount}
-                            onChange={e => setAmount(e.target.value)}
-                            className="text-lg font-bold"
+                            placeholder="Nro de transferencia, TXID Zelle, etc."
+                            value={reference}
+                            onChange={e => setReference(normalizeText(e.target.value))}
                         />
                     </div>
 
-                    {/* Method */}
+                    {/* Notes */}
                     <div>
                         <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-1.5">
-                            Método de Pago *
+                            Notas (opcional)
                         </label>
-                        <div className="grid grid-cols-3 gap-1.5">
-                            {PAYMENT_METHODS.map(m => (
-                                <button
-                                    key={m.value}
-                                    type="button"
-                                    onClick={() => setProvider(m.value)}
-                                    className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 transition-all text-center min-h-[56px] ${
-                                        provider === m.value
-                                            ? 'border-emerald-500 bg-emerald-50 shadow-sm'
-                                            : 'border-slate-200 hover:border-slate-300'
-                                    }`}
-                                >
-                                    <m.Icon className={`w-5 h-5 ${provider === m.value ? 'text-emerald-600' : 'text-slate-500'}`} />
-                                    <span className="text-[10px] font-bold text-slate-600">{m.label}</span>
-                                </button>
-                            ))}
-                        </div>
+                        <Input
+                            placeholder="Observaciones del pago"
+                            value={notes}
+                            onChange={e => setNotes(normalizeText(e.target.value))}
+                        />
                     </div>
+
+                    <Button
+                        onClick={handlePay}
+                        disabled={!amount || parseFloat(amount) <= 0 || payMutation.isPending}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 font-bold min-h-[44px]"
+                    >
+                        {payMutation.isPending ? (
+                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Enviando...</>
+                        ) : (
+                            <><Send className="w-4 h-4 mr-2" /> Enviar Pago</>
+                        )}
+                    </Button>
+
+                    <p className="text-[10px] text-slate-400 text-center">
+                        Tu pago será verificado por el administrador y confirmado en un plazo de 24 horas.
+                    </p>
                 </div>
-
-                {/* Reference */}
-                <div>
-                    <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-1.5">
-                        Referencia / Nro. de Operación
-                    </label>
-                    <Input
-                        placeholder="Nro de transferencia, TXID Zelle, etc."
-                        value={reference}
-                        onChange={e => setReference(normalizeText(e.target.value))}
-                    />
-                </div>
-
-                {/* Notes */}
-                <div>
-                    <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-1.5">
-                        Notas (opcional)
-                    </label>
-                    <Input
-                        placeholder="Observaciones del pago"
-                        value={notes}
-                        onChange={e => setNotes(normalizeText(e.target.value))}
-                    />
-                </div>
-
-                <Button
-                    onClick={handlePay}
-                    disabled={!amount || parseFloat(amount) <= 0 || payMutation.isPending}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 font-bold min-h-[44px]"
-                >
-                    {payMutation.isPending ? (
-                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Enviando...</>
-                    ) : (
-                        <><Send className="w-4 h-4 mr-2" /> Enviar Pago</>
-                    )}
-                </Button>
-
-                <p className="text-[10px] text-slate-400 text-center">
-                    Tu pago será verificado por el administrador y confirmado en un plazo de 24 horas.
-                </p>
-            </div>
+            )}
 
             {/* Payment History */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">

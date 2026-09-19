@@ -85,6 +85,19 @@ router.get('/:slug/status', async (req: Request, res: Response) => {
 
         const plan = plans[tenant.plan] || plans.free;
 
+        // Verificar si tiene un pago pendiente
+        const pendingPayment = await prisma.payment.findFirst({
+            where: { tenantId: tenant.id, status: 'PENDING' },
+            orderBy: { createdAt: 'desc' },
+            select: {
+                id: true,
+                paymentCode: true,
+                amountCents: true,
+                provider: true,
+                createdAt: true,
+            },
+        });
+
         // Últimos 5 pagos
         const recentPayments = await prisma.payment.findMany({
             where: { tenantId: tenant.id },
@@ -102,6 +115,8 @@ router.get('/:slug/status', async (req: Request, res: Response) => {
             },
         });
 
+        const canPay = paymentStatus !== 'current' && !pendingPayment;
+
         res.json({
             tenant: {
                 slug: tenant.slug,
@@ -114,6 +129,15 @@ router.get('/:slug/status', async (req: Request, res: Response) => {
                 daysUntilDue,
                 lastPaymentAt: tenant.lastPaymentAt,
                 nextPaymentDue: tenant.nextPaymentDue,
+                canPay,
+                hasPendingPayment: Boolean(pendingPayment),
+                pendingPayment: pendingPayment ? {
+                    id: pendingPayment.id,
+                    paymentCode: pendingPayment.paymentCode,
+                    amount: pendingPayment.amountCents / 100,
+                    provider: pendingPayment.provider,
+                    createdAt: pendingPayment.createdAt,
+                } : null,
             },
             recentPayments: recentPayments.map(p => ({
                 id: p.id,
@@ -157,11 +181,42 @@ router.post('/:slug/pay', async (req: Request, res: Response) => {
         // Buscar tenant
         const tenant = await prisma.tenant.findUnique({
             where: { slug },
-            select: { id: true, slug: true, plan: true },
+            select: { id: true, slug: true, plan: true, nextPaymentDue: true },
         });
 
         if (!tenant) {
             res.status(404).json({ error: 'Tenant no encontrado' });
+            return;
+        }
+
+        // 1. Validar si la cuenta está al día (más de 7 días antes de la fecha de corte)
+        const now = new Date();
+        const dueDate = tenant.nextPaymentDue ? new Date(tenant.nextPaymentDue) : null;
+        const daysUntilDue = dueDate
+            ? Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+            : null;
+
+        if (daysUntilDue !== null && daysUntilDue > 7) {
+            res.status(400).json({
+                error: `Tu cuenta se encuentra al día (vence en ${daysUntilDue} días). Podrás registrar tu pago durante los 7 días previos a la fecha de corte.`,
+                code: 'PAYMENT_NOT_DUE',
+                daysUntilDue,
+                nextPaymentDue: tenant.nextPaymentDue,
+            });
+            return;
+        }
+
+        // 2. Validar si ya existe un pago pendiente de confirmación
+        const existingPending = await prisma.payment.findFirst({
+            where: { tenantId: tenant.id, status: 'PENDING' },
+        });
+
+        if (existingPending) {
+            res.status(400).json({
+                error: `Ya tienes un pago pendiente de confirmación (${existingPending.paymentCode}). Espera a que el administrador lo verifique.`,
+                code: 'PAYMENT_ALREADY_PENDING',
+                paymentCode: existingPending.paymentCode,
+            });
             return;
         }
 

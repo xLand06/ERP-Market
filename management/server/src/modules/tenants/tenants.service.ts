@@ -4,6 +4,7 @@ import {
     suspendTenant as dockerSuspend,
     resumeTenant as dockerResume,
     deleteTenant as dockerDelete,
+    syncTenantPlan,
     ProvisionInput,
 } from '../../services/provisioner';
 
@@ -83,10 +84,13 @@ export async function updateTenant(slug: string, input: UpdateTenantInput) {
  * Actualiza solo el plan de un tenant.
  */
 export async function updatePlan(slug: string, plan: string) {
-    return prisma.tenant.update({
+    const updated = await prisma.tenant.update({
         where: { slug },
         data: { plan },
     });
+    // Sincronizar en caliente en la base de datos del tenant (SystemSetting)
+    await syncTenantPlan(slug, plan);
+    return updated;
 }
 
 /**
