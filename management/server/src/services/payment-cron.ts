@@ -1,76 +1,120 @@
 import { prisma } from '../config/prisma';
-import { suspendTenant } from './provisioner';
+import { suspendTenant, deleteTenant } from './provisioner';
 import { createAuditEntry } from '../modules/audit/audit.service';
 
 /**
- * Cron de auto-suspension por falta de pago.
- * Cada 6 horas suspende tenants ACTIVOS cuyo vencimiento (nextPaymentDue)
- * supero la fecha actual + dias de gracia.
+ * Cron de auto-suspension por falta de pago y limpieza de tenants abandonados.
+ * Cada 6 horas:
+ * 1. Suspende tenants de prueba (trials) que superaron los 14 días (+1 día de gracia).
+ * 2. Suspende clientes regulares que superaron el vencimiento (+7 días de gracia).
+ * 3. Purga (elimina contenedores y volumen) de tenants suspendidos por más de 30 días sin pago.
  */
 
 const CRON_INTERVAL_MS = 6 * 60 * 60 * 1000; // cada 6 horas
-const GRACE_DAYS = 7; // dias de gracia tras el vencimiento
+const PAID_GRACE_DAYS = 7; // días de gracia tras el vencimiento para clientes con historial de pago
+const TRIAL_GRACE_DAYS = 1; // 24 horas de gracia para pruebas gratis
 
 let cronTimer: ReturnType<typeof setInterval> | null = null;
 
 /**
- * Ejecuta un ciclo de auto-suspension por pagos.
- * Idempotente: solo afecta tenants con status ACTIVE y vencimiento vencido.
+ * Ejecuta un ciclo de auto-suspension y garbage collection.
  */
 export async function runPaymentCronCycle(): Promise<{
     checked: number;
     suspended: number;
+    purged: number;
     failed: number;
 }> {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - GRACE_DAYS);
+    const now = new Date();
+    const paidCutoff = new Date(now.getTime() - PAID_GRACE_DAYS * 24 * 60 * 60 * 1000);
+    const trialCutoff = new Date(now.getTime() - TRIAL_GRACE_DAYS * 24 * 60 * 60 * 1000);
 
-    const overdueTenants = await prisma.tenant.findMany({
+    const activeTenants = await prisma.tenant.findMany({
         where: {
             status: 'ACTIVE',
-            nextPaymentDue: { lt: cutoff },
+            nextPaymentDue: { lt: now },
         },
-        select: { id: true, slug: true, nextPaymentDue: true },
+        include: {
+            payments: {
+                where: { status: 'PAID' },
+                take: 1,
+            },
+        },
     });
 
     let suspended = 0;
+    let purged = 0;
     let failed = 0;
 
-    for (const tenant of overdueTenants) {
-        try {
-            // Reutiliza el provisioner: detiene contenedores Docker,
-            // marca SUSPENDED en DB y registra su propio audit entry
-            await suspendTenant(tenant.slug);
+    for (const tenant of activeTenants) {
+        const isTrial = tenant.payments.length === 0;
+        const cutoff = isTrial ? trialCutoff : paidCutoff;
 
-            // Audit dedicado de la auto-suspension por falta de pago
+        if (tenant.nextPaymentDue && tenant.nextPaymentDue < cutoff) {
+            try {
+                // Reutiliza el provisioner: detiene contenedores Docker y libera RAM
+                await suspendTenant(tenant.slug);
+
+                await createAuditEntry({
+                    actor: 'system',
+                    action: isTrial ? 'TENANT_TRIAL_EXPIRED' : 'TENANT_SUSPENDED_PAYMENT',
+                    tenantId: tenant.id,
+                    details: {
+                        slug: tenant.slug,
+                        isTrial,
+                        nextPaymentDue: tenant.nextPaymentDue?.toISOString(),
+                        graceDays: isTrial ? TRIAL_GRACE_DAYS : PAID_GRACE_DAYS,
+                    },
+                });
+
+                suspended++;
+                console.log(
+                    `[payment-cron] Tenant ${tenant.slug} (${isTrial ? 'TRIAL' : 'REGULAR'}) suspendido por vencimiento ` +
+                    `(venció ${tenant.nextPaymentDue?.toISOString()})`
+                );
+            } catch (error) {
+                failed++;
+                console.error(`[payment-cron] Error suspendiendo tenant ${tenant.slug}:`, error);
+            }
+        }
+    }
+
+    // ── Garbage Collection: Purga de tenants suspendidos > 30 días sin pago ──
+    const purgeCutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const abandonedTenants = await prisma.tenant.findMany({
+        where: {
+            status: 'SUSPENDED',
+            updatedAt: { lt: purgeCutoff },
+            payments: {
+                none: { status: 'PAID' },
+            },
+        },
+        select: { id: true, slug: true, updatedAt: true },
+    });
+
+    for (const abandoned of abandonedTenants) {
+        try {
+            console.log(`[payment-cron] Purgando tenant abandonado tras 30 días suspendido: ${abandoned.slug}`);
+            await deleteTenant(abandoned.slug);
             await createAuditEntry({
                 actor: 'system',
-                action: 'TENANT_SUSPENDED_PAYMENT',
-                tenantId: tenant.id,
-                details: {
-                    slug: tenant.slug,
-                    nextPaymentDue: tenant.nextPaymentDue?.toISOString(),
-                    graceDays: GRACE_DAYS,
-                },
+                action: 'TENANT_PURGED_ABANDONED',
+                tenantId: abandoned.id,
+                details: { slug: abandoned.slug, suspendedSince: abandoned.updatedAt.toISOString() },
             });
-
-            suspended++;
-            console.log(
-                `[payment-cron] Tenant ${tenant.slug} suspendido por falta de pago ` +
-                `(vencio ${tenant.nextPaymentDue?.toISOString()})`
-            );
-        } catch (error) {
+            purged++;
+        } catch (err) {
             failed++;
-            console.error(`[payment-cron] Error suspendiendo tenant ${tenant.slug}:`, error);
+            console.error(`[payment-cron] Error purgando tenant ${abandoned.slug}:`, err);
         }
     }
 
     console.log(
-        `[payment-cron] Ciclo completado: ${overdueTenants.length} vencidos, ` +
-        `${suspended} suspendidos, ${failed} errores`
+        `[payment-cron] Ciclo completado: ${activeTenants.length} revisados, ` +
+        `${suspended} suspendidos, ${purged} purgados, ${failed} errores`
     );
 
-    return { checked: overdueTenants.length, suspended, failed };
+    return { checked: activeTenants.length, suspended, purged, failed };
 }
 
 /**

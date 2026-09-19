@@ -76,6 +76,11 @@ services:
       # PostgreSQL itself recomputes the probe from container start, so this
       # only affects the pre-seed window (harmless once ready).
       start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
     networks:
       - default
 
@@ -111,6 +116,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          cpus: '0.5'
     networks:
       - default
       - erp_proxy

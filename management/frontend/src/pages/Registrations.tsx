@@ -7,6 +7,7 @@ interface TrialRegistration {
     id: string;
     businessName: string;
     ownerName: string;
+    taxId?: string | null;
     phone: string;
     email: string;
     plan: string;
@@ -186,6 +187,7 @@ export default function Registrations() {
         const matchesSearch =
             r.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             r.ownerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (r.taxId && r.taxId.toLowerCase().includes(searchTerm.toLowerCase())) ||
             r.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
             r.phone.includes(searchTerm);
         return matchesStatus && matchesSearch;
@@ -384,7 +386,12 @@ export default function Registrations() {
                                             </td>
 
                                             <td style={{ padding: '12px 16px', color: '#334155' }}>
-                                                {r.ownerName}
+                                                <div style={{ fontWeight: 600 }}>{r.ownerName}</div>
+                                                {r.taxId && (
+                                                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace', marginTop: 2 }}>
+                                                        Doc: {r.taxId}
+                                                    </div>
+                                                )}
                                             </td>
 
                                             <td style={{ padding: '12px 16px' }}>

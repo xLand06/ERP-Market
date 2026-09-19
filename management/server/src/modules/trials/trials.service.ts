@@ -4,6 +4,7 @@ import { createTenant } from '../tenants/tenants.service';
 export interface CreateTrialInput {
     businessName: string;
     ownerName: string;
+    taxId: string;
     phone: string;
     email: string;
     plan?: string;
@@ -14,6 +15,14 @@ export interface ApproveTrialInput {
     slug?: string;
     plan?: string;
     adminPassword?: string;
+}
+
+/**
+ * Normaliza un RIF o documento de identidad a formato canónico alfanumérico en mayúsculas.
+ */
+export function normalizeTaxId(raw?: string | null): string {
+    if (!raw) return '';
+    return raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
 /**
@@ -32,13 +41,39 @@ export function slugify(text: string): string {
 }
 
 /**
- * Crea una nueva solicitud de prueba gratis (Lead).
+ * Crea una nueva solicitud de prueba gratis (Lead) con validación estricta anti-abuso.
  */
 export async function createTrialRegistration(input: CreateTrialInput) {
+    const cleanTaxId = normalizeTaxId(input.taxId);
+    if (!cleanTaxId || cleanTaxId.length < 5) {
+        throw new Error('TAX_ID_REQUIRED');
+    }
+
+    // ── Anti-abuso 1: Un solo trial por RIF o Cédula ───────────────────────
+    const existingTax = await prisma.trialRegistration.findFirst({
+        where: { taxId: cleanTaxId },
+    });
+    if (existingTax) {
+        throw new Error('TAX_ID_ALREADY_USED');
+    }
+
+    // ── Anti-abuso 2: Un solo trial por número de WhatsApp ─────────────────
+    const phoneDigits = (input.phone || '').replace(/\D/g, '');
+    if (phoneDigits.length >= 7) {
+        const phoneSuffix = phoneDigits.slice(-7);
+        const existingPhone = await prisma.trialRegistration.findFirst({
+            where: { phone: { contains: phoneSuffix } },
+        });
+        if (existingPhone) {
+            throw new Error('PHONE_ALREADY_USED');
+        }
+    }
+
     return prisma.trialRegistration.create({
         data: {
             businessName: input.businessName.trim(),
             ownerName: input.ownerName.trim(),
+            taxId: cleanTaxId,
             phone: input.phone.trim(),
             email: input.email.trim().toLowerCase(),
             plan: (input.plan || 'pro').toLowerCase(),

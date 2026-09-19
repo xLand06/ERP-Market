@@ -92,6 +92,7 @@ model TrialRegistration {
     id           String             @id @default(uuid())
     businessName String
     ownerName    String
+    taxId        String?            // RIF o Cedula de Identidad
     phone        String
     email        String
     plan         String             @default("pro")

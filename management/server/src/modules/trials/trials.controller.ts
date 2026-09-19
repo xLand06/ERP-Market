@@ -15,6 +15,18 @@ export async function createHandler(req: Request, res: Response): Promise<void> 
             status: registration.status,
         });
     } catch (error: any) {
+        if (error.message === 'TAX_ID_REQUIRED') {
+            res.status(400).json({ error: 'El RIF o Documento de Identidad es obligatorio para solicitar la prueba gratis.' });
+            return;
+        }
+        if (error.message === 'TAX_ID_ALREADY_USED') {
+            res.status(409).json({ error: 'Este RIF o Documento de Identidad ya ha disfrutado de un período de prueba gratuito en ALLMARKET.' });
+            return;
+        }
+        if (error.message === 'PHONE_ALREADY_USED') {
+            res.status(409).json({ error: 'Este número de WhatsApp ya fue utilizado para registrar una prueba gratis previa.' });
+            return;
+        }
         console.error('[trials.controller] Error creando solicitud de prueba:', error);
         res.status(500).json({ error: 'Error al registrar la solicitud de prueba gratis' });
     }
