@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { exportToExcel } from '@/lib/exportUtils';
-import { Search, Plus, Edit2, UserX, UserCheck, Download, AlertCircle, Users } from 'lucide-react';
+import { Search, Plus, Edit2, UserX, UserCheck, Download, AlertCircle, Users, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { DataTable, type Column } from '@/components/ui/table';
 import { UserFormModal, Branch, User } from '../components/UserFormModal';
+import { PlanUpgradeModal } from '@/components/modals/PlanUpgradeModal';
+import { useConfigStore } from '@/hooks/useConfigStore';
+import { getPlanLimits, normalizePlanType } from '@/lib/planConfig';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -40,7 +43,12 @@ export default function EmployeeDirectoryPage() {
 
     // Modal State
     const [modalOpen, setModalOpen] = useState(false);
+    const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+    const { planTier } = useConfigStore();
+    const currentPlan = normalizePlanType(planTier);
+    const limits = getPlanLimits(currentPlan);
 
     const queryClient = useQueryClient();
 
@@ -53,6 +61,9 @@ export default function EmployeeDirectoryPage() {
         },
         retry: false,
     });
+
+    const activeUsersCount = users.filter((e: User) => e.isActive !== false).length;
+    const isAtLimit = activeUsersCount >= limits.maxUsers;
 
     const { data: branches = [] } = useQuery<Branch[]>({
         queryKey: ['branches'],
@@ -94,6 +105,10 @@ export default function EmployeeDirectoryPage() {
     });
 
     const handleOpenCreate = () => {
+        if (isAtLimit) {
+            setUpgradeModalOpen(true);
+            return;
+        }
         setSelectedUser(null);
         setModalOpen(true);
     };
@@ -225,13 +240,31 @@ export default function EmployeeDirectoryPage() {
                 onSuccess={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
             />
 
+            <PlanUpgradeModal
+                open={upgradeModalOpen}
+                onClose={() => setUpgradeModalOpen(false)}
+                resourceName="usuarios"
+                currentCount={activeUsersCount}
+                limitCount={limits.maxUsers}
+            />
+
             <div className="flex flex-col gap-6 max-w-[1400px] mx-auto pb-8">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                            Gestión de Usuarios
-                        </h1>
+                        <div className="flex items-center gap-2.5">
+                            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                                Gestión de Usuarios
+                            </h1>
+                            <span className={cn(
+                                "px-2.5 py-0.5 rounded-full text-xs font-bold border",
+                                isAtLimit
+                                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                                    : "bg-slate-100 text-slate-600 border-slate-200"
+                            )}>
+                                {activeUsersCount} / {limits.maxUsers} activos ({currentPlan})
+                            </span>
+                        </div>
                         <p className="text-xs text-slate-400 mt-1 font-medium">
                             {users.filter(e => e.isActive).length} activos
                             · {users.filter(e => !e.isActive).length} inactivos
@@ -241,8 +274,27 @@ export default function EmployeeDirectoryPage() {
                         <Button onClick={handleExportExcel} variant="outline" size="lg" className="h-10 font-bold text-slate-700">
                             <Download className="w-4.5 h-4.5 mr-2" /> Exportar
                         </Button>
-                        <Button onClick={handleOpenCreate} size="lg" className="h-10 font-bold shadow-sm shadow-emerald-500/20">
-                            <Plus className="w-4.5 h-4.5 mr-2" /> Nuevo Usuario
+                        <Button
+                            onClick={handleOpenCreate}
+                            size="lg"
+                            className={cn(
+                                "h-10 font-bold shadow-sm transition-all",
+                                isAtLimit
+                                    ? "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-500/20"
+                                    : "shadow-emerald-500/20"
+                            )}
+                        >
+                            {isAtLimit ? (
+                                <>
+                                    <Sparkles className="w-4.5 h-4.5 mr-2 text-amber-200" />
+                                    <span>Límite Alcanzado · Mejorar</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Plus className="w-4.5 h-4.5 mr-2" />
+                                    <span>Nuevo Usuario</span>
+                                </>
+                            )}
                         </Button>
                     </div>
                 </div>

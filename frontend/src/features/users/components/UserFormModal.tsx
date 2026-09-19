@@ -5,6 +5,7 @@ import {
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { cn, normalizeText } from '@/lib/utils';
+import { PlanUpgradeModal } from '@/components/modals/PlanUpgradeModal';
 import toast from 'react-hot-toast';
 
 // Genera una contraseña legible pero segura (sin caracteres confusos)
@@ -77,6 +78,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
     const [errors, setErrors] = useState<Record<string, string[]>>({});
     const [showPw, setShowPw] = useState(false);
     const [createdResult, setCreatedResult] = useState<{ username: string; password: string } | null>(null);
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const initialFocusRef = useRef<HTMLInputElement>(null);
 
     // Auto-fill form when user changes or reset on open
@@ -185,8 +187,13 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
             }
         } catch (error: any) {
             console.error('Error saving user:', error);
-            const backendMsg = error?.response?.data?.error;
-            const details = error?.response?.data?.details;
+            const resData = error?.response?.data;
+            if (error?.response?.status === 403 || resData?.code === 'PLAN_LIMIT_EXCEEDED') {
+                setShowUpgradeModal(true);
+                return;
+            }
+            const backendMsg = resData?.error;
+            const details = resData?.details;
 
             if (details) {
                 setErrors(details);
@@ -213,6 +220,7 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
     };
 
     return (
+        <>
         <Dialog open={open} onOpenChange={o => !o && onClose()}>
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader className="border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -528,5 +536,15 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                 )}
             </DialogContent>
         </Dialog>
+
+        <PlanUpgradeModal
+            open={showUpgradeModal}
+            onClose={() => {
+                setShowUpgradeModal(false);
+                onClose();
+            }}
+            resourceName="usuarios"
+        />
+        </>
     );
 }

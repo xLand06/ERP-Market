@@ -77,13 +77,14 @@ async function runAddClientScript(
     adminEmail: string,
     adminUser: string,
     adminPassword: string,
+    plan?: string,
 ): Promise<string> {
     const { execSync } = await import('child_process');
 
-    // add-client.sh: add-client.sh <slug> [domain] [admin-email] [admin-user] [admin-password]
-    // IMPORTANTE: siempre pasar los 5 args en orden (aunque sean vacíos),
+    // add-client.sh: add-client.sh <slug> [domain] [admin-email] [admin-user] [admin-password] [plan]
+    // IMPORTANTE: siempre pasar los args en orden (aunque sean vacíos),
     // sino los argumentos se corren de posición y el script falla.
-    const args = [slug, domain || '', adminEmail || '', adminUser || 'admin', adminPassword || ''];
+    const args = [slug, domain || '', adminEmail || '', adminUser || 'admin', adminPassword || '', plan || 'pro'];
 
     const cmd = `BUILD_CONTEXT=/repo HOST_TLS_DIR=/opt/erp-market/deploy/clients/${slug}/tls /repo/deploy/scripts/add-client.sh ${args.join(' ')}`;
     console.log(`[provisioner] Ejecutando: ${cmd}`);
@@ -234,7 +235,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     console.log(`[provisioner] Iniciando provisioning para tenant: ${slug} via add-client.sh`);
 
     // ── 1. Ejecutar add-client.sh ──────────────────────────────────────
-    const output = await runAddClientScript(slug, domain, adminEmailFinal, adminUserFinal, adminPasswordFinal);
+    const output = await runAddClientScript(slug, domain, adminEmailFinal, adminUserFinal, adminPasswordFinal, plan);
     console.log(`[provisioner] add-client.sh completado para ${slug}`);
 
     // ── 2. Registrar/actualizar tenant en la DB ───────────────────────

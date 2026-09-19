@@ -81,6 +81,10 @@ export interface ConfigState {
     catalogActive: boolean; // flag maestro que habilita el catálogo público
     socialLinks: string;    // JSON string: { facebook?, instagram?, whatsapp? }
 
+    // Plan Comercial & Límites
+    planTier: string;       // 'basic' | 'pro' | 'premium'
+    planConfig: string;     // JSON string: { maxUsers, maxBranches, maxProducts }
+
     // Convenience getters
     vesRate: number;
     copRate: number;
@@ -174,6 +178,9 @@ export const useConfigStore = create<ConfigState>()(
             catalogSlug: '',
             catalogActive: false,
             socialLinks: '{}',
+
+            planTier: 'basic',
+            planConfig: '',
 
             get vesRate() { return get().rates['VES'] || 5.5; },
             get copRate() { return get().rates['USD'] || get().rates['COP'] || 3600; },

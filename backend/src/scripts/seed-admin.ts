@@ -48,32 +48,53 @@ async function main() {
 
     // 2. Usuario admin (idempotente por email)
     const existing = await prisma.user.findFirst({ where: { email } });
-    if (existing) {
-        console.log(`[seed-admin] Admin ya existe: ${existing.username} (${email}) — skip`);
-        return;
+    if (!existing) {
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const admin = await prisma.user.create({
+            data: {
+                username: finalUsername,
+                email,
+                password: hashedPassword,
+                nombre: 'Administrador',
+                cedula: '00000000',
+                cedulaType: 'V',
+                role: 'OWNER',
+                branchId: branch.id,
+                isActive: true,
+            },
+        });
+
+        console.log(`[seed-admin] Admin creado:`);
+        console.log(`  Username : ${finalUsername}`);
+        console.log(`  Email    : ${admin.email}`);
+        console.log(`  Role     : ${admin.role}`);
+        console.log(`  Branch   : ${branch.name}`);
+    } else {
+        console.log(`[seed-admin] Admin ya existe: ${existing.username} (${email})`);
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // 3. Configuración de Plan Comercial y Límites (idempotente)
+    const rawPlan = (process.env.PLAN_TIER || 'pro').toLowerCase();
+    const normalizedTier = (rawPlan === 'premium') ? 'premium' : (rawPlan === 'basic' || rawPlan === 'basico') ? 'basic' : 'pro';
+    const planConfigMap: Record<string, { maxUsers: number; maxBranches: number; maxProducts: number }> = {
+        basic: { maxUsers: 2, maxBranches: 1, maxProducts: 500 },
+        pro: { maxUsers: 6, maxBranches: 2, maxProducts: 99999 },
+        premium: { maxUsers: 999, maxBranches: 5, maxProducts: 99999 },
+    };
+    const configObj = planConfigMap[normalizedTier] || planConfigMap.pro;
 
-    const admin = await prisma.user.create({
-        data: {
-            username: finalUsername,
-            email,
-            password: hashedPassword,
-            nombre: 'Administrador',
-            cedula: '00000000',
-            cedulaType: 'V',
-            role: 'OWNER',
-            branchId: branch.id,
-            isActive: true,
-        },
+    await prisma.systemSetting.upsert({
+        where: { key: 'planTier' },
+        update: { value: normalizedTier },
+        create: { key: 'planTier', value: normalizedTier },
     });
-
-    console.log(`[seed-admin] Admin creado:`);
-    console.log(`  Username : ${finalUsername}`);
-    console.log(`  Email    : ${admin.email}`);
-    console.log(`  Role     : ${admin.role}`);
-    console.log(`  Branch   : ${branch.name}`);
+    await prisma.systemSetting.upsert({
+        where: { key: 'planConfig' },
+        update: { value: JSON.stringify(configObj) },
+        create: { key: 'planConfig', value: JSON.stringify(configObj) },
+    });
+    console.log(`[seed-admin] Plan configurado: ${normalizedTier} (${JSON.stringify(configObj)})`);
 }
 
 main()

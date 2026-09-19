@@ -17,6 +17,17 @@ interface TrialRegistration {
     updatedAt: string;
 }
 
+interface AccessModalData {
+    businessName: string;
+    ownerName: string;
+    slug: string;
+    phone: string;
+    email: string;
+    password: string;
+    url: string;
+    installerUrl: string;
+}
+
 export default function Registrations() {
     const navigate = useNavigate();
     const [registrations, setRegistrations] = useState<TrialRegistration[]>([]);
@@ -32,6 +43,9 @@ export default function Registrations() {
     const [modalPassword, setModalPassword] = useState('admin123');
     const [isApproving, setIsApproving] = useState(false);
     const [modalError, setModalError] = useState<string | null>(null);
+
+    // Estado del modal de envío de accesos
+    const [accessData, setAccessData] = useState<AccessModalData | null>(null);
 
     // Toast
     const [toast, setToast] = useState<string | null>(null);
@@ -107,7 +121,21 @@ export default function Registrations() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Error al dar de alta el tenant');
 
-            showToast(`✅ Tenant '${data.tenant?.slug || modalSlug}' dado de alta. Provisioning iniciado.`);
+            const finalSlug = data.tenant?.slug || modalSlug;
+            showToast(`✅ Tenant '${finalSlug}' dado de alta.`);
+
+            // Abrir automáticamente el modal de despacho de accesos
+            setAccessData({
+                businessName: selectedReg.businessName,
+                ownerName: selectedReg.ownerName,
+                slug: finalSlug,
+                phone: selectedReg.phone,
+                email: selectedReg.email,
+                password: data.adminPassword || modalPassword,
+                url: `https://${finalSlug}.89.167.46.144.sslip.io`,
+                installerUrl: 'https://allmarket.allcode.site/download/allmarket-desktop.exe',
+            });
+
             setSelectedReg(null);
             fetchRegistrations();
         } catch (err: any) {
@@ -115,6 +143,25 @@ export default function Registrations() {
         } finally {
             setIsApproving(false);
         }
+    };
+
+    // Abrir modal de accesos para un registro ya aprobado
+    const handleOpenAccessModal = (reg: TrialRegistration) => {
+        let pass = 'admin123';
+        if (reg.notes && reg.notes.includes('Clave:')) {
+            pass = reg.notes.replace(/.*Clave:\s*/, '').trim();
+        }
+        const finalSlug = reg.tenantSlug || 'app';
+        setAccessData({
+            businessName: reg.businessName,
+            ownerName: reg.ownerName,
+            slug: finalSlug,
+            phone: reg.phone,
+            email: reg.email,
+            password: pass,
+            url: `https://${finalSlug}.89.167.46.144.sslip.io`,
+            installerUrl: 'https://allmarket.allcode.site/download/allmarket-desktop.exe',
+        });
     };
 
     // Descartar solicitud
@@ -429,21 +476,42 @@ export default function Registrations() {
                                                 )}
 
                                                 {r.status === 'APPROVED' && r.tenantSlug && (
-                                                    <button
-                                                        onClick={() => navigate(`/tenants/${r.tenantSlug}`)}
-                                                        style={{
-                                                            background: '#f8fafc',
-                                                            border: '1px solid #cbd5e1',
-                                                            borderRadius: 8,
-                                                            padding: '6px 12px',
-                                                            fontSize: '0.8rem',
-                                                            fontWeight: 600,
-                                                            color: '#334155',
-                                                            cursor: 'pointer',
-                                                        }}
-                                                    >
-                                                        Ver Tenant ({r.tenantSlug}) →
-                                                    </button>
+                                                    <div style={{ display: 'inline-flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                                        <button
+                                                            onClick={() => handleOpenAccessModal(r)}
+                                                            style={{
+                                                                background: '#ecfdf5',
+                                                                border: '1px solid #a7f3d0',
+                                                                color: '#047857',
+                                                                borderRadius: 8,
+                                                                padding: '6px 10px',
+                                                                fontSize: '0.8rem',
+                                                                fontWeight: 700,
+                                                                cursor: 'pointer',
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: 4,
+                                                            }}
+                                                            title="Enviar credenciales por WhatsApp o Correo"
+                                                        >
+                                                            <span>🔑 Accesos</span>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => navigate(`/tenants/${r.tenantSlug}`)}
+                                                            style={{
+                                                                background: '#f8fafc',
+                                                                border: '1px solid #cbd5e1',
+                                                                borderRadius: 8,
+                                                                padding: '6px 10px',
+                                                                fontSize: '0.8rem',
+                                                                fontWeight: 600,
+                                                                color: '#334155',
+                                                                cursor: 'pointer',
+                                                            }}
+                                                        >
+                                                            Ver ({r.tenantSlug}) →
+                                                        </button>
+                                                    </div>
                                                 )}
                                             </td>
                                         </tr>
@@ -629,6 +697,199 @@ export default function Registrations() {
                     </div>
                 </div>
             )}
+
+            {/* Modal de Despacho de Accesos (WhatsApp / Correo / Copiar) */}
+            {accessData && (() => {
+                const cleanPhone = accessData.phone.replace(/[^0-9]/g, '');
+                const waNumber = cleanPhone.startsWith('0') ? `58${cleanPhone.slice(1)}` : cleanPhone.startsWith('58') ? cleanPhone : `58${cleanPhone}`;
+
+                const messageText = `¡Hola ${accessData.ownerName}! 🎉 Te damos la bienvenida a *ALLMARKET*.
+
+Tu servidor y cuenta de prueba gratis ya están activos:
+
+📍 *Servidor Web:* ${accessData.url}
+👤 *Usuario:* admin
+🔑 *Contraseña:* ${accessData.password}
+
+💻 *Descarga de App Desktop (Modo Offline incluido):*
+${accessData.installerUrl}
+
+Cualquier duda o para configurar tus balanzas e impresoras, escribinos directamente por acá.`;
+
+                const handleCopy = () => {
+                    navigator.clipboard.writeText(messageText);
+                    showToast('📋 Accesos copiados al portapapeles');
+                };
+
+                return (
+                    <div style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 9500,
+                        background: 'rgba(15,23,42,0.65)',
+                        backdropFilter: 'blur(4px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '1rem',
+                    }}>
+                        <div style={{
+                            background: '#fff',
+                            borderRadius: 16,
+                            maxWidth: 540,
+                            width: '100%',
+                            padding: '1.75rem',
+                            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <span style={{ fontSize: '1.4rem' }}>🚀</span>
+                                    <div>
+                                        <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
+                                            Accesos: {accessData.businessName}
+                                        </h3>
+                                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                                            Enviá las credenciales de acceso al comercio en 1 clic
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setAccessData(null)}
+                                    style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#94a3b8' }}
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            {/* Resumen de Credenciales */}
+                            <div style={{
+                                background: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: 12,
+                                padding: '1rem',
+                                marginBottom: '1.25rem',
+                                fontSize: '0.85rem',
+                                lineHeight: 1.6,
+                            }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                                    <span style={{ color: '#64748b', fontWeight: 600 }}>URL del Tenant:</span>
+                                    <a href={accessData.url} target="_blank" rel="noopener noreferrer" style={{ color: '#0284c7', fontWeight: 700, textDecoration: 'none', fontFamily: 'monospace' }}>
+                                        {accessData.url} ↗
+                                    </a>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                                    <span style={{ color: '#64748b', fontWeight: 600 }}>Usuario Admin:</span>
+                                    <span style={{ color: '#0f172a', fontWeight: 700, fontFamily: 'monospace' }}>admin</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                                    <span style={{ color: '#64748b', fontWeight: 600 }}>Contraseña:</span>
+                                    <span style={{ color: '#047857', fontWeight: 700, fontFamily: 'monospace', background: '#ecfdf5', padding: '1px 6px', borderRadius: 4 }}>
+                                        {accessData.password}
+                                    </span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                                    <span style={{ color: '#64748b', fontWeight: 600 }}>Contacto:</span>
+                                    <span style={{ color: '#0f172a' }}>{accessData.ownerName} ({accessData.phone})</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span style={{ color: '#64748b', fontWeight: 600 }}>Instalador Desktop:</span>
+                                    <a href={accessData.installerUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#475569', textDecoration: 'underline', fontSize: '0.75rem' }}>
+                                        allmarket-desktop.exe
+                                    </a>
+                                </div>
+                            </div>
+
+                            {/* Botones de Despacho 1 Clic */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                                <a
+                                    href={`https://wa.me/${waNumber}?text=${encodeURIComponent(messageText)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: 8,
+                                        background: '#25D366',
+                                        color: '#fff',
+                                        padding: '12px 16px',
+                                        borderRadius: 10,
+                                        fontSize: '0.9rem',
+                                        fontWeight: 700,
+                                        textDecoration: 'none',
+                                        boxShadow: '0 4px 12px rgba(37,211,102,0.25)',
+                                        textAlign: 'center',
+                                    }}
+                                >
+                                    <span>📱 Enviar Accesos por WhatsApp (+{waNumber})</span>
+                                </a>
+
+                                <div style={{ display: 'flex', gap: '0.65rem' }}>
+                                    <a
+                                        href={`mailto:${accessData.email}?subject=${encodeURIComponent('Tus accesos de prueba gratis a ALLMARKET')}&body=${encodeURIComponent(messageText)}`}
+                                        style={{
+                                            flex: 1,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: 6,
+                                            background: '#f1f5f9',
+                                            color: '#334155',
+                                            padding: '10px 14px',
+                                            borderRadius: 10,
+                                            fontSize: '0.85rem',
+                                            fontWeight: 600,
+                                            textDecoration: 'none',
+                                            border: '1px solid #cbd5e1',
+                                            textAlign: 'center',
+                                        }}
+                                    >
+                                        <span>✉️ Enviar por Email</span>
+                                    </a>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleCopy}
+                                        style={{
+                                            flex: 1,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: 6,
+                                            background: '#fff',
+                                            color: '#0f172a',
+                                            padding: '10px 14px',
+                                            borderRadius: 10,
+                                            fontSize: '0.85rem',
+                                            fontWeight: 600,
+                                            border: '1px solid #cbd5e1',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        <span>📋 Copiar Accesos</span>
+                                    </button>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setAccessData(null)}
+                                    style={{
+                                        marginTop: '0.5rem',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#94a3b8',
+                                        fontSize: '0.8rem',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                    }}
+                                >
+                                    Cerrar ventana
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }

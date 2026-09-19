@@ -44,6 +44,7 @@ DOMAIN_ARG="${2:-}"
 ADMIN_EMAIL="${3:-}"
 ADMIN_USER="${4:-admin}"
 ADMIN_PASSWORD="${5:-admin123}"
+CLIENT_PLAN="${6:-pro}"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -261,9 +262,9 @@ echo "smoke check OK — db healthy, /api/health returned 200 (inside stack)"
 # ── Seed admin user (idempotent) ────────────────────────────────────────────
 echo "seeding admin user for '$SLUG'..."
 if docker exec "api-$SLUG" sh -c \
-    "ADMIN_EMAIL='$ADMIN_EMAIL' ADMIN_PASSWORD='$ADMIN_PASSWORD' ADMIN_USERNAME='$ADMIN_USER' npx tsx src/scripts/seed-admin.ts" \
+    "ADMIN_EMAIL='$ADMIN_EMAIL' ADMIN_PASSWORD='$ADMIN_PASSWORD' ADMIN_USERNAME='$ADMIN_USER' PLAN_TIER='$CLIENT_PLAN' npx tsx src/scripts/seed-admin.ts" \
     2>&1; then
-    echo "admin user seeded: $ADMIN_EMAIL"
+    echo "admin user seeded: $ADMIN_EMAIL (plan: $CLIENT_PLAN)"
 else
     echo "WARNING: admin seed failed (non-fatal — you can re-run manually)" >&2
     echo "  docker exec api-$SLUG sh -c \"ADMIN_EMAIL='$ADMIN_EMAIL' ADMIN_PASSWORD='$ADMIN_PASSWORD' npx ts-node src/scripts/seed-admin.ts\"" >&2
@@ -314,7 +315,7 @@ async function main() {
             domain: '$CLIENT_DOMAIN',
             url: '$CLIENT_URL',
             status: 'ACTIVE',
-            plan: 'free',
+            plan: '$CLIENT_PLAN',
             adminEmail: '$ADMIN_EMAIL'
         }
     });

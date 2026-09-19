@@ -95,17 +95,21 @@ export async function approveTrialRegistration(id: string, input?: ApproveTrialI
     });
 
     // 3. Actualizar solicitud
+    const finalPassword = input?.adminPassword || 'admin123';
     const updatedReg = await prisma.trialRegistration.update({
         where: { id },
         data: {
             status: 'APPROVED',
             tenantSlug: finalSlug,
+            notes: `Clave: ${finalPassword}`,
         },
     });
 
     return {
         registration: updatedReg,
         tenant,
+        adminUser: 'admin',
+        adminPassword: finalPassword,
     };
 }
 

@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { isPathAllowed } from '../../lib/planConfig';
+import toast from 'react-hot-toast';
 
 interface PlanGuardProps {
     children: React.ReactNode;
@@ -13,6 +14,10 @@ export function PlanGuard({ children }: PlanGuardProps) {
     if (location.pathname === '/') return <>{children}</>;
 
     if (!isPathAllowed(location.pathname, user?.role)) {
+        toast.error('Este módulo no está disponible en tu plan actual. Actualiza tu plan para desbloquearlo.', {
+            id: 'plan-guard-blocked',
+            duration: 4000,
+        });
         return <Navigate to="/dashboard" replace />;
     }
 

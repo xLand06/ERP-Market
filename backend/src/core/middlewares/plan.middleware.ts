@@ -46,7 +46,8 @@ export const planEnforcement = (resource: PlanResource) => {
     return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const settings = await getSettings();
-            const tier = settings.planTier || 'basic';
+            const rawTier = (settings.planTier || 'basic').toLowerCase();
+            const tier = rawTier === 'basico' ? 'basic' : rawTier;
 
             // Límite desde planConfig (JSON string) si está presente; si no, usar defaults del tier
             let configLimit: number | undefined;
@@ -68,11 +69,16 @@ export const planEnforcement = (resource: PlanResource) => {
             });
 
             if (current >= limit) {
+                const nextTier = tier === 'basic' ? 'Pro' : 'Premium';
                 res.status(403).json({
                     success: false,
-                    error: `Has alcanzado el límite de tu plan (${RESOURCE_LABEL[resource]}). Actualiza a Pro.`,
+                    error: `Has alcanzado el límite de tu plan (${RESOURCE_LABEL[resource]}: ${current}/${limit}). Actualiza al plan ${nextTier}.`,
+                    code: 'PLAN_LIMIT_EXCEEDED',
+                    resource,
                     limit,
                     current,
+                    tier,
+                    nextTier,
                 });
                 return;
             }
