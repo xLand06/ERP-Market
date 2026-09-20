@@ -61,7 +61,7 @@ app.get('/api/health', async (_req, res) => {
 });
 
 // Rutas API
-// /api/auth, /api/health y POST /api/trials son publicos; /api/billing valida por tenant secret
+// /api/auth, /api/health, POST /api/trials y GET /api/resolve-business son publicos; /api/billing valida por tenant secret
 app.use('/api/auth', authRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/trials', trialsRoutes);
@@ -69,6 +69,39 @@ app.use('/api/tenants', authMiddleware, tenantsRoutes);
 app.use('/api/payments', authMiddleware, paymentsRoutes);
 app.use('/api/audit', authMiddleware, auditRoutes);
 app.use('/api/health', healthRoutes);
+
+// ── Resolve Business — público, sin auth ─────────────────────────────────────
+// La APK usa esto para resolver un código de negocio a la URL del tenant.
+app.get('/api/resolve-business', async (req, res) => {
+    try {
+        const code = (req.query.code as string || '').trim().toLowerCase();
+        if (!code) {
+            return res.status(400).json({ error: 'Falta el parámetro code' });
+        }
+        const tenant = await prisma.tenant.findFirst({
+            where: {
+                OR: [
+                    { slug: code },
+                    { slug: code.toLowerCase() },
+                ],
+                status: 'ACTIVE',
+            },
+            select: { slug: true, url: true, domain: true, product: true },
+        });
+        if (!tenant || !tenant.url) {
+            return res.status(404).json({ error: 'Negocio no encontrado o inactivo' });
+        }
+        res.json({
+            slug: tenant.slug,
+            url: tenant.url,
+            domain: tenant.domain,
+            product: tenant.product || 'market',
+        });
+    } catch (err: any) {
+        console.error('[mgmt-server] Error en resolve-business:', err.message);
+        res.status(500).json({ error: 'Error interno' });
+    }
+});
 
 // GET /api/vps/stats — estadísticas del servidor VPS
 app.get('/api/vps/stats', authMiddleware, (_req, res) => {
