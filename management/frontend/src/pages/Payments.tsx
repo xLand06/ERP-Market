@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from '../api';
 
 /* ── Estilos inyectados ─────────────────────────────────────────────────── */
 
@@ -88,17 +89,13 @@ export default function Payments() {
     const [statusFilter, setStatusFilter] = useState<string>('');
     const [providerFilter, setProviderFilter] = useState<string>('');
 
-    const token = localStorage.getItem('mgmt_token');
-    const headers = { Authorization: `Bearer ${token}` };
-
     useEffect(() => {
         const params = new URLSearchParams();
         if (statusFilter) params.set('status', statusFilter);
         if (providerFilter) params.set('provider', providerFilter);
         const qs = params.toString();
 
-        fetch(`/api/payments${qs ? `?${qs}` : ''}`, { headers })
-            .then((r) => r.json())
+        apiFetch<Payment[]>(`/api/payments${qs ? `?${qs}` : ''}`)
             .then((data) => setPayments(Array.isArray(data) ? data : []))
             .catch(console.error)
             .finally(() => setLoading(false));

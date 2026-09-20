@@ -46,6 +46,10 @@ export interface SystemSettings {
     catalogSlug: string;    // slug público del catálogo ('' = sin catálogo)
     catalogActive: boolean; // flag maestro que habilita el catálogo público
     socialLinks: string;    // JSON string: { facebook?, instagram?, whatsapp? }
+
+    // Avisos y comunicados del sistema
+    systemNotice?: string | null;
+    noticeLevel?: string;
 }
 
 const DEFAULT_SETTINGS: SystemSettings = {
@@ -88,6 +92,9 @@ const DEFAULT_SETTINGS: SystemSettings = {
     catalogSlug: '',
     catalogActive: false,
     socialLinks: '{}',
+
+    systemNotice: null,
+    noticeLevel: 'INFO',
 };
 
 export async function getSettings(): Promise<SystemSettings> {

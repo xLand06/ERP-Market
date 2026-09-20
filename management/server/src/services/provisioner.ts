@@ -722,3 +722,266 @@ export async function syncTenantPlan(slug: string, plan: string): Promise<void> 
         console.warn(`[provisioner] No se pudo sincronizar plan en contenedor api-${slug}:`, err);
     }
 }
+
+/**
+ * Sincroniza un aviso administrativo en tiempo real en la base de datos del tenant (SystemSetting)
+ */
+export async function syncTenantNotice(slug: string, notice: string | null, level: string = 'INFO'): Promise<void> {
+    try {
+        const container = docker.getContainer(`api-${slug}`);
+        const safeNotice = notice ? JSON.stringify(notice) : 'null';
+        const safeLevel = JSON.stringify(level);
+        const exec = await container.exec({
+            Cmd: [
+                'node',
+                '-e',
+                `
+                const { prisma } = require('/app/dist/config/prisma.js');
+                async function sync() {
+                    try {
+                        const noticeVal = ${safeNotice};
+                        if (noticeVal) {
+                            await prisma.systemSetting.upsert({
+                                where: { key: 'systemNotice' },
+                                update: { value: noticeVal },
+                                create: { key: 'systemNotice', value: noticeVal }
+                            });
+                            await prisma.systemSetting.upsert({
+                                where: { key: 'noticeLevel' },
+                                update: { value: ${safeLevel} },
+                                create: { key: 'noticeLevel', value: ${safeLevel} }
+                            });
+                        } else {
+                            await prisma.systemSetting.deleteMany({
+                                where: { key: { in: ['systemNotice', 'noticeLevel'] } }
+                            });
+                        }
+                        console.log('notice synced in tenant DB: ${slug}');
+                    } catch (e) {
+                        console.error('sync notice error:', e);
+                    } finally {
+                        process.exit(0);
+                    }
+                }
+                sync();
+                `
+            ],
+            AttachStdout: true,
+            AttachStderr: true,
+        });
+        await exec.start({});
+        console.log(`[provisioner] Aviso sincronizado en tenant ${slug}`);
+    } catch (err) {
+        console.warn(`[provisioner] No se pudo sincronizar aviso en contenedor api-${slug}:`, err);
+    }
+}
+
+// ── Cache en memoria para telemetría (TTL: 60s) para evitar sobrecarga en Docker ──
+const metricsCache = new Map<string, { data: { usersCount: number; productsCount: number; branchesCount: number }; timestamp: number }>();
+const METRICS_CACHE_TTL_MS = 60 * 1000;
+
+/**
+ * Consulta la telemetría y uso real de recursos del tenant (usuarios, productos, sucursales).
+ * Implementa caché en memoria de 60 segundos para evitar saturar el daemon de Docker.
+ */
+export async function getTenantUsageMetrics(slug: string, force: boolean = false): Promise<{ usersCount: number; productsCount: number; branchesCount: number } | null> {
+    const cached = metricsCache.get(slug);
+    const now = Date.now();
+    if (!force && cached && now - cached.timestamp < METRICS_CACHE_TTL_MS) {
+        return cached.data;
+    }
+
+    try {
+        const { execSync } = await import('child_process');
+        const script = `
+        const { prisma } = require('/app/dist/config/prisma.js');
+        async function run() {
+            try {
+                const [usersCount, productsCount, branchesCount] = await Promise.all([
+                    prisma.user.count({ where: { isActive: true } }),
+                    prisma.product.count({ where: { isActive: true } }),
+                    prisma.branch.count({ where: { isActive: true } }),
+                ]);
+                console.log(JSON.stringify({ usersCount, productsCount, branchesCount }));
+            } catch(e) {
+                console.log(JSON.stringify({ error: e.message }));
+            } finally {
+                await prisma.$disconnect();
+            }
+        }
+        run();
+        `;
+        const output = execSync(`docker exec api-${slug} node -e "${script.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`, {
+            encoding: 'utf-8',
+            timeout: 15000,
+        });
+        const match = output.match(/\{"usersCount".*\}/);
+        if (match) {
+            const data = JSON.parse(match[0]);
+            metricsCache.set(slug, { data, timestamp: now });
+            return data;
+        }
+        return null;
+    } catch (err) {
+        console.warn(`[provisioner] No se pudieron obtener métricas de api-${slug}:`, err);
+        return null;
+    }
+}
+
+/**
+ * Genera un token JWT seguro y efímero (30m) para login asistido de soporte
+ */
+export async function generateImpersonationSession(slug: string): Promise<{ token: string; user: any } | null> {
+    try {
+        const { execSync } = await import('child_process');
+        const script = `
+        const { prisma } = require('/app/dist/config/prisma.js');
+        const jwt = require('jsonwebtoken');
+        const { env } = require('/app/dist/config/env.js');
+        async function run() {
+            try {
+                const user = await prisma.user.findFirst({
+                    where: { role: 'OWNER', isActive: true }
+                }) || await prisma.user.findFirst({
+                    where: { isActive: true }
+                });
+                if (!user) {
+                    console.log(JSON.stringify({ error: 'No active user found' }));
+                    return;
+                }
+                // Token efímero de soporte (expira en 30 minutos por seguridad)
+                const token = jwt.sign(
+                    {
+                        id: user.id,
+                        role: user.role,
+                        name: user.nombre,
+                        email: user.email || undefined,
+                        branchId: user.branchId || undefined,
+                        canManageInventory: user.canManageInventory,
+                        isImpersonation: true,
+                        impersonatedAt: Date.now(),
+                    },
+                    env.JWT_SECRET,
+                    { expiresIn: '30m' }
+                );
+                console.log(JSON.stringify({
+                    token,
+                    user: {
+                        id: user.id,
+                        username: user.username,
+                        nombre: user.nombre,
+                        apellido: user.apellido,
+                        email: user.email,
+                        role: user.role,
+                        branchId: user.branchId,
+                        canManageInventory: user.canManageInventory
+                    }
+                }));
+            } catch(e) {
+                console.log(JSON.stringify({ error: e.message }));
+            } finally {
+                await prisma.$disconnect();
+            }
+        }
+        run();
+        `;
+        const output = execSync(`docker exec api-${slug} node -e "${script.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`, {
+            encoding: 'utf-8',
+            timeout: 15000,
+        });
+        const match = output.match(/\{"token".*\}/);
+        if (match) {
+            return JSON.parse(match[0]);
+        }
+        return null;
+    } catch (err) {
+        console.warn(`[provisioner] Error generando sesión de soporte para ${slug}:`, err);
+        return null;
+    }
+}
+
+export interface BackupItem {
+    filename: string;
+    sizeBytes: number;
+    createdAt: string;
+}
+
+/**
+ * Crea un backup on-demand de la base de datos de un tenant con estricta sanitización de inputs
+ */
+export async function backupTenantDatabase(slug: string): Promise<BackupItem> {
+    const SAFE_IDENTIFIER = /^[a-zA-Z0-9_-]+$/;
+    if (!SAFE_IDENTIFIER.test(slug)) {
+        throw new Error('Identificador de tenant no válido');
+    }
+
+    const { execSync } = await import('child_process');
+    const clientsDir = path.join(DEPLOY_DIR, 'clients');
+    const backupsDir = path.join(DEPLOY_DIR, 'backups');
+    const clientDir = path.join(clientsDir, slug);
+    const envFile = path.join(clientDir, '.env');
+
+    let dbUser = 'postgres';
+    let dbName = slug;
+
+    try {
+        const envContent = await fs.readFile(envFile, 'utf-8');
+        const envVars = parseEnvFile(envContent);
+        if (envVars.DB_USER && SAFE_IDENTIFIER.test(envVars.DB_USER)) dbUser = envVars.DB_USER;
+        if (envVars.DB_NAME && SAFE_IDENTIFIER.test(envVars.DB_NAME)) dbName = envVars.DB_NAME;
+    } catch (e) {
+        console.warn(`[provisioner] No se pudo leer .env para backup de ${slug}, usando defaults:`, e);
+    }
+
+    const outDir = path.join(backupsDir, slug);
+    await fs.mkdir(outDir, { recursive: true });
+
+    const now = new Date();
+    const stamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = `${stamp}.sql.gz`;
+    const outFile = path.join(outDir, filename);
+
+    const cmd = `docker exec db-${slug} pg_dump -U "${dbUser}" "${dbName}" | gzip -c > "${outFile}"`;
+    console.log(`[provisioner] Ejecutando backup: ${cmd}`);
+    execSync(cmd, { encoding: 'utf-8', timeout: 120000 });
+
+    const stats = await fs.stat(outFile);
+    return {
+        filename,
+        sizeBytes: stats.size,
+        createdAt: now.toISOString(),
+    };
+}
+
+/**
+ * Lista los backups disponibles para un tenant (máximo 50 más recientes)
+ */
+export async function listTenantBackups(slug: string): Promise<BackupItem[]> {
+    const SAFE_IDENTIFIER = /^[a-zA-Z0-9_-]+$/;
+    if (!SAFE_IDENTIFIER.test(slug)) return [];
+
+    const backupsDir = path.join(DEPLOY_DIR, 'backups', slug);
+    try {
+        const files = await fs.readdir(backupsDir);
+        const backups: BackupItem[] = [];
+
+        for (const file of files) {
+            if (!file.endsWith('.sql.gz')) continue;
+            const fullPath = path.join(backupsDir, file);
+            const stats = await fs.stat(fullPath);
+            backups.push({
+                filename: file,
+                sizeBytes: stats.size,
+                createdAt: stats.mtime.toISOString(),
+            });
+        }
+
+        return backups
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 50);
+    } catch {
+        return [];
+    }
+}
+
+

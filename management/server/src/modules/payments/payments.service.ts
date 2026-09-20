@@ -2,13 +2,15 @@ import crypto from 'crypto';
 import { prisma } from '../../config/prisma';
 import { Prisma, PaymentStatus } from '@prisma/client';
 import { createAuditEntry } from '../audit/audit.service';
-import { resumeTenant } from '../../services/provisioner';
+import { resumeTenant, syncTenantPlan } from '../../services/provisioner';
 
 export interface CreatePaymentInput {
     tenantId: string;
     amountCents: number;
     currency?: string;
     provider?: string;
+    billingCycle?: string;
+    periodMonths?: number;
     externalId?: string;
     notes?: string;
     status?: PaymentStatus;
@@ -18,8 +20,20 @@ export interface CreatePaymentInput {
 // Metodos de pago permitidos
 export const PAYMENT_PROVIDERS = ['zelle', 'pago_movil', 'binance', 'cash', 'other'] as const;
 
-// Periodo del plan en dias: se usa para calcular el proximo vencimiento
-const PLAN_PERIOD_DAYS = 30;
+export function getPeriodDays(billingCycle?: string | null, periodMonths?: number | null): number {
+    if (billingCycle === 'ANNUAL' || periodMonths === 12) {
+        return 365;
+    }
+    if (periodMonths && periodMonths > 0) {
+        return periodMonths * 30;
+    }
+    return 30;
+}
+
+export function calculateNextDue(currentDue: Date | null | undefined, paidAt: Date, daysToAdd: number): Date {
+    const baseDate = (currentDue && new Date(currentDue) > paidAt) ? new Date(currentDue) : paidAt;
+    return addDays(baseDate, daysToAdd);
+}
 
 // Longitud del sufijo aleatorio del paymentCode (caracteres A-Z2-7 de base32)
 const PAYMENT_CODE_LENGTH = 6;
@@ -148,6 +162,14 @@ export async function createPayment(input: CreatePaymentInput, actor: string) {
     const paidAt = isPaid ? new Date() : null;
     const dueDate = input.dueDate ? new Date(input.dueDate) : null;
 
+    const cycle = (input.billingCycle === 'ANNUAL' || input.billingCycle === 'annual')
+        ? 'ANNUAL'
+        : (input.billingCycle === 'MONTHLY' || input.billingCycle === 'monthly')
+            ? 'MONTHLY'
+            : (tenant.billingCycle || 'MONTHLY');
+    const periodMonths = input.periodMonths || (cycle === 'ANNUAL' ? 12 : 1);
+    const periodDays = getPeriodDays(cycle, periodMonths);
+
     // Crear pago con reintento ante colision de paymentCode (unique)
     let payment: Awaited<ReturnType<typeof getPaymentById>> | null = null;
     for (let attempt = 0; attempt < 5 && !payment; attempt++) {
@@ -160,6 +182,8 @@ export async function createPayment(input: CreatePaymentInput, actor: string) {
                     currency: input.currency || 'USD',
                     status: input.status ?? 'PENDING',
                     provider,
+                    billingCycle: cycle,
+                    periodMonths,
                     externalId: input.externalId,
                     paymentCode,
                     notes: input.notes,
@@ -180,17 +204,18 @@ export async function createPayment(input: CreatePaymentInput, actor: string) {
         throw new PaymentError('No se pudo registrar el pago', 'CODE_GENERATION');
     }
 
-    // Desnormalizar campos del tenant para listados rapidos
+    // Desnormalizar campos del tenant para listados rapidos y extender periodo
+    const calculatedDue = isPaid
+        ? calculateNextDue(tenant.nextPaymentDue, paidAt as Date, periodDays)
+        : (dueDate ?? calculateNextDue(tenant.nextPaymentDue, new Date(), periodDays));
+
     await prisma.tenant.update({
         where: { id: tenant.id },
-        data: isPaid
-            ? {
-                lastPaymentAt: paidAt,
-                nextPaymentDue: addDays(paidAt as Date, PLAN_PERIOD_DAYS),
-            }
-            : {
-                nextPaymentDue: dueDate ?? addDays(new Date(), PLAN_PERIOD_DAYS),
-            },
+        data: {
+            billingCycle: cycle,
+            ...(isPaid ? { lastPaymentAt: paidAt } : {}),
+            nextPaymentDue: calculatedDue,
+        },
     });
 
     // Audit log: referencia truncada, nunca completa
@@ -205,12 +230,14 @@ export async function createPayment(input: CreatePaymentInput, actor: string) {
             currency: payment.currency,
             status: payment.status,
             provider,
+            billingCycle: cycle,
+            periodMonths,
             ref: truncateRef(input.externalId),
         },
     });
 
     console.log(
-        `[payments] Pago ${payment.paymentCode} registrado (${payment.amountCents} ${payment.currency}) ` +
+        `[payments] Pago ${payment.paymentCode} registrado (${payment.amountCents} ${payment.currency}, ${cycle}) ` +
         `tenant=${tenant.slug} provider=${provider} ref:${truncateRef(input.externalId) ?? 'n/a'}`
     );
 
@@ -224,7 +251,7 @@ export async function createPayment(input: CreatePaymentInput, actor: string) {
 export async function confirmPayment(id: string, actor: string) {
     const existing = await prisma.payment.findUnique({
         where: { id },
-        include: { tenant: { select: { id: true, slug: true, status: true } } },
+        include: { tenant: { select: { id: true, slug: true, plan: true, billingCycle: true, status: true, nextPaymentDue: true } } },
     });
     if (!existing) {
         throw new PaymentError('Pago no encontrado', 'NOT_FOUND');
@@ -243,18 +270,31 @@ export async function confirmPayment(id: string, actor: string) {
         include: { tenant: { select: { slug: true, domain: true } } },
     });
 
+    const cycle = payment.billingCycle || existing.tenant.billingCycle || 'MONTHLY';
+    const periodMonths = payment.periodMonths || (cycle === 'ANNUAL' ? 12 : 1);
+    const periodDays = getPeriodDays(cycle, periodMonths);
+    const nextDue = calculateNextDue(existing.tenant.nextPaymentDue, paidAt, periodDays);
+
     // Desnormalizar campos del tenant
     await prisma.tenant.update({
         where: { id: existing.tenantId },
         data: {
             lastPaymentAt: paidAt,
-            nextPaymentDue: addDays(paidAt, PLAN_PERIOD_DAYS),
+            nextPaymentDue: nextDue,
+            billingCycle: cycle,
         },
     });
 
     // Si estaba suspendido por pagos, reactivar servicio completo (contenedores + status)
     if (existing.tenant.status === 'SUSPENDED') {
         await resumeTenant(existing.tenant.slug);
+    }
+
+    // Sincronizar en caliente el plan en la BD del tenant
+    try {
+        await syncTenantPlan(existing.tenant.slug, existing.tenant.plan);
+    } catch (e) {
+        console.warn(`[payments] No se pudo sincronizar plan tras pago:`, e);
     }
 
     await createAuditEntry({

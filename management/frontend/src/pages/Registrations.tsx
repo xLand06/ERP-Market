@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiFetch } from '../api';
 
 /* ── Tipos ────────────────────────────────────────────────────────────────── */
 
@@ -56,24 +57,17 @@ export default function Registrations() {
         setTimeout(() => setToast(null), 4000);
     };
 
-    const token = localStorage.getItem('mgmt_token');
-
     // Cargar solicitudes
     const fetchRegistrations = useCallback(async () => {
-        if (!token) return;
         try {
-            const res = await fetch('/api/trials', {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!res.ok) throw new Error('Error al cargar solicitudes');
-            const data = await res.json();
-            setRegistrations(data);
+            const data = await apiFetch<TrialRegistration[]>('/api/trials');
+            setRegistrations(Array.isArray(data) ? data : []);
         } catch (err: any) {
             setError(err.message);
         } finally {
             setLoading(false);
         }
-    }, [token]);
+    }, []);
 
     useEffect(() => {
         fetchRegistrations();
@@ -100,27 +94,20 @@ export default function Registrations() {
     // Ejecutar aprobación y creación de tenant
     const handleConfirmApprove = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedReg || !token) return;
+        if (!selectedReg) return;
 
         setIsApproving(true);
         setModalError(null);
 
         try {
-            const res = await fetch(`/api/trials/${selectedReg.id}/approve`, {
+            const data = await apiFetch<any>(`/api/trials/${selectedReg.id}/approve`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
+                body: {
                     slug: modalSlug.trim().toLowerCase(),
                     plan: modalPlan,
                     adminPassword: modalPassword,
-                }),
+                },
             });
-
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Error al dar de alta el tenant');
 
             const finalSlug = data.tenant?.slug || modalSlug;
             showToast(`✅ Tenant '${finalSlug}' dado de alta.`);
@@ -167,13 +154,11 @@ export default function Registrations() {
 
     // Descartar solicitud
     const handleReject = async (id: string) => {
-        if (!token || !window.confirm('¿Seguro que querés descartar esta solicitud?')) return;
+        if (!window.confirm('¿Seguro que querés descartar esta solicitud?')) return;
         try {
-            const res = await fetch(`/api/trials/${id}/reject`, {
+            await apiFetch(`/api/trials/${id}/reject`, {
                 method: 'PATCH',
-                headers: { Authorization: `Bearer ${token}` },
             });
-            if (!res.ok) throw new Error('Error al descartar');
             showToast('Solicitud marcada como descartada');
             fetchRegistrations();
         } catch (err: any) {

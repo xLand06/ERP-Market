@@ -35,6 +35,65 @@ function tenantAuth(req: Request, res: Response, next: Function) {
 
 router.use(tenantAuth);
 
+export interface PlanDefinition {
+    id: string;
+    name: string;
+    monthlyPriceCents: number;
+    annualPriceCents: number;
+    currency: string;
+    maxUsers: number;
+    maxBranches: number;
+    maxProducts: number;
+    features: string[];
+}
+
+export const CANONICAL_PLANS: Record<string, PlanDefinition> = {
+    free: {
+        id: 'free',
+        name: 'Free / Trial',
+        monthlyPriceCents: 0,
+        annualPriceCents: 0,
+        currency: 'USD',
+        maxUsers: 2,
+        maxBranches: 1,
+        maxProducts: 250,
+        features: ['Hasta 2 usuarios', '1 sucursal / caja', 'Hasta 250 productos', 'Prueba de 14 días'],
+    },
+    basic: {
+        id: 'basic',
+        name: 'Básico',
+        monthlyPriceCents: 1000,
+        annualPriceCents: 10000, // $100/año (Ahorro $20)
+        currency: 'USD',
+        maxUsers: 2,
+        maxBranches: 1,
+        maxProducts: 500,
+        features: ['Hasta 2 usuarios cajeros', '1 sucursal / caja principal', 'Hasta 500 productos', 'Punto de venta e inventario', 'Flujo de caja y arqueos', 'Desktop App Offline incluida'],
+    },
+    pro: {
+        id: 'pro',
+        name: 'Pro',
+        monthlyPriceCents: 2000,
+        annualPriceCents: 20000, // $200/año (Ahorro $40)
+        currency: 'USD',
+        maxUsers: 6,
+        maxBranches: 2,
+        maxProducts: 99999,
+        features: ['Hasta 6 usuarios activos', 'Hasta 2 sucursales', 'Productos ilimitados', 'Clientes y Fiados (crédito)', 'Compras a Proveedores', 'Toma de inventario física por lotes', 'Desktop App Offline incluida'],
+    },
+    premium: {
+        id: 'premium',
+        name: 'Premium',
+        monthlyPriceCents: 3000,
+        annualPriceCents: 30000, // $300/año (Ahorro $60)
+        currency: 'USD',
+        maxUsers: 999,
+        maxBranches: 5,
+        maxProducts: 99999,
+        features: ['Usuarios ilimitados', 'Hasta 5 sucursales centralizadas', 'Productos ilimitados', 'Catálogo Digital en Línea público', 'Módulo de Bancos y Conciliación', 'Cotizaciones y presupuestos', 'Soporte prioritario 24/7', 'Desktop App Offline incluida'],
+    },
+};
+
 /**
  * GET /api/billing/:slug/status
  * Retorna el estado de facturación del tenant
@@ -49,9 +108,15 @@ router.get('/:slug/status', async (req: Request, res: Response) => {
                 id: true,
                 slug: true,
                 plan: true,
+                billingCycle: true,
                 status: true,
+                subscriptionStartedAt: true,
                 lastPaymentAt: true,
                 nextPaymentDue: true,
+                discountPercent: true,
+                customPriceCents: true,
+                systemNotice: true,
+                noticeLevel: true,
             },
         });
 
@@ -75,15 +140,19 @@ router.get('/:slug/status', async (req: Request, res: Response) => {
             else paymentStatus = 'overdue';
         }
 
-        // Planes y precios ($10 Básico, $20 Pro, $30 Premium)
-        const plans: Record<string, { name: string; priceCents: number; currency: string }> = {
-            free: { name: 'Free', priceCents: 0, currency: 'USD' },
-            basic: { name: 'Básico', priceCents: 1000, currency: 'USD' },
-            pro: { name: 'Pro', priceCents: 2000, currency: 'USD' },
-            premium: { name: 'Premium', priceCents: 3000, currency: 'USD' },
-        };
+        const planKey = (tenant.plan || 'free').toLowerCase();
+        const normalizedKey = planKey === 'basico' ? 'basic' : planKey;
+        const plan = CANONICAL_PLANS[normalizedKey] || CANONICAL_PLANS.free;
+        const currentCycle = tenant.billingCycle === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY';
+        
+        // Calcular precio considerando customPriceCents o discountPercent
+        const baseMonthlyCents = tenant.customPriceCents ?? plan.monthlyPriceCents;
+        const baseAnnualCents = tenant.customPriceCents ? (tenant.customPriceCents * 10) : plan.annualPriceCents;
+        const discountFactor = tenant.discountPercent > 0 ? (1 - tenant.discountPercent / 100) : 1;
 
-        const plan = plans[tenant.plan] || plans.free;
+        const effectiveMonthlyCents = Math.round(baseMonthlyCents * discountFactor);
+        const effectiveAnnualCents = Math.round(baseAnnualCents * discountFactor);
+        const expectedPriceCents = currentCycle === 'ANNUAL' ? effectiveAnnualCents : effectiveMonthlyCents;
 
         // Verificar si tiene un pago pendiente
         const pendingPayment = await prisma.payment.findFirst({
@@ -93,6 +162,8 @@ router.get('/:slug/status', async (req: Request, res: Response) => {
                 id: true,
                 paymentCode: true,
                 amountCents: true,
+                billingCycle: true,
+                periodMonths: true,
                 provider: true,
                 createdAt: true,
             },
@@ -109,6 +180,8 @@ router.get('/:slug/status', async (req: Request, res: Response) => {
                 currency: true,
                 status: true,
                 provider: true,
+                billingCycle: true,
+                periodMonths: true,
                 paymentCode: true,
                 createdAt: true,
                 paidAt: true,
@@ -121,12 +194,36 @@ router.get('/:slug/status', async (req: Request, res: Response) => {
             tenant: {
                 slug: tenant.slug,
                 plan: tenant.plan,
+                billingCycle: currentCycle,
                 status: tenant.status,
+                discountPercent: tenant.discountPercent,
+                customPriceCents: tenant.customPriceCents,
+                systemNotice: tenant.systemNotice,
+                noticeLevel: tenant.noticeLevel,
             },
             subscription: {
-                plan: plan,
+                plan: {
+                    name: plan.name,
+                    priceCents: expectedPriceCents,
+                    monthlyPriceCents: effectiveMonthlyCents,
+                    annualPriceCents: effectiveAnnualCents,
+                    originalMonthlyPriceCents: plan.monthlyPriceCents,
+                    originalAnnualPriceCents: plan.annualPriceCents,
+                    currency: plan.currency,
+                    maxUsers: plan.maxUsers,
+                    maxBranches: plan.maxBranches,
+                    maxProducts: plan.maxProducts,
+                    features: plan.features,
+                },
+                discountPercent: tenant.discountPercent,
+                customPriceCents: tenant.customPriceCents,
+                systemNotice: tenant.systemNotice,
+                noticeLevel: tenant.noticeLevel,
+                billingCycle: currentCycle,
+                availablePlans: CANONICAL_PLANS,
                 paymentStatus,
                 daysUntilDue,
+                subscriptionStartedAt: tenant.subscriptionStartedAt,
                 lastPaymentAt: tenant.lastPaymentAt,
                 nextPaymentDue: tenant.nextPaymentDue,
                 canPay,
@@ -135,6 +232,8 @@ router.get('/:slug/status', async (req: Request, res: Response) => {
                     id: pendingPayment.id,
                     paymentCode: pendingPayment.paymentCode,
                     amount: pendingPayment.amountCents / 100,
+                    billingCycle: pendingPayment.billingCycle || currentCycle,
+                    periodMonths: pendingPayment.periodMonths || (currentCycle === 'ANNUAL' ? 12 : 1),
                     provider: pendingPayment.provider,
                     createdAt: pendingPayment.createdAt,
                 } : null,
@@ -145,6 +244,8 @@ router.get('/:slug/status', async (req: Request, res: Response) => {
                 currency: p.currency,
                 status: p.status,
                 provider: p.provider,
+                billingCycle: p.billingCycle || 'MONTHLY',
+                periodMonths: p.periodMonths || 1,
                 paymentCode: p.paymentCode,
                 createdAt: p.createdAt,
                 paidAt: p.paidAt,
@@ -164,7 +265,7 @@ router.get('/:slug/status', async (req: Request, res: Response) => {
 router.post('/:slug/pay', async (req: Request, res: Response) => {
     try {
         const { slug } = req.params;
-        const { amount, provider, reference, notes } = req.body;
+        const { amount, provider, reference, notes, billingCycle } = req.body;
 
         // Validaciones
         if (!amount || typeof amount !== 'number' || amount <= 0) {
@@ -181,7 +282,7 @@ router.post('/:slug/pay', async (req: Request, res: Response) => {
         // Buscar tenant
         const tenant = await prisma.tenant.findUnique({
             where: { slug },
-            select: { id: true, slug: true, plan: true, nextPaymentDue: true },
+            select: { id: true, slug: true, plan: true, billingCycle: true, nextPaymentDue: true },
         });
 
         if (!tenant) {
@@ -245,6 +346,13 @@ router.post('/:slug/pay', async (req: Request, res: Response) => {
             return;
         }
 
+        const cycle = (billingCycle === 'ANNUAL' || billingCycle === 'annual')
+            ? 'ANNUAL'
+            : (billingCycle === 'MONTHLY' || billingCycle === 'monthly')
+                ? 'MONTHLY'
+                : (tenant.billingCycle || 'MONTHLY');
+        const periodMonths = cycle === 'ANNUAL' ? 12 : 1;
+
         // Crear pago como PENDING (el admin lo confirma)
         const amountCents = Math.round(amount * 100);
         const payment = await prisma.payment.create({
@@ -254,6 +362,8 @@ router.post('/:slug/pay', async (req: Request, res: Response) => {
                 currency: 'USD',
                 status: 'PENDING',
                 provider: provider || 'other',
+                billingCycle: cycle,
+                periodMonths,
                 externalId: reference || null,
                 paymentCode,
                 notes: notes || null,

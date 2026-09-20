@@ -13,12 +13,46 @@ import {
     ShieldCheck, ArrowRight, Sparkles, Info
 } from 'lucide-react';
 
+interface PlanLimits {
+    maxUsers: number;
+    maxBranches: number;
+    maxProducts: number;
+}
+
 interface BillingStatus {
-    tenant: { slug: string; plan: string; status: string };
+    tenant: {
+        slug: string;
+        plan: string;
+        billingCycle?: 'MONTHLY' | 'ANNUAL';
+        status: string;
+        discountPercent?: number;
+        customPriceCents?: number | null;
+        systemNotice?: string | null;
+        noticeLevel?: 'INFO' | 'WARNING' | 'DANGER';
+    };
     subscription: {
-        plan: { name: string; priceCents: number; currency: string };
+        plan: {
+            name: string;
+            priceCents: number;
+            monthlyPriceCents?: number;
+            annualPriceCents?: number;
+            originalMonthlyPriceCents?: number;
+            originalAnnualPriceCents?: number;
+            currency: string;
+            maxUsers?: number;
+            maxBranches?: number;
+            maxProducts?: number;
+            features?: string[];
+        };
+        discountPercent?: number;
+        customPriceCents?: number | null;
+        systemNotice?: string | null;
+        noticeLevel?: 'INFO' | 'WARNING' | 'DANGER';
+        billingCycle?: 'MONTHLY' | 'ANNUAL';
+        availablePlans?: Record<string, any>;
         paymentStatus: 'current' | 'due_soon' | 'overdue' | 'unknown';
         daysUntilDue: number | null;
+        subscriptionStartedAt?: string | null;
         lastPaymentAt: string | null;
         nextPaymentDue: string | null;
         canPay?: boolean;
@@ -27,6 +61,8 @@ interface BillingStatus {
             id: string;
             paymentCode: string;
             amount: number;
+            billingCycle?: 'MONTHLY' | 'ANNUAL';
+            periodMonths?: number;
             provider: string;
             createdAt: string;
         } | null;
@@ -37,6 +73,8 @@ interface BillingStatus {
         currency: string;
         status: string;
         provider: string | null;
+        billingCycle?: string | null;
+        periodMonths?: number | null;
         paymentCode: string | null;
         createdAt: string;
         paidAt: string | null;
@@ -62,6 +100,7 @@ export function BillingSettings() {
     const queryClient = useQueryClient();
     const [amount, setAmount] = useState('');
     const [provider, setProvider] = useState('zelle');
+    const [selectedCycle, setSelectedCycle] = useState<'MONTHLY' | 'ANNUAL'>('MONTHLY');
     const [reference, setReference] = useState('');
     const [notes, setNotes] = useState('');
 
@@ -77,7 +116,7 @@ export function BillingSettings() {
 
     // Register payment mutation
     const payMutation = useMutation({
-        mutationFn: async (data: { amount: number; provider: string; reference?: string; notes?: string }) => {
+        mutationFn: async (data: { amount: number; provider: string; billingCycle: 'MONTHLY' | 'ANNUAL'; periodMonths: number; reference?: string; notes?: string }) => {
             const res = await api.post('/billing/pay', data);
             return res.data;
         },
@@ -102,6 +141,8 @@ export function BillingSettings() {
         payMutation.mutate({
             amount: amountNum,
             provider,
+            billingCycle: selectedCycle,
+            periodMonths: selectedCycle === 'ANNUAL' ? 12 : 1,
             reference: reference.trim() || undefined,
             notes: notes.trim() || undefined,
         });
@@ -135,6 +176,10 @@ export function BillingSettings() {
 
     const { subscription, recentPayments } = billing;
     const price = (subscription.plan.priceCents / 100).toFixed(2);
+    const originalPriceCents = subscription.billingCycle === 'ANNUAL'
+        ? subscription.plan.originalAnnualPriceCents
+        : subscription.plan.originalMonthlyPriceCents;
+    const originalPrice = originalPriceCents ? (originalPriceCents / 100).toFixed(2) : null;
     const isCurrent = subscription.paymentStatus === 'current';
     const pendingPaymentItem = subscription.pendingPayment || recentPayments.find(p => p.status === 'PENDING') || null;
     const hasPending = Boolean(subscription.hasPendingPayment || pendingPaymentItem);
@@ -150,14 +195,61 @@ export function BillingSettings() {
                 <p className="text-xs text-slate-400 mt-1">Gestiona tu plan y pagos de ALL MARKET</p>
             </div>
 
+            {/* System / Admin Notice Banner */}
+            {subscription.systemNotice && (
+                <div className={`p-4 rounded-xl border flex items-start gap-3 shadow-sm ${
+                    subscription.noticeLevel === 'DANGER'
+                        ? 'bg-red-500/10 border-red-500/30 text-red-800 dark:text-red-300'
+                        : subscription.noticeLevel === 'WARNING'
+                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300'
+                        : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-800 dark:text-indigo-300'
+                }`}>
+                    {subscription.noticeLevel === 'DANGER' ? (
+                        <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                    ) : subscription.noticeLevel === 'WARNING' ? (
+                        <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                    ) : (
+                        <Info className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                        <p className="text-xs font-bold uppercase tracking-wider">
+                            {subscription.noticeLevel === 'DANGER'
+                                ? 'Aviso Urgente del Administrador'
+                                : subscription.noticeLevel === 'WARNING'
+                                ? 'Aviso Importante'
+                                : 'Aviso del Sistema'}
+                        </p>
+                        <p className="text-sm font-medium mt-0.5 whitespace-pre-line leading-relaxed">
+                            {subscription.systemNotice}
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* Plan Card — Dark gradient */}
             <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white rounded-2xl p-6 space-y-5 shadow-xl">
-                <div className="flex items-start justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                     <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Plan Actual</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Plan Actual</p>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                {subscription.billingCycle === 'ANNUAL' ? 'Facturación Anual' : 'Facturación Mensual'}
+                            </span>
+                            {subscription.discountPercent && subscription.discountPercent > 0 ? (
+                                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 flex items-center gap-1 shadow-sm">
+                                    <Sparkles className="w-3 h-3" />
+                                    {subscription.discountPercent}% OFF ESPECIAL
+                                </span>
+                            ) : null}
+                            {subscription.customPriceCents !== undefined && subscription.customPriceCents !== null ? (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                    Tarifa Personalizada
+                                </span>
+                            ) : null}
+                        </div>
                         <p className="text-3xl font-black mt-1 tracking-tight">{subscription.plan.name}</p>
                     </div>
-                    <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 ${
+                    <div className={`self-start px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 ${
                         subscription.paymentStatus === 'current' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
                         subscription.paymentStatus === 'due_soon' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
                         subscription.paymentStatus === 'overdue' ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
@@ -166,25 +258,61 @@ export function BillingSettings() {
                         {subscription.paymentStatus === 'current' && <CheckCircle2 className="w-3.5 h-3.5" />}
                         {subscription.paymentStatus === 'due_soon' && <Clock className="w-3.5 h-3.5" />}
                         {subscription.paymentStatus === 'overdue' && <AlertTriangle className="w-3.5 h-3.5" />}
-                        {subscription.paymentStatus === 'current' && 'Al dia'}
-                        {subscription.paymentStatus === 'due_soon' && `Vence en ${subscription.daysUntilDue} dias`}
+                        {subscription.paymentStatus === 'current' && 'Al día'}
+                        {subscription.paymentStatus === 'due_soon' && `Vence en ${subscription.daysUntilDue} días`}
                         {subscription.paymentStatus === 'overdue' && 'Vencido'}
                         {subscription.paymentStatus === 'unknown' && 'Sin datos'}
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Precio mensual</p>
-                        <p className="text-2xl font-black text-emerald-400">${price} <span className="text-sm font-medium text-slate-400">USD</span></p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                            {subscription.billingCycle === 'ANNUAL' ? 'Costo Anual' : 'Costo Mensual'}
+                        </p>
+                        <div className="flex items-baseline gap-2">
+                            <p className="text-2xl font-black text-emerald-400">
+                                ${price} <span className="text-sm font-medium text-slate-400">USD</span>
+                            </p>
+                            {originalPrice && Number(originalPrice) > Number(price) && (
+                                <span className="text-sm font-semibold line-through text-slate-400">
+                                    ${originalPrice} USD
+                                </span>
+                            )}
+                        </div>
+                        {subscription.customPriceCents !== undefined && subscription.customPriceCents !== null && (
+                            <p className="text-[10px] text-indigo-300 mt-1">Precio fijado por administración</p>
+                        )}
                     </div>
                     <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Proximo vencimiento</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Próximo vencimiento</p>
                         <p className="text-lg font-black">
                             {subscription.nextPaymentDue
                                 ? new Date(subscription.nextPaymentDue).toLocaleDateString('es-VE', { day: 'numeric', month: 'short', year: 'numeric' })
                                 : 'Sin fecha'}
                         </p>
+                    </div>
+                </div>
+
+                {/* Plan limits showcase */}
+                <div className="pt-2 border-t border-white/10 grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-white/5 rounded-lg p-2.5">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Usuarios</span>
+                        <span className="text-sm font-black text-slate-100">
+                            {subscription.plan.maxUsers && subscription.plan.maxUsers >= 900 ? 'Ilimitados' : `${subscription.plan.maxUsers || 2} máx`}
+                        </span>
+                    </div>
+                    <div className="bg-white/5 rounded-lg p-2.5">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Sucursales</span>
+                        <span className="text-sm font-black text-slate-100">
+                            {subscription.plan.maxBranches || 1} {Number(subscription.plan.maxBranches) === 1 ? 'sucursal' : 'sucursales'}
+                        </span>
+                    </div>
+                    <div className="bg-white/5 rounded-lg p-2.5">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Productos</span>
+                        <span className="text-sm font-black text-slate-100">
+                            {subscription.plan.maxProducts && subscription.plan.maxProducts >= 90000 ? 'Ilimitados' : `${subscription.plan.maxProducts || 500} máx`}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -199,10 +327,10 @@ export function BillingSettings() {
                             </div>
                             <div className="space-y-1">
                                 <h4 className="text-sm font-bold text-amber-900">
-                                    Pago en Proceso de Verificacion
+                                    Pago en Proceso de Verificación
                                 </h4>
                                 <p className="text-xs text-amber-700 leading-relaxed">
-                                    Tenes un reporte de pago registrado que esta siendo revisado por el equipo de administracion. Mientras se procesa la confirmacion, no es necesario registrar otro pago.
+                                    Tenés un reporte de pago registrado que está siendo revisado por el equipo de administración. Mientras se procesa la confirmación, no es necesario registrar otro pago.
                                 </p>
                             </div>
                         </div>
@@ -232,16 +360,16 @@ export function BillingSettings() {
                             </div>
                             <div className="space-y-1">
                                 <h4 className="text-sm font-bold text-emerald-900">
-                                    Tu suscripcion esta al dia
+                                    Tu suscripción está al día
                                 </h4>
                                 <p className="text-xs text-emerald-700 leading-relaxed">
-                                    No presentas deudas pendientes. El proximo ciclo vence el{' '}
+                                    No presentás deudas pendientes. El próximo ciclo vence el{' '}
                                     <strong className="font-semibold">
                                         {subscription.nextPaymentDue
                                             ? new Date(subscription.nextPaymentDue).toLocaleDateString('es-VE', { day: 'numeric', month: 'long', year: 'numeric' })
-                                            : 'proximo ciclo'}
+                                            : 'próximo ciclo'}
                                     </strong>
-                                    {subscription.daysUntilDue !== null && ` (en ${subscription.daysUntilDue} dias)`}. Podras registrar tu siguiente pago a partir de los 7 dias previos a la fecha de corte.
+                                    {subscription.daysUntilDue !== null && ` (en ${subscription.daysUntilDue} días)`}. Podrás registrar tu siguiente pago a partir de los 7 días previos a la fecha de corte.
                                 </p>
                             </div>
                         </div>
@@ -256,10 +384,76 @@ export function BillingSettings() {
                         Registrar Pago
                     </h4>
 
+                    {/* Cycle Selector */}
+                    <div>
+                        <label className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 block">
+                            Periodo a Renovar *
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSelectedCycle('MONTHLY');
+                                    const mPrice = subscription.plan.monthlyPriceCents
+                                        ? (subscription.plan.monthlyPriceCents / 100).toFixed(2)
+                                        : '10.00';
+                                    setAmount(mPrice);
+                                }}
+                                className={`p-3.5 rounded-xl border-2 text-left transition-all ${
+                                    selectedCycle === 'MONTHLY'
+                                        ? 'border-indigo-600 bg-indigo-50/50 shadow-sm'
+                                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                                }`}
+                            >
+                                <span className="block text-xs font-bold text-slate-900">Mensual (30 días)</span>
+                                <div className="flex items-baseline gap-1.5 mt-0.5">
+                                    <span className="text-lg font-black text-indigo-700">
+                                        ${subscription.plan.monthlyPriceCents ? (subscription.plan.monthlyPriceCents / 100).toFixed(2) : price} USD
+                                    </span>
+                                    {subscription.plan.originalMonthlyPriceCents && subscription.plan.monthlyPriceCents && subscription.plan.originalMonthlyPriceCents > subscription.plan.monthlyPriceCents && (
+                                        <span className="text-xs line-through text-slate-400 font-semibold">
+                                            ${(subscription.plan.originalMonthlyPriceCents / 100).toFixed(2)}
+                                        </span>
+                                    )}
+                                </div>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSelectedCycle('ANNUAL');
+                                    const aPrice = subscription.plan.annualPriceCents
+                                        ? (subscription.plan.annualPriceCents / 100).toFixed(2)
+                                        : '100.00';
+                                    setAmount(aPrice);
+                                }}
+                                className={`p-3.5 rounded-xl border-2 text-left transition-all relative ${
+                                    selectedCycle === 'ANNUAL'
+                                        ? 'border-indigo-600 bg-indigo-50/50 shadow-sm'
+                                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                                }`}
+                            >
+                                <span className="absolute -top-2 right-2 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                                    Ahorrá 2 meses
+                                </span>
+                                <span className="block text-xs font-bold text-slate-900">Anual (365 días)</span>
+                                <div className="flex items-baseline gap-1.5 mt-0.5">
+                                    <span className="text-lg font-black text-indigo-700">
+                                        ${subscription.plan.annualPriceCents ? (subscription.plan.annualPriceCents / 100).toFixed(2) : (parseFloat(price) * 10).toFixed(2)} USD
+                                    </span>
+                                    {subscription.plan.originalAnnualPriceCents && subscription.plan.annualPriceCents && subscription.plan.originalAnnualPriceCents > subscription.plan.annualPriceCents && (
+                                        <span className="text-xs line-through text-slate-400 font-semibold">
+                                            ${(subscription.plan.originalAnnualPriceCents / 100).toFixed(2)}
+                                        </span>
+                                    )}
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
                     {/* Payment method grid */}
                     <div>
                         <label className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 block">
-                            Metodo de Pago *
+                            Método de Pago *
                         </label>
                         <div className="grid grid-cols-5 gap-2">
                             {PAYMENT_METHODS.map(m => (

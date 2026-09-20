@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import HealthBadge from '../components/HealthBadge';
+import { apiFetch } from '../api';
 
 /* ── Estilos globales inyectados una sola vez ─────────────────────────────── */
 
@@ -314,13 +315,10 @@ export default function Tenants() {
     }, []);
 
     const fetchTenants = useCallback(() => {
-        const token = localStorage.getItem('mgmt_token');
-        const headers = { Authorization: `Bearer ${token}` };
-
         return Promise.all([
-            fetch('/api/tenants', { headers }).then((r) => r.json()),
-            fetch('/api/health/tenants', { headers }).then((r) => r.json()),
-            fetch('/api/vps/stats', { headers }).then((r) => r.json()),
+            apiFetch<Tenant[]>('/api/tenants'),
+            apiFetch<TenantHealth[]>('/api/health/tenants'),
+            apiFetch<VpsStats>('/api/vps/stats'),
         ])
             .then(([tenantsData, healthData, vpsData]) => {
                 setTenants(Array.isArray(tenantsData) ? tenantsData : []);
@@ -377,7 +375,6 @@ export default function Tenants() {
         setCreating(true);
 
         try {
-            const token = localStorage.getItem('mgmt_token');
             const body: Record<string, string> = {
                 slug: formSlug,
                 domain: formDomain,
@@ -388,60 +385,32 @@ export default function Tenants() {
             if (formPassword) body.adminPassword = formPassword;
             if (formPlan) body.plan = formPlan;
 
-            // POST no bloqueante: el provisioning corre en background y
-            // la respuesta llega inmediatamente con status PROVISIONING
-            const res = await fetch('/api/tenants', {
+            const data = await apiFetch<CreateTenantResponse>('/api/tenants', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify(body),
+                body,
             });
 
-            if (!res.ok) {
-                const data = await res.json();
-                setFormError(data.error || 'Error al crear tenant');
-                return;
-            }
-
-            const data: CreateTenantResponse = await res.json();
             addToast(`Tenant ${data.slug} creado — provisionando en background`, 'success');
             resetForm();
             setShowCreateModal(false);
             fetchTenants();
-        } catch {
-            setFormError('Error de conexion al crear tenant');
+        } catch (err) {
+            setFormError(err instanceof Error ? err.message : 'Error al crear tenant');
         } finally {
             setCreating(false);
         }
     }, [formSlug, formDomain, formEmail, formPassword, formPlan, formProduct, resetForm, fetchTenants, addToast]);
 
     const handleSuspend = useCallback(async (slug: string) => {
-        const token = localStorage.getItem('mgmt_token');
-        const res = await fetch(`/api/tenants/${slug}/suspend`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error('Error al suspender');
+        await apiFetch(`/api/tenants/${slug}/suspend`, { method: 'POST' });
     }, []);
 
     const handleResume = useCallback(async (slug: string) => {
-        const token = localStorage.getItem('mgmt_token');
-        const res = await fetch(`/api/tenants/${slug}/resume`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error('Error al reactivar');
+        await apiFetch(`/api/tenants/${slug}/resume`, { method: 'POST' });
     }, []);
 
     const handleDelete = useCallback(async (slug: string) => {
-        const token = localStorage.getItem('mgmt_token');
-        const res = await fetch(`/api/tenants/${slug}`, {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error('Error al eliminar');
+        await apiFetch(`/api/tenants/${slug}`, { method: 'DELETE' });
     }, []);
 
     const executeConfirmAction = useCallback(async () => {

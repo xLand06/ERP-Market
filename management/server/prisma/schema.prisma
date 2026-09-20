@@ -31,18 +31,27 @@ model Tenant {
     url           String
     status        TenantStatus @default(ACTIVE)
     plan          String       @default("free")
+    billingCycle  String       @default("MONTHLY")  // MONTHLY | ANNUAL
     product       String       @default("market")   // ALL MARKET, ALL REPAIR, ...
     adminEmail    String?
     adminPassword String?
     dbPassword    String?
     jwtSecret     String?
+    subscriptionStartedAt DateTime?
     lastPaymentAt DateTime?    // ultimo pago registrado (denormalizado para listados)
     nextPaymentDue DateTime?   // proximo vencimiento (denormalizado para listados)
+    discountPercent Int        @default(0)   // 0 a 100%
+    customPriceCents Int?                    // precio custom mensual si aplica
+    systemNotice   String?                   // aviso o comunicado broadcast/directo
+    noticeLevel    String      @default("INFO") // INFO | WARNING | DANGER
     createdAt     DateTime     @default(now())
     updatedAt     DateTime     @updatedAt
     payments      Payment[]
     healthChecks  HealthCheck[]
     auditLogs     AuditLog[]
+
+    @@index([status])
+    @@index([nextPaymentDue])
 }
 
 model Payment {
@@ -53,12 +62,18 @@ model Payment {
     currency    String        @default("USD")
     status      PaymentStatus @default(PENDING)
     provider    String?       // zelle | pago_movil | binance | cash | other
+    billingCycle String?      // MONTHLY | ANNUAL
+    periodMonths Int?         @default(1) // 1 mes o 12 meses
     externalId  String?       // referencia del pago (Zelle ref, TXID, etc.)
     paymentCode String?       @unique // codigo generado: ALLCODE-XXXX
     notes       String?
     dueDate     DateTime?     // vencimiento
     paidAt      DateTime?
     createdAt   DateTime      @default(now())
+
+    @@index([tenantId])
+    @@index([status])
+    @@index([createdAt])
 }
 
 model HealthCheck {
@@ -70,6 +85,9 @@ model HealthCheck {
     containerUp Boolean
     memoryMb    Int?
     checkedAt   DateTime @default(now())
+
+    @@index([tenantId])
+    @@index([checkedAt])
 }
 
 model AuditLog {
@@ -80,6 +98,10 @@ model AuditLog {
     tenant    Tenant?  @relation(fields: [tenantId], references: [id])
     details   Json?
     createdAt DateTime @default(now())
+
+    @@index([tenantId])
+    @@index([createdAt])
+    @@index([action])
 }
 
 enum RegistrationStatus {

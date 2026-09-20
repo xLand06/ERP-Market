@@ -115,3 +115,109 @@ export async function resumeHandler(req: Request, res: Response): Promise<void> 
         res.status(500).json({ error: 'Error al reactivar tenant' });
     }
 }
+
+/**
+ * POST /api/tenants/:slug/extend
+ * Extiende la suscripción sumando días al vencimiento
+ */
+export async function extendHandler(req: Request, res: Response): Promise<void> {
+    try {
+        const { days, reason } = req.body;
+        const actor = req.user?.username || 'admin';
+        const tenant = await tenantsService.extendSubscription(req.params.slug, days, reason, actor);
+        res.json(tenant);
+    } catch (error: any) {
+        res.status(400).json({ error: error.message || 'Error al extender suscripción' });
+    }
+}
+
+/**
+ * POST /api/tenants/:slug/set-subscription
+ * Establece fechas específicas de suscripción
+ */
+export async function setDatesHandler(req: Request, res: Response): Promise<void> {
+    try {
+        const { startedAt, nextPaymentDue, reason } = req.body;
+        const actor = req.user?.username || 'admin';
+        const tenant = await tenantsService.setSubscriptionDates(
+            req.params.slug,
+            { startedAt, nextPaymentDue, reason },
+            actor
+        );
+        res.json(tenant);
+    } catch (error: any) {
+        res.status(400).json({ error: error.message || 'Error al fijar fechas' });
+    }
+}
+
+/**
+ * PATCH /api/tenants/:slug/notice
+ * Configura o elimina el aviso administrativo al tenant
+ */
+export async function noticeHandler(req: Request, res: Response): Promise<void> {
+    try {
+        const { notice, level } = req.body;
+        const actor = req.user?.username || 'admin';
+        const tenant = await tenantsService.updateNotice(req.params.slug, notice, level, actor);
+        res.json(tenant);
+    } catch (error: any) {
+        res.status(400).json({ error: error.message || 'Error al actualizar aviso' });
+    }
+}
+
+/**
+ * GET /api/tenants/:slug/metrics
+ * Obtiene telemetría de uso real del tenant
+ */
+export async function metricsHandler(req: Request, res: Response): Promise<void> {
+    try {
+        const force = req.query.force === 'true';
+        const data = await tenantsService.getTenantMetrics(req.params.slug, force);
+        res.json(data);
+    } catch (error: any) {
+        res.status(400).json({ error: error.message || 'Error al obtener métricas' });
+    }
+}
+
+/**
+ * POST /api/tenants/:slug/impersonate
+ * Genera sesión de soporte para login asistido en el ERP
+ */
+export async function impersonateHandler(req: Request, res: Response): Promise<void> {
+    try {
+        const actor = req.user?.username || 'admin';
+        const data = await tenantsService.impersonateTenant(req.params.slug, actor);
+        res.json(data);
+    } catch (error: any) {
+        res.status(400).json({ error: error.message || 'Error al generar sesión de soporte' });
+    }
+}
+
+/**
+ * POST /api/tenants/:slug/backups
+ * Dispara un backup on-demand
+ */
+export async function backupCreateHandler(req: Request, res: Response): Promise<void> {
+    try {
+        const actor = req.user?.username || 'admin';
+        const backup = await tenantsService.createTenantBackup(req.params.slug, actor);
+        res.json(backup);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message || 'Error al crear backup' });
+    }
+}
+
+/**
+ * GET /api/tenants/:slug/backups
+ * Lista los backups disponibles
+ */
+export async function backupListHandler(req: Request, res: Response): Promise<void> {
+    try {
+        const backups = await tenantsService.getTenantBackups(req.params.slug);
+        res.json(backups);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message || 'Error al listar backups' });
+    }
+}
+
+

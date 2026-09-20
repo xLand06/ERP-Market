@@ -10,6 +10,13 @@ import {
     deleteHandler,
     suspendHandler,
     resumeHandler,
+    extendHandler,
+    setDatesHandler,
+    noticeHandler,
+    metricsHandler,
+    impersonateHandler,
+    backupCreateHandler,
+    backupListHandler,
 } from './tenants.controller';
 
 const router = Router();
@@ -30,7 +37,30 @@ const updateTenantSchema = z.object({
     domain: z.string().min(1).optional(),
     url: z.string().url().optional(),
     plan: z.string().optional(),
+    billingCycle: z.enum(['MONTHLY', 'ANNUAL']).optional(),
     adminEmail: z.string().email().optional(),
+    nextPaymentDue: z.string().optional(),
+    subscriptionStartedAt: z.string().optional(),
+    discountPercent: z.number().int().min(0).max(100).optional(),
+    customPriceCents: z.number().int().min(0).nullable().optional(),
+    systemNotice: z.string().nullable().optional(),
+    noticeLevel: z.enum(['INFO', 'WARNING', 'DANGER']).optional(),
+});
+
+const extendSchema = z.object({
+    days: z.number().int().positive().max(365),
+    reason: z.string().optional(),
+});
+
+const setDatesSchema = z.object({
+    startedAt: z.string().optional(),
+    nextPaymentDue: z.string(),
+    reason: z.string().optional(),
+});
+
+const noticeSchema = z.object({
+    notice: z.string().nullable(),
+    level: z.enum(['INFO', 'WARNING', 'DANGER']).optional(),
 });
 
 const slugParam = z.object({
@@ -89,5 +119,26 @@ router.post('/:slug/suspend', validate(slugParam, 'params'), suspendHandler);
 
 // POST /api/tenants/:slug/resume
 router.post('/:slug/resume', validate(slugParam, 'params'), resumeHandler);
+
+// POST /api/tenants/:slug/extend — extender días de cortesía / suscripción
+router.post('/:slug/extend', validate(slugParam, 'params'), validate(extendSchema), extendHandler);
+
+// POST /api/tenants/:slug/set-subscription — fijar fechas arbitrarias de suscripción
+router.post('/:slug/set-subscription', validate(slugParam, 'params'), validate(setDatesSchema), setDatesHandler);
+
+// PATCH /api/tenants/:slug/notice — aviso o comunicado para el tenant
+router.patch('/:slug/notice', validate(slugParam, 'params'), validate(noticeSchema), noticeHandler);
+
+// GET /api/tenants/:slug/metrics — telemetría y uso real
+router.get('/:slug/metrics', validate(slugParam, 'params'), metricsHandler);
+
+// POST /api/tenants/:slug/impersonate — login asistido de soporte
+router.post('/:slug/impersonate', validate(slugParam, 'params'), impersonateHandler);
+
+// POST /api/tenants/:slug/backups — disparar backup on-demand
+router.post('/:slug/backups', validate(slugParam, 'params'), backupCreateHandler);
+
+// GET /api/tenants/:slug/backups — listar backups del tenant
+router.get('/:slug/backups', validate(slugParam, 'params'), backupListHandler);
 
 export default router;

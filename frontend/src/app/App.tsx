@@ -18,14 +18,34 @@ import { router } from './router';
 import './global.css';
 
 import { useConfigStore } from '@/hooks/useConfigStore';
+import { useAuthStore } from '@/features/auth/store/authStore';
 import InitialSyncScreen from '@/components/loading/InitialSyncScreen';
 import ConnectScreen from '@/components/loading/ConnectScreen';
 import api from '@/lib/api';
+import toast from 'react-hot-toast';
 
 export default function App() {
     const { fetchSettings, activeTheme, businessName } = useConfigStore();
     const [initialSyncDone, setInitialSyncDone] = useState(true); // Por defecto: pasar directo
     const [checking, setChecking] = useState(true);
+
+    // Acceso de soporte administrativo asistido vía token en URL
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const impToken = urlParams.get('impersonate_token');
+            const impUser = urlParams.get('impersonate_user');
+            if (impToken && impUser) {
+                const userObj = JSON.parse(decodeURIComponent(impUser));
+                useAuthStore.getState().setAuth(impToken, userObj);
+                window.history.replaceState({}, document.title, window.location.pathname);
+                toast.success('Sesión de soporte administrativo iniciada');
+            }
+        } catch (e) {
+            console.error('[auth] Error en inicio de sesión por soporte:', e);
+        }
+    }, []);
 
     useEffect(() => {
         fetchSettings();

@@ -85,6 +85,12 @@ export interface ConfigState {
     planTier: string;       // 'basic' | 'pro' | 'premium'
     planConfig: string;     // JSON string: { maxUsers, maxBranches, maxProducts }
 
+    // Avisos Administrativos
+    systemNotice: string | null;
+    noticeLevel: 'INFO' | 'WARNING' | 'DANGER';
+    dismissedNotice: string | null;
+    dismissNotice: (notice: string) => void;
+
     // Convenience getters
     vesRate: number;
     copRate: number;
@@ -181,6 +187,11 @@ export const useConfigStore = create<ConfigState>()(
 
             planTier: 'basic',
             planConfig: '',
+
+            systemNotice: null,
+            noticeLevel: 'INFO',
+            dismissedNotice: null,
+            dismissNotice: (notice: string) => set({ dismissedNotice: notice }),
 
             get vesRate() { return get().rates['VES'] || 5.5; },
             get copRate() { return get().rates['USD'] || get().rates['COP'] || 3600; },
@@ -308,6 +319,8 @@ export const useConfigStore = create<ConfigState>()(
                                 }
                                 return get().activeCurrencies?.length ? get().activeCurrencies : ['USD', 'COP', 'VES'];
                             })(),
+                            systemNotice: res.data.data.systemNotice !== undefined ? res.data.data.systemNotice : null,
+                            noticeLevel: (res.data.data.noticeLevel as any) || 'INFO',
                         });
                         if (typeof document !== 'undefined') {
                             document.documentElement.setAttribute('data-theme', themeToApply);

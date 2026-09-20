@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import StatsCard from '../components/StatsCard';
 import HealthBadge from '../components/HealthBadge';
+import { apiFetch } from '../api';
 
 /* ── Estilos inyectados ─────────────────────────────────────────────────── */
 
@@ -137,17 +138,14 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const token = localStorage.getItem('mgmt_token');
-        const headers = { Authorization: `Bearer ${token}` };
-
         Promise.all([
-            fetch('/api/health/tenants', { headers }).then((r) => r.json()),
-            fetch('/api/payments/stats', { headers }).then((r) => r.json()),
-            fetch('/api/tenants', { headers }).then((r) => r.json()),
-            fetch('/api/vps/stats', { headers }).then((r) => r.json()),
+            apiFetch<TenantHealth[]>('/api/health/tenants'),
+            apiFetch<PaymentStats>('/api/payments/stats'),
+            apiFetch<any[]>('/api/tenants'),
+            apiFetch<VpsStats>('/api/vps/stats'),
         ])
             .then(([healthData, statsData, tenantsData, vpsData]) => {
-                setHealth(healthData);
+                setHealth(Array.isArray(healthData) ? healthData : []);
                 setPaymentStats(statsData);
 
                 const tenants = Array.isArray(tenantsData) ? tenantsData : [];
@@ -159,7 +157,10 @@ export default function Dashboard() {
 
                 setVpsStats(vpsData);
             })
-            .catch(console.error)
+            .catch((err) => {
+                console.error('[Dashboard] Error cargando datos:', err);
+                setHealth([]);
+            })
             .finally(() => setLoading(false));
     }, []);
 
@@ -180,7 +181,8 @@ export default function Dashboard() {
         );
     }
 
-    const healthyCount = health.filter(
+    const safeHealth = Array.isArray(health) ? health : [];
+    const healthyCount = safeHealth.filter(
         (h) => h.lastCheck?.apiHealthy && h.lastCheck?.dbHealthy && h.lastCheck?.containerUp
     ).length;
 
@@ -413,7 +415,7 @@ export default function Dashboard() {
                             </tr>
                         </thead>
                         <tbody>
-                            {health.map((h) => {
+                            {safeHealth.map((h) => {
                                 const st = STATUS_PALETTE[h.status] || STATUS_PALETTE.ACTIVE;
                                 return (
                                     <tr
@@ -455,7 +457,7 @@ export default function Dashboard() {
                                     </tr>
                                 );
                             })}
-                            {health.length === 0 && (
+                            {safeHealth.length === 0 && (
                                 <tr>
                                     <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
                                         No hay tenants activos
