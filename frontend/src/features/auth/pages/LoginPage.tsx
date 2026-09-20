@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { Eye, EyeOff, Lock, User, Loader2, Cloud, CloudOff, RefreshCw, Smartphone, Monitor, Download, QrCode } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, Loader2, Cloud, CloudOff, RefreshCw, Smartphone, Monitor, Download, QrCode, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLoginForm, useLogin } from '@/features/auth/hooks';
@@ -8,6 +8,9 @@ import type { LoginPayload } from '@/features/auth/types';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
+
+// ── Detectar si es APK (Capacitor) ──────────────────────────────────────────
+const isCapacitor = !!(window as any).Capacitor;
 
 // ── Descargas de escritorio ────────────────────────────────────────────────
 // Se sirven desde el management server del VPS (repo privado, no GitHub).
@@ -131,7 +134,106 @@ export default function LoginPage() {
         }
     }, [showQr, qrDataUrl]);
 
+    // ── QR Scanner para APK ────────────────────────────────────────────────
+    const [scannerOpen, setScannerOpen] = useState(false);
+    const [scannerReady, setScannerReady] = useState(false);
+    const scannerRef = useRef<any>(null);
+
+    useEffect(() => {
+        if (!scannerOpen) {
+            // Cleanup scanner
+            if (scannerRef.current) {
+                (async () => {
+                    try {
+                        if (scannerRef.current.isScanning) await scannerRef.current.stop();
+                        scannerRef.current.clear();
+                    } catch {}
+                    scannerRef.current = null;
+                })();
+            }
+            setScannerReady(false);
+            return;
+        }
+
+        let cancelled = false;
+        const timer = setTimeout(async () => {
+            try {
+                const { Html5Qrcode } = await import('html5-qrcode');
+                if (cancelled) return;
+
+                const scanner = new Html5Qrcode('login-qr-scanner', { verbose: false });
+                scannerRef.current = scanner;
+
+                const cameras = await Html5Qrcode.getCameras();
+                if (cancelled || !cameras || cameras.length === 0) {
+                    toast.error('No se detectaron cámaras');
+                    setScannerOpen(false);
+                    return;
+                }
+
+                const back = cameras.find((d: any) =>
+                    d.label.toLowerCase().includes('back') ||
+                    d.label.toLowerCase().includes('trasera') ||
+                    d.label.toLowerCase().includes('environment')
+                );
+
+                await scanner.start(
+                    back ? back.id : cameras[0].id,
+                    { fps: 15, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
+                    (decoded) => {
+                        const text = decoded.trim();
+                        // Parse allmarket://connect?server=...
+                        if (text.startsWith('allmarket://')) {
+                            try {
+                                const url = new URL(text);
+                                const server = url.searchParams.get('server');
+                                if (server) {
+                                    // Haptic + beep
+                                    if (navigator.vibrate) try { navigator.vibrate(100); } catch {}
+                                    try {
+                                        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                                        const osc = ctx.createOscillator();
+                                        const g = ctx.createGain();
+                                        osc.connect(g); g.connect(ctx.destination);
+                                        osc.frequency.value = 1000;
+                                        g.gain.setValueAtTime(0.1, ctx.currentTime);
+                                        osc.start(); osc.stop(ctx.currentTime + 0.1);
+                                    } catch {}
+
+                                    toast.success('Negocio conectado');
+                                    localStorage.setItem('serverUrl', server);
+                                    setTimeout(() => window.location.reload(), 500);
+                                    return;
+                                }
+                            } catch {}
+                        }
+                        // Also accept plain URLs
+                        if (text.startsWith('https://') || text.startsWith('http://')) {
+                            if (navigator.vibrate) try { navigator.vibrate(100); } catch {}
+                            toast.success('Negocio conectado');
+                            localStorage.setItem('serverUrl', text);
+                            setTimeout(() => window.location.reload(), 500);
+                            return;
+                        }
+                        toast.error('QR no reconocido');
+                    },
+                    () => {}
+                );
+
+                if (!cancelled) setScannerReady(true);
+            } catch (err: any) {
+                if (!cancelled) {
+                    toast.error(err?.message || 'Error al iniciar cámara');
+                    setScannerOpen(false);
+                }
+            }
+        }, 300);
+
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [scannerOpen]);
+
     return (
+        <>
         <div className={`min-h-screen flex items-center justify-center p-3 sm:p-6 ${
             isDark
                 ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950'
@@ -243,6 +345,22 @@ export default function LoginPage() {
                                 'Ingresar al sistema'
                             )}
                         </Button>
+
+                        {/* QR Scanner button — solo en APK */}
+                        {isCapacitor && (
+                            <button
+                                type="button"
+                                onClick={() => setScannerOpen(true)}
+                                className={`w-full h-12 rounded-xl border-2 font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 ${
+                                    isDark
+                                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                                        : 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                }`}
+                            >
+                                <Camera className="w-4 h-4" />
+                                Escanear QR para conectar
+                            </button>
+                        )}
                     </div>
                 </form>
 
@@ -387,5 +505,54 @@ export default function LoginPage() {
                 </p>
             </div>
         </div>
+
+        {/* QR Scanner Modal — solo APK */}
+        {scannerOpen && (
+            <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+                <div className="w-full max-w-sm bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl">
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+                        <div className="flex items-center gap-2">
+                            <Camera className="w-4 h-4 text-emerald-400" />
+                            <span className="text-sm font-bold text-white">Escanear QR</span>
+                        </div>
+                        <button
+                            onClick={() => setScannerOpen(false)}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                        >
+                            ✕
+                        </button>
+                    </div>
+
+                    {/* Scanner */}
+                    <div className="relative min-h-[280px] flex items-center justify-center bg-black">
+                        <div id="login-qr-scanner" className="w-full min-h-[280px]" />
+                        {scannerReady && (
+                            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                <div className="w-[220px] h-[220px] border-2 border-emerald-400/90 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] flex flex-col justify-between p-2">
+                                    <div className="flex justify-between">
+                                        <span className="w-5 h-5 border-t-4 border-l-4 border-emerald-400 rounded-tl-sm" />
+                                        <span className="w-5 h-5 border-t-4 border-r-4 border-emerald-400 rounded-tr-sm" />
+                                    </div>
+                                    <div className="w-full h-0.5 bg-emerald-400/60 shadow-[0_0_8px_#34d399]" />
+                                    <div className="flex justify-between">
+                                        <span className="w-5 h-5 border-b-4 border-l-4 border-emerald-400 rounded-bl-sm" />
+                                        <span className="w-5 h-5 border-b-4 border-r-4 border-emerald-400 rounded-br-sm" />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-4 py-3 border-t border-slate-800 text-center">
+                        <p className="text-[10px] text-slate-500">
+                            Apuntá al QR que muestra el panel web de tu negocio
+                        </p>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
     );
 }
