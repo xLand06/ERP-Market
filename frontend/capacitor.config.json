@@ -1,6 +1,6 @@
 {
-  "appId": "com.erpmarket.app",
-  "appName": "ERP Market",
+  "appId": "com.allmarket.app",
+  "appName": "ALL MARKET",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {
