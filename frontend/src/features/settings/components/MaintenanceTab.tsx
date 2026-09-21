@@ -53,7 +53,11 @@ function SectionCard({ icon: Icon, title, description, children, color = 'indigo
     );
 }
 
-export function MaintenanceTab() {
+export interface MaintenanceTabProps {
+    onNavigateToBackup?: () => void;
+}
+
+export function MaintenanceTab({ onNavigateToBackup }: MaintenanceTabProps) {
     const { data: stats, isLoading: loadingStats, refetch: refetchStats } = useLocalStats();
     const clearPending = useClearPending();
     const forceSync = useForceSync();
@@ -61,17 +65,17 @@ export function MaintenanceTab() {
     const clearTokens = useClearSyncTokens();
 
     const handleClearPending = () => {
-        if (!window.confirm('¿Eliminar transacciones ya sincronizadas de la base de datos local?\n\nEsto reducirá el tamaño de la base SQLite pero no afectará la nube.')) return;
+        if (!window.confirm('¿Eliminar transacciones ya sincronizadas de la memoria local?\n\nEsto liberará espacio en disco y optimizará el rendimiento sin afectar los datos en el servidor.')) return;
         clearPending.mutate();
     };
 
     const handleForceSync = () => {
-        if (!window.confirm('¿Forzar sincronización inmediata?\n\nSe intentarán sincronizar todos los registros pendientes.')) return;
+        if (!window.confirm('¿Forzar sincronización inmediata?\n\nSe intentarán sincronizar todos los registros pendientes con el servidor.')) return;
         forceSync.mutate();
     };
 
     const handleClearTokens = () => {
-        if (!window.confirm('¿Reiniciar sincronización desde cero?\n\nSe borrarán los tokens de sync y se forzará una re-sincronización completa.')) return;
+        if (!window.confirm('¿Reiniciar sincronización desde cero?\n\nSe borrarán los tokens de sincronización y se forzará una reconciliación completa.')) return;
         clearTokens.mutate();
         toast.success('Tokens limpiados — reinicia la app para aplicar');
     };
@@ -79,7 +83,7 @@ export function MaintenanceTab() {
     return (
         <div className="space-y-6 animate-fade-in">
             {/* Sección 1: Estadísticas del sistema */}
-            <SectionCard icon={Server} title="Estadísticas del Sistema" description="Uso de la base de datos SQLite local" color="indigo">
+            <SectionCard icon={Server} title="Volumen de Datos del Negocio" description="Registros activos en la base de datos" color="indigo">
                 {loadingStats ? (
                     <div className="py-8 text-center text-slate-400">Cargando estadísticas...</div>
                 ) : (
@@ -95,11 +99,11 @@ export function MaintenanceTab() {
             </SectionCard>
 
             {/* Sección 2: Limpiar transacciones sincronizadas */}
-            <SectionCard icon={Trash2} title="Limpiar Transacciones Sincronizadas" description="Eliminar registros ya respaldados en la nube para reducir tamaño de SQLite" color="amber">
+            <SectionCard icon={Trash2} title="Optimización de Almacenamiento Local" description="Depuración de registros transaccionales temporales ya asegurados en la nube" color="amber">
                 <div className="flex items-center justify-between">
                     <div>
-                        <p className="text-sm text-slate-700 font-medium">Transacciones sincronizadas</p>
-                        <p className="text-xs text-slate-500 mt-1">Borra las transacciones que ya están en Supabase (marcadas como SYNCED)</p>
+                        <p className="text-sm text-slate-700 font-medium">Registros locales sincronizados</p>
+                        <p className="text-xs text-slate-500 mt-1">Libera espacio local eliminando el histórico ya respaldado en el servidor principal</p>
                     </div>
                     <button
                         onClick={handleClearPending}
@@ -107,13 +111,13 @@ export function MaintenanceTab() {
                         className="px-4 py-2 bg-amber-600 text-white rounded-lg font-bold text-sm hover:bg-amber-700 transition-all disabled:opacity-50 flex items-center gap-2"
                     >
                         <Trash2 className="w-4 h-4" />
-                        {clearPending.isPending ? 'Limpiando...' : 'Limpiar'}
+                        {clearPending.isPending ? 'Optimizando...' : 'Optimizar Ahora'}
                     </button>
                 </div>
             </SectionCard>
 
             {/* Sección 3: Opciones de sincronización */}
-            <SectionCard icon={RefreshCw} title="Sincronización" description="Control manual del proceso de sync con la nube" color="emerald">
+            <SectionCard icon={RefreshCw} title="Estado de Sincronización y Red" description="Supervisión de enlace y replicación con el servidor central" color="emerald">
                 <div className="space-y-4">
                     {/* Estado actual */}
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
@@ -122,9 +126,9 @@ export function MaintenanceTab() {
                                 <div className={`w-3 h-3 rounded-full ${syncStatus?.isOnline ? 'bg-emerald-500' : 'bg-red-500'}`} />
                                 <div>
                                     <p className="text-sm font-bold text-slate-800">
-                                        {loadingSync ? 'Verificando...' : syncStatus?.isOnline ? 'Conectado a la nube' : 'Sin conexión'}
+                                        {loadingSync ? 'Verificando...' : syncStatus?.isOnline ? 'Conectado al servidor' : 'Sin conexión central'}
                                     </p>
-                                    <p className="text-xs text-slate-500">Última sync: {syncStatus?.lastSyncAt ? new Date(syncStatus.lastSyncAt).toLocaleString('es-CO') : 'Nunca'}</p>
+                                    <p className="text-xs text-slate-500">Última sincronización: {syncStatus?.lastSyncAt ? new Date(syncStatus.lastSyncAt).toLocaleString('es-CO') : 'Nunca'}</p>
                                 </div>
                             </div>
                             {syncStatus?.pendingCount !== undefined && (
@@ -150,24 +154,30 @@ export function MaintenanceTab() {
                             className="flex-1 min-w-[200px] px-4 py-2.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-bold text-sm hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
                         >
                             <AlertTriangle className="w-4 h-4" />
-                            Reiniciar Sync
+                            Reiniciar Reconciliación
                         </button>
                     </div>
                 </div>
             </SectionCard>
 
-            {/* Sección 4: Link a Purga de Supabase (del tab Backup) */}
-            <SectionCard icon={Cloud} title="Purga de Base de Datos en la Nube" description="Gestionar datos en Supabase (backup, restore, purge)" color="blue">
+            {/* Sección 4: Link a Backup y Portabilidad */}
+            <SectionCard icon={Cloud} title="Copias de Seguridad y Portabilidad (Takeout)" description="Descarga tu archivo de resguardo completo (.json.gz) o restaura información" color="blue">
                 <div className="flex items-center justify-between">
                     <div>
-                        <p className="text-sm text-slate-700 font-medium">Supabase Cloud</p>
-                        <p className="text-xs text-slate-500 mt-1">Crear backups, restaurar datos o purgar registros antiguos de la nube</p>
+                        <p className="text-sm text-slate-700 font-medium">Panel de Respaldos y Takeout</p>
+                        <p className="text-xs text-slate-500 mt-1">Generar copias con compresión máxima, restaurar datos o purgar registros históricos</p>
                     </div>
                     <button
-                        onClick={() => window.location.hash = 'settings/backup'}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-all flex items-center gap-2"
+                        onClick={() => {
+                            if (onNavigateToBackup) {
+                                onNavigateToBackup();
+                            } else {
+                                window.location.hash = 'settings/backup';
+                            }
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer shadow-xs"
                     >
-                        Gestionar en Backup
+                        Gestionar Respaldos
                         <ArrowRight className="w-4 h-4" />
                     </button>
                 </div>

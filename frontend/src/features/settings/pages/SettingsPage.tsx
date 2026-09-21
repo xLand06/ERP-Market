@@ -182,7 +182,7 @@ export default function SettingsPage() {
             case 'backup':
                 return <BackupPanel />;
             case 'maintenance':
-                return <MaintenanceTab />;
+                return <MaintenanceTab onNavigateToBackup={() => setActiveTab('backup')} />;
             default:
                 return null;
         }
