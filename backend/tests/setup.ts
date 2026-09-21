@@ -3,6 +3,8 @@
 // Usa SQLite local con DB única por archivo de test
 // =============================================================================
 
+process.env.DEPLOY_MODE = 'desktop';
+
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
