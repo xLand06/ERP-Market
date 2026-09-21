@@ -12,7 +12,7 @@ import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
 import { promisify } from 'util';
-import { getLocalPrisma, getCloudPrisma } from '../../config/prisma';
+import { prisma, getLocalPrisma, getCloudPrisma } from '../../config/prisma';
 import logger from '../../core/utils/logger';
 
 const gzip = promisify(zlib.gzip);
@@ -75,16 +75,16 @@ export interface CloudStorageStats {
  *   const driveFileId = await uploadToDrive(meta.filePath, driveAccessToken);
  */
 export async function exportLocalBackup(): Promise<BackupMeta & { filePath: string }> {
-    const local = getLocalPrisma();
+    const db = prisma as any;
 
     // Asegurar que exista el directorio de backups
     if (!fs.existsSync(BACKUP_DIR)) {
         fs.mkdirSync(BACKUP_DIR, { recursive: true });
     }
 
-    logger.info('[Backup] Iniciando exportación desde SQLite...');
+    logger.info('[Backup] Iniciando exportación de datos de negocio...');
 
-    // Exportar todas las tablas en paralelo
+    // Exportar todas las tablas principales
     const [
         users,
         branches,
@@ -95,42 +95,51 @@ export async function exportLocalBackup(): Promise<BackupMeta & { filePath: stri
         productPresentations,
         branchInventory,
         suppliers,
+        customers,
+        customerPayments,
         purchaseOrders,
         purchaseOrderItems,
         transactions,
         transactionItems,
         cashRegisters,
         exchangeRates,
+        bankAccounts,
+        productBatches,
         auditLogs,
     ] = await Promise.all([
-        local.user.findMany(),
-        local.branch.findMany(),
-        local.group.findMany(),
-        local.subGroup.findMany(),
-        local.product.findMany(),
-        local.productBarcode.findMany(),
-        local.productPresentation.findMany(),
-        local.branchInventory.findMany(),
-        local.supplier.findMany(),
-        local.purchaseOrder.findMany(),
-        local.purchaseOrderItem.findMany(),
-        local.transaction.findMany(),
-        local.transactionItem.findMany(),
-        local.cashRegister.findMany(),
-        local.exchangeRate.findMany(),
-        local.auditLog.findMany(),
+        db.user ? db.user.findMany() : Promise.resolve([]),
+        db.branch ? db.branch.findMany() : Promise.resolve([]),
+        db.group ? db.group.findMany() : Promise.resolve([]),
+        db.subGroup ? db.subGroup.findMany() : Promise.resolve([]),
+        db.product ? db.product.findMany() : Promise.resolve([]),
+        db.productBarcode ? db.productBarcode.findMany() : Promise.resolve([]),
+        db.productPresentation ? db.productPresentation.findMany() : Promise.resolve([]),
+        db.branchInventory ? db.branchInventory.findMany() : Promise.resolve([]),
+        db.supplier ? db.supplier.findMany() : Promise.resolve([]),
+        db.customer ? db.customer.findMany() : Promise.resolve([]),
+        db.customerPayment ? db.customerPayment.findMany() : Promise.resolve([]),
+        db.purchaseOrder ? db.purchaseOrder.findMany() : Promise.resolve([]),
+        db.purchaseOrderItem ? db.purchaseOrderItem.findMany() : Promise.resolve([]),
+        db.transaction ? db.transaction.findMany() : Promise.resolve([]),
+        db.transactionItem ? db.transactionItem.findMany() : Promise.resolve([]),
+        db.cashRegister ? db.cashRegister.findMany() : Promise.resolve([]),
+        db.exchangeRate ? db.exchangeRate.findMany() : Promise.resolve([]),
+        db.bankAccount ? db.bankAccount.findMany() : Promise.resolve([]),
+        db.productBatch ? db.productBatch.findMany() : Promise.resolve([]),
+        db.auditLog ? db.auditLog.findMany() : Promise.resolve([]),
     ]);
 
     const tablesIncluded = [
         'users', 'branches', 'groups', 'subGroups', 'products', 'productBarcodes',
-        'productPresentations', 'branchInventory', 'suppliers', 'purchaseOrders',
-        'purchaseOrderItems', 'transactions', 'transactionItems', 'cashRegisters',
-        'exchangeRates', 'auditLogs',
+        'productPresentations', 'branchInventory', 'suppliers', 'customers',
+        'customerPayments', 'purchaseOrders', 'purchaseOrderItems', 'transactions',
+        'transactionItems', 'cashRegisters', 'exchangeRates', 'bankAccounts',
+        'productBatches', 'auditLogs',
     ];
 
     const payload = {
         exportedAt: new Date().toISOString(),
-        version: '1.0',
+        version: '2.0',
         system: 'ERP-Market',
         tablesIncluded,
         data: {
@@ -143,19 +152,23 @@ export async function exportLocalBackup(): Promise<BackupMeta & { filePath: stri
             productPresentations,
             branchInventory,
             suppliers,
+            customers,
+            customerPayments,
             purchaseOrders,
             purchaseOrderItems,
             transactions,
             transactionItems,
             cashRegisters,
             exchangeRates,
+            bankAccounts,
+            productBatches,
             auditLogs,
         },
     };
 
-    // Comprimir con gzip
+    // Comprimir con gzip nivel 9
     const jsonBuffer = Buffer.from(JSON.stringify(payload));
-    const compressed = await gzip(jsonBuffer);
+    const compressed = await gzip(jsonBuffer, { level: 9 });
 
     // Nombre del archivo con timestamp
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -166,6 +179,22 @@ export async function exportLocalBackup(): Promise<BackupMeta & { filePath: stri
 
     const sizeBytes = fs.statSync(filePath).size;
     logger.info('[Backup] Exportación completada', { filename, sizeBytes });
+
+    // Rotación automática local: conservar sólo los últimos 7 backups
+    try {
+        const existing = fs.readdirSync(BACKUP_DIR)
+            .filter((f) => f.endsWith('.json.gz'))
+            .map((f) => ({ name: f, time: fs.statSync(path.join(BACKUP_DIR, f)).mtime.getTime() }))
+            .sort((a, b) => b.time - a.time);
+
+        if (existing.length > 7) {
+            for (let i = 7; i < existing.length; i++) {
+                fs.unlinkSync(path.join(BACKUP_DIR, existing[i].name));
+            }
+        }
+    } catch {
+        // Rotación silente
+    }
 
     return {
         filename,
