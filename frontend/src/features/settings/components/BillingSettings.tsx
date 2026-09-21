@@ -10,7 +10,7 @@ import {
     CreditCard, Wallet, AlertTriangle, CheckCircle2, Clock,
     Loader2, Copy, Send, History, DollarSign, Calendar,
     Banknote, Smartphone, Coins, BanknoteIcon, FileText,
-    ShieldCheck, ArrowRight, Sparkles, Info
+    ShieldCheck, ArrowRight, Sparkles, Info, Download, X
 } from 'lucide-react';
 
 interface PlanLimits {
@@ -103,6 +103,7 @@ export function BillingSettings() {
     const [selectedCycle, setSelectedCycle] = useState<'MONTHLY' | 'ANNUAL'>('MONTHLY');
     const [reference, setReference] = useState('');
     const [notes, setNotes] = useState('');
+    const [showTermsModal, setShowTermsModal] = useState(false);
 
     // Fetch billing status
     const { data: billing, isLoading, error } = useQuery<BillingStatus>({
@@ -596,6 +597,162 @@ export function BillingSettings() {
                     </div>
                 )}
             </div>
+
+            {/* ── Soberanía y Portabilidad de Datos ────────────────────────── */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-4 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-100/80 border border-indigo-200/60 flex items-center justify-center shrink-0 mt-0.5">
+                            <ShieldCheck className="w-5 h-5 text-indigo-700" />
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                Tus Datos son 100% Tuyos
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    Zero Lock-in
+                                </span>
+                            </h4>
+                            <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-2xl">
+                                Si decides no continuar con la suscripción o necesitas migrar, tienes derecho a llevarte toda tu información en cualquier momento sin costo alguno ni penalidades.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowTermsModal(true)}
+                            className="text-xs font-semibold text-slate-700 hover:text-indigo-600 hover:bg-white border-slate-300"
+                        >
+                            <FileText className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
+                            Términos, Custodia y SLA
+                        </Button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-200/70 text-xs text-slate-600">
+                    <div className="flex items-start gap-2 bg-white p-3 rounded-xl border border-slate-200/60 shadow-xs">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="font-bold text-slate-800">7 Días de Gracia</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">Continuidad de venta y facturación sin cortes tras el vencimiento.</p>
+                        </div>
+                    </div>
+                    <div className="flex items-start gap-2 bg-white p-3 rounded-xl border border-slate-200/60 shadow-xs">
+                        <Clock className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="font-bold text-slate-800">30 Días de Custodia</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">Tus datos se guardan intactos para reactivar o exportar.</p>
+                        </div>
+                    </div>
+                    <div className="flex items-start gap-2 bg-white p-3 rounded-xl border border-slate-200/60 shadow-xs">
+                        <Download className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="font-bold text-slate-800">Portabilidad Libre</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">Copias estructuradas PostgreSQL y reportes tabulares abiertos.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Modal de Términos y Condiciones, Custodia y SLA ─────────── */}
+            {showTermsModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs"
+                    onClick={() => setShowTermsModal(false)}
+                >
+                    <div
+                        className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center">
+                                    <FileText className="w-4 h-4 text-indigo-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Términos del Servicio, Custodia y Portabilidad</h3>
+                                    <p className="text-[11px] text-slate-400">ALL MARKET ERP Multi-Tenant SaaS</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowTermsModal(false)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {/* Contenido scrolleable */}
+                        <div className="p-6 overflow-y-auto space-y-5 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                            <section className="space-y-1.5 bg-indigo-50/50 dark:bg-indigo-950/20 p-3.5 rounded-xl border border-indigo-100 dark:border-indigo-900/40">
+                                <h5 className="font-bold text-indigo-950 dark:text-indigo-200 text-xs flex items-center gap-1.5">
+                                    <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                                    1. Propiedad Exclusiva de los Datos
+                                </h5>
+                                <p>
+                                    El cliente es el único propietario de la información cargada en el sistema (clientes, productos, precios, ventas y contabilidad). ALL MARKET actúa únicamente como custodio tecnológico. Tus datos nunca serán vendidos, compartidos ni utilizados para fines comerciales ajenos.
+                                </p>
+                            </section>
+
+                            <section className="space-y-1.5">
+                                <h5 className="font-bold text-slate-900 dark:text-white text-xs">2. Garantía de Portabilidad (Zero Lock-in)</h5>
+                                <p>
+                                    Si decides cancelar tu suscripción o migrar a otra plataforma, tienes derecho a llevarte todos tus datos en formatos universales:
+                                </p>
+                                <ul className="list-disc pl-5 space-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                    <li><strong>Copia Completa de Base de Datos (.sql.gz):</strong> Volcado nativo de PostgreSQL sin restricciones de licencia, listo para restaurar en cualquier servidor propio.</li>
+                                    <li><strong>Exportación Universal:</strong> Catálogos y transacciones exportables a hojas de cálculo (CSV / Excel).</li>
+                                </ul>
+                            </section>
+
+                            <section className="space-y-1.5">
+                                <h5 className="font-bold text-slate-900 dark:text-white text-xs">3. Política de Resguardo y Optimización de Espacio</h5>
+                                <p>
+                                    Las copias de seguridad se generan con algoritmos de máxima compresión (gzip -9 sin permisos propietarios) para optimizar el almacenamiento. El sistema mantiene un historial rotativo de hasta <strong>7 copias de seguridad por cliente</strong> y purga automáticamente respaldos con más de 30 días de antigüedad.
+                                </p>
+                            </section>
+
+                            <section className="space-y-1.5">
+                                <h5 className="font-bold text-slate-900 dark:text-white text-xs">4. Período de Gracia, Suspensión y Tiempos de Custodia</h5>
+                                <div className="space-y-2 pt-1">
+                                    <div className="flex gap-2">
+                                        <span className="font-bold text-emerald-600 shrink-0">Días 1 a 7:</span>
+                                        <span><strong>Período de Gracia Operativa.</strong> El ERP continúa funcionando con total normalidad para tus cajas y ventas.</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <span className="font-bold text-amber-600 shrink-0">Día 8 a 38:</span>
+                                        <span><strong>Custodia de Datos (30 días).</strong> Si la suscripción no fue renovada, el acceso se pausa preventivamente pero la base de datos se custodia intacta. Puedes solicitar la descarga de tu información o reactivar en 1 clic.</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <span className="font-bold text-red-600 shrink-0">Día 45:</span>
+                                        <span><strong>Purga Definitiva.</strong> Tras 45 días continuos de suspensión sin regularización ni solicitud de datos, los contenedores y volúmenes son eliminados de forma segura e irreversible.</span>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section className="space-y-1.5">
+                                <h5 className="font-bold text-slate-900 dark:text-white text-xs">5. Disponibilidad del Servicio (SLA)</h5>
+                                <p>
+                                    ALL MARKET apunta a un 99.5% de disponibilidad mensual en infraestructura de nube, con monitoreo continuo de salud de contenedores y bases de datos.
+                                </p>
+                            </section>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 flex justify-end">
+                            <Button
+                                size="sm"
+                                onClick={() => setShowTermsModal(false)}
+                                className="text-xs font-semibold"
+                            >
+                                Entendido
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

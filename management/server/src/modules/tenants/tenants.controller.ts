@@ -220,4 +220,22 @@ export async function backupListHandler(req: Request, res: Response): Promise<vo
     }
 }
 
+/**
+ * GET /api/tenants/:slug/backups/:filename/download
+ * Descarga el archivo de backup
+ */
+export async function backupDownloadHandler(req: Request, res: Response): Promise<void> {
+    try {
+        const { slug, filename } = req.params;
+        const filePath = await tenantsService.getTenantBackupDownload(slug, filename);
+        if (!filePath) {
+            res.status(404).json({ error: 'Archivo de backup no encontrado' });
+            return;
+        }
+        res.download(filePath, filename);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message || 'Error al descargar backup' });
+    }
+}
+
 

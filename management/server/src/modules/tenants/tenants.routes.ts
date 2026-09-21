@@ -17,6 +17,7 @@ import {
     impersonateHandler,
     backupCreateHandler,
     backupListHandler,
+    backupDownloadHandler,
 } from './tenants.controller';
 
 const router = Router();
@@ -140,5 +141,8 @@ router.post('/:slug/backups', validate(slugParam, 'params'), backupCreateHandler
 
 // GET /api/tenants/:slug/backups — listar backups del tenant
 router.get('/:slug/backups', validate(slugParam, 'params'), backupListHandler);
+
+// GET /api/tenants/:slug/backups/:filename/download — descargar archivo de backup
+router.get('/:slug/backups/:filename/download', backupDownloadHandler);
 
 export default router;
