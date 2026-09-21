@@ -606,10 +606,103 @@ export async function resumeTenant(slug: string): Promise<void> {
 }
 
 /**
- * Elimina un tenant: contenedores Docker, volumen, directorio, Caddy y DB record.
+ * Genera un snapshot de archivo frío (Cold Storage) antes del borrado definitivo.
+ * Permite restauraciones o recuperación legal/comercial posterior si el cliente regresa.
  */
-export async function deleteTenant(slug: string): Promise<void> {
+export async function createColdArchiveSnapshot(slug: string): Promise<string | null> {
+    const SAFE_IDENTIFIER = /^[a-zA-Z0-9_-]+$/;
+    if (!SAFE_IDENTIFIER.test(slug)) return null;
+
+    const archivesDir = path.join(DEPLOY_DIR, 'archives');
+    await fs.mkdir(archivesDir, { recursive: true });
+
+    let startedTempDb = false;
+    try {
+        const container = docker.getContainer(`db-${slug}`);
+        const info = await container.inspect();
+        if (!info.State.Running) {
+            await container.start();
+            startedTempDb = true;
+            await waitForHealthy(`db-${slug}`, 15000);
+        }
+    } catch {
+        // Contenedor no existe o no accesible
+    }
+
+    try {
+        const clientsDir = path.join(DEPLOY_DIR, 'clients');
+        const clientDir = path.join(clientsDir, slug);
+        const envFile = path.join(clientDir, '.env');
+        let dbUser = 'postgres';
+        let dbName = slug;
+
+        try {
+            const envContent = await fs.readFile(envFile, 'utf-8');
+            const envVars = parseEnvFile(envContent);
+            if (envVars.DB_USER && SAFE_IDENTIFIER.test(envVars.DB_USER)) dbUser = envVars.DB_USER;
+            if (envVars.DB_NAME && SAFE_IDENTIFIER.test(envVars.DB_NAME)) dbName = envVars.DB_NAME;
+        } catch {
+            // defaults
+        }
+
+        const now = new Date();
+        const stamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const filename = `final-archive-${slug}-${stamp}.sql.gz`;
+        const archiveFile = path.join(archivesDir, filename);
+
+        const { execSync } = await import('child_process');
+        const cmd = `docker exec db-${slug} pg_dump -U "${dbUser}" --no-owner --no-privileges "${dbName}" | gzip -9 -c > "${archiveFile}"`;
+        console.log(`[provisioner] Generando Cold Archive Snapshot de resguardo para ${slug}: ${cmd}`);
+        execSync(cmd, { encoding: 'utf-8', timeout: 240000 });
+
+        const stats = await fs.stat(archiveFile);
+        console.log(`[provisioner] Cold Archive Snapshot resguardado (${stats.size} bytes): ${filename}`);
+
+        const tenant = await prisma.tenant.findUnique({ where: { slug } });
+        if (tenant) {
+            await createAuditEntry({
+                actor: 'system',
+                action: 'TENANT_COLD_ARCHIVE_SAVED',
+                tenantId: tenant.id,
+                details: {
+                    slug,
+                    filename,
+                    sizeBytes: stats.size,
+                },
+            });
+        }
+
+        return archiveFile;
+    } catch (err) {
+        console.warn(`[provisioner] No se pudo crear Cold Archive Snapshot para ${slug}:`, err);
+        return null;
+    } finally {
+        if (startedTempDb) {
+            try {
+                const container = docker.getContainer(`db-${slug}`);
+                await container.stop({ t: 5 });
+            } catch {
+                // silente
+            }
+        }
+    }
+}
+
+/**
+ * Elimina un tenant: contenedores Docker, volumen, directorio, Caddy y DB record.
+ * Genera preventivamente un Cold Archive Snapshot para evitar pérdida irreversible de datos.
+ */
+export async function deleteTenant(slug: string, options?: { skipArchive?: boolean }): Promise<void> {
     console.log(`[provisioner] Eliminando tenant: ${slug}`);
+
+    // Resguardo preventivo en Cold Storage antes de destruir el volumen
+    if (!options?.skipArchive) {
+        try {
+            await createColdArchiveSnapshot(slug);
+        } catch (e) {
+            console.warn(`[provisioner] Advertencia al generar snapshot frío previo a borrar ${slug}:`, e);
+        }
+    }
 
     // Obtener tenant antes de eliminarlo
     const tenant = await prisma.tenant.findUnique({ where: { slug } });
