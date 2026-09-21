@@ -137,7 +137,48 @@ export default function LoginPage() {
     // ── QR Scanner para APK ────────────────────────────────────────────────
     const [scannerOpen, setScannerOpen] = useState(false);
     const [scannerReady, setScannerReady] = useState(false);
+    const [connectingServer, setConnectingServer] = useState<string | null>(null);
     const scannerRef = useRef<any>(null);
+
+    /** Valida que el servidor responda antes de guardar y recargar */
+    const validateAndConnect = async (server: string, attempt = 1) => {
+        const MAX_ATTEMPTS = 5;
+        const TIMEOUT_MS = 8000;
+
+        setConnectingServer(server);
+
+        for (let i = attempt; i <= MAX_ATTEMPTS; i++) {
+            try {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+                const res = await fetch(`${server}/api/health`, {
+                    method: 'GET',
+                    signal: controller.signal,
+                });
+                clearTimeout(timer);
+
+                if (res.ok) {
+                    // Servidor responde — guardar y recargar
+                    toast.success('Negocio conectado');
+                    localStorage.setItem('serverUrl', server);
+                    setTimeout(() => window.location.reload(), 300);
+                    return;
+                }
+            } catch {
+                // Servidor no responde aún — esperar y reintentar
+            }
+
+            // Backoff: 1s, 2s, 3s, 4s
+            if (i < MAX_ATTEMPTS) {
+                await new Promise(r => setTimeout(r, i * 1000));
+            }
+        }
+
+        // Todos los intentos fallaron
+        setConnectingServer(null);
+        toast.error('No se pudo conectar al servidor. Verificá la URL del QR.');
+    };
 
     useEffect(() => {
         if (!scannerOpen) {
@@ -152,6 +193,7 @@ export default function LoginPage() {
                 })();
             }
             setScannerReady(false);
+            setConnectingServer(null);
             return;
         }
 
@@ -181,41 +223,42 @@ export default function LoginPage() {
                     back ? back.id : cameras[0].id,
                     { fps: 15, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
                     (decoded) => {
+                        // Ignorar si ya está conectando
+                        if (connectingServer) return;
+
                         const text = decoded.trim();
+                        let server: string | null = null;
+
                         // Parse allmarket://connect?server=...
                         if (text.startsWith('allmarket://')) {
                             try {
                                 const url = new URL(text);
-                                const server = url.searchParams.get('server');
-                                if (server) {
-                                    // Haptic + beep
-                                    if (navigator.vibrate) try { navigator.vibrate(100); } catch {}
-                                    try {
-                                        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-                                        const osc = ctx.createOscillator();
-                                        const g = ctx.createGain();
-                                        osc.connect(g); g.connect(ctx.destination);
-                                        osc.frequency.value = 1000;
-                                        g.gain.setValueAtTime(0.1, ctx.currentTime);
-                                        osc.start(); osc.stop(ctx.currentTime + 0.1);
-                                    } catch {}
-
-                                    toast.success('Negocio conectado');
-                                    localStorage.setItem('serverUrl', server);
-                                    setTimeout(() => window.location.reload(), 500);
-                                    return;
-                                }
+                                server = url.searchParams.get('server');
                             } catch {}
                         }
-                        // Also accept plain URLs
-                        if (text.startsWith('https://') || text.startsWith('http://')) {
-                            if (navigator.vibrate) try { navigator.vibrate(100); } catch {}
-                            toast.success('Negocio conectado');
-                            localStorage.setItem('serverUrl', text);
-                            setTimeout(() => window.location.reload(), 500);
-                            return;
+                        // Plain URLs
+                        if (!server && (text.startsWith('https://') || text.startsWith('http://'))) {
+                            server = text;
                         }
-                        toast.error('QR no reconocido');
+
+                        if (server) {
+                            // Haptic + beep
+                            if (navigator.vibrate) try { navigator.vibrate(100); } catch {}
+                            try {
+                                const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                                const osc = ctx.createOscillator();
+                                const g = ctx.createGain();
+                                osc.connect(g); g.connect(ctx.destination);
+                                osc.frequency.value = 1000;
+                                g.gain.setValueAtTime(0.1, ctx.currentTime);
+                                osc.start(); osc.stop(ctx.currentTime + 0.1);
+                            } catch {}
+
+                            // Validar servidor antes de reconectar
+                            validateAndConnect(server);
+                        } else {
+                            toast.error('QR no reconocido');
+                        }
                     },
                     () => {}
                 );
@@ -513,21 +556,43 @@ export default function LoginPage() {
                     {/* Header */}
                     <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
                         <div className="flex items-center gap-2">
-                            <Camera className="w-4 h-4 text-emerald-400" />
-                            <span className="text-sm font-bold text-white">Escanear QR</span>
+                            {connectingServer ? (
+                                <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
+                            ) : (
+                                <Camera className="w-4 h-4 text-emerald-400" />
+                            )}
+                            <span className="text-sm font-bold text-white">
+                                {connectingServer ? 'Conectando...' : 'Escanear QR'}
+                            </span>
                         </div>
-                        <button
-                            onClick={() => setScannerOpen(false)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                        >
-                            ✕
-                        </button>
+                        {!connectingServer && (
+                            <button
+                                onClick={() => setScannerOpen(false)}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                            >
+                                ✕
+                            </button>
+                        )}
                     </div>
 
                     {/* Scanner */}
                     <div className="relative min-h-[280px] flex items-center justify-center bg-black">
                         <div id="login-qr-scanner" className="w-full min-h-[280px]" />
-                        {scannerReady && (
+
+                        {/* Connecting overlay */}
+                        {connectingServer && (
+                            <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 z-10">
+                                <div className="w-16 h-16 rounded-full border-4 border-amber-500/20 border-t-amber-400 animate-spin" />
+                                <div className="text-center">
+                                    <p className="text-sm font-bold text-white mb-1">Conectando al negocio...</p>
+                                    <p className="text-[11px] text-slate-400 font-mono">{connectingServer}</p>
+                                    <p className="text-[10px] text-slate-500 mt-2">Reintentando automáticamente</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Viewfinder */}
+                        {scannerReady && !connectingServer && (
                             <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                                 <div className="w-[220px] h-[220px] border-2 border-emerald-400/90 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] flex flex-col justify-between p-2">
                                     <div className="flex justify-between">
@@ -546,9 +611,15 @@ export default function LoginPage() {
 
                     {/* Footer */}
                     <div className="px-4 py-3 border-t border-slate-800 text-center">
-                        <p className="text-[10px] text-slate-500">
-                            Apuntá al QR que muestra el panel web de tu negocio
-                        </p>
+                        {connectingServer ? (
+                            <p className="text-[10px] text-amber-400 font-medium">
+                                Esperando respuesta del servidor...
+                            </p>
+                        ) : (
+                            <p className="text-[10px] text-slate-500">
+                                Apuntá al QR que muestra el panel web de tu negocio
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>
