@@ -104,6 +104,37 @@ export function BillingSettings() {
     const [reference, setReference] = useState('');
     const [notes, setNotes] = useState('');
     const [showTermsModal, setShowTermsModal] = useState(false);
+    const [exportingBackup, setExportingBackup] = useState(false);
+
+    const handleDownloadTakeout = async () => {
+        setExportingBackup(true);
+        const toastId = toast.loading('Generando copia completa de seguridad...');
+        try {
+            const res = await api.post('/backup/export');
+            const filename = res?.data?.data?.filename;
+            if (filename) {
+                toast.success('Copia generada. Iniciando descarga directa...', { id: toastId });
+                const response = await api.get(`/backup/download/${filename}`, {
+                    responseType: 'blob',
+                });
+                const blob = new Blob([response.data], { type: 'application/gzip' });
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(downloadUrl);
+            } else {
+                toast.error('No se pudo generar el archivo de respaldo', { id: toastId });
+            }
+        } catch (e: any) {
+            toast.error(e?.response?.data?.error || 'Error al exportar los datos', { id: toastId });
+        } finally {
+            setExportingBackup(false);
+        }
+    };
 
     // Fetch billing status
     const { data: billing, isLoading, error } = useQuery<BillingStatus>({
@@ -617,7 +648,26 @@ export function BillingSettings() {
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <Button
+                            variant="default"
+                            size="sm"
+                            onClick={handleDownloadTakeout}
+                            disabled={exportingBackup}
+                            className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
+                        >
+                            {exportingBackup ? (
+                                <>
+                                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                                    Generando Respaldo...
+                                </>
+                            ) : (
+                                <>
+                                    <Download className="w-3.5 h-3.5 mr-1.5" />
+                                    Descargar Copia (Takeout)
+                                </>
+                            )}
+                        </Button>
                         <Button
                             variant="outline"
                             size="sm"
