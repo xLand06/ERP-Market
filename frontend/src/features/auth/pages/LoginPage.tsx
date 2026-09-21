@@ -139,15 +139,18 @@ export default function LoginPage() {
     const [scannerReady, setScannerReady] = useState(false);
     const [connectingServer, setConnectingServer] = useState<string | null>(null);
     const scannerRef = useRef<any>(null);
+    const connectingRef = useRef(false); // Flag para evitar múltiples escaneos
 
     /** Valida que el servidor responda antes de guardar y recargar */
-    const validateAndConnect = async (server: string, attempt = 1) => {
-        const MAX_ATTEMPTS = 5;
-        const TIMEOUT_MS = 8000;
-
+    const validateAndConnect = async (server: string) => {
+        if (connectingRef.current) return; // Ya está conectando
+        connectingRef.current = true;
         setConnectingServer(server);
 
-        for (let i = attempt; i <= MAX_ATTEMPTS; i++) {
+        const MAX_ATTEMPTS = 8;
+        const TIMEOUT_MS = 5000;
+
+        for (let i = 1; i <= MAX_ATTEMPTS; i++) {
             try {
                 const controller = new AbortController();
                 const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -166,18 +169,20 @@ export default function LoginPage() {
                     return;
                 }
             } catch {
-                // Servidor no responde aún — esperar y reintentar
+                // Servidor no responde aún
             }
 
-            // Backoff: 1s, 2s, 3s, 4s
+            // Esperar antes del siguiente intento
             if (i < MAX_ATTEMPTS) {
-                await new Promise(r => setTimeout(r, i * 1000));
+                setConnectingServer(`${server} (intento ${i + 1}/${MAX_ATTEMPTS})`);
+                await new Promise(r => setTimeout(r, 2000));
             }
         }
 
         // Todos los intentos fallaron
+        connectingRef.current = false;
         setConnectingServer(null);
-        toast.error('No se pudo conectar al servidor. Verificá la URL del QR.');
+        toast.error('No se pudo conectar. Verificá tu conexión y volvé a escanear.');
     };
 
     useEffect(() => {
@@ -194,6 +199,7 @@ export default function LoginPage() {
             }
             setScannerReady(false);
             setConnectingServer(null);
+            connectingRef.current = false;
             return;
         }
 
@@ -221,10 +227,10 @@ export default function LoginPage() {
 
                 await scanner.start(
                     back ? back.id : cameras[0].id,
-                    { fps: 15, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
+                    { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
                     (decoded) => {
-                        // Ignorar si ya está conectando
-                        if (connectingServer) return;
+                        // Bloquear si ya está conectando
+                        if (connectingRef.current) return;
 
                         const text = decoded.trim();
                         let server: string | null = null;
@@ -254,10 +260,8 @@ export default function LoginPage() {
                                 osc.start(); osc.stop(ctx.currentTime + 0.1);
                             } catch {}
 
-                            // Validar servidor antes de reconectar
+                            // Pausar scanner y validar
                             validateAndConnect(server);
-                        } else {
-                            toast.error('QR no reconocido');
                         }
                     },
                     () => {}
