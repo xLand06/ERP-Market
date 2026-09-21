@@ -941,16 +941,103 @@ export async function backupTenantDatabase(slug: string): Promise<BackupItem> {
     const filename = `${stamp}.sql.gz`;
     const outFile = path.join(outDir, filename);
 
-    const cmd = `docker exec db-${slug} pg_dump -U "${dbUser}" "${dbName}" | gzip -c > "${outFile}"`;
-    console.log(`[provisioner] Ejecutando backup: ${cmd}`);
-    execSync(cmd, { encoding: 'utf-8', timeout: 120000 });
+    // Compresión máxima (gzip -9) y eliminación de declaraciones propietarias de permisos/owner
+    // para reducir drásticamente el tamaño del archivo y asegurar portabilidad universal.
+    const cmd = `docker exec db-${slug} pg_dump -U "${dbUser}" --no-owner --no-privileges "${dbName}" | gzip -9 -c > "${outFile}"`;
+    console.log(`[provisioner] Ejecutando backup optimizado: ${cmd}`);
+    execSync(cmd, { encoding: 'utf-8', timeout: 180000 });
 
     const stats = await fs.stat(outFile);
+
+    // Purgar automáticamente backups antiguos que excedan la cuota de retención (máximo 7 backups o >30 días)
+    try {
+        const pruned = await pruneTenantBackups(slug, 7, 30);
+        if (pruned > 0) {
+            console.log(`[provisioner] Se purgaron ${pruned} backups viejos para el tenant ${slug}`);
+        }
+    } catch (e) {
+        console.warn(`[provisioner] Error al rotar backups viejos de ${slug}:`, e);
+    }
+
     return {
         filename,
         sizeBytes: stats.size,
         createdAt: now.toISOString(),
     };
+}
+
+/**
+ * Rota y purga backups antiguos de un tenant para ahorrar espacio en disco.
+ * Mantiene hasta maxToKeep backups y elimina aquellos con más de maxAgeDays días.
+ */
+export async function pruneTenantBackups(slug: string, maxToKeep = 7, maxAgeDays = 30): Promise<number> {
+    const SAFE_IDENTIFIER = /^[a-zA-Z0-9_-]+$/;
+    if (!SAFE_IDENTIFIER.test(slug)) return 0;
+
+    const backupsDir = path.join(DEPLOY_DIR, 'backups', slug);
+    try {
+        const files = await fs.readdir(backupsDir);
+        const validFiles: { name: string; fullPath: string; mtime: Date }[] = [];
+
+        for (const file of files) {
+            if (!file.endsWith('.sql.gz') && !file.endsWith('.dump')) continue;
+            const fullPath = path.join(backupsDir, file);
+            const stats = await fs.stat(fullPath);
+            validFiles.push({
+                name: file,
+                fullPath,
+                mtime: stats.mtime,
+            });
+        }
+
+        // Orden descendente (más nuevos primero)
+        validFiles.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+
+        const now = Date.now();
+        const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
+        let prunedCount = 0;
+
+        for (let i = 0; i < validFiles.length; i++) {
+            const item = validFiles[i];
+            const isBeyondLimit = i >= maxToKeep;
+            const isTooOld = now - item.mtime.getTime() > maxAgeMs;
+
+            if (isBeyondLimit || isTooOld) {
+                try {
+                    await fs.unlink(item.fullPath);
+                    prunedCount++;
+                } catch (err) {
+                    console.warn(`[provisioner] Error eliminando backup antiguo ${item.name}:`, err);
+                }
+            }
+        }
+
+        return prunedCount;
+    } catch {
+        return 0;
+    }
+}
+
+/**
+ * Retorna el path absoluto verificado de un backup para descarga segura.
+ */
+export async function getTenantBackupPath(slug: string, filename: string): Promise<string | null> {
+    const SAFE_IDENTIFIER = /^[a-zA-Z0-9_-]+$/;
+    const SAFE_FILENAME = /^[a-zA-Z0-9_.-]+$/;
+
+    if (!SAFE_IDENTIFIER.test(slug) || !SAFE_FILENAME.test(filename)) return null;
+    if (!filename.endsWith('.sql.gz') && !filename.endsWith('.dump')) return null;
+
+    const fullPath = path.join(DEPLOY_DIR, 'backups', slug, filename);
+    try {
+        const stats = await fs.stat(fullPath);
+        if (stats.isFile()) {
+            return fullPath;
+        }
+    } catch {
+        return null;
+    }
+    return null;
 }
 
 /**
@@ -966,7 +1053,7 @@ export async function listTenantBackups(slug: string): Promise<BackupItem[]> {
         const backups: BackupItem[] = [];
 
         for (const file of files) {
-            if (!file.endsWith('.sql.gz')) continue;
+            if (!file.endsWith('.sql.gz') && !file.endsWith('.dump')) continue;
             const fullPath = path.join(backupsDir, file);
             const stats = await fs.stat(fullPath);
             backups.push({

@@ -10,6 +10,7 @@ import {
     generateImpersonationSession,
     backupTenantDatabase,
     listTenantBackups,
+    getTenantBackupPath,
     ProvisionInput,
 } from '../../services/provisioner';
 import { createAuditEntry } from '../audit/audit.service';
@@ -349,4 +350,15 @@ export async function getTenantBackups(slug: string) {
 
     return listTenantBackups(slug);
 }
+
+/**
+ * Obtiene la ruta física del archivo de backup para descarga
+ */
+export async function getTenantBackupDownload(slug: string, filename: string) {
+    const tenant = await prisma.tenant.findUnique({ where: { slug } });
+    if (!tenant) throw new Error('Tenant no encontrado');
+
+    return getTenantBackupPath(slug, filename);
+}
+
 

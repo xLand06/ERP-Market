@@ -1,18 +1,23 @@
 import { prisma } from '../config/prisma';
-import { suspendTenant, deleteTenant } from './provisioner';
+import { suspendTenant, deleteTenant, pruneTenantBackups } from './provisioner';
 import { createAuditEntry } from '../modules/audit/audit.service';
 
 /**
- * Cron de auto-suspension por falta de pago y limpieza de tenants abandonados.
+ * Cron de auto-suspension por falta de pago, custodia y rotación de backups.
  * Cada 6 horas:
- * 1. Suspende tenants de prueba (trials) que superaron los 14 días (+1 día de gracia).
- * 2. Suspende clientes regulares que superaron el vencimiento (+7 días de gracia).
- * 3. Purga (elimina contenedores y volumen) de tenants suspendidos por más de 30 días sin pago.
+ * 1. Suspende tenants de prueba (trials) tras superar el periodo de prueba (+1 día de gracia).
+ * 2. Suspende clientes regulares tras superar el vencimiento (+7 días de gracia operativa).
+ * 3. Custodia de Datos:
+ *    - Pruebas abandonadas: purga definitiva a los 14 días de suspensión.
+ *    - Clientes regulares suspendidos: periodo de custodia de 30 días (+15 de aviso final = 45 días) antes de purga definitiva.
+ * 4. Mantenimiento de almacenamiento: rotación y purga de backups antiguos (>7 backups o >30 días).
  */
 
 const CRON_INTERVAL_MS = 6 * 60 * 60 * 1000; // cada 6 horas
 const PAID_GRACE_DAYS = 7; // días de gracia tras el vencimiento para clientes con historial de pago
 const TRIAL_GRACE_DAYS = 1; // 24 horas de gracia para pruebas gratis
+const TRIAL_PURGE_DAYS = 14; // 14 días de custodia para trials antes de purga definitiva
+const PAID_CUSTODY_PURGE_DAYS = 45; // 45 días de custodia para cuentas regulares suspendidas
 
 let cronTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -24,6 +29,7 @@ export async function runPaymentCronCycle(): Promise<{
     suspended: number;
     purged: number;
     failed: number;
+    backupsPruned: number;
 }> {
     const now = new Date();
     const paidCutoff = new Date(now.getTime() - PAID_GRACE_DAYS * 24 * 60 * 60 * 1000);
@@ -45,6 +51,7 @@ export async function runPaymentCronCycle(): Promise<{
     let suspended = 0;
     let purged = 0;
     let failed = 0;
+    let backupsPruned = 0;
 
     for (const tenant of activeTenants) {
         const isTrial = tenant.payments.length === 0;
@@ -79,12 +86,13 @@ export async function runPaymentCronCycle(): Promise<{
         }
     }
 
-    // ── Garbage Collection: Purga de tenants suspendidos > 30 días sin pago ──
-    const purgeCutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const abandonedTenants = await prisma.tenant.findMany({
+    // ── Garbage Collection: Purga definitiva post-periodo de custodia ───────
+    // 1. Trials suspendidos > 14 días sin pago
+    const trialPurgeCutoff = new Date(now.getTime() - TRIAL_PURGE_DAYS * 24 * 60 * 60 * 1000);
+    const abandonedTrials = await prisma.tenant.findMany({
         where: {
             status: 'SUSPENDED',
-            updatedAt: { lt: purgeCutoff },
+            updatedAt: { lt: trialPurgeCutoff },
             payments: {
                 none: { status: 'PAID' },
             },
@@ -92,29 +100,72 @@ export async function runPaymentCronCycle(): Promise<{
         select: { id: true, slug: true, updatedAt: true },
     });
 
-    for (const abandoned of abandonedTenants) {
+    for (const abandoned of abandonedTrials) {
         try {
-            console.log(`[payment-cron] Purgando tenant abandonado tras 30 días suspendido: ${abandoned.slug}`);
+            console.log(`[payment-cron] Purgando trial abandonado tras ${TRIAL_PURGE_DAYS} días: ${abandoned.slug}`);
             await deleteTenant(abandoned.slug);
             await createAuditEntry({
                 actor: 'system',
-                action: 'TENANT_PURGED_ABANDONED',
+                action: 'TENANT_PURGED_ABANDONED_TRIAL',
                 tenantId: abandoned.id,
                 details: { slug: abandoned.slug, suspendedSince: abandoned.updatedAt.toISOString() },
             });
             purged++;
         } catch (err) {
             failed++;
-            console.error(`[payment-cron] Error purgando tenant ${abandoned.slug}:`, err);
+            console.error(`[payment-cron] Error purgando trial ${abandoned.slug}:`, err);
         }
+    }
+
+    // 2. Clientes regulares suspendidos > 45 días (30 de custodia + 15 de aviso final)
+    const paidPurgeCutoff = new Date(now.getTime() - PAID_CUSTODY_PURGE_DAYS * 24 * 60 * 60 * 1000);
+    const abandonedPaidTenants = await prisma.tenant.findMany({
+        where: {
+            status: 'SUSPENDED',
+            updatedAt: { lt: paidPurgeCutoff },
+            payments: {
+                some: { status: 'PAID' },
+            },
+        },
+        select: { id: true, slug: true, updatedAt: true },
+    });
+
+    for (const abandoned of abandonedPaidTenants) {
+        try {
+            console.log(`[payment-cron] Purgando cliente regular tras ${PAID_CUSTODY_PURGE_DAYS} días de custodia: ${abandoned.slug}`);
+            await deleteTenant(abandoned.slug);
+            await createAuditEntry({
+                actor: 'system',
+                action: 'TENANT_PURGED_CUSTODY_EXPIRED',
+                tenantId: abandoned.id,
+                details: { slug: abandoned.slug, suspendedSince: abandoned.updatedAt.toISOString() },
+            });
+            purged++;
+        } catch (err) {
+            failed++;
+            console.error(`[payment-cron] Error purgando cliente ${abandoned.slug}:`, err);
+        }
+    }
+
+    // ── Mantenimiento de almacenamiento: rotación y purga de backups antiguos ──
+    try {
+        const allTenants = await prisma.tenant.findMany({
+            select: { slug: true },
+        });
+        for (const t of allTenants) {
+            const count = await pruneTenantBackups(t.slug, 7, 30);
+            backupsPruned += count;
+        }
+    } catch (e) {
+        console.warn('[payment-cron] Error en rotación periódica de backups:', e);
     }
 
     console.log(
         `[payment-cron] Ciclo completado: ${activeTenants.length} revisados, ` +
-        `${suspended} suspendidos, ${purged} purgados, ${failed} errores`
+        `${suspended} suspendidos, ${purged} purgados, ${backupsPruned} backups viejos rotados, ${failed} errores`
     );
 
-    return { checked: activeTenants.length, suspended, purged, failed };
+    return { checked: activeTenants.length, suspended, purged, failed, backupsPruned };
 }
 
 /**

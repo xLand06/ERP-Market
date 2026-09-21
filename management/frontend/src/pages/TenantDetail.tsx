@@ -1629,7 +1629,7 @@ export default function TenantDetailPage() {
                                     <th style={{ padding: '0.6rem 0', fontWeight: 600, fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' }}>Archivo</th>
                                     <th style={{ fontWeight: 600, fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' }}>Tamaño</th>
                                     <th style={{ fontWeight: 600, fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' }}>Fecha de Creación</th>
-                                    <th style={{ fontWeight: 600, fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', textAlign: 'right' }}>Estado</th>
+                                    <th style={{ fontWeight: 600, fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', textAlign: 'right' }}>Estado / Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1647,20 +1647,43 @@ export default function TenantDetailPage() {
                                             {new Date(b.createdAt).toLocaleString('es-AR')}
                                         </td>
                                         <td style={{ textAlign: 'right' }}>
-                                            <span style={{
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: 4,
-                                                padding: '2px 8px',
-                                                borderRadius: 999,
-                                                fontSize: '0.7rem',
-                                                fontWeight: 600,
-                                                background: '#ecfdf5',
-                                                color: '#065f46',
-                                            }}>
-                                                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981' }} />
-                                                Disponible
-                                            </span>
+                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+                                                <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: 4,
+                                                    padding: '2px 8px',
+                                                    borderRadius: 999,
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 600,
+                                                    background: '#ecfdf5',
+                                                    color: '#065f46',
+                                                }}>
+                                                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981' }} />
+                                                    Disponible
+                                                </span>
+                                                <a
+                                                    href={`/api/tenants/${slug}/backups/${b.filename}/download`}
+                                                    download={b.filename}
+                                                    style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: 4,
+                                                        padding: '3px 8px',
+                                                        borderRadius: 6,
+                                                        fontSize: '0.72rem',
+                                                        fontWeight: 600,
+                                                        background: '#eff6ff',
+                                                        color: '#1d4ed8',
+                                                        border: '1px solid #bfdbfe',
+                                                        textDecoration: 'none',
+                                                        cursor: 'pointer',
+                                                    }}
+                                                    title="Descargar copia para entrega o resguardo"
+                                                >
+                                                    Descargar
+                                                </a>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
