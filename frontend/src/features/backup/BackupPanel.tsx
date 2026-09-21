@@ -1,5 +1,5 @@
 // =============================================================================
-// BackupPanel — Panel de Backup y Purga de Supabase
+// BackupPanel — Panel de Backup, Portabilidad (Takeout) y Optimización de Almacenamiento
 // Escalable para Google Drive OAuth2 (ver comentarios TODO)
 // =============================================================================
 
@@ -100,7 +100,7 @@ function BackupExportSection() {
 
     const handleExport = async () => {
         setExporting(true);
-        const toastId = toast.loading('Generando backup desde SQLite...');
+        const toastId = toast.loading('Generando copia completa (Takeout)...');
         try {
             const res = await api.post('/backup/export');
             const { filename } = res.data.data;
@@ -138,19 +138,17 @@ function BackupExportSection() {
         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
             <SectionHeader
                 icon={Archive}
-                title="Copias de Seguridad Locales"
-                subtitle="Exporta todos los datos de SQLite como archivo comprimido .json.gz"
+                title="Copias de Seguridad y Portabilidad (Takeout)"
+                subtitle="Exporta la base de datos completa con compresión máxima (gzip -9) y portabilidad garantizada"
             />
 
             {/* Info banner */}
             <div className="flex items-start gap-3 p-4 bg-indigo-50 border border-indigo-100 rounded-xl mb-5">
                 <Info className="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" />
                 <div className="text-xs text-indigo-700 space-y-1">
-                    <p className="font-semibold">¿Qué incluye el backup?</p>
-                    <p>Todos los datos del sistema: productos, ventas, inventario, clientes, usuarios y configuración. El archivo se genera desde la base de datos local (SQLite) y <strong>no modifica ningún dato</strong>.</p>
-                    {/* TODO (Google Drive): reemplazar el párrafo de abajo por el botón de "Subir a Drive" 
-                        una vez implementado OAuth2 con Google Cloud Console */}
-                    <p className="mt-1 font-medium text-indigo-600">💡 Descarga el archivo y súbelo manualmente a Google Drive, OneDrive o cualquier almacenamiento en la nube de tu preferencia.</p>
+                    <p className="font-semibold">Soberanía de Datos y Política de Retención</p>
+                    <p>Incluye todos los registros del negocio: productos, lotes, ventas, pagos, clientes, cuentas bancarias, inventario y configuración. Formato comprimido ultraligero (.json.gz con gzip -9) sin bloqueo de proveedor (Zero Lock-in).</p>
+                    <p className="mt-1 font-medium text-indigo-600">💡 Retención automática: El sistema conserva las últimas 7 copias locales para optimizar el almacenamiento. Puedes descargarlas cuando desees o guardarlas en almacenamiento externo.</p>
                 </div>
             </div>
 
@@ -286,7 +284,7 @@ function BackupExportSection() {
     );
 }
 
-// ── Sección 2: Purgar Supabase ────────────────────────────────────────────────
+// ── Sección 2: Depuración y Optimización de Almacenamiento ───────────────────
 
 function CloudPurgeSection() {
     const [olderThanDays, setOlderThanDays] = useState('30');
@@ -315,20 +313,19 @@ function CloudPurgeSection() {
         staleTime: 60_000,
     });
 
-    console.log('stats', stats);
     const totalToDelete = stats?.reduce((s, r) => s + (r as any).count, 0) ?? 0;
     const totalInCloud = stats?.reduce((s, r) => s + (r as any).totalCount, 0) ?? 0;
 
     const handlePurge = async () => {
         if (!window.confirm(
-            `¿Confirmas la purga de registros con más de ${olderThanDays} días en Supabase?\n\n` +
-            `• Se eliminarán aproximadamente ${totalToDelete.toLocaleString()} registros de la NUBE.\n` +
-            `• Los datos locales (SQLite) permanecerán INTACTOS.\n` +
-            `• Solo se borran registros ya sincronizados (SYNCED).`
+            `¿Confirmas la depuración de registros históricos con más de ${olderThanDays} días?\n\n` +
+            `• Se optimizarán y liberarán aproximadamente ${totalToDelete.toLocaleString()} registros antiguos.\n` +
+            `• Catálogos esenciales (productos, clientes, inventario base) permanecen 100% protegidos.\n` +
+            `• Sesiones de caja abiertas nunca se modifican.`
         )) return;
 
         setPurging(true);
-        const toastId = toast.loading('Purgando Supabase...');
+        const toastId = toast.loading('Optimizando base de datos...');
         try {
             const days = parseInt(olderThanDays) || 30;
             const res = await api.post('/backup/purge-cloud', { olderThanDays: days, logRetentionDays });
@@ -336,7 +333,7 @@ function CloudPurgeSection() {
             toast.success(res.data.data.message, { id: toastId, duration: 6000 });
             refetchStats();
         } catch (err: any) {
-            toast.error(err?.response?.data?.error || 'Error al purgar Supabase', { id: toastId });
+            toast.error(err?.response?.data?.error || 'Error al optimizar registros', { id: toastId });
         } finally {
             setPurging(false);
         }
@@ -346,17 +343,17 @@ function CloudPurgeSection() {
         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
             <SectionHeader
                 icon={Cloud}
-                title="Gestión de Supabase"
-                subtitle="Libera espacio en la nube borrando registros antiguos ya sincronizados"
+                title="Depuración Histórica y Optimización de Base de Datos"
+                subtitle="Acelera consultas y optimiza almacenamiento depurando transacciones históricas antiguas"
                 color="amber"
             />
 
-            {/* Consumo de Almacenamiento en Supabase */}
+            {/* Consumo de Almacenamiento */}
             <div className="mb-5 p-4 bg-slate-50 border border-slate-200 rounded-xl">
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                         <HardDrive className="w-4 h-4 text-slate-500" />
-                        <span className="text-sm font-bold text-slate-700">Espacio en Supabase (Plan Gratuito 500 MB)</span>
+                        <span className="text-sm font-bold text-slate-700">Uso de Almacenamiento en Base de Datos</span>
                     </div>
                     {loadingStorage ? (
                         <span className="text-xs text-slate-400 font-medium">Calculando...</span>
@@ -394,13 +391,12 @@ function CloudPurgeSection() {
             <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-100 rounded-xl mb-5">
                 <Shield className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
                 <div className="text-xs text-amber-800 space-y-1">
-                    <p className="font-semibold">Política de Purga Inteligente</p>
+                    <p className="font-semibold">Política de Depuración Inteligente</p>
                     <ul className="space-y-0.5 list-disc list-inside text-amber-700">
-                        <li>Solo se borran registros marcados como <strong>SYNCED</strong> (ya en la nube)</li>
-                        <li><strong>Purga Automática:</strong> Se activa al superar el <strong>70%</strong> de uso en Supabase.</li>
-                        <li><strong>Retención:</strong> Registros antiguos (&gt;15 días) y Logs (&gt;60 días) se eliminan al purgar.</li>
-                        <li>Las cajas abiertas nunca se borran.</li>
-                        <li><strong>Los datos locales (SQLite) permanecen intactos.</strong></li>
+                        <li>Solo se depuran transacciones históricas sincronizadas y logs que superen la antigüedad elegida.</li>
+                        <li><strong>Catálogos 100% protegidos:</strong> Productos, clientes, categorías, inventario actual y usuarios <strong>NUNCA</strong> se eliminan.</li>
+                        <li><strong>Cajas activas protegidas:</strong> Las sesiones de caja abiertas nunca se borran.</li>
+                        <li><strong>Recomendación:</strong> Genera un Takeout completo antes de purgar periodos extensos.</li>
                     </ul>
                 </div>
             </div>
@@ -450,15 +446,15 @@ function CloudPurgeSection() {
                         {showStats ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
                     {loadingStats ? (
-                        <div className="p-4 text-center text-sm text-slate-400">Consultando Supabase...</div>
+                        <div className="p-4 text-center text-sm text-slate-400">Consultando registros históricos...</div>
                     ) : (
                         <>
                             <table className="w-full text-sm">
                             <thead className="bg-slate-50 border-y border-slate-100">
                                 <tr>
                                     <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-500 uppercase">Tabla</th>
-                                    <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">A eliminar</th>
-                                    <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Total en Nube</th>
+                                    <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">A depurar</th>
+                                    <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Total en Base de Datos</th>
                                     <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Más antiguo</th>
                                 </tr>
                             </thead>
@@ -486,7 +482,7 @@ function CloudPurgeSection() {
                         </table>
                         {totalToDelete === 0 && (stats?.some(s => (s as any).totalCount > 0)) && (
                             <div className="p-3 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500 text-center italic">
-                                Nota: Hay registros en la nube, pero ninguno supera los {olderThanDays} días de antigüedad seleccionados.
+                                Nota: Hay registros en la base de datos, pero ninguno supera los {olderThanDays} días de antigüedad seleccionados.
                             </div>
                         )}
                     </>
@@ -499,7 +495,7 @@ function CloudPurgeSection() {
                 <div className="mb-5 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
                     <div className="flex items-center gap-2 mb-3">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span className="text-sm font-bold text-emerald-700">Purga completada exitosamente</span>
+                        <span className="text-sm font-bold text-emerald-700">Depuración completada exitosamente</span>
                     </div>
                     <div className="space-y-1.5">
                         {purgeResults.map(r => (
@@ -519,7 +515,7 @@ function CloudPurgeSection() {
                 className="flex items-center gap-2 px-5 py-2.5 bg-amber-600 text-white text-sm font-bold rounded-xl hover:bg-amber-700 transition-all active:scale-95 shadow-sm shadow-amber-200 disabled:opacity-60"
             >
                 {purging ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CloudOff className="w-4 h-4" />}
-                {purging ? 'Purgando Supabase...' : `Purgar registros > ${olderThanDays} días`}
+                {purging ? 'Optimizando base de datos...' : `Depurar registros > ${olderThanDays} días`}
             </button>
 
             {olderThanDays < 7 && (
