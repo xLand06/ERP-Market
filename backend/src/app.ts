@@ -96,7 +96,15 @@ app.use(helmet({
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'", "http://127.0.0.1:3000", "http://127.0.0.1:3001", "http://localhost:3000", "http://localhost:3001"],
+            connectSrc: [
+                "'self'",
+                "http://127.0.0.1:3000", "http://127.0.0.1:3001",
+                "http://localhost:3000", "http://localhost:3001",
+                // Capacitor APK: permite conexiones al mismo servidor
+                "https:", "http:",
+                // Capacitor deep link origins
+                "capacitor://localhost", "ionic://localhost",
+            ],
         },
     },
     crossOriginEmbedderPolicy: false,
