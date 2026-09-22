@@ -156,8 +156,14 @@ export default function App() {
         );
     }
 
-    // Sin servidor configurado: mostrar pantalla de conexión
-    if (!hasServerUrl) {
+    // Thin client sin servidor: mostrar ConnectScreen
+    // Web normal → NUNCA (usa /api relativo del mismo origen)
+    // Electron → cuando no tiene serverUrl
+    // Capacitor APK → cuando no tiene serverUrl (carga desde https://localhost)
+    const isElectron = !!(window as any).erpApi?.isElectron;
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const needsConnectScreen = isElectron || isLocalhost;
+    if (needsConnectScreen && !hasServerUrl) {
         return <ConnectScreen />;
     }
 
