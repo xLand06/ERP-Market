@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Monitor, Link2, Loader2, QrCode, Camera, Hash } from 'lucide-react';
+import { AppStorage } from '@/services/app-storage';
 
 // =============================================================================
 // CONNECT SCREEN — Pantalla de conexión del thin client (Electron / APK).
@@ -158,7 +159,7 @@ export default function ConnectScreen() {
                 }
                 return;
             }
-            localStorage.setItem('serverUrl', server);
+            await AppStorage.setItem('serverUrl', server);
             window.location.reload();
         } catch (err: any) {
             setError(err?.message || 'Error al conectar');
