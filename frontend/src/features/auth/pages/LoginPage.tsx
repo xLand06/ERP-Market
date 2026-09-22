@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLoginForm, useLogin } from '@/features/auth/hooks';
 import { useConfigStore } from '@/hooks/useConfigStore';
+import { AppStorage } from '@/services/app-storage';
 import type { LoginPayload } from '@/features/auth/types';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -164,7 +165,7 @@ export default function LoginPage() {
                 if (res.ok) {
                     // Servidor responde — guardar y recargar
                     toast.success('Negocio conectado');
-                    localStorage.setItem('serverUrl', server);
+                    await AppStorage.setItem('serverUrl', server);
                     setTimeout(() => window.location.reload(), 300);
                     return;
                 }

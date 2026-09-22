@@ -21,13 +21,16 @@ import { useConfigStore } from '@/hooks/useConfigStore';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import InitialSyncScreen from '@/components/loading/InitialSyncScreen';
 import ConnectScreen from '@/components/loading/ConnectScreen';
+import { AppStorage } from '@/services/app-storage';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
 export default function App() {
     const { fetchSettings, activeTheme, businessName } = useConfigStore();
-    const [initialSyncDone, setInitialSyncDone] = useState(true); // Por defecto: pasar directo
+    const [initialSyncDone, setInitialSyncDone] = useState(true);
     const [checking, setChecking] = useState(true);
+    const [serverUrlReady, setServerUrlReady] = useState(false);
+    const [hasServerUrl, setHasServerUrl] = useState(false);
 
     // Acceso de soporte administrativo asistido vía token en URL
     useEffect(() => {
@@ -50,6 +53,16 @@ export default function App() {
     useEffect(() => {
         fetchSettings();
     }, [fetchSettings]);
+
+    // ── Inicializar serverUrl desde SQLite/localStorage ─────────────────────
+    useEffect(() => {
+        (async () => {
+            const url = await AppStorage.initServerUrl();
+            const electronUrl = (window as any).erpApi?.serverUrl;
+            setHasServerUrl(!!url || !!electronUrl);
+            setServerUrlReady(true);
+        })();
+    }, []);
 
     // Título dinámico: ALLMARKET -- <nombre de la empresa del tenant>
     useEffect(() => {
@@ -134,9 +147,16 @@ export default function App() {
         );
     }
 
-    // Thin client sin servidor configurado: mostrar pantalla de conexión
-    // Funciona para Electron, Capacitor, o cualquier entorno sin serverUrl
-    const hasServerUrl = !!(window as any).erpApi?.serverUrl || !!localStorage.getItem('serverUrl');
+    // Esperar a que se cargue el serverUrl desde SQLite
+    if (!serverUrlReady) {
+        return (
+            <div className="fixed inset-0 bg-slate-900 flex items-center justify-center z-50">
+                <div className="animate-spin w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full" />
+            </div>
+        );
+    }
+
+    // Sin servidor configurado: mostrar pantalla de conexión
     if (!hasServerUrl) {
         return <ConnectScreen />;
     }
