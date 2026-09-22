@@ -25,7 +25,15 @@ function getElectronBase(): string {
     return 'http://127.0.0.1:3001/api';
 }
 
+/** Obtiene el serverUrl guardado en localStorage (APK / Capacitor) */
+function getCapacitorBase(): string {
+    const server = localStorage.getItem('serverUrl');
+    if (server) return `${server.replace(/\/+$/, '')}/api`;
+    return '/api';
+}
+
 const isElectron = window.location.protocol === 'file:' || (window as any).erpApi?.isElectron;
+const isCapacitor = !!(window as any).Capacitor;
 
 // VITE_API_URL anula todo si está definida (builds web con API externa)
 const envBaseURL = import.meta.env.VITE_API_URL as string | undefined;
@@ -44,7 +52,9 @@ api.interceptors.request.use((config) => {
         ? envBaseURL.replace(/\/+$/, '')
         : isElectron
             ? getElectronBase()
-            : '/api';
+            : isCapacitor
+                ? getCapacitorBase()
+                : '/api';
     if (config.url && !/^https?:\/\//.test(config.url)) {
         config.url = base + config.url;
     }
