@@ -9,6 +9,68 @@ import toast from 'react-hot-toast';
 
 import { AppStorage } from '../services/app-storage';
 
+// ── Capacitor HTTP Adapter ──────────────────────────────────────────────────
+// En Capacitor, fetch() está bloqueado por cross-origin en el WebView.
+// Usamos CapacitorHttp de @capacitor/core que bypass el WebView y usa HTTP nativo.
+const isCapacitor = !!(window as any).Capacitor || window.location.hostname === 'localhost';
+
+let capacitorHttp: any = null;
+if (isCapacitor) {
+    import('@capacitor/core').then(({ CapacitorHttp }) => {
+        capacitorHttp = CapacitorHttp;
+    }).catch(() => {});
+}
+
+/**
+ * Custom axios adapter para Capacitor — usa HTTP nativo en vez de fetch.
+ */
+function createCapacitorAdapter() {
+    return async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+        if (!capacitorHttp) {
+            throw new Error('Capacitor HTTP not initialized');
+        }
+
+        const method = (config.method || 'get').toUpperCase();
+        const url = config.url || '';
+        const headers: Record<string, string> = {};
+        if (config.headers) {
+            Object.entries(config.headers).forEach(([k, v]) => {
+                if (v !== undefined && v !== null) headers[k] = String(v);
+            });
+        }
+
+        const options: any = {
+            url,
+            method,
+            headers,
+            connectTimeout: config.timeout || 10000,
+            readTimeout: config.timeout || 30000,
+        };
+
+        if (config.data) {
+            options.data = typeof config.data === 'string' ? config.data : JSON.stringify(config.data);
+            if (!headers['Content-Type']) {
+                options.headers['Content-Type'] = 'application/json';
+            }
+        }
+
+        if (config.params) {
+            const qs = new URLSearchParams(config.params as any).toString();
+            options.url += (url.includes('?') ? '&' : '?') + qs;
+        }
+
+        const response = await capacitorHttp.request(options);
+
+        return {
+            data: response.data,
+            status: response.status,
+            statusText: response.status >= 200 && response.status < 300 ? 'OK' : 'Error',
+            headers: response.headers || {},
+            config,
+        };
+    };
+}
+
 /**
  * Resuelve la base del API de forma síncrona.
  *
@@ -42,12 +104,11 @@ export function getCachedServerUrl(): string | null {
 // VITE_API_URL anula todo si está definida (builds web con API externa)
 const envBaseURL = import.meta.env.VITE_API_URL as string | undefined;
 
-// La instancia NO define baseURL en la creación: se resuelve por request en el
-// interceptor, permitiendo modo web (relativo), offline (3001) y thin client
-// (serverUrl remoto) con la misma instancia.
+// La instancia usa HTTP nativo en Capacitor, fetch normal en web/Electron
 export const api = axios.create({
     timeout: 10000,
     headers: { 'Content-Type': 'application/json' },
+    adapter: isCapacitor ? createCapacitorAdapter() as any : undefined,
 });
 
 // Prefijo dinámico de la base URL — preserva el comportamiento web (relativo /api).
