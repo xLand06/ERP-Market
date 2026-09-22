@@ -135,10 +135,9 @@ export default function App() {
     }
 
     // Thin client sin servidor configurado: mostrar pantalla de conexión
-    // Electron (erpApi.serverUrl) o Capacitor (localStorage.serverUrl)
-    const isElectronNoServer = (window as any).erpApi?.isElectron && !(window as any).erpApi?.serverUrl;
-    const isCapacitorNoServer = !!(window as any).Capacitor && !localStorage.getItem('serverUrl');
-    if (isElectronNoServer || isCapacitorNoServer) {
+    // Funciona para Electron, Capacitor, o cualquier entorno sin serverUrl
+    const hasServerUrl = !!(window as any).erpApi?.serverUrl || !!localStorage.getItem('serverUrl');
+    if (!hasServerUrl) {
         return <ConnectScreen />;
     }
 
