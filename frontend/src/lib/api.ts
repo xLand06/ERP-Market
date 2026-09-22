@@ -48,12 +48,13 @@ export const api = axios.create({
 
 // Prefijo dinámico de la base URL — preserva el comportamiento web (relativo /api).
 api.interceptors.request.use((config) => {
+    // Prioridad: env > localStorage serverUrl (QR scan) > Electron > relativo
     const base = envBaseURL
         ? envBaseURL.replace(/\/+$/, '')
-        : isElectron
-            ? getElectronBase()
-            : isCapacitor
-                ? getCapacitorBase()
+        : localStorage.getItem('serverUrl')
+            ? `${localStorage.getItem('serverUrl')!.replace(/\/+$/, '')}/api`
+            : isElectron
+                ? getElectronBase()
                 : '/api';
     if (config.url && !/^https?:\/\//.test(config.url)) {
         config.url = base + config.url;
