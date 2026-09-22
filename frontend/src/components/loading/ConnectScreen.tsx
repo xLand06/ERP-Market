@@ -3,8 +3,8 @@ import { Monitor, Link2, Loader2, QrCode, Camera, Hash } from 'lucide-react';
 import { AppStorage } from '@/services/app-storage';
 
 // =============================================================================
-// CONNECT SCREEN — Pantalla de conexión del thin client (Electron / APK).
-// 3 métodos: QR (principal) → Código de negocio (fallback fácil) → URL (fallback último)
+// CONNECT SCREEN — Pantalla de conexión (Electron / APK / web).
+// 3 métodos: QR (principal) → Código de negocio (fallback) → URL (fallback)
 // =============================================================================
 
 const MGMT_API = 'https://mgmt.allcode.site';
@@ -20,8 +20,10 @@ export default function ConnectScreen() {
     const [resolving, setResolving] = useState(false);
     const scannerRef = useRef<any>(null);
     const scannerContainerRef = useRef<HTMLDivElement>(null);
+    const modeRef = useRef(mode);
+    modeRef.current = mode;
 
-    // ── QR Scanner lifecycle ─────────────────────────────────────────────────
+    // ── QR Scanner — usa la misma lógica que el LoginPage ───────────────────
     useEffect(() => {
         if (mode !== 'qr') {
             stopScanner();
@@ -35,6 +37,10 @@ export default function ConnectScreen() {
                 const { Html5Qrcode } = await import('html5-qrcode');
                 if (cancelled || !scannerContainerRef.current) return;
 
+                // Esperar a que el DOM esté listo
+                await new Promise(r => setTimeout(r, 100));
+                if (cancelled || !scannerContainerRef.current) return;
+
                 const scanner = new Html5Qrcode('qr-connect-scanner', { verbose: false });
                 scannerRef.current = scanner;
 
@@ -42,35 +48,42 @@ export default function ConnectScreen() {
                 if (cancelled) return;
 
                 if (!cameras || cameras.length === 0) {
-                    setError('No se detectaron cámaras disponibles.');
-                    setMode('code');
+                    if (!cancelled) {
+                        setError('No se detectaron cámaras. Usá código o URL.');
+                        setMode('code');
+                    }
                     return;
                 }
 
-                const backCamera = cameras.find(
-                    (d: any) => d.label.toLowerCase().includes('back') ||
-                               d.label.toLowerCase().includes('trasera') ||
-                               d.label.toLowerCase().includes('environment')
+                // Preferir cámara trasera
+                const back = cameras.find((d: any) =>
+                    d.label.toLowerCase().includes('back') ||
+                    d.label.toLowerCase().includes('trasera') ||
+                    d.label.toLowerCase().includes('environment')
                 );
-                const cameraId = backCamera ? backCamera.id : cameras[0].id;
 
                 await scanner.start(
-                    cameraId,
-                    { fps: 15, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
-                    (decodedText) => handleQrScan(decodedText.trim()),
-                    () => {}
+                    back ? back.id : cameras[0].id,
+                    { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+                    (decodedText) => {
+                        // Ignorar si ya está conectando o cambió de modo
+                        if (modeRef.current !== 'qr' || connecting) return;
+                        handleQrScan(decodedText.trim());
+                    },
+                    () => {} // ignore decode errors
                 );
 
                 if (!cancelled) setQrReady(true);
             } catch (err: any) {
                 if (!cancelled) {
-                    setError(err?.message || 'Error al iniciar la cámara');
+                    console.error('[ConnectScreen] QR scanner error:', err);
+                    setError(err?.message || 'Error al iniciar cámara. Usá código o URL.');
                     setMode('code');
                 }
             }
         };
 
-        const timer = setTimeout(initScanner, 300);
+        const timer = setTimeout(initScanner, 500);
         return () => {
             cancelled = true;
             clearTimeout(timer);
@@ -95,10 +108,10 @@ export default function ConnectScreen() {
         try {
             const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
             const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain); gain.connect(ctx.destination);
+            const g = ctx.createGain();
+            osc.connect(g); g.connect(ctx.destination);
             osc.frequency.value = 1000;
-            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            g.gain.setValueAtTime(0.1, ctx.currentTime);
             osc.start(); osc.stop(ctx.currentTime + 0.1);
         } catch {}
 
@@ -195,18 +208,16 @@ export default function ConnectScreen() {
                 {/* Mode tabs */}
                 <div className="flex gap-1.5 mb-4 bg-white/5 rounded-xl p-1 border border-white/10">
                     {([
-                        { key: 'qr' as Mode, icon: QrCode, label: 'QR' },
-                        { key: 'code' as Mode, icon: Hash, label: 'Código' },
-                        { key: 'url' as Mode, icon: Link2, label: 'URL' },
+                        { key: 'qr' as Mode, icon: QrCode, label: 'QR', color: 'emerald' },
+                        { key: 'code' as Mode, icon: Hash, label: 'Código', color: 'amber' },
+                        { key: 'url' as Mode, icon: Link2, label: 'URL', color: 'indigo' },
                     ]).map(tab => (
                         <button
                             key={tab.key}
                             onClick={() => { setMode(tab.key); setError(null); setInput(''); }}
                             className={`flex-1 h-10 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 ${
                                 mode === tab.key
-                                    ? tab.key === 'qr' ? 'bg-emerald-600 text-white'
-                                    : tab.key === 'code' ? 'bg-amber-600 text-white'
-                                    : 'bg-indigo-600 text-white'
+                                    ? `bg-${tab.color}-600 text-white`
                                     : 'text-slate-400 hover:text-white'
                             }`}
                         >
@@ -226,11 +237,13 @@ export default function ConnectScreen() {
                 {/* QR Scanner */}
                 {mode === 'qr' && (
                     <div className="bg-white/[0.06] border border-white/10 rounded-2xl p-4 backdrop-blur-xl shadow-2xl">
-                        <div className="relative min-h-[280px] flex items-center justify-center bg-black rounded-xl overflow-hidden">
-                            <div id="qr-connect-scanner" className="w-full min-h-[280px]" />
+                        <div className="relative min-h-[300px] flex items-center justify-center bg-black rounded-xl overflow-hidden">
+                            <div id="qr-connect-scanner" ref={scannerContainerRef} className="w-full min-h-[300px]" />
+
+                            {/* Viewfinder */}
                             {qrReady && (
                                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                                    <div className="w-[220px] h-[220px] border-2 border-emerald-400/90 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] flex flex-col justify-between p-2 animate-pulse">
+                                    <div className="w-[250px] h-[250px] border-2 border-emerald-400/90 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] flex flex-col justify-between p-2">
                                         <div className="flex justify-between">
                                             <span className="w-5 h-5 border-t-4 border-l-4 border-emerald-400 rounded-tl-sm" />
                                             <span className="w-5 h-5 border-t-4 border-r-4 border-emerald-400 rounded-tr-sm" />
@@ -241,6 +254,14 @@ export default function ConnectScreen() {
                                             <span className="w-5 h-5 border-b-4 border-r-4 border-emerald-400 rounded-br-sm" />
                                         </div>
                                     </div>
+                                </div>
+                            )}
+
+                            {/* Loading */}
+                            {!qrReady && !error && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
+                                    <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mb-3" />
+                                    <p className="text-xs text-slate-400">Iniciando cámara...</p>
                                 </div>
                             )}
                         </div>
