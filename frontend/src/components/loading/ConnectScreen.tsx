@@ -145,10 +145,28 @@ export default function ConnectScreen() {
         }
         setResolving(true);
         try {
-            const res = await fetch(`${MGMT_API}/api/resolve-business?code=${encodeURIComponent(code)}`);
-            const data = await res.json();
-            if (!res.ok || !data.url) {
-                setError(data.error || 'Negocio no encontrado. Verificá el código.');
+            let data: any;
+            const url = `${MGMT_API}/api/resolve-business?code=${encodeURIComponent(code)}`;
+            if ((window as any).Capacitor || window.location.hostname === 'localhost') {
+                const { CapacitorHttp } = await import('@capacitor/core');
+                const res = await CapacitorHttp.get({ url, connectTimeout: 10000, readTimeout: 10000 });
+                data = res.data;
+                if (res.status < 200 || res.status >= 300) {
+                    setError(data?.error || 'Negocio no encontrado.');
+                    setResolving(false);
+                    return;
+                }
+            } else {
+                const res = await fetch(url);
+                data = await res.json();
+                if (!res.ok || !data.url) {
+                    setError(data.error || 'Negocio no encontrado.');
+                    setResolving(false);
+                    return;
+                }
+            }
+            if (!data.url) {
+                setError('Negocio no encontrado. Verificá el código.');
                 setResolving(false);
                 return;
             }

@@ -177,20 +177,32 @@ export default function LoginPage() {
         connectingRef.current = true;
         setConnectingServer(server);
 
+        // En Capacitor, usar HTTP nativo en vez de fetch (bypass CORS/CSP)
+        const checkHealth = async (url: string): Promise<boolean> => {
+            if (isCapacitor) {
+                try {
+                    const { CapacitorHttp } = await import('@capacitor/core');
+                    const res = await CapacitorHttp.get({ url, connectTimeout: 5000, readTimeout: 5000 });
+                    return res.status >= 200 && res.status < 300;
+                } catch { return false; }
+            }
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 5000);
+            try {
+                const res = await fetch(url, { method: 'GET', signal: controller.signal });
+                clearTimeout(timer);
+                return res.ok;
+            } catch { clearTimeout(timer); return false; }
+        };
+
         const MAX = 8;
         for (let i = 1; i <= MAX; i++) {
-            try {
-                const controller = new AbortController();
-                const timer = setTimeout(() => controller.abort(), 5000);
-                const res = await fetch(`${server}/api/health`, { method: 'GET', signal: controller.signal });
-                clearTimeout(timer);
-                if (res.ok) {
-                    toast.success('Negocio conectado');
-                    await AppStorage.setItem('serverUrl', server);
-                    setTimeout(() => window.location.reload(), 300);
-                    return;
-                }
-            } catch {}
+            if (await checkHealth(`${server}/api/health`)) {
+                toast.success('Negocio conectado');
+                await AppStorage.setItem('serverUrl', server);
+                setTimeout(() => window.location.reload(), 300);
+                return;
+            }
             if (i < MAX) setConnectingServer(`${server} (intento ${i + 1}/${MAX})`);
             await new Promise(r => setTimeout(r, 2000));
         }
