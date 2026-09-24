@@ -16,6 +16,7 @@ export interface ThermalPrinterConfig {
     port?: number;
     usbVendorId?: number;
     usbProductId?: number;
+    baudRate?: number; // Web Serial: 9600, 19200, 38400, 57600, 115200
     paperWidth: '80mm' | '58mm';
     autoCut: boolean;
     openCashDrawer: boolean;
@@ -337,6 +338,7 @@ export const useConfigStore = create<ConfigState>()(
                     id: 'default-pos-usb',
                     name: 'Impresora Caja Principal (USB 80mm)',
                     connectionType: 'thermal_usb',
+                    baudRate: 9600,
                     paperWidth: '80mm',
                     autoCut: true,
                     openCashDrawer: true,

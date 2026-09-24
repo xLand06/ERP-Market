@@ -12,91 +12,59 @@ import { ThermalReceiptTicket } from '@/components/common/ThermalReceiptTicket';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
-// Helper para probar envio de bytes ESC/POS reales por WebUSB
+// Helper para probar envio de bytes ESC/POS reales por Web Serial (como ZeuFood)
 async function testWebUSBDeviceReal(vendorId?: number, productId?: number): Promise<{ success: boolean; message: string }> {
-    if (!('usb' in navigator)) {
-        return { success: false, message: 'WebUSB no es compatible en este navegador.' };
+    if (!('serial' in navigator)) {
+        return { success: false, message: 'Web Serial no es compatible en este navegador. Usa Chrome o Edge con HTTPS.' };
     }
-    let device: any = null;
+    let port: any = null;
     try {
-        const devices = await (navigator as any).usb.getDevices();
-        device = devices.find((d: any) => {
-            if (vendorId != null && productId != null) {
-                return d.vendorId === vendorId && d.productId === productId;
-            }
-            if (vendorId != null) {
-                return d.vendorId === vendorId;
-            }
-            return false;
-        });
-        if (!device && devices.length > 0) {
-            device = devices[0];
-        }
-        if (!device) {
-            return { success: false, message: 'No hay ninguna impresora USB vinculada. Haz clic en "Buscar y Vincular Impresora USB".' };
-        }
+        port = await (navigator as any).serial.requestPort();
 
-        await device.open();
-        try {
-            if (device.configuration === null) {
-                await device.selectConfiguration(1);
-            }
-
-            // Detección robusta de interfaz y endpoint de salida
-            let targetInterfaceNumber = 0;
-            let outEndpointNumber: number | null = null;
-
-            if (device.configuration?.interfaces) {
-                for (const iface of device.configuration.interfaces) {
-                    const ep = iface.alternate?.endpoints?.find((e: any) => e.direction === 'out')
-                        || iface.alternates?.flatMap((a: any) => a.endpoints || []).find((e: any) => e.direction === 'out');
-                    if (ep) {
-                        targetInterfaceNumber = iface.interfaceNumber;
-                        outEndpointNumber = ep.endpointNumber;
-                        break;
-                    }
-                }
-            }
-
-            await device.claimInterface(targetInterfaceNumber);
-
-            // Bytes ESC/POS reales: Init (1B 40) + Text + Cut (1D 56 00)
-            const encoder = new TextEncoder();
-            const escInit = new Uint8Array([0x1B, 0x40]);
-            const text = encoder.encode('\n--- ERP-MARKET PRINTER TEST ---\nESTADO: CONECTADO OK\n--------------------------------\n\n\n');
-            const escCut = new Uint8Array([0x1D, 0x56, 0x00]);
-
-            // Unir buffers
-            const fullData = new Uint8Array(escInit.length + text.length + escCut.length);
-            fullData.set(escInit, 0);
-            fullData.set(text, escInit.length);
-            fullData.set(escCut, escInit.length + text.length);
-
-            if (outEndpointNumber !== null) {
-                await device.transferOut(outEndpointNumber, fullData);
-            } else {
-                throw new Error('No se encontró un endpoint de salida (OUT) en la interfaz USB.');
-            }
-
-            return { success: true, message: `Conexión física exitosa con ${device.productName || 'Impresora USB'}` };
-        } finally {
-            if (device.opened) {
-                try {
-                    await device.close();
-                } catch (closeErr) {
-                    console.warn('Error al cerrar dispositivo USB:', closeErr);
-                }
+        // Reintentar apertura
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                await port.open({ baudRate: 9600 });
+                break;
+            } catch (e) {
+                if (attempt === 2) throw e;
+                await new Promise(r => setTimeout(r, 500));
             }
         }
+
+        const writer = port.writable.getWriter();
+
+        // Bytes ESC/POS reales: Init + Text + Feed + Cut
+        const encoder = new TextEncoder();
+        const escInit = new Uint8Array([0x1B, 0x40]); // ESC @
+        const text = encoder.encode('\n--- ALL MARKET PRINTER TEST ---\nESTADO: CONECTADO OK\nPuerto serial activo\n--------------------------------\n\n\n');
+        const escFeed = new Uint8Array([0x1B, 0x64, 4]); // ESC d 4
+        const escCut = new Uint8Array([0x1D, 0x56, 0x00]); // GS V 0
+
+        const fullData = new Uint8Array(escInit.length + text.length + escFeed.length + escCut.length);
+        fullData.set(escInit, 0);
+        fullData.set(text, escInit.length);
+        fullData.set(escFeed, escInit.length + text.length);
+        fullData.set(escCut, escInit.length + text.length + escFeed.length);
+
+        // Escribir por chunks (impresoras baratas necesitan pausas)
+        const CHUNK = 64;
+        for (let i = 0; i < fullData.length; i += CHUNK) {
+            await writer.write(fullData.slice(i, i + CHUNK));
+            await new Promise(r => setTimeout(r, 60));
+        }
+
+        writer.releaseLock();
+        await port.close();
+
+        return { success: true, message: 'Conexión serial exitosa. Test impreso correctamente.' };
     } catch (err: any) {
         const errMsg = err?.message || String(err);
-        if (err?.name === 'SecurityError' || errMsg.includes('Access denied') || errMsg.includes('SecurityError')) {
-            return {
-                success: false,
-                message: "Acceso denegado por Windows: la impresora está bloqueada por el driver de Windows. En Windows se requiere asociar el driver WinUSB (usando Zadig) para permitir WebUSB directo, o usar 'Impresora del Sistema'."
-            };
+        if (errMsg.includes('cancelled') || errMsg.includes('NotFoundError')) {
+            return { success: false, message: 'Selección de puerto cancelada.' };
         }
-        return { success: false, message: errMsg || 'Error al comunicarse con la impresora USB.' };
+        if (port) { try { await port.close(); } catch {} }
+        return { success: false, message: `Error serial: ${errMsg}` };
     }
 }
 
@@ -119,6 +87,7 @@ function PrinterFormModal({
     const [paperWidth, setPaperWidth] = useState<'80mm' | '58mm'>('80mm');
     const [autoCut, setAutoCut] = useState(true);
     const [openCashDrawer, setOpenCashDrawer] = useState(true);
+    const [baudRate, setBaudRate] = useState(9600);
     const [isPrimary, setIsPrimary] = useState(false);
     const [role, setRole] = useState<'pos' | 'kitchen' | 'backup'>('pos');
 
@@ -261,6 +230,7 @@ function PrinterFormModal({
             port: connectionType === 'thermal_network' ? port : undefined,
             usbVendorId: pairedUsbDevice?.vendorId,
             usbProductId: pairedUsbDevice?.productId,
+            baudRate: connectionType === 'thermal_usb' ? baudRate : undefined,
             paperWidth,
             autoCut,
             openCashDrawer,
@@ -500,6 +470,24 @@ function PrinterFormModal({
                                 className="w-5 h-5 rounded text-emerald-600 focus:ring-emerald-500"
                             />
                         </label>
+
+                        {connectionType === 'thermal_usb' && (
+                            <div className="p-3.5 bg-white border-2 border-slate-200 rounded-xl">
+                                <label className="text-xs font-black text-slate-950 block mb-2">Velocidad Serial (Baud Rate)</label>
+                                <p className="text-[11px] text-slate-500 font-bold mb-2">Velocidad de comunicación con la impresora. La mayoría usa 9600.</p>
+                                <select
+                                    value={baudRate}
+                                    onChange={e => setBaudRate(Number(e.target.value))}
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                                >
+                                    <option value={9600}>9600 (Default — más compatible)</option>
+                                    <option value={19200}>19200</option>
+                                    <option value={38400}>38400</option>
+                                    <option value={57600}>57600</option>
+                                    <option value={115200}>115200 (Rápido)</option>
+                                </select>
+                            </div>
+                        )}
 
                         <label className="flex items-center justify-between p-3.5 bg-emerald-50 border-2 border-emerald-300 rounded-xl cursor-pointer">
                             <div>

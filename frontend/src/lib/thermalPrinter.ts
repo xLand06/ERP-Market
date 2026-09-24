@@ -1,82 +1,155 @@
+// =============================================================================
+// THERMAL PRINTER — ESC/POS via Web Serial API (como ZeuFood Backoffice)
+//
+// 3 capas:
+//   1. Motor de recibos (modelo de líneas)
+//   2. Codificador ESC/POS + code page (sin acentos UTF-8)
+//   3. Transporte Web Serial (navigator.serial)
+// =============================================================================
+
 import { ThermalPrinterConfig } from '@/hooks/useConfigStore';
 import toast from 'react-hot-toast';
 
-// Helper to find WebUSB device matching configured vendorId and productId (if available) or fallback to first available
-async function findWebUsbDevice(printer: ThermalPrinterConfig | null): Promise<any | null> {
-    if (!('usb' in navigator)) return null;
-    const devices = await (navigator as any).usb.getDevices();
-    let device = devices.find((d: any) => {
-        if (printer?.usbVendorId != null && printer?.usbProductId != null) {
-            return d.vendorId === printer.usbVendorId && d.productId === printer.usbProductId;
+// ── Code Page: Unicode → ASCII para impresoras térmicas ──────────────────────
+// Las impresoras NO entienden UTF-8. Los acentos se tratan como ASCII plano.
+const CP_BASE: Record<string, string> = {
+    'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u', 'ñ': 'n', 'ü': 'u', 'ç': 'c',
+    'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U', 'Ñ': 'N', 'Ü': 'U', 'Ç': 'C',
+    'À': 'A', 'È': 'E', 'Ì': 'I', 'Ò': 'O', 'Ù': 'U', 'â': 'a', 'ê': 'e', 'î': 'i',
+    'ô': 'o', 'û': 'u', 'Â': 'A', 'Ê': 'E', 'Î': 'I', 'Ô': 'O', 'Û': 'U',
+    'ä': 'a', 'ë': 'e', 'ï': 'i', 'ö': 'o', 'Ä': 'A', 'Ë': 'E', 'Ï': 'I', 'Ö': 'O',
+    '¿': '?', '¡': '!', 'º': '.', 'ª': '.', '°': '.', '€': 'EUR', '·': '-', '•': '-',
+};
+
+function cpBytes(str: string): number[] {
+    const out: number[] = [];
+    for (let i = 0; i < str.length; i++) {
+        const code = str.charCodeAt(i);
+        if (code < 0x80) { out.push(code); continue; }
+        const ch = str.charAt(i);
+        const base = CP_BASE[ch];
+        if (base) {
+            for (let j = 0; j < base.length; j++) out.push(base.charCodeAt(j));
+            continue;
         }
-        if (printer?.usbVendorId != null) {
-            return d.vendorId === printer.usbVendorId;
+        out.push(0x3F); // '?'
+    }
+    return out;
+}
+
+// ── Configuración de impresora ──────────────────────────────────────────────
+function getPrinterProfile(printer: ThermalPrinterConfig | null) {
+    const width = printer?.paperWidth || '80mm';
+    const chars = width === '58mm' ? 32 : 48;
+    const baudRate = (printer as any)?.baudRate || 9600;
+    const codePage = 2; // PC850 (acentos latinos)
+    const cut = printer?.autoCut !== false;
+    return { width, chars, baudRate, codePage, cut };
+}
+
+// ── Capa 1: Utilidades de formato de líneas ─────────────────────────────────
+function padRight(s: string, chars: number) {
+    s = String(s);
+    return s.length >= chars ? s.slice(0, chars) : s + ' '.repeat(chars - s.length);
+}
+
+function padLeft(s: string, chars: number) {
+    s = String(s);
+    return s.length >= chars ? s.slice(0, chars) : ' '.repeat(chars - s.length) + s;
+}
+
+function center(s: string, chars: number) {
+    s = String(s);
+    const pad = Math.max(0, chars - s.length);
+    return ' '.repeat(Math.floor(pad / 2)) + s.slice(0, chars - pad) + ' '.repeat(pad - Math.floor(pad / 2));
+}
+
+function truncate(s: string, chars: number) {
+    s = String(s);
+    return s.length > chars ? s.slice(0, chars) : s;
+}
+
+function wrapText(s: string, chars: number, indent = 0): string[] {
+    s = String(s || '');
+    const words = s.split(/\s+/).filter(Boolean);
+    const lines: string[] = [];
+    let cur = '';
+    const max = chars - indent;
+    words.forEach(w => {
+        const candidate = cur ? cur + ' ' + w : w;
+        if (candidate.length > max && cur) {
+            lines.push(cur);
+            cur = w;
+        } else {
+            cur = candidate;
         }
-        return false;
     });
-    if (!device && devices.length > 0) {
-        device = devices[0];
-    }
-    return device || null;
+    if (cur) lines.push(cur);
+    if (lines.length === 0) lines.push('');
+    return lines.map(l => ' '.repeat(indent) + l);
 }
 
-// Dynamically find interface and OUT endpoint from the device configuration
-function findOutEndpoint(device: any): { interfaceNumber: number; endpointNumber: number } | null {
-    if (!device.configuration?.interfaces) return null;
-    for (const iface of device.configuration.interfaces) {
-        const ep = iface.alternate?.endpoints?.find((e: any) => e.direction === 'out')
-            || iface.alternates?.flatMap((a: any) => a.endpoints || []).find((e: any) => e.direction === 'out');
-        if (ep) {
-            return {
-                interfaceNumber: iface.interfaceNumber,
-                endpointNumber: ep.endpointNumber,
-            };
-        }
-    }
-    return null;
+function totalLine(label: string, amount: string, chars: number) {
+    return truncate(label, chars) + ' '.repeat(Math.max(1, chars - label.length - amount.length)) + amount;
 }
 
-// Safely transfers ESC/POS data to the WebUSB device, ensuring device.close() is always called in try/finally
-async function sendEscPosToWebUsb(device: any, payload: Uint8Array): Promise<void> {
-    await device.open();
-    try {
-        if (device.configuration === null) {
-            await device.selectConfiguration(1);
-        }
+// ── Capa 2: Codificador ESC/POS ─────────────────────────────────────────────
+function encodeReceipt(lines: Array<{ t: string; a?: number; b?: boolean }>, profile: ReturnType<typeof getPrinterProfile>): Uint8Array {
+    const bytes: number[] = [0x1B, 0x40]; // ESC @ init
+    bytes.push(0x1B, 0x74, profile.codePage); // ESC t n (code page)
 
-        const out = findOutEndpoint(device);
-        if (!out) {
-            throw new Error('No se encontró un endpoint de salida (OUT) en la interfaz USB de la impresora.');
-        }
+    for (const ln of lines) {
+        bytes.push(0x1B, 0x61, ln.a || 0); // ESC a n (alineación)
+        if (ln.b) bytes.push(0x1B, 0x45, 1); // ESC E 1 (negrita on)
+        cpBytes(ln.t).forEach(b => bytes.push(b));
+        bytes.push(0x0A); // \n
+        if (ln.b) bytes.push(0x1B, 0x45, 0); // ESC E 0 (negrita off)
+    }
 
-        await device.claimInterface(out.interfaceNumber);
-        await device.transferOut(out.endpointNumber, payload);
-    } finally {
-        if (device.opened) {
-            try {
-                await device.close();
-            } catch (closeErr) {
-                console.warn('Error al cerrar dispositivo USB:', closeErr);
+    bytes.push(0x1B, 0x64, 4); // ESC d 4 (feed)
+    if (profile.cut) {
+        bytes.push(0x1D, 0x56, 0x00); // GS V 0 (corte completo)
+    } else {
+        bytes.push(0x1D, 0x56, 0x41); // GS V A (corte parcial)
+    }
+
+    return new Uint8Array(bytes);
+}
+
+// ── Capa 3: Transporte Web Serial ───────────────────────────────────────────
+// Escribe por chunks con pausa: impresoras baratas tienen buffer chico
+async function writeChunks(writer: WritableStreamDefaultWriter<Uint8Array>, data: Uint8Array, chunkSize = 64) {
+    for (let i = 0; i < data.length; i += chunkSize) {
+        await writer.write(data.slice(i, i + chunkSize));
+        await new Promise(r => setTimeout(r, 60)); // Pausa entre chunks
+    }
+}
+
+async function openSerialPort(baudRate: number): Promise<SerialPort> {
+    if (!('serial' in navigator)) {
+        throw new Error('Web Serial no está soportado en este navegador. Usa Chrome o Edge con HTTPS.');
+    }
+
+    const port = await (navigator as any).serial.requestPort();
+
+    // Reintentar apertura (algunos drivers necesitan un momento)
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            await port.open({ baudRate });
+            return port;
+        } catch (e) {
+            if (attempt < 2) {
+                await new Promise(r => setTimeout(r, 500));
+            } else {
+                throw e;
             }
         }
     }
+
+    throw new Error('No se pudo abrir el puerto serial después de 3 intentos.');
 }
 
-// Error handling with clear diagnostics for Access denied / Windows driver conflicts
-function handleWebUsbError(err: any): { message: string } {
-    const errMsg = err?.message || String(err);
-    if (err?.name === 'SecurityError' || errMsg.includes('Access denied') || errMsg.includes('SecurityError')) {
-        const diagnosticMsg = "Acceso denegado por Windows: la impresora está bloqueada por el driver de Windows. En Windows se requiere asociar el driver WinUSB (usando Zadig) para permitir WebUSB directo, o usar 'Impresora del Sistema'.";
-        console.warn(`[WebUSB Diagnostic]: ${diagnosticMsg}`, err);
-        toast.error(diagnosticMsg, { duration: 6000 });
-        return { message: diagnosticMsg };
-    }
-    const generalMsg = `Error al comunicarse con la impresora USB: ${errMsg}`;
-    console.error('[WebUSB Error]:', err);
-    toast.error(generalMsg);
-    return { message: generalMsg };
-}
-
+// ── Types ───────────────────────────────────────────────────────────────────
 export interface TicketPrintData {
     invoiceNumber: string;
     date?: string;
@@ -106,304 +179,243 @@ export interface TicketPrintData {
     footerMessage?: string;
 }
 
-/**
- * Direct ESC/POS printing pipeline inspired by Zeu Backoffice 3-layer architecture.
- * - Automatic printing if a hardware/thermal printer is configured.
- * - Non-blocking flow if no printer is configured (does not open blocking window.print() dialogs).
- */
+// ── Utilidad: convertir TicketPrintData a líneas de recibo ──────────────────
+function ticketToLines(data: TicketPrintData, profile: ReturnType<typeof getPrinterProfile>): Array<{ t: string; a?: number; b?: boolean }> {
+    const L: Array<{ t: string; a?: number; b?: boolean }> = [];
+    const LINE = '-'.repeat(profile.chars);
+
+    // 1. ENCABEZADO
+    if (data.businessName) wrapText(data.businessName, profile.chars).forEach(l => L.push({ t: l, a: 1, b: true }));
+    if (data.taxId) L.push({ t: `RIF: ${data.taxId}`, a: 1 });
+    if (data.fiscalAddress) wrapText(data.fiscalAddress, profile.chars).forEach(l => L.push({ t: l, a: 1 }));
+    if (data.fiscalPhone) L.push({ t: `Tel: ${data.fiscalPhone}`, a: 1 });
+    L.push({ t: LINE });
+
+    // 2. METADATOS
+    L.push({ t: totalLine('FACTURA', data.invoiceNumber || 'FACT-000000', profile.chars) });
+    L.push({ t: `FECHA: ${data.date || new Date().toLocaleDateString('es-VE')}` });
+    if (data.cashierName) L.push({ t: `CAJERO: ${data.cashierName}` });
+    L.push({ t: LINE });
+
+    // 3. CLIENTE
+    if (data.customerName) {
+        L.push({ t: `Cliente: ${data.customerName}` });
+        if (data.customerTaxId) L.push({ t: `C.I./RIF: ${data.customerTaxId}` });
+        if (data.customerPhone) L.push({ t: `Tel: ${data.customerPhone}` });
+        L.push({ t: LINE });
+    }
+
+    // 4. TABLA DE PRODUCTOS
+    L.push({ t: padRight('Concepto', profile.chars - 13) + padLeft('Cant', 5) + padLeft('Importe', 8), b: true });
+
+    for (const item of data.items) {
+        const unitPrice = item.unitPrice || (item.qty ? item.total / item.qty : item.total);
+        const priceStr = `$${item.total.toFixed(2)}`;
+        const head = `${item.qty}x ${item.name}`;
+        const avail = profile.chars - priceStr.length;
+
+        if (head.length > avail) {
+            const wrapped = wrapText(head, profile.chars);
+            wrapped[0] = wrapped[0].slice(0, avail) + ' '.repeat(Math.max(1, profile.chars - wrapped[0].length - priceStr.length)) + priceStr;
+            wrapped.forEach(l => L.push({ t: l }));
+        } else {
+            L.push({ t: head + ' '.repeat(profile.chars - head.length - priceStr.length) + priceStr });
+        }
+    }
+
+    L.push({ t: LINE });
+
+    // 5. TOTALES
+    const gravable = data.totalUSD / 1.16;
+    const iva = data.totalUSD - gravable;
+    L.push({ t: totalLine('BASE IMPONIBLE (G 16%):', `$${gravable.toFixed(2)}`, profile.chars) });
+    L.push({ t: totalLine('IVA (16.00%):', `$${iva.toFixed(2)}`, profile.chars) });
+    L.push({ t: LINE });
+    L.push({ t: totalLine('TOTAL USD:', `$${data.totalUSD.toFixed(2)}`, profile.chars), b: true });
+    if (data.totalVES) L.push({ t: totalLine('TOTAL VES:', `Bs. ${data.totalVES.toFixed(2)}`, profile.chars) });
+    if (data.totalCOP) L.push({ t: totalLine('TOTAL COP:', `$${data.totalCOP.toLocaleString('es-CO')}`, profile.chars) });
+
+    // 6. PAGO
+    if (data.paymentMethods?.length) {
+        L.push({ t: LINE });
+        L.push({ t: 'FORMAS DE PAGO:' });
+        for (const m of data.paymentMethods) {
+            const val = m.currency === 'VES' ? `Bs. ${m.amount.toFixed(2)}` : `$${m.amount.toFixed(2)}`;
+            L.push({ t: totalLine(`- ${m.type.toUpperCase()} (${m.currency}):`, val, profile.chars) });
+        }
+        if (data.changeUSD && data.changeUSD > 0) {
+            L.push({ t: totalLine('- CAMBIO USD:', `$${data.changeUSD.toFixed(2)}`, profile.chars) });
+        }
+    }
+
+    L.push({ t: LINE });
+    L.push({ t: data.footerMessage || '¡Gracias por su compra! Vuelva pronto', a: 1, b: true });
+
+    return L;
+}
+
+// ── Funciones públicas ──────────────────────────────────────────────────────
+
 export async function printThermalReceiptReal(
     printer: ThermalPrinterConfig | null,
     data: TicketPrintData
-): Promise<{ success: boolean; method: 'webusb' | 'browser' | 'none'; message: string }> {
-    const paperWidth = printer?.paperWidth || '80mm';
-    const charWidth = paperWidth === '58mm' ? 32 : 48;
-    const divider = '-'.repeat(charWidth);
+): Promise<{ success: boolean; method: 'serial' | 'browser' | 'none'; message: string }> {
+    const profile = getPrinterProfile(printer);
 
-    const padRow = (left: string, right: string) => {
-        const avail = charWidth - right.length;
-        if (left.length > avail) {
-            return left.substring(0, avail - 1) + ' ' + right;
-        }
-        return left + ' '.repeat(avail - left.length) + right;
-    };
-
-    // 1. Impresión Directa Hardware WebUSB (ESC/POS)
+    // 1. Impresión por Web Serial (ESC/POS)
     if (printer?.connectionType === 'thermal_usb') {
-        if (!('usb' in navigator)) {
-            const msg = 'WebUSB no es compatible en este navegador. Usa Google Chrome o Microsoft Edge, o cambia a "Impresora del Sistema".';
-            toast.error(msg);
-            return { success: false, method: 'none', message: msg };
-        }
         try {
-            const device = await findWebUsbDevice(printer);
-            if (!device) {
-                const notFoundMsg = 'No se encontró la impresora USB vinculada. Verifica la conexión en Configuración.';
-                toast.error(notFoundMsg);
-                return { success: false, method: 'none', message: notFoundMsg };
+            const port = await openSerialPort(profile.baudRate);
+            try {
+                const writer = port.writable.getWriter();
+                const lines = ticketToLines(data, profile);
+                const payload = encodeReceipt(lines, profile);
+                await writeChunks(writer, payload, 64);
+                writer.releaseLock();
+                return {
+                    success: true,
+                    method: 'serial',
+                    message: `Factura enviada a ${printer.name} por puerto serial.`
+                };
+            } finally {
+                await port.close().catch(() => {});
             }
-
-            const encoder = new TextEncoder();
-            const escInit = new Uint8Array([0x1B, 0x40]); // ESC @
-            const escCenter = new Uint8Array([0x1B, 0x61, 0x01]); // Align Center
-            const escCut = new Uint8Array([0x1D, 0x56, 0x00]); // GS V 0 (Cut)
-            const escDrawer = new Uint8Array([0x1B, 0x70, 0x00, 0x19, 0xFA]); // Open Drawer
-
-            let text = '';
-            text += `${data.businessName || 'ABASTOS SOFIMAR'}\n`;
-            if (data.taxId) text += `RIF: ${data.taxId}\n`;
-            if (data.fiscalAddress) text += `${data.fiscalAddress}\n`;
-            if (data.fiscalPhone) text += `TEL: ${data.fiscalPhone}\n`;
-            text += `${divider}\n`;
-
-            text += padRow(`FACTURA #: ${data.invoiceNumber || 'FACT-000482'}`, data.date || new Date().toLocaleDateString('es-VE')) + '\n';
-            if (data.cashierName) text += `CAJERO: ${data.cashierName}\n`;
-            if (data.customerName) text += padRow(`CLIENTE: ${data.customerName}`, data.customerTaxId || '') + '\n';
-            text += `${divider}\n`;
-
-            text += padRow('CANT / DESCRIPCION', 'TOTAL USD') + '\n';
-            text += `${divider}\n`;
-
-            data.items.forEach(item => {
-                const unitPriceUSD = item.unitPrice || (item.qty ? item.total / item.qty : item.total);
-                text += padRow(`${item.qty}x ${item.name}`, `$${item.total.toFixed(2)}`) + '\n';
-                text += `   ${item.qty} x $${unitPriceUSD.toFixed(2)} USD\n`;
-            });
-
-            text += `${divider}\n`;
-
-            const gravableUSD = data.totalUSD / 1.16;
-            const ivaUSD = data.totalUSD - gravableUSD;
-
-            text += padRow('BASE IMPONIBLE (G 16%):', `$${gravableUSD.toFixed(2)}`) + '\n';
-            text += padRow('IVA (16.00%):', `$${ivaUSD.toFixed(2)}`) + '\n';
-            text += `${divider}\n`;
-
-            text += padRow('TOTAL USD:', `$${data.totalUSD.toFixed(2)}`) + '\n';
-            if (data.totalVES) text += padRow('TOTAL VES:', `Bs. ${data.totalVES.toFixed(2)}`) + '\n';
-            if (data.totalCOP) text += padRow('TOTAL COP:', `$${data.totalCOP.toLocaleString('es-CO')}`) + '\n';
-
-            if (data.paymentMethods && data.paymentMethods.length > 0) {
-                text += `${divider}\n`;
-                text += 'FORMAS DE PAGO:\n';
-                data.paymentMethods.forEach(m => {
-                    const val = m.currency === 'VES' ? `Bs. ${m.amount.toFixed(2)}` : `$${m.amount.toFixed(2)}`;
-                    text += padRow(`- ${m.type.toUpperCase()} (${m.currency}):`, val) + '\n';
-                });
-                if (data.changeUSD && data.changeUSD > 0) {
-                    text += padRow('- CAMBIO USD:', `$${data.changeUSD.toFixed(2)}`) + '\n';
-                }
-            }
-
-            text += `${divider}\n`;
-            text += `${data.footerMessage || '¡Gracias por su compra! Vuelva pronto'}\n\n\n`;
-
-            const bodyBuffer = encoder.encode(text);
-            const parts = [escInit, escCenter, bodyBuffer, escCut];
-            if (printer.openCashDrawer) parts.push(escDrawer);
-
-            let totalLen = parts.reduce((acc, p) => acc + p.length, 0);
-            const payload = new Uint8Array(totalLen);
-            let offset = 0;
-            for (const part of parts) {
-                payload.set(part, offset);
-                offset += part.length;
-            }
-
-            await sendEscPosToWebUsb(device, payload);
-
-            return {
-                success: true,
-                method: 'webusb',
-                message: `Factura enviada directamente a ${device.productName || printer.name} por USB.`
-            };
         } catch (err: any) {
-            const { message } = handleWebUsbError(err);
-            return {
-                success: false,
-                method: 'none',
-                message,
-            };
+            const errMsg = err?.message || String(err);
+            if (errMsg.includes('cancelled') || errMsg.includes('NotFoundError')) {
+                return { success: false, method: 'none', message: 'Selección de puerto cancelada.' };
+            }
+            toast.error(`Error de impresión: ${errMsg}`);
+            return { success: false, method: 'none', message: errMsg };
         }
     }
 
-    // 2. Impresión Explícita de Navegador (Solo si la impresora está configurada con tipo 'browser')
+    // 2. Impresión por navegador
     if (printer?.connectionType === 'browser') {
         window.print();
-        return {
-            success: true,
-            method: 'browser',
-            message: `Imprimiendo en navegador para ${printer.name}`
-        };
+        return { success: true, method: 'browser', message: `Imprimiendo en navegador para ${printer.name}` };
     }
 
-    // 3. Flujo No Bloqueante: Si no hay impresora térmica configurada o vinculada, no bloquear la pantalla con ventanas emergentes
-    return {
-        success: true,
-        method: 'none',
-        message: 'Venta completada sin impresora configurada.'
-    };
+    // 3. Sin impresora
+    return { success: true, method: 'none', message: 'Venta completada sin impresora configurada.' };
 }
 
+// ── Reportes X/Z ────────────────────────────────────────────────────────────
 import { ReportAuditData } from '@/components/common/ThermalAuditTicket';
 export type { ReportAuditData };
 
-/**
- * Direct ESC/POS printing pipeline for Reporte X and Reporte Z audit tickets.
- */
+function auditToLines(data: ReportAuditData, profile: ReturnType<typeof getPrinterProfile>): Array<{ t: string; a?: number; b?: boolean }> {
+    const L: Array<{ t: string; a?: number; b?: boolean }> = [];
+    const LINE = '-'.repeat(profile.chars);
+    const isZ = data.type === 'Z';
+    const fmtNum = (v: number) => v.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtDate = (d?: string | Date | null) => d ? new Date(d).toLocaleString('es-VE') : '-';
+
+    // Header
+    if (data.businessName) wrapText(data.businessName, profile.chars).forEach(l => L.push({ t: l, a: 1, b: true }));
+    if (data.taxId) L.push({ t: `RIF: ${data.taxId}`, a: 1 });
+    L.push({ t: `${data.branch?.name ? `SEDE: ${data.branch.name}` : 'SEDE PRINCIPAL'}`, a: 1 });
+    L.push({ t: LINE });
+    L.push({ t: isZ ? '--- REPORTE Z (CIERRE) ---' : '--- REPORTE X (PARCIAL) ---', a: 1, b: true });
+    L.push({ t: LINE });
+
+    // Caja
+    L.push({ t: totalLine('CAJA ID:', data.registerId.slice(-8).toUpperCase(), profile.chars) });
+    L.push({ t: totalLine('CAJERO:', data.user?.nombre || data.user?.username || 'SISTEMA', profile.chars) });
+    L.push({ t: totalLine('APERTURA:', fmtDate(data.openedAt), profile.chars) });
+    if (isZ) L.push({ t: totalLine('CIERRE:', fmtDate(data.closedAt || new Date()), profile.chars) });
+    L.push({ t: LINE });
+
+    // Ventas
+    L.push({ t: 'DESGLOSE DE VENTAS:', b: true });
+    L.push({ t: totalLine('Nº TRANSACCIONES:', String(data.transactionCount), profile.chars) });
+    L.push({ t: totalLine('TOTAL VENTAS:', `$ ${fmtNum(data.salesTotal)}`, profile.chars) });
+    L.push({ t: LINE });
+
+    // Pagos
+    L.push({ t: 'FORMAS DE PAGO:', b: true });
+    L.push({ t: totalLine('- EFECTIVO COP:', `$ ${fmtNum(data.paymentBreakdown.efectivoCOP)}`, profile.chars) });
+    L.push({ t: totalLine('- EFECTIVO USD:', `$ ${fmtNum(data.paymentBreakdown.efectivoUSD)}`, profile.chars) });
+    L.push({ t: totalLine('- EFECTIVO VES:', `Bs. ${fmtNum(data.paymentBreakdown.efectivoVES)}`, profile.chars) });
+    L.push({ t: totalLine('- TRANSFERENCIA:', `$ ${fmtNum(data.paymentBreakdown.transferencia)}`, profile.chars) });
+    L.push({ t: totalLine('- TARJETA:', `$ ${fmtNum(data.paymentBreakdown.tarjeta)}`, profile.chars) });
+    if (data.paymentBreakdown.otros > 0) L.push({ t: totalLine('- OTROS:', `$ ${fmtNum(data.paymentBreakdown.otros)}`, profile.chars) });
+    L.push({ t: LINE });
+
+    // SENIAT
+    L.push({ t: 'RESUMEN FISCAL SENIAT:', b: true });
+    L.push({ t: totalLine('BASE IMPONIBLE (16%):', `$ ${fmtNum(data.seniatTax.baseImponible)}`, profile.chars) });
+    L.push({ t: totalLine('IVA (16%):', `$ ${fmtNum(data.seniatTax.iva16)}`, profile.chars) });
+    L.push({ t: totalLine('EXENTO (0%):', `$ ${fmtNum(data.seniatTax.exento)}`, profile.chars) });
+    L.push({ t: totalLine('TOTAL AUDITADO:', `$ ${fmtNum(data.seniatTax.totalVentas)}`, profile.chars) });
+    L.push({ t: LINE });
+
+    // Saldos
+    L.push({ t: 'SALDOS EN CAJA:', b: true });
+    L.push({ t: totalLine('MONTO APERTURA:', `$ ${fmtNum(data.openingAmount)}`, profile.chars) });
+    L.push({ t: totalLine('TOTAL ESPERADO:', `$ ${fmtNum(data.expectedBalances.totalExpectedCOP)}`, profile.chars) });
+
+    if (isZ) {
+        L.push({ t: LINE });
+        L.push({ t: 'RESULTADO AUDITORIA:', b: true });
+        if (data.physicalCounts) {
+            L.push({ t: totalLine('FÍSICO COP:', `$ ${fmtNum(data.physicalCounts.countedCOP || 0)}`, profile.chars) });
+            L.push({ t: totalLine('FÍSICO USD:', `$ ${fmtNum(data.physicalCounts.countedUSD || 0)}`, profile.chars) });
+            L.push({ t: totalLine('FÍSICO VES:', `Bs. ${fmtNum(data.physicalCounts.countedVES || 0)}`, profile.chars) });
+        }
+        L.push({ t: totalLine('TOTAL DECLARADO:', `$ ${fmtNum(data.closingAmount || 0)}`, profile.chars) });
+        L.push({ t: totalLine('RESULTADO:', data.varianceType || 'EXACTO', profile.chars) });
+        if (data.difference !== undefined && data.difference !== 0) {
+            L.push({ t: totalLine(`DIFERENCIA (${data.varianceType}):`, `$ ${fmtNum(Math.abs(data.difference))}`, profile.chars) });
+        }
+        if (data.notes) L.push({ t: `OBS: ${data.notes}` });
+    }
+
+    L.push({ t: LINE });
+    L.push({ t: 'IMPRESO DESDE SISTEMA ALL MARKET', a: 1 });
+
+    return L;
+}
+
 export async function printAuditTicketReal(
     printer: ThermalPrinterConfig | null,
     data: ReportAuditData
-): Promise<{ success: boolean; method: 'webusb' | 'browser' | 'none'; message: string }> {
-    const isZ = data.type === 'Z';
-    const paperWidth = printer?.paperWidth || '80mm';
-    const charWidth = paperWidth === '58mm' ? 32 : 48;
-    const divider = '-'.repeat(charWidth);
+): Promise<{ success: boolean; method: 'serial' | 'browser' | 'none'; message: string }> {
+    const profile = getPrinterProfile(printer);
 
-    const padRow = (left: string, right: string) => {
-        const avail = charWidth - right.length;
-        if (left.length > avail) {
-            return left.substring(0, avail - 1) + ' ' + right;
-        }
-        return left + ' '.repeat(avail - left.length) + right;
-    };
-
-    const fmtNum = (val: number) => val.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const fmtDate = (d?: string | Date | null) => d ? new Date(d).toLocaleString('es-VE') : '-';
-
-    // 1. Direct WebUSB ESC/POS Hardware Printing
     if (printer?.connectionType === 'thermal_usb') {
-        if (!('usb' in navigator)) {
-            const msg = 'WebUSB no es compatible en este navegador. Usa Google Chrome o Microsoft Edge, o cambia a "Impresora del Sistema".';
-            toast.error(msg);
-            return { success: false, method: 'none', message: msg };
-        }
         try {
-            const device = await findWebUsbDevice(printer);
-            if (!device) {
-                const notFoundMsg = 'No se encontró la impresora USB vinculada. Verifica la conexión en Configuración.';
-                toast.error(notFoundMsg);
-                return { success: false, method: 'none', message: notFoundMsg };
+            const port = await openSerialPort(profile.baudRate);
+            try {
+                const writer = port.writable.getWriter();
+                const lines = auditToLines(data, profile);
+                const payload = encodeReceipt(lines, profile);
+                await writeChunks(writer, payload, 64);
+                writer.releaseLock();
+                return {
+                    success: true,
+                    method: 'serial',
+                    message: `Reporte ${data.type} enviado a ${printer.name}.`
+                };
+            } finally {
+                await port.close().catch(() => {});
             }
-
-            const encoder = new TextEncoder();
-            const escInit = new Uint8Array([0x1B, 0x40]); // ESC @
-            const escCenter = new Uint8Array([0x1B, 0x61, 0x01]); // Align Center
-            const escLeft = new Uint8Array([0x1B, 0x61, 0x00]); // Align Left
-            const escCut = new Uint8Array([0x1D, 0x56, 0x00]); // GS V 0 (Cut)
-            const escDrawer = new Uint8Array([0x1B, 0x70, 0x00, 0x19, 0xFA]); // Open Drawer
-
-            let textHeader = '';
-            textHeader += `${data.businessName || 'ABASTOS SOFIMAR'}\n`;
-            if (data.taxId) textHeader += `RIF: ${data.taxId}\n`;
-            textHeader += `${data.branch?.name ? `SEDE: ${data.branch.name}` : 'SEDE PRINCIPAL'}\n`;
-            textHeader += `${divider}\n`;
-            textHeader += isZ ? '--- REPORTE Z (CIERRE) ---\n' : '--- REPORTE X (PARCIAL) ---\n';
-            textHeader += `${divider}\n`;
-
-            let textBody = '';
-            textBody += padRow('CAJA ID:', data.registerId.slice(-8).toUpperCase()) + '\n';
-            textBody += padRow('CAJERO:', data.user?.nombre || data.user?.username || 'SISTEMA') + '\n';
-            textBody += padRow('APERTURA:', fmtDate(data.openedAt)) + '\n';
-            if (isZ) textBody += padRow('CIERRE:', fmtDate(data.closedAt || new Date())) + '\n';
-            textBody += `${divider}\n`;
-
-            textBody += 'DESGLOSE DE VENTAS:\n';
-            textBody += padRow('Nº TRANSACCIONES:', String(data.transactionCount)) + '\n';
-            textBody += padRow('TOTAL VENTAS:', `$ ${fmtNum(data.salesTotal)}`) + '\n';
-            textBody += `${divider}\n`;
-
-            textBody += 'FORMAS DE PAGO:\n';
-            textBody += padRow('- EFECTIVO COP:', `$ ${fmtNum(data.paymentBreakdown.efectivoCOP)}`) + '\n';
-            textBody += padRow('- EFECTIVO USD:', `$ ${fmtNum(data.paymentBreakdown.efectivoUSD)}`) + '\n';
-            textBody += padRow('- EFECTIVO VES:', `Bs. ${fmtNum(data.paymentBreakdown.efectivoVES)}`) + '\n';
-            textBody += padRow('- TRANSFERENCIA:', `$ ${fmtNum(data.paymentBreakdown.transferencia)}`) + '\n';
-            textBody += padRow('- TARJETA:', `$ ${fmtNum(data.paymentBreakdown.tarjeta)}`) + '\n';
-            if (data.paymentBreakdown.otros > 0) {
-                textBody += padRow('- OTROS:', `$ ${fmtNum(data.paymentBreakdown.otros)}`) + '\n';
-            }
-            textBody += `${divider}\n`;
-
-            textBody += 'RESUMEN FISCAL SENIAT:\n';
-            textBody += padRow('BASE IMPONIBLE (16%):', `$ ${fmtNum(data.seniatTax.baseImponible)}`) + '\n';
-            textBody += padRow('IVA (16%):', `$ ${fmtNum(data.seniatTax.iva16)}`) + '\n';
-            textBody += padRow('EXENTO (0%):', `$ ${fmtNum(data.seniatTax.exento)}`) + '\n';
-            textBody += padRow('TOTAL AUDITADO:', `$ ${fmtNum(data.seniatTax.totalVentas)}`) + '\n';
-            textBody += `${divider}\n`;
-
-            textBody += 'SALDOS EN CAJA (ESPERADOS):\n';
-            textBody += padRow('MONTO APERTURA:', `$ ${fmtNum(data.openingAmount)}`) + '\n';
-            textBody += padRow('TOTAL ESPERADO:', `$ ${fmtNum(data.expectedBalances.totalExpectedCOP)}`) + '\n';
-
-            if (isZ) {
-                textBody += `${divider}\n`;
-                textBody += 'RESULTADO AUDITORIA CIERRE:\n';
-                if (data.physicalCounts) {
-                    textBody += padRow('FÍSICO COP:', `$ ${fmtNum(data.physicalCounts.countedCOP || 0)}`) + '\n';
-                    textBody += padRow('FÍSICO USD:', `$ ${fmtNum(data.physicalCounts.countedUSD || 0)}`) + '\n';
-                    textBody += padRow('FÍSICO VES:', `Bs. ${fmtNum(data.physicalCounts.countedVES || 0)}`) + '\n';
-                }
-                textBody += padRow('TOTAL DECLARADO:', `$ ${fmtNum(data.closingAmount || 0)}`) + '\n';
-                textBody += padRow('RESULTADO:', data.varianceType || 'EXACTO') + '\n';
-                if (data.difference !== undefined && data.difference !== 0) {
-                    textBody += padRow(`DIFERENCIA (${data.varianceType}):`, `$ ${fmtNum(Math.abs(data.difference))}`) + '\n';
-                }
-                if (data.notes) {
-                    textBody += `OBS: ${data.notes}\n`;
-                }
-            }
-
-            textBody += `${divider}\n`;
-            textBody += 'IMPRESO DESDE SISTEMA ERP MARKET\n\n\n';
-
-            const headerBuf = encoder.encode(textHeader);
-            const bodyBuf = encoder.encode(textBody);
-
-            const parts = [escInit, escCenter, headerBuf, escLeft, bodyBuf, escCut];
-            // For Report Z, kick cash drawer
-            if (isZ || printer.openCashDrawer) {
-                parts.push(escDrawer);
-            }
-
-            let totalLen = parts.reduce((acc, p) => acc + p.length, 0);
-            const payload = new Uint8Array(totalLen);
-            let offset = 0;
-            for (const part of parts) {
-                payload.set(part, offset);
-                offset += part.length;
-            }
-
-            await sendEscPosToWebUsb(device, payload);
-
-            return {
-                success: true,
-                method: 'webusb',
-                message: `Reporte ${data.type} enviado a impresora térmica USB.`
-            };
         } catch (err: any) {
-            const { message } = handleWebUsbError(err);
-            return {
-                success: false,
-                method: 'none',
-                message,
-            };
+            const errMsg = err?.message || String(err);
+            if (errMsg.includes('cancelled') || errMsg.includes('NotFoundError')) {
+                return { success: false, method: 'none', message: 'Selección cancelada.' };
+            }
+            toast.error(`Error de impresión: ${errMsg}`);
+            return { success: false, method: 'none', message: errMsg };
         }
     }
 
-    // 2. Browser Print Fallback
     if (printer?.connectionType === 'browser' || !printer) {
         window.print();
-        return {
-            success: true,
-            method: 'browser',
-            message: `Imprimiendo Reporte ${data.type} mediante diálogo de navegador.`
-        };
+        return { success: true, method: 'browser', message: `Imprimiendo Reporte ${data.type} en navegador.` };
     }
 
-    return {
-        success: true,
-        method: 'none',
-        message: `Reporte ${data.type} procesado.`
-    };
+    return { success: true, method: 'none', message: `Reporte ${data.type} procesado.` };
 }
 
 export async function printReportXTicket(printer: ThermalPrinterConfig | null, data: ReportAuditData) {
@@ -413,4 +425,3 @@ export async function printReportXTicket(printer: ThermalPrinterConfig | null, d
 export async function printReportZTicket(printer: ThermalPrinterConfig | null, data: ReportAuditData) {
     return printAuditTicketReal(printer, { ...data, type: 'Z' });
 }
-
