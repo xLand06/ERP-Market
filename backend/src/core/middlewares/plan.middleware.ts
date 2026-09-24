@@ -10,6 +10,37 @@ import { prisma } from '../../config/prisma';
 import { getSettings } from '../../modules/settings/settings.service';
 
 export type PlanResource = 'users' | 'branches' | 'products';
+export type PlanTierLevel = 'basic' | 'pro' | 'premium';
+
+const TIER_ORDER: Record<PlanTierLevel, number> = { basic: 0, pro: 1, premium: 2 };
+
+/**
+ * Middleware que bloquea si el tier del tenant no alcanza el mínimo requerido.
+ * Uso: planGuard('PREMIUM') → solo tenants premium o superior pasan.
+ */
+export const planGuard = (minimumTier: PlanTierLevel) => {
+    return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const settings = await getSettings();
+            const rawTier = (settings.planTier || 'basic').toLowerCase();
+            const tier: PlanTierLevel = rawTier === 'basico' ? 'basic' : rawTier as PlanTierLevel;
+
+            if ((TIER_ORDER[tier] ?? 0) < (TIER_ORDER[minimumTier] ?? 0)) {
+                res.status(403).json({
+                    success: false,
+                    error: `Esta función requiere el plan ${minimumTier.charAt(0).toUpperCase() + minimumTier.slice(1)} o superior. Tu plan actual es ${tier.charAt(0).toUpperCase() + tier.slice(1)}.`,
+                    code: 'PLAN_TIER_INSUFFICIENT',
+                    tier,
+                    required: minimumTier,
+                });
+                return;
+            }
+            next();
+        } catch {
+            next(); // fail-open
+        }
+    };
+};
 
 /**
  * Límites por defecto según el tier del plan.
