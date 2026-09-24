@@ -127,3 +127,62 @@ export function getVpsStats(): VpsStats {
 
     return cache;
 }
+
+/**
+ * Invalida la caché de estadísticas del VPS.
+ */
+export function invalidateVpsCache(): void {
+    cache = null;
+    cacheTimestamp = 0;
+}
+
+/**
+ * Ejecuta una limpieza segura de Docker en el host:
+ * - docker image prune -f (imágenes huérfanas/dangling con timeout 60s)
+ * - docker builder prune -f (caché de construcción con timeout 60s)
+ * NUNCA usa --volumes y NUNCA ejecuta docker container prune.
+ */
+export function pruneDockerSystem(): { success: boolean; output: string; reclaimedSpace?: string } {
+    const outputs: string[] = [];
+    let hasError = false;
+
+    // 1. Limpieza de imágenes huérfanas
+    try {
+        const imageOut = execSync('docker image prune -f', { encoding: 'utf-8', timeout: 60000 }).trim();
+        outputs.push(`[docker image prune]\n${imageOut || 'No dangling images removed.'}`);
+    } catch (err: any) {
+        hasError = true;
+        const stderr = err.stderr ? err.stderr.toString().trim() : '';
+        const stdout = err.stdout ? err.stdout.toString().trim() : '';
+        outputs.push(`[docker image prune ERROR]\n${stderr || stdout || err.message}`);
+    }
+
+    // 2. Limpieza de caché de buildx/builder
+    try {
+        const builderOut = execSync('docker builder prune -f', { encoding: 'utf-8', timeout: 60000 }).trim();
+        outputs.push(`[docker builder prune]\n${builderOut || 'No build cache removed.'}`);
+    } catch (err: any) {
+        hasError = true;
+        const stderr = err.stderr ? err.stderr.toString().trim() : '';
+        const stdout = err.stdout ? err.stdout.toString().trim() : '';
+        outputs.push(`[docker builder prune ERROR]\n${stderr || stdout || err.message}`);
+    }
+
+    // Invalida la caché del VPS para reflejar el estado actual tras la limpieza
+    invalidateVpsCache();
+
+    const fullOutput = outputs.join('\n\n');
+
+    // Extraer espacio liberado (e.g. "Total reclaimed space: 1.25GB")
+    const matches = Array.from(fullOutput.matchAll(/Total reclaimed space:\s*([^\r\n]+)/gi));
+    let reclaimedSpace: string | undefined;
+    if (matches.length > 0) {
+        reclaimedSpace = matches.map((m) => m[1].trim()).join(' | ');
+    }
+
+    return {
+        success: !hasError,
+        output: fullOutput,
+        reclaimedSpace,
+    };
+}

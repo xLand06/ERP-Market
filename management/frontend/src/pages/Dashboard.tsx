@@ -136,6 +136,45 @@ export default function Dashboard() {
     const [tenantsSummary, setTenantsSummary] = useState<TenantsSummary | null>(null);
     const [vpsStats, setVpsStats] = useState<VpsStats | null>(null);
     const [loading, setLoading] = useState(true);
+    const [showPruneModal, setShowPruneModal] = useState(false);
+    const [pruneLoading, setPruneLoading] = useState(false);
+    const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+    function showToast(type: 'success' | 'error', message: string) {
+        setToast({ type, message });
+        setTimeout(() => {
+            setToast((current) => (current?.message === message ? null : current));
+        }, 6000);
+    }
+
+    const handlePruneDocker = async () => {
+        setPruneLoading(true);
+        setShowPruneModal(false);
+        try {
+            const res = await apiFetch<{
+                success: boolean;
+                message: string;
+                output?: string;
+                reclaimedSpace?: string;
+                stats?: VpsStats;
+            }>('/api/vps/docker-prune', {
+                method: 'POST',
+            });
+            if (res.stats) {
+                setVpsStats(res.stats);
+            } else {
+                const freshStats = await apiFetch<VpsStats>('/api/vps/stats');
+                setVpsStats(freshStats);
+            }
+            const spaceText = res.reclaimedSpace ? ` Espacio liberado: ${res.reclaimedSpace}.` : '';
+            showToast('success', `${res.message || 'Limpieza de Docker completada.'}${spaceText}`);
+        } catch (err: any) {
+            console.error('[Dashboard] Error en docker-prune:', err);
+            showToast('error', err.message || 'Error al ejecutar la limpieza de Docker');
+        } finally {
+            setPruneLoading(false);
+        }
+    };
 
     useEffect(() => {
         Promise.all([
@@ -365,7 +404,32 @@ export default function Dashboard() {
                         padding: '1.25rem',
                         boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                     }}>
-                        <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>Docker</h3>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                            <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>Docker</h3>
+                            <button
+                                type="button"
+                                onClick={() => setShowPruneModal(true)}
+                                disabled={pruneLoading}
+                                title="Optimizar Docker: liberar imágenes huérfanas y caché builder"
+                                style={{
+                                    background: pruneLoading ? '#f1f5f9' : '#f8fafc',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: 6,
+                                    padding: '3px 8px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 600,
+                                    color: '#334155',
+                                    cursor: pruneLoading ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    transition: 'all 0.15s ease',
+                                }}
+                            >
+                                <span>🧹</span>
+                                {pruneLoading ? 'Limpiando...' : 'Optimizar Docker'}
+                            </button>
+                        </div>
                         <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.75rem' }}>
                             <div>
                                 <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#059669', fontVariantNumeric: 'tabular-nums' }}>{vpsStats.docker.running}</div>
@@ -468,6 +532,157 @@ export default function Dashboard() {
                     </table>
                 </div>
             </div>
+
+            {/* Modal de confirmación para Limpieza de Docker */}
+            {showPruneModal && (
+                <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9000,
+                    background: 'rgba(15,23,42,0.6)',
+                    backdropFilter: 'blur(3px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1rem',
+                }}>
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: 16,
+                        maxWidth: 480,
+                        width: '100%',
+                        padding: '1.5rem',
+                        boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <div style={{
+                                    width: 38,
+                                    height: 38,
+                                    borderRadius: 10,
+                                    background: '#ecfdf5',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '1.2rem',
+                                    flexShrink: 0,
+                                }}>
+                                    🧹
+                                </div>
+                                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
+                                    Optimizar Docker
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => !pruneLoading && setShowPruneModal(false)}
+                                disabled={pruneLoading}
+                                style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: pruneLoading ? 'not-allowed' : 'pointer', color: '#94a3b8' }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <p style={{ margin: '0 0 1.25rem', fontSize: '0.875rem', color: '#475569', lineHeight: 1.5 }}>
+                            Esta acción liberará espacio eliminando imágenes huérfanas y caché de compilación en el VPS. Los contenedores y volúmenes de datos de los tenants NO serán afectados.
+                        </p>
+
+                        <div style={{
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: 8,
+                            padding: '0.75rem 1rem',
+                            marginBottom: '1.5rem',
+                            fontSize: '0.78rem',
+                            color: '#64748b',
+                        }}>
+                            <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: 4 }}>Operaciones a ejecutar:</div>
+                            <div>&bull; <code style={{ color: '#059669' }}>docker image prune -f</code> (imágenes huérfanas)</div>
+                            <div>&bull; <code style={{ color: '#059669' }}>docker builder prune -f</code> (caché de construcción)</div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                            <button
+                                type="button"
+                                onClick={() => setShowPruneModal(false)}
+                                disabled={pruneLoading}
+                                style={{
+                                    padding: '0.55rem 1rem',
+                                    borderRadius: 8,
+                                    border: '1px solid #cbd5e1',
+                                    background: '#fff',
+                                    color: '#475569',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 600,
+                                    cursor: pruneLoading ? 'not-allowed' : 'pointer',
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handlePruneDocker}
+                                disabled={pruneLoading}
+                                style={{
+                                    padding: '0.55rem 1.25rem',
+                                    borderRadius: 8,
+                                    border: 'none',
+                                    background: '#059669',
+                                    color: '#fff',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 600,
+                                    cursor: pruneLoading ? 'not-allowed' : 'pointer',
+                                    opacity: pruneLoading ? 0.7 : 1,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                }}
+                            >
+                                {pruneLoading ? 'Limpiando...' : 'Confirmar Limpieza'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Toast / Notificación de estado */}
+            {toast && (
+                <div style={{
+                    position: 'fixed',
+                    bottom: '1.5rem',
+                    right: '1.5rem',
+                    zIndex: 9999,
+                    background: toast.type === 'success' ? '#065f46' : '#991b1b',
+                    color: '#fff',
+                    padding: '0.75rem 1.25rem',
+                    borderRadius: 8,
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    maxWidth: 420,
+                }}>
+                    <span>{toast.type === 'success' ? '✓' : '⚠'}</span>
+                    <span style={{ flex: 1, wordBreak: 'break-word' }}>{toast.message}</span>
+                    <button
+                        type="button"
+                        onClick={() => setToast(null)}
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'rgba(255,255,255,0.8)',
+                            fontSize: '1rem',
+                            cursor: 'pointer',
+                            padding: 0,
+                            lineHeight: 1,
+                        }}
+                    >
+                        &times;
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
