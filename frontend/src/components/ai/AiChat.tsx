@@ -207,7 +207,7 @@ export function AiChat() {
                             <h3 className="text-sm font-black text-white tracking-tight">Asistente IA</h3>
                             <div className="flex items-center gap-1.5">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                <p className="text-[11px] text-slate-400 font-medium">Online · Groq + Qwen 3.8</p>
+                                <p className="text-[11px] text-slate-400 font-medium">Online · Siempre disponible</p>
                             </div>
                         </div>
                         {messages.length > 0 && (
@@ -325,7 +325,7 @@ export function AiChat() {
                             </button>
                         </form>
                         <p className="text-[10px] text-slate-400 mt-2 text-center font-medium">
-                            Groq + Qwen 3.8 · CSV/Excel · Solo lectura
+                            Asistente IA · Análisis de negocio
                         </p>
                     </div>
                 </div>

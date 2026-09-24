@@ -25,7 +25,7 @@ export const chat = async (req: AuthRequest, res: Response) => {
             return res.status(400).json({ success: false, error: 'La pregunta es demasiado larga (máx. 500 caracteres).' });
         }
 
-        const result = await aiChatService.processAiQuestion(trimmed);
+        const result = await aiChatService.processAiQuestion(trimmed, userId);
 
         // Guardar mensajes en la sesión
         try {
@@ -33,7 +33,7 @@ export const chat = async (req: AuthRequest, res: Response) => {
             const newMessages = [
                 ...existing,
                 { role: 'user' as const, content: trimmed, timestamp: new Date().toISOString() },
-                { role: 'assistant' as const, content: result.answer, sql: result.sql, exportData: result.exportData, timestamp: new Date().toISOString() },
+                { role: 'assistant' as const, content: result.answer, exportData: result.exportData, timestamp: new Date().toISOString() },
             ];
             // Mantener solo últimos 50 mensajes
             const trimmed2 = newMessages.slice(-50);
@@ -46,7 +46,6 @@ export const chat = async (req: AuthRequest, res: Response) => {
             success: true,
             data: {
                 answer: result.answer,
-                sql: result.sql || null,
                 rows: result.data || null,
                 exportData: result.exportData || null,
             },
