@@ -115,3 +115,63 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
         res.status(error.status || 500).json({ success: false, error: error.message });
     }
 };
+
+/**
+ * Transferir entre cuentas — Auditado
+ */
+export const transfer = async (req: AuthRequest, res: Response) => {
+    try {
+        const { fromAccountId, toAccountId, amount, concept } = req.body;
+
+        if (!fromAccountId || !toAccountId || !amount) {
+            return res.status(400).json({ success: false, error: 'Faltan campos: fromAccountId, toAccountId, amount' });
+        }
+
+        const result = await banksService.transferBetweenAccounts({
+            fromAccountId,
+            toAccountId,
+            amount: Number(amount),
+            concept,
+        });
+
+        await logAudit({
+            action: 'BANK_TRANSFER',
+            module: 'banks',
+            details: { fromAccountId, toAccountId, amount },
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
+        });
+
+        res.status(201).json({ success: true, data: result });
+    } catch (error: any) {
+        res.status(error.status || 500).json({ success: false, error: error.message });
+    }
+};
+
+/**
+ * Conciliación bancaria — comparar extracto con sistema
+ */
+export const reconcile = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = validatedData(req, 'params');
+        const { items } = req.body;
+
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ success: false, error: 'Se requiere un array de items del extracto' });
+        }
+
+        const result = await banksService.reconcileBankStatement(id, items);
+
+        await logAudit({
+            action: 'BANK_RECONCILIATION',
+            module: 'banks',
+            details: { accountId: id, totalItems: items.length, matched: result.matched },
+            userId: req.user!.id,
+            ipAddress: extractIp(req),
+        });
+
+        res.json({ success: true, data: result });
+    } catch (error: any) {
+        res.status(error.status || 500).json({ success: false, error: error.message });
+    }
+};

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Building2, Landmark, ArrowUpRight, ArrowDownRight, ChevronRight } from 'lucide-react';
+import { Plus, Building2, Landmark, ArrowUpRight, ArrowDownRight, ChevronRight, ArrowLeftRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import {
     DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { useBankAccounts, useCreateBankAccount } from '../hooks/useBanks';
+import { useBankAccounts, useCreateBankAccount, useTransferBetweenAccounts } from '../hooks/useBanks';
 
 // ─── Modal "Nueva Cuenta" ─────────────────────────────────────────────────────
 function NewAccountModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -131,8 +131,94 @@ function NewAccountModal({ open, onClose }: { open: boolean; onClose: () => void
     );
 }
 
+// ─── Modal "Transferir" ─────────────────────────────────────────────────────
+function TransferModal({ open, onClose, accounts }: { open: boolean; onClose: () => void; accounts: any[] }) {
+    const transfer = useTransferBetweenAccounts();
+    const [fromAccountId, setFromAccountId] = useState('');
+    const [toAccountId, setToAccountId] = useState('');
+    const [amount, setAmount] = useState('');
+    const [concept, setConcept] = useState('');
+    const [error, setError] = useState('');
+
+    const handleSave = () => {
+        if (!fromAccountId || !toAccountId) {
+            setError('Seleccioná ambas cuentas');
+            return;
+        }
+        if (fromAccountId === toAccountId) {
+            setError('Las cuentas deben ser diferentes');
+            return;
+        }
+        if (!amount || parseFloat(amount) <= 0) {
+            setError('El monto debe ser mayor a 0');
+            return;
+        }
+        setError('');
+        transfer.mutate(
+            { fromAccountId, toAccountId, amount: parseFloat(amount), concept: concept.trim() || undefined },
+            { onSuccess: () => { setFromAccountId(''); setToAccountId(''); setAmount(''); setConcept(''); onClose(); } }
+        );
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={open => !open && onClose()}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
+                            <ArrowLeftRight className="w-4 h-4 text-purple-600" />
+                        </div>
+                        Transferir entre cuentas
+                    </DialogTitle>
+                    <DialogDescription>Mové dinero de una cuenta a otra de forma instantánea.</DialogDescription>
+                </DialogHeader>
+                <div className="px-6 pb-4 space-y-4">
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Cuenta origen</label>
+                        <select value={fromAccountId} onChange={e => setFromAccountId(e.target.value)}
+                            className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm bg-white">
+                            <option value="">Seleccionar...</option>
+                            {accounts.filter(a => a.isActive).map(a => (
+                                <option key={a.id} value={a.id}>{a.name} — ${a.balance.toLocaleString()}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Cuenta destino</label>
+                        <select value={toAccountId} onChange={e => setToAccountId(e.target.value)}
+                            className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm bg-white">
+                            <option value="">Seleccionar...</option>
+                            {accounts.filter(a => a.isActive && a.id !== fromAccountId).map(a => (
+                                <option key={a.id} value={a.id}>{a.name} — ${a.balance.toLocaleString()}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Monto</label>
+                        <Input type="number" min="0" step="0.01" placeholder="0.00" value={amount}
+                            onChange={e => setAmount(e.target.value)} className="tabular-nums" />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Concepto (opcional)</label>
+                        <Input placeholder="ej. Pago de proveedor" value={concept} onChange={e => setConcept(e.target.value)} />
+                    </div>
+                    {error && <p className="text-xs text-red-500">{error}</p>}
+                </div>
+                <DialogFooter className="border-t border-slate-100">
+                    <Button variant="outline" onClick={onClose}>Cancelar</Button>
+                    <Button onClick={handleSave} disabled={transfer.isPending}
+                        className="bg-purple-600 hover:bg-purple-700 shadow-sm shadow-purple-500/20">
+                        {transfer.isPending ? 'Transfiriendo...' : 'Transferir'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 export default function BanksPage() {
     const [modalOpen, setModalOpen] = useState(false);
+    const [transferOpen, setTransferOpen] = useState(false);
     const { data: accounts = [], isLoading } = useBankAccounts();
 
     const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
@@ -147,9 +233,14 @@ export default function BanksPage() {
                         {accounts.length} cuentas · Saldo total ${totalBalance.toLocaleString()}
                     </p>
                 </div>
-                <Button size="lg" className="h-10 font-bold gap-2 shadow-sm shadow-blue-500/20" onClick={() => setModalOpen(true)}>
-                    <Plus className="w-4.5 h-4.5" /> Nueva Cuenta
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" size="lg" className="h-10 font-bold gap-2" onClick={() => setTransferOpen(true)}>
+                        <ArrowLeftRight className="w-4 h-4" /> Transferir
+                    </Button>
+                    <Button size="lg" className="h-10 font-bold gap-2 shadow-sm shadow-blue-500/20" onClick={() => setModalOpen(true)}>
+                        <Plus className="w-4.5 h-4.5" /> Nueva Cuenta
+                    </Button>
+                </div>
             </div>
 
             {/* Accounts grid */}
@@ -212,6 +303,7 @@ export default function BanksPage() {
             )}
 
             <NewAccountModal open={modalOpen} onClose={() => setModalOpen(false)} />
+            <TransferModal open={transferOpen} onClose={() => setTransferOpen(false)} accounts={accounts} />
         </div>
     );
 }
