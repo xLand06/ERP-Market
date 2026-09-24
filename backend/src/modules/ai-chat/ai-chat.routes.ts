@@ -17,4 +17,11 @@ router.use(authMiddleware);
  */
 router.post('/', ctrl.chat);
 
+/**
+ * POST /api/ai-chat/export
+ * Exporta datos como CSV o Excel.
+ * Body: { data: any[], format: 'csv' | 'excel', filename?: string }
+ */
+router.post('/export', ctrl.exportData);
+
 export default router;
