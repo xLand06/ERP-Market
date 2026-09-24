@@ -37,6 +37,7 @@ import catalogRouter from './modules/catalog/catalog.routes';
 import banksRouter from './modules/banks/banks.routes';
 import notificationsRouter from './modules/notifications/notifications.routes';
 import uploadRouter from './modules/upload/upload.routes';
+import aiChatRouter from './modules/ai-chat/ai-chat.routes';
 
 const app = express();
 
@@ -242,6 +243,8 @@ app.use('/api/banks',       banksRouter);
 app.use('/api/notifications', notificationsRouter);
 // Upload de imágenes (solo plan PREMIUM)
 app.use('/api/upload', uploadRouter);
+// Asistente IA (Groq/Llama)
+app.use('/api/ai-chat', aiChatRouter);
 // Facturación / billing del tenant (proxy al management server)
 import billingRouter from './modules/billing/billing.routes';
 app.use('/api/billing',     billingRouter);

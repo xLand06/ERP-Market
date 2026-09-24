@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useSyncStore } from '@/services/sync.service';
 import { ShoppingCart, Package, LayoutDashboard, Banknote, Warehouse, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
+import { AiChat } from '@/components/ai/AiChat';
 
 export function AppShellLayout() {
     const { fetchRates, systemNotice, noticeLevel, dismissedNotice, dismissNotice } = useConfigStore();
@@ -199,6 +200,9 @@ export function AppShellLayout() {
                     })}
                 </nav>
             </div>
+
+            {/* AI Chat Bubble */}
+            <AiChat />
         </div>
     );
 }
