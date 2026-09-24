@@ -1,10 +1,34 @@
-import { BarChart2, TrendingUp, TrendingDown, Package, Truck, DollarSign, Download, ArrowRight } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { BarChart2, TrendingUp, TrendingDown, Package, DollarSign, Download, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { exportToExcel } from '@/lib/exportUtils';
+import {
+    useReportSummary,
+    useSalesByDay,
+    useTopProducts,
+    useSalesByBranch,
+    type DatePreset,
+} from '../hooks/useReports';
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const FORMAT_COP = (v: number) =>
+    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v);
+
+const FORMAT_NUM = (v: number) => new Intl.NumberFormat('es-VE').format(v);
+
+const DATE_PRESETS: { key: DatePreset; label: string }[] = [
+    { key: 'last7', label: 'Últimos 7 días' },
+    { key: 'last30', label: 'Últimos 30 días' },
+    { key: 'thisMonth', label: 'Este mes' },
+    { key: 'thisYear', label: 'Este año' },
+];
 
 // ─── Mini bar spark ───────────────────────────────────────────────────────────
 function SparkBars({ values, color }: { values: number[]; color: string }) {
+    if (values.length === 0) return null;
     const max = Math.max(...values);
+    if (max === 0) return null;
     return (
         <div className="flex items-end gap-0.5 h-8 w-full">
             {values.map((v, i) => (
@@ -23,7 +47,7 @@ interface ReportCardProps {
     icon: React.ElementType;
     title: string;
     value: string;
-    change: number;
+    change?: number;
     sub: string;
     spark?: number[];
     sparkColor?: string;
@@ -33,20 +57,22 @@ interface ReportCardProps {
 }
 
 function ReportCard({ icon: Icon, title, value, change, sub, spark, sparkColor, iconBg, iconColor, cta }: ReportCardProps) {
-    const up = change >= 0;
+    const up = (change ?? 0) >= 0;
     return (
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col gap-3 hover:shadow-md transition-shadow">
             <div className="flex items-start justify-between">
                 <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', iconBg)}>
                     <Icon className={cn('w-5 h-5', iconColor)} />
                 </div>
-                <span className={cn(
-                    'flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full',
-                    up ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
-                )}>
-                    {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                    {Math.abs(change)}%
-                </span>
+                {change !== undefined && (
+                    <span className={cn(
+                        'flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full',
+                        up ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                    )}>
+                        {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                        {Math.abs(change).toFixed(1)}%
+                    </span>
+                )}
             </div>
             <div>
                 <p className="text-xs text-slate-400 font-medium">{title}</p>
@@ -63,26 +89,81 @@ function ReportCard({ icon: Icon, title, value, change, sub, spark, sparkColor, 
     );
 }
 
-// ─── Top product row ──────────────────────────────────────────────────────────
-const TOP_PRODUCTS = [
-    { name: 'Harina PAN 1kg',     units: 842, revenue: 1010.40, pct: 100 },
-    { name: 'Aceite Mazola 1L',   units: 634, revenue: 1585.00, pct: 83  },
-    { name: 'Arroz Cristal 1kg',  units: 520, revenue:  494.00, pct: 68  },
-    { name: 'Café Fama 500g',     units: 418, revenue: 1212.20, pct: 55  },
-    { name: 'Leche Completa 1L',  units: 375, revenue:  525.00, pct: 48  },
-];
+// ─── Loading skeleton ─────────────────────────────────────────────────────────
+function LoadingSkeleton() {
+    return (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <Loader2 className="w-8 h-8 text-slate-300 animate-spin" />
+            <p className="text-sm text-slate-400 font-medium">Cargando reportes...</p>
+        </div>
+    );
+}
+
+// ─── Error state ──────────────────────────────────────────────────────────────
+function ErrorState({ message }: { message: string }) {
+    return (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <AlertCircle className="w-8 h-8 text-red-400" />
+            <p className="text-sm text-red-600 font-medium">{message}</p>
+        </div>
+    );
+}
+
+// ─── Empty state ──────────────────────────────────────────────────────────────
+function EmptyState({ text }: { text: string }) {
+    return (
+        <div className="flex flex-col items-center justify-center py-12 gap-2">
+            <Package className="w-8 h-8 text-slate-300" />
+            <p className="text-sm text-slate-400">{text}</p>
+        </div>
+    );
+}
+
+// ─── Branch colors ────────────────────────────────────────────────────────────
+const BRANCH_COLORS = ['bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-purple-500', 'bg-rose-500'];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
-import { exportToExcel } from '@/lib/exportUtils';
-
 export default function ReportsPage() {
+    const [datePreset, setDatePreset] = useState<DatePreset>('last30');
+
+    const summary = useReportSummary(datePreset);
+    const dailySales = useSalesByDay(datePreset);
+    const topProducts = useTopProducts(datePreset);
+    const branchSales = useSalesByBranch(datePreset);
+
+    const isLoading = summary.isLoading || dailySales.isLoading || topProducts.isLoading || branchSales.isLoading;
+    const isError = summary.isError || dailySales.isError || topProducts.isError || branchSales.isError;
+    const errorMsg = 'Error al cargar los datos. Verifica tu conexión.';
+
+    // Compute spark data from daily sales (last 7 data points)
+    const sparkValues = useMemo(() => {
+        const days = dailySales.data ?? [];
+        return days.slice(-7).map((d) => d.total);
+    }, [dailySales.data]);
+
+    // Total for branch percentage calculation
+    const branchTotal = useMemo(
+        () => (branchSales.data ?? []).reduce((sum, b) => sum + b.total, 0),
+        [branchSales.data]
+    );
+
+    // Max revenue in top products for bar percentage
+    const maxProductRevenue = useMemo(
+        () => Math.max(...(topProducts.data ?? []).map((p) => p.total), 1),
+        [topProducts.data]
+    );
+
+    // Estimate profit (30% margin on total sales)
+    const estimatedProfit = (summary.data?.totalSales ?? 0) * 0.3;
+
     const handleExportReports = () => {
+        const s = summary.data;
         exportToExcel(
             [
-                { indicador: 'Ventas del Mes', valor: '$18,420', comparativa: '+12.4% vs mes anterior' },
-                { indicador: 'Órdenes Totales', valor: '342', comparativa: '+8.1% vs mes anterior' },
-                { indicador: 'Ticket Promedio', valor: '$53.86', comparativa: '+4.0% vs mes anterior' },
-                { indicador: 'Ganancia Est. (30%)', valor: '$5,526', comparativa: 'Margen saludable' },
+                { indicador: 'Ventas Totales', valor: FORMAT_COP(s?.totalSales ?? 0), comparativa: '' },
+                { indicador: 'Transacciones', valor: FORMAT_NUM(s?.transactionCount ?? 0), comparativa: '' },
+                { indicador: 'Ticket Promedio', valor: FORMAT_COP(s?.avgTicket ?? 0), comparativa: '' },
+                { indicador: 'Ganancia Est. (30%)', valor: FORMAT_COP(estimatedProfit), comparativa: '' },
             ],
             [
                 { header: 'Indicador', key: 'indicador' },
@@ -91,7 +172,30 @@ export default function ReportsPage() {
             ],
             'Reporte_Gerencial'
         );
+
+        // Also export top products if available
+        if (topProducts.data && topProducts.data.length > 0) {
+            exportToExcel(
+                topProducts.data.map((p) => ({
+                    producto: p.productName,
+                    unidades: p.quantity,
+                    ingresos: FORMAT_COP(p.total),
+                })),
+                [
+                    { header: 'Producto', key: 'producto' },
+                    { header: 'Unidades', key: 'unidades' },
+                    { header: 'Ingresos', key: 'ingresos' },
+                ],
+                'Top_Productos'
+            );
+        }
     };
+
+    // ── Render ──────────────────────────────────────────────────────────────
+    if (isLoading) return <LoadingSkeleton />;
+    if (isError) return <ErrorState message={errorMsg} />;
+
+    const s = summary.data!;
 
     return (
         <div className="flex flex-col gap-6 max-w-[1400px] mx-auto pb-8">
@@ -102,59 +206,70 @@ export default function ReportsPage() {
                         Reportes y Análisis
                     </h1>
                     <p className="text-xs text-slate-400 mt-1 font-medium">
-                        Datos del período actual · Marzo 2026
+                        Datos del período seleccionado
                     </p>
                 </div>
-                <Button onClick={handleExportReports} variant="outline" size="lg" className="h-10 font-bold text-slate-700 w-fit">
-                    <Download className="w-4.5 h-4.5 mr-2" /> Exportar todo
-                </Button>
+                <div className="flex items-center gap-3">
+                    {/* Date range selector */}
+                    <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5">
+                        {DATE_PRESETS.map((p) => (
+                            <button
+                                key={p.key}
+                                onClick={() => setDatePreset(p.key)}
+                                className={cn(
+                                    'px-3 py-1.5 text-xs font-bold rounded-md transition-all',
+                                    datePreset === p.key
+                                        ? 'bg-white text-slate-900 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                )}
+                            >
+                                {p.label}
+                            </button>
+                        ))}
+                    </div>
+                    <Button onClick={handleExportReports} variant="outline" size="lg" className="h-10 font-bold text-slate-700 w-fit">
+                        <Download className="w-4.5 h-4.5 mr-2" /> Exportar todo
+                    </Button>
+                </div>
             </div>
 
             {/* KPI report cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <ReportCard
                     icon={DollarSign}
-                    title="Ventas del Mes"
-                    value="$18,420"
-                    change={+12.4}
-                    sub="vs. $16,380 el mes pasado"
-                    spark={[8200, 9400, 10100, 12000, 14200, 15600, 18420]}
+                    title="Ventas Totales"
+                    value={FORMAT_COP(s.totalSales)}
+                    sub={`${FORMAT_NUM(s.transactionCount)} transacciones`}
+                    spark={sparkValues}
                     sparkColor="bg-emerald-500"
                     iconBg="bg-emerald-50"
                     iconColor="text-emerald-600"
                     cta="Ver historial de ventas"
                 />
                 <ReportCard
-                    icon={Package}
-                    title="Valor en Inventario"
-                    value="$42,750"
-                    change={-3.1}
-                    sub="1,842 unidades en stock"
-                    spark={[45000, 44200, 43100, 44800, 43900, 43100, 42750]}
-                    sparkColor="bg-blue-500"
+                    icon={BarChart2}
+                    title="Ticket Promedio"
+                    value={FORMAT_COP(s.avgTicket)}
+                    sub="Por transacción"
                     iconBg="bg-blue-50"
                     iconColor="text-blue-600"
-                    cta="Ver inventario"
+                    cta="Ver detalle"
                 />
                 <ReportCard
-                    icon={Truck}
-                    title="Compras del Mes"
-                    value="$11,200"
-                    change={+8.7}
-                    sub="vs. $10,300 el mes pasado"
-                    spark={[7200, 8400, 9100, 9800, 10500, 10900, 11200]}
-                    sparkColor="bg-amber-500"
+                    icon={Package}
+                    title="Productos Más Vendidos"
+                    value={FORMAT_NUM(topProducts.data?.length ?? 0)}
+                    sub="productos con ventas"
                     iconBg="bg-amber-50"
                     iconColor="text-amber-600"
-                    cta="Ver compras"
+                    cta="Ver catálogo"
                 />
                 <ReportCard
-                    icon={BarChart2}
-                    title="Margen Bruto"
-                    value="39%"
-                    change={+2.3}
-                    sub="$7,184 de beneficio bruto"
-                    spark={[34, 35, 36, 37, 36, 38, 39]}
+                    icon={DollarSign}
+                    title="Ganancia Estimada (30%)"
+                    value={FORMAT_COP(estimatedProfit)}
+                    sub={`Sobre ${FORMAT_COP(s.totalSales)} en ventas`}
+                    spark={sparkValues.length > 0 ? sparkValues.map((v) => v * 0.3) : undefined}
                     sparkColor="bg-purple-500"
                     iconBg="bg-purple-50"
                     iconColor="text-purple-600"
@@ -166,104 +281,102 @@ export default function ReportsPage() {
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
                     <div>
-                        <h2 className="text-sm font-bold text-slate-900">Productos Más Vendidos</h2>
-                        <p className="text-xs text-slate-400 mt-0.5">Ranking por unidades · Marzo 2026</p>
+                        <h2 className="text-sm font-bold text-slate-900">Top {topProducts.data?.length ?? 0} Productos Más Vendidos</h2>
+                        <p className="text-xs text-slate-400 mt-0.5">Ranking por ingresos</p>
                     </div>
                     <Button variant="ghost" className="touch-target text-xs text-slate-500 font-bold">
                         Ver todos <ArrowRight className="w-3.5 h-3.5 ml-1" />
                     </Button>
                 </div>
                 <div className="divide-y divide-slate-100">
-                    {TOP_PRODUCTS.map((p, i) => (
-                        <div key={p.name} className="flex items-center gap-4 px-5 py-3.5">
-                            <span className="w-6 text-xs font-black text-slate-300 text-center shrink-0">
-                                {i + 1}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-slate-800 truncate">{p.name}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <div className="h-1.5 bg-emerald-100 rounded-full flex-1 overflow-hidden">
-                                        <div
-                                            className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                                            style={{ width: `${p.pct}%` }}
-                                        />
-                                    </div>
-                                    <span className="text-[10px] font-bold text-slate-400 shrink-0 tabular-nums">
-                                        {p.units} uds
+                    {(topProducts.data ?? []).length === 0 ? (
+                        <EmptyState text="No hay ventas en este período" />
+                    ) : (
+                        (topProducts.data ?? []).map((p, i) => {
+                            const pct = Math.round((p.total / maxProductRevenue) * 100);
+                            return (
+                                <div key={p.productId} className="flex items-center gap-4 px-5 py-3.5">
+                                    <span className="w-6 text-xs font-black text-slate-300 text-center shrink-0">
+                                        {i + 1}
                                     </span>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-slate-800 truncate">{p.productName}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <div className="h-1.5 bg-emerald-100 rounded-full flex-1 overflow-hidden">
+                                                <div
+                                                    className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                                                    style={{ width: `${pct}%` }}
+                                                />
+                                            </div>
+                                            <span className="text-[10px] font-bold text-slate-400 shrink-0 tabular-nums">
+                                                {FORMAT_NUM(p.quantity)} uds
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        <p className="text-sm font-bold tabular-nums text-slate-900">{FORMAT_COP(p.total)}</p>
+                                        <p className="text-[10px] text-slate-400">ingresos</p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="text-right shrink-0">
-                                <p className="text-sm font-bold tabular-nums text-slate-900">${p.revenue.toLocaleString()}</p>
-                                <p className="text-[10px] text-slate-400">ingresos</p>
-                            </div>
-                        </div>
-                    ))}
+                            );
+                        })
+                    )}
                 </div>
             </div>
 
-            {/* Bottom 2-col: Branches + Payment methods */}
+            {/* Bottom 2-col: Branches + summary */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Branch comparison */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="px-5 pt-5 pb-4 border-b border-slate-100">
                         <h2 className="text-sm font-bold text-slate-900">Ventas por Sucursal</h2>
-                        <p className="text-xs text-slate-400 mt-0.5">Distribución del mes</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Distribución del período</p>
                     </div>
                     <div className="p-5 space-y-4">
-                        {[
-                            { name: 'Principal',   value: 9840,  pct: 53, color: 'bg-emerald-500' },
-                            { name: 'Sucursal A',  value: 5620,  pct: 31, color: 'bg-blue-500'    },
-                            { name: 'Sucursal B',  value: 2960,  pct: 16, color: 'bg-amber-500'   },
-                        ].map(b => (
-                            <div key={b.name} className="space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-semibold text-slate-700">{b.name}</span>
-                                    <div className="text-right">
-                                        <span className="text-sm font-bold tabular-nums text-slate-900">${b.value.toLocaleString()}</span>
-                                        <span className="text-xs text-slate-400 ml-2">({b.pct}%)</span>
+                        {(branchSales.data ?? []).length === 0 ? (
+                            <EmptyState text="No hay datos por sucursal" />
+                        ) : (
+                            (branchSales.data ?? []).map((b, i) => {
+                                const pct = branchTotal > 0 ? Math.round((b.total / branchTotal) * 100) : 0;
+                                return (
+                                    <div key={b.branchId} className="space-y-1.5">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-semibold text-slate-700">{b.branchName}</span>
+                                            <div className="text-right">
+                                                <span className="text-sm font-bold tabular-nums text-slate-900">{FORMAT_COP(b.total)}</span>
+                                                <span className="text-xs text-slate-400 ml-2">({pct}%)</span>
+                                            </div>
+                                        </div>
+                                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                            <div
+                                                className={cn('h-full rounded-full transition-all duration-700', BRANCH_COLORS[i % BRANCH_COLORS.length])}
+                                                style={{ width: `${pct}%` }}
+                                            />
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                    <div
-                                        className={cn('h-full rounded-full transition-all duration-700', b.color)}
-                                        style={{ width: `${b.pct}%` }}
-                                    />
-                                </div>
-                            </div>
-                        ))}
+                                );
+                            })
+                        )}
                     </div>
                 </div>
 
-                {/* Payment distribution */}
+                {/* Summary card */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="px-5 pt-5 pb-4 border-b border-slate-100">
-                        <h2 className="text-sm font-bold text-slate-900">Métodos de Pago</h2>
-                        <p className="text-xs text-slate-400 mt-0.5">Distribución por monto</p>
+                        <h2 className="text-sm font-bold text-slate-900">Resumen del Período</h2>
+                        <p className="text-xs text-slate-400 mt-0.5">Métricas consolidadas</p>
                     </div>
-                    <div className="p-5 space-y-3">
+                    <div className="p-5 space-y-4">
                         {[
-                            { name: 'Efectivo',       amount: 7368,  pct: 40, badge: 'bg-emerald-100 text-emerald-700' },
-                            { name: 'Tarjeta',        amount: 5526,  pct: 30, badge: 'bg-blue-100 text-blue-700'       },
-                            { name: 'Transferencia',  amount: 3684,  pct: 20, badge: 'bg-purple-100 text-purple-700'  },
-                            { name: 'Divisa',         amount: 1842,  pct: 10, badge: 'bg-amber-100 text-amber-700'    },
-                        ].map(m => (
-                            <div key={m.name} className="flex items-center gap-3">
-                                <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full w-28 text-center shrink-0', m.badge)}>
-                                    {m.name}
-                                </span>
-                                <div className="h-2 bg-slate-100 rounded-full flex-1 overflow-hidden">
-                                    <div
-                                        className="h-full bg-slate-700 rounded-full transition-all duration-700"
-                                        style={{ width: `${m.pct}%` }}
-                                    />
-                                </div>
-                                <div className="text-right shrink-0 min-w-12">
-                                    <span className="text-xs font-bold tabular-nums text-slate-700">{m.pct}%</span>
-                                </div>
-                                <span className="text-xs font-semibold tabular-nums text-slate-900 min-w-16 text-right">
-                                    ${m.amount.toLocaleString()}
-                                </span>
+                            { label: 'Ventas totales', value: FORMAT_COP(s.totalSales), color: 'text-emerald-600' },
+                            { label: 'Transacciones', value: FORMAT_NUM(s.transactionCount), color: 'text-slate-900' },
+                            { label: 'Ticket promedio', value: FORMAT_COP(s.avgTicket), color: 'text-slate-900' },
+                            { label: 'Ganancia estimada', value: FORMAT_COP(estimatedProfit), color: 'text-purple-600' },
+                            { label: 'Sucursal principal', value: (branchSales.data ?? [])[0]?.branchName ?? 'N/A', color: 'text-slate-900' },
+                        ].map((item) => (
+                            <div key={item.label} className="flex items-center justify-between">
+                                <span className="text-sm text-slate-500">{item.label}</span>
+                                <span className={cn('text-sm font-bold tabular-nums', item.color)}>{item.value}</span>
                             </div>
                         ))}
                     </div>
