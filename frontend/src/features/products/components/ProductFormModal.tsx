@@ -163,7 +163,9 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
     const [presentations, setPresentations] = useState<ProductPresentation[]>([]);
     const [saving, setSaving] = useState(false);
     const [minStock, setMinStock] = useState<number | ''>('');
-    const [trackStock, setTrackStock] = useState(true);    // ── Kits / Combos ──────────────────────────────────────────────────────
+    const [trackStock, setTrackStock] = useState(true);
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [uploadingImage, setUploadingImage] = useState(false);    // ── Kits / Combos ──────────────────────────────────────────────────────
     const [isKit, setIsKit] = useState(false);
     const [kitRows, setKitRows] = useState<KitComponentRow[]>([]);
     const [componentSearch, setComponentSearch] = useState('');
@@ -197,6 +199,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                 setExpectedSpoilagePercent(product.expectedSpoilagePercent ?? '');
                 setCost(product.cost ?? '');
                 setPrice(product.price ?? '');
+                setImageUrl(product.imageUrl || null);
                 setSubGroupId(product.subGroupId || '');
                 setTrackStock(product.trackStock !== false);
                 const sg = subgroups.find((s: any) => s.id === product.subGroupId);
@@ -378,6 +381,38 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
         }
     };
 
+    // ── Upload de imagen de producto (solo PREMIUM) ──────────────────────────
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('La imagen no puede superar 5MB.');
+            return;
+        }
+
+        setUploadingImage(true);
+        try {
+            const formData = new FormData();
+            formData.append('image', file);
+            const res = await api.post('/upload/product-image', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            if (res.data?.success && res.data?.url) {
+                setImageUrl(res.data.url);
+                toast.success('Imagen subida correctamente');
+            } else {
+                toast.error('Error al subir imagen');
+            }
+        } catch (err: any) {
+            const msg = err?.response?.data?.error || 'Error al subir imagen';
+            toast.error(msg);
+        } finally {
+            setUploadingImage(false);
+            e.target.value = '';
+        }
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
         if (e.key === 'Enter') {
             const target = e.target as HTMLElement;
@@ -398,6 +433,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
             const data: any = {
                 name,
                 description: description || null,
+                imageUrl: imageUrl || null,
                 baseUnit,
                 trackStock,
                 expectedSpoilagePercent: (isWeighable && expectedSpoilagePercent !== '') ? Number(expectedSpoilagePercent) : null,
@@ -482,6 +518,53 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                     placeholder="Ej: Coca-Cola 350ml"
                                 />
                             </div>
+
+                            {/* ── Imagen del producto (solo PREMIUM) ────────────── */}
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                                    Foto del Producto
+                                    <span className="ml-1.5 text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Premium</span>
+                                </label>
+                                <div className="flex items-start gap-4">
+                                    {/* Preview */}
+                                    {imageUrl ? (
+                                        <div className="relative w-24 h-24 rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-100 shrink-0">
+                                            <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                                            <button
+                                                type="button"
+                                                onClick={() => setImageUrl(null)}
+                                                className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 cursor-pointer"
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <label className="w-24 h-24 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors shrink-0">
+                                            <input
+                                                type="file"
+                                                accept="image/jpeg,image/png,image/webp,image/gif"
+                                                onChange={handleImageUpload}
+                                                className="hidden"
+                                                disabled={uploadingImage}
+                                            />
+                                            {uploadingImage ? (
+                                                <RefreshCw className="w-5 h-5 text-indigo-500 animate-spin" />
+                                            ) : (
+                                                <>
+                                                    <Camera className="w-5 h-5 text-slate-400" />
+                                                    <span className="text-[10px] text-slate-400 font-medium">Subir foto</span>
+                                                </>
+                                            )}
+                                        </label>
+                                    )}
+                                    <div className="text-xs text-slate-400 pt-1">
+                                        <p className="font-medium">Formatos: JPG, PNG, WebP, GIF</p>
+                                        <p>Tamaño máximo: 5MB</p>
+                                        <p className="mt-1">La foto se muestra en el catálogo público y en el POS.</p>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Unidad Base (UMB) *</label>
                                 <select

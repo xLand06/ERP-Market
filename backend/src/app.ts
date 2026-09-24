@@ -36,6 +36,7 @@ import batchesRouter from './modules/batches/batches.routes';
 import catalogRouter from './modules/catalog/catalog.routes';
 import banksRouter from './modules/banks/banks.routes';
 import notificationsRouter from './modules/notifications/notifications.routes';
+import uploadRouter from './modules/upload/upload.routes';
 
 const app = express();
 
@@ -239,9 +240,18 @@ app.use('/api/catalog',     catalogRouter);
 app.use('/api/banks',       banksRouter);
 // Notificaciones calculadas en vivo (fiados + stock bajo)
 app.use('/api/notifications', notificationsRouter);
+// Upload de imágenes (solo plan PREMIUM)
+app.use('/api/upload', uploadRouter);
 // Facturación / billing del tenant (proxy al management server)
 import billingRouter from './modules/billing/billing.routes';
 app.use('/api/billing',     billingRouter);
+
+// ─── UPLOADS — Imágenes de productos ─────────────────────────────────────────
+const uploadsDir = path.join(__dirname, '../uploads');
+app.use('/uploads', express.static(uploadsDir, {
+    maxAge: '30d',
+    immutable: true,
+}));
 
 // ─── FRONTEND ESTÁTICO (modo standalone sin Electron) ─────────────────────
 // Sirve el frontend compilado desde backend/public/
