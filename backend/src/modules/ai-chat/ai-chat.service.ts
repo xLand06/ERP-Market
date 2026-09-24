@@ -7,7 +7,8 @@
 import Groq from 'groq-sdk';
 import { prisma } from '../../config/prisma';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const groqApiKey = process.env.GROQ_API_KEY;
+const groq = groqApiKey ? new Groq({ apiKey: groqApiKey }) : null;
 
 // ─── System prompt: solo genera SQL, sin explicaciones ───────────────────────
 const SYSTEM_PROMPT = `Eres un generador de consultas SQL PostgreSQL para un ERP de tienda/abastos en Venezuela.
@@ -114,6 +115,9 @@ export interface AiChatResponse {
  * Procesa una pregunta del usuario, genera SQL con Groq, lo ejecuta y retorna la respuesta.
  */
 export const processAiQuestion = async (question: string): Promise<AiChatResponse> => {
+    if (!groq) {
+        return { answer: 'El asistente IA no está configurado. Agregá GROQ_API_KEY en el .env del tenant.' };
+    }
     try {
         // ── PASO 1: Generar SQL ──────────────────────────────────────────────
         const completion = await groq.chat.completions.create({
