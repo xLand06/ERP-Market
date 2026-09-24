@@ -2,7 +2,8 @@
 // AI CHAT — CONTROLLER
 // =============================================================================
 
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../../core/middlewares/auth.middleware';
 import * as aiChatService from './ai-chat.service';
 
 /**
@@ -10,7 +11,7 @@ import * as aiChatService from './ai-chat.service';
  * Body: { question: string }
  * Responde con análisis del negocio usando IA + SQL.
  */
-export const chat = async (req: Request, res: Response) => {
+export const chat = async (req: AuthRequest, res: Response) => {
     try {
         const { question } = req.body;
         const userId = req.user?.id || 'anonymous';
@@ -61,7 +62,7 @@ export const chat = async (req: Request, res: Response) => {
  * Sube un CSV/Excel para análisis con IA.
  * multipart/form-data { file: File, question?: string }
  */
-export const uploadFile = async (req: Request, res: Response) => {
+export const uploadFile = async (req: AuthRequest, res: Response) => {
     try {
         if (!req.file) {
             return res.status(400).json({ success: false, error: 'No se envió ningún archivo.' });
@@ -90,7 +91,7 @@ export const uploadFile = async (req: Request, res: Response) => {
  * Body: { data: any[], format: 'csv' | 'excel', filename?: string }
  * Descarga un archivo CSV o Excel con los datos.
  */
-export const exportData = async (req: Request, res: Response) => {
+export const exportData = async (req: AuthRequest, res: Response) => {
     try {
         const { data, format = 'csv', filename } = req.body;
 
@@ -142,7 +143,7 @@ export const exportData = async (req: Request, res: Response) => {
  * GET /api/ai-chat/session
  * Carga el historial de chat del usuario.
  */
-export const loadSession = async (req: Request, res: Response) => {
+export const loadSession = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id || 'anonymous';
         const messages = await aiChatService.loadChatSession(userId);
@@ -156,7 +157,7 @@ export const loadSession = async (req: Request, res: Response) => {
  * DELETE /api/ai-chat/session
  * Limpia el historial de chat del usuario.
  */
-export const clearSession = async (req: Request, res: Response) => {
+export const clearSession = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id || 'anonymous';
         await aiChatService.clearChatSession(userId);
