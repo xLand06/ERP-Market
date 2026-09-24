@@ -236,3 +236,114 @@ function formatValue(val: any): string {
     }
     return String(val);
 }
+
+// ─── Análisis de archivos CSV/Excel subidos ──────────────────────────────────
+export const analyzeUploadedFile = async (fileBuffer: Buffer, filename: string, question?: string): Promise<AiChatResponse> => {
+    if (!groq) {
+        return { answer: 'El asistente IA no está configurado.' };
+    }
+
+    try {
+        const XLSX = await import('xlsx');
+        const ext = filename.toLowerCase().split('.').pop();
+
+        let data: any[] = [];
+
+        if (ext === 'csv') {
+            const text = fileBuffer.toString('utf-8');
+            const wb = XLSX.read(text, { type: 'string' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            data = XLSX.utils.sheet_to_json(ws);
+        } else if (ext === 'xlsx' || ext === 'xls') {
+            const wb = XLSX.read(fileBuffer, { type: 'buffer' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            data = XLSX.utils.sheet_to_json(ws);
+        } else {
+            return { answer: `Formato no soportado: ${ext}. Usa CSV o Excel (.xlsx).` };
+        }
+
+        if (data.length === 0) {
+            return { answer: 'El archivo está vacío o no tiene datos legibles.' };
+        }
+
+        const headers = Object.keys(data[0]);
+        const preview = data.slice(0, 15);
+
+        // Enviar a IA para análisis
+        const userPrompt = question
+            ? `El usuario subió un archivo "${filename}" con ${data.length} registros. Pregunta: "${question}"\n\nColumnas: ${headers.join(', ')}\n\nPrimeros 15 registros:\n${JSON.stringify(preview, null, 2)}`
+            : `El usuario subió un archivo "${filename}" con ${data.length} registros. Analízalo y dame un resumen útil.\n\nColumnas: ${headers.join(', ')}\n\nPrimeros 15 registros:\n${JSON.stringify(preview, null, 2)}`;
+
+        const completion = await groq.chat.completions.create({
+            model: 'qwen/qwen3.8-27b',
+            messages: [
+                {
+                    role: 'system',
+                    content: `Eres un analista de datos. El usuario te sube un archivo CSV/Excel y te pide que lo analices. Responde en español, sé conciso y directo. Muestra datos clave, tendencias, totales. Si el usuario pregunta algo específico sobre los datos, respondelo.`,
+                },
+                { role: 'user', content: userPrompt },
+            ],
+            temperature: 0.3,
+            max_tokens: 1024,
+        });
+
+        const answer = completion.choices[0]?.message?.content?.trim() || `El archivo tiene ${data.length} registros con columnas: ${headers.join(', ')}`;
+
+        return { answer, data };
+    } catch (error: any) {
+        console.error('[ai-chat] File analysis error:', error.message);
+        return { answer: `Error al analizar el archivo: ${error.message}` };
+    }
+};
+
+// ─── Persistencia de sesiones de chat ────────────────────────────────────────
+export interface ChatMessage {
+    role: 'user' | 'assistant';
+    content: string;
+    sql?: string | null;
+    exportData?: any[] | null;
+    timestamp: string;
+}
+
+export const saveChatSession = async (userId: string, messages: ChatMessage[]): Promise<void> => {
+    try {
+        // Usar system_settings como store simple: key = chat_session_{userId}
+        const key = `chat_session_${userId}`;
+        const value = JSON.stringify(messages);
+
+        await prisma.$executeRawUnsafe(`
+            INSERT INTO "system_settings" ("id", "key", "value", "createdAt", "updatedAt")
+            VALUES ($1, $2, $3, NOW(), NOW())
+            ON CONFLICT ("key") DO UPDATE SET "value" = $3, "updatedAt" = NOW()
+        `, key, key, value);
+    } catch (error: any) {
+        console.error('[ai-chat] Error saving session:', error.message);
+    }
+};
+
+export const loadChatSession = async (userId: string): Promise<ChatMessage[]> => {
+    try {
+        const key = `chat_session_${userId}`;
+        const rows = await prisma.$queryRawUnsafe<{ value: string }[]>(
+            `SELECT "value" FROM "system_settings" WHERE "key" = $1`,
+            key
+        );
+
+        if (rows.length > 0) {
+            return JSON.parse(rows[0].value);
+        }
+        return [];
+    } catch (error: any) {
+        console.error('[ai-chat] Error loading session:', error.message);
+        return [];
+    }
+};
+
+export const clearChatSession = async (userId: string): Promise<void> => {
+    try {
+        const key = `chat_session_${userId}`;
+        await prisma.$executeRawUnsafe(`DELETE FROM "system_settings" WHERE "key" = $1`, key);
+    } catch (error: any) {
+        console.error('[ai-chat] Error clearing session:', error.message);
+    }
+};

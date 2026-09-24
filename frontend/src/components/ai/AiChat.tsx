@@ -1,9 +1,10 @@
 // =============================================================================
 // AI CHAT — Floating Chat Component
 // Burbuja flotante que abre un panel de chat con el asistente IA del negocio.
+// Soporta: preguntas, análisis de archivos CSV/Excel, exportación, sesiones.
 // =============================================================================
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import toast from 'react-hot-toast';
@@ -36,6 +37,18 @@ const IconClose = () => (
     </svg>
 );
 
+const IconTrash = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+    </svg>
+);
+
+const IconFile = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" />
+    </svg>
+);
+
 // ─── Quick questions ─────────────────────────────────────────────────────────
 const QUICK_QUESTIONS = [
     '¿Cuánto vendí hoy?',
@@ -51,8 +64,10 @@ export function AiChat() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const { token } = useAuthStore();
 
     // Auto-scroll to bottom
@@ -66,6 +81,39 @@ export function AiChat() {
             setTimeout(() => inputRef.current?.focus(), 100);
         }
     }, [isOpen]);
+
+    // Load session history on mount
+    const loadSession = useCallback(async () => {
+        try {
+            const res = await api.get('/ai-chat/session');
+            const data = res.data?.data;
+            if (Array.isArray(data) && data.length > 0) {
+                setMessages(data.map((m: any) => ({
+                    ...m,
+                    timestamp: new Date(m.timestamp),
+                })));
+            }
+        } catch {
+            // Silently ignore
+        }
+    }, []);
+
+    useEffect(() => {
+        if (isOpen && token && messages.length === 0) {
+            loadSession();
+        }
+    }, [isOpen, token]);
+
+    // Clear session
+    const clearSession = async () => {
+        try {
+            await api.delete('/ai-chat/session');
+            setMessages([]);
+            toast.success('Historial limpiado');
+        } catch {
+            toast.error('Error al limpiar historial');
+        }
+    };
 
     const sendMessage = async (text: string) => {
         if (!text.trim() || loading) return;
@@ -106,9 +154,54 @@ export function AiChat() {
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        sendMessage(input);
+    // ── Upload CSV/Excel ─────────────────────────────────────────────────────
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        if (!['csv', 'xlsx', 'xls'].includes(ext || '')) {
+            toast.error('Formato no soportado. Usa CSV o Excel (.xlsx).');
+            return;
+        }
+
+        // Show user message
+        const userMsg: Message = {
+            role: 'user',
+            content: `📄 Archivo: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`,
+            timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, userMsg]);
+        setUploading(true);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const res = await api.post('/ai-chat/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+
+            const data = res.data?.data;
+            const assistantMsg: Message = {
+                role: 'assistant',
+                content: data?.answer || 'No pude analizar el archivo.',
+                rows: data?.rows || null,
+                timestamp: new Date(),
+            };
+
+            setMessages(prev => [...prev, assistantMsg]);
+        } catch (error: any) {
+            const errorMsg = error?.response?.data?.error || 'Error al subir el archivo.';
+            setMessages(prev => [...prev, {
+                role: 'assistant',
+                content: `❌ ${errorMsg}`,
+                timestamp: new Date(),
+            }]);
+        } finally {
+            setUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
     };
 
     // ── Download CSV/Excel ────────────────────────────────────────────────────
@@ -118,9 +211,7 @@ export function AiChat() {
                 data,
                 format,
                 filename: 'reporte_erp',
-            }, {
-                responseType: 'blob',
-            });
+            }, { responseType: 'blob' });
 
             const blob = new Blob([res.data]);
             const url = URL.createObjectURL(blob);
@@ -134,6 +225,11 @@ export function AiChat() {
         } catch {
             toast.error('Error al descargar el archivo');
         }
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        sendMessage(input);
     };
 
     // Don't render if not logged in
@@ -155,7 +251,7 @@ export function AiChat() {
                 {isOpen ? <IconClose /> : <IconBot />}
             </button>
 
-            {/* Notification dot (when closed and no messages) */}
+            {/* Notification dot */}
             {!isOpen && messages.length === 0 && (
                 <div className="fixed bottom-[4.5rem] right-6 z-50">
                     <div className="bg-white rounded-2xl shadow-lg px-3 py-2 border border-slate-200 max-w-[200px] animate-bounce">
@@ -176,7 +272,16 @@ export function AiChat() {
                             <h3 className="text-sm font-bold text-white">Asistente IA</h3>
                             <p className="text-[11px] text-indigo-200">Análisis de tu negocio</p>
                         </div>
-                        <span className="px-2 py-0.5 bg-white/20 rounded-full text-[10px] font-bold text-white">GRATIS</span>
+                        {messages.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={clearSession}
+                                className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                                title="Limpiar historial"
+                            >
+                                <IconTrash />
+                            </button>
+                        )}
                     </div>
 
                     {/* Messages */}
@@ -187,9 +292,8 @@ export function AiChat() {
                                     <IconBot />
                                 </div>
                                 <h4 className="text-sm font-bold text-slate-800 mb-1">Hola, soy tu asistente IA</h4>
-                                <p className="text-xs text-slate-500 mb-4">Preguntame lo que quieras sobre tu negocio</p>
+                                <p className="text-xs text-slate-500 mb-4">Preguntame lo que quieras o subí un archivo</p>
 
-                                {/* Quick questions */}
                                 <div className="flex flex-wrap gap-1.5 justify-center">
                                     {QUICK_QUESTIONS.map((q) => (
                                         <button
@@ -212,7 +316,6 @@ export function AiChat() {
                                         ? 'bg-indigo-600 text-white rounded-br-sm'
                                         : 'bg-slate-100 text-slate-800 rounded-bl-sm'
                                 }`}>
-                                    {/* Answer text */}
                                     <p className="text-sm whitespace-pre-wrap leading-relaxed">
                                         {formatMarkdown(msg.content)}
                                     </p>
@@ -225,9 +328,7 @@ export function AiChat() {
                                                 onClick={() => downloadFile(msg.exportData && msg.exportData.length > 0 ? msg.exportData : msg.rows!, 'csv')}
                                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-[11px] font-bold rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer"
                                             >
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
-                                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
-                                                </svg>
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
                                                 CSV
                                             </button>
                                             <button
@@ -235,14 +336,37 @@ export function AiChat() {
                                                 onClick={() => downloadFile(msg.exportData && msg.exportData.length > 0 ? msg.exportData : msg.rows!, 'excel')}
                                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-[11px] font-bold rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
                                             >
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
-                                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
-                                                </svg>
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
                                                 Excel
                                             </button>
                                             <span className="text-[10px] text-slate-400">{(msg.exportData?.length || msg.rows?.length || 0)} registros</span>
                                         </div>
                                     ) : null}
+
+                                    {/* File analysis preview */}
+                                    {msg.rows && msg.rows.length > 0 && !msg.content.includes('📊') && msg.role === 'assistant' && (
+                                        <div className="mt-2 pt-2 border-t border-slate-200">
+                                            <p className="text-[10px] text-slate-400 mb-1.5">{msg.rows.length} registros disponibles</p>
+                                            <div className="flex gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => downloadFile(msg.rows!, 'csv')}
+                                                    className="flex items-center gap-1 px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-md hover:bg-emerald-200 transition-colors cursor-pointer"
+                                                >
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                                                    CSV
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => downloadFile(msg.rows!, 'excel')}
+                                                    className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-md hover:bg-blue-200 transition-colors cursor-pointer"
+                                                >
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                                                    Excel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     <p className={`text-[10px] mt-1.5 ${msg.role === 'user' ? 'text-indigo-200' : 'text-slate-400'}`}>
                                         {msg.timestamp.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
@@ -252,7 +376,7 @@ export function AiChat() {
                         ))}
 
                         {/* Loading indicator */}
-                        {loading && (
+                        {(loading || uploading) && (
                             <div className="flex justify-start">
                                 <div className="bg-slate-100 rounded-2xl rounded-bl-sm px-4 py-3">
                                     <div className="flex items-center gap-2">
@@ -261,7 +385,9 @@ export function AiChat() {
                                             <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:150ms]" />
                                             <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:300ms]" />
                                         </div>
-                                        <span className="text-xs text-slate-400 font-medium">Analizando...</span>
+                                        <span className="text-xs text-slate-400 font-medium">
+                                            {uploading ? 'Analizando archivo...' : 'Analizando...'}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -271,29 +397,46 @@ export function AiChat() {
                     </div>
 
                     {/* Input */}
-                    <form onSubmit={handleSubmit} className="border-t border-slate-200 px-4 py-3 bg-white shrink-0">
-                        <div className="flex items-center gap-2">
+                    <div className="border-t border-slate-200 px-4 py-3 bg-white shrink-0">
+                        {/* Upload button */}
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".csv,.xlsx,.xls"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                        />
+                        <form onSubmit={handleSubmit} className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={loading || uploading}
+                                className="w-10 h-10 bg-slate-100 text-slate-500 rounded-xl flex items-center justify-center hover:bg-slate-200 transition-colors disabled:opacity-50 cursor-pointer shrink-0"
+                                title="Subir CSV o Excel"
+                            >
+                                <IconFile />
+                            </button>
                             <input
                                 ref={inputRef}
                                 type="text"
                                 value={input}
                                 onChange={e => setInput(e.target.value)}
                                 placeholder="Preguntale a la IA..."
-                                disabled={loading}
+                                disabled={loading || uploading}
                                 className="flex-1 px-4 py-2.5 bg-slate-100 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50"
                             />
                             <button
                                 type="submit"
-                                disabled={loading || !input.trim()}
+                                disabled={loading || uploading || !input.trim()}
                                 className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0"
                             >
                                 <IconSend />
                             </button>
-                        </div>
+                        </form>
                         <p className="text-[10px] text-slate-400 mt-1.5 text-center">
-                            Powered by Groq + Llama 3.1 · Solo consultas de lectura
+                            Powered by Groq + Qwen 3.8 · CSV/Excel · Solo lectura
                         </p>
-                    </form>
+                    </div>
                 </div>
             )}
         </>
@@ -302,13 +445,11 @@ export function AiChat() {
 
 // ─── Simple markdown → JSX ───────────────────────────────────────────────────
 function formatMarkdown(text: string): React.ReactNode {
-    // Bold
     const parts = text.split(/(\*\*[^*]+\*\*)/g);
     return parts.map((part, i) => {
         if (part.startsWith('**') && part.endsWith('**')) {
             return <strong key={i} className="font-bold">{part.slice(2, -2)}</strong>;
         }
-        // Italic
         const italicParts = part.split(/(_[^_]+_)/g);
         return italicParts.map((ip, j) => {
             if (ip.startsWith('_') && ip.endsWith('_')) {
