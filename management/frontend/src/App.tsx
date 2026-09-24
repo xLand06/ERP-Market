@@ -42,7 +42,7 @@ function CatalogRouter() {
 }
 
 // Admin panel routes (auth required)
-function AdminRouter({ auth, onLogout }: { auth: AuthState; onLogout: () => void }) {
+function AdminRouter({ onLogout }: { onLogout: () => void }) {
     return (
         <BrowserRouter>
             <Layout onLogout={onLogout}>
@@ -105,5 +105,5 @@ export default function App() {
         return <Login onLogin={handleLogin} />;
     }
 
-    return <AdminRouter auth={auth} onLogout={handleLogout} />;
+    return <AdminRouter onLogout={handleLogout} />;
 }
