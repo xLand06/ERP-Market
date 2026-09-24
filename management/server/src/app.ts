@@ -17,6 +17,7 @@ import { ensureNetwork } from './services/provisioner';
 import billingRoutes from './modules/billing/billing.routes';
 import trialsRoutes from './modules/trials/trials.routes';
 import publicCatalogRoutes from './modules/public-catalog/public-catalog.routes';
+import { sendEmailWithResend } from './services/notifications';
 
 const app = express();
 
@@ -155,6 +156,44 @@ app.post('/api/vps/docker-prune', authMiddleware, async (req, res) => {
             success: false,
             error: error.message || 'Error al ejecutar la limpieza de Docker',
         });
+    }
+});
+
+// POST /api/vps/test-email — Envío de correo de prueba para verificar Resend
+app.post('/api/vps/test-email', authMiddleware, async (req, res) => {
+    try {
+        const to = req.body?.to || req.user?.username;
+        if (!to || !to.includes('@')) {
+            return res.status(400).json({ error: 'Debes proporcionar un email válido en el campo "to"' });
+        }
+
+        const result = await sendEmailWithResend({
+            to,
+            subject: 'Prueba de conexión exitosa — ALL MARKET',
+            html: `
+                <div style="font-family: sans-serif; padding: 24px; color: #1e293b; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px;">
+                    <h2 style="color: #059669; margin-top: 0;">¡Servicio de Correo Conectado con Éxito!</h2>
+                    <p style="font-size: 15px; line-height: 1.6;">Este es un correo de prueba enviado desde la API de gestión de <strong>ALL MARKET</strong> a través de <strong>Resend</strong>.</p>
+                    <p style="font-size: 14px; color: #475569;">Tu dominio <code>allcode.site</code> está correctamente autenticado con firmas DKIM y SPF, y listo para despachar avisos automáticos a clientes.</p>
+                    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+                    <p style="font-size: 12px; color: #94a3b8; margin-bottom: 0;">ALLCODE &bull; ALL MARKET Platform</p>
+                </div>
+            `,
+            text: '¡Servicio de Correo Conectado con Éxito! Correo de prueba enviado desde ALL MARKET.',
+        });
+
+        if (!result.success) {
+            return res.status(500).json({ success: false, error: result.error });
+        }
+
+        res.json({
+            success: true,
+            message: `Correo de prueba enviado exitosamente a ${to}`,
+            id: result.id,
+        });
+    } catch (error: any) {
+        console.error('[mgmt-server] Error enviando correo de prueba:', error);
+        res.status(500).json({ error: error.message || 'Error al enviar correo de prueba' });
     }
 });
 
