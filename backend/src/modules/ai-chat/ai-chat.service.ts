@@ -45,6 +45,8 @@ SCHEMA:
 - "product_batches": id, "batchCode", "expiryDate", "quantity", "productId", "branchId"
 - "bank_accounts": id, "name", "bankName", "initialBalance"
 - "bank_transactions": id, "type", "amount", "concept", "createdAt", "accountId"
+- "exchange_rates": id, "code" (USD/VES/COP), "rate" (Decimal(18,4)), "updatedAt"
+- "system_settings": id, "key", "value"
 - "users": id, "username", "nombre", "apellido", "role", "branchId"
 - "kit_components": id, "kitProductId", "componentProductId", "quantity"
 
@@ -53,6 +55,8 @@ RELACIONES:
 - branch_inventory: stock por producto por sucursal
 - transactions → transaction_items: detalle de cada venta
 - transactions."customerId": ventas a crédito (fiados)
+- exchange_rates."code": USD = dólar, VES = bolívar, COP = peso colombiano. La columna "rate" indica cuántas unidades de esa moneda equivalen a 1 unidad de la moneda base del sistema.
+- system_settings."key": businessName, catalogActive, catalogSlug, socialLinks, planTier, etc.
 
 EJEMPLO de respuesta correcta:
 \`\`\`sql
