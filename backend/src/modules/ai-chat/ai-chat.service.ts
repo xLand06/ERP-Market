@@ -72,25 +72,28 @@ LIMIT 10
 
 // ─── System prompt para formatear la respuesta final ────────────────────────
 function buildFormatPrompt(question: string, sql: string, data: any[]): string {
-    return `Eres un asistente de negocio amigable. El usuario preguntó: "${question}"
+    return `Eres el asistente de negocio más amigable del mundo. El usuario preguntó: "${question}"
 
 Se ejecutó esta consulta SQL y estos son los resultados:
 SQL: ${sql}
 Datos (JSON): ${JSON.stringify(data.slice(0, 30))}
 
 Responde en lenguaje natural y directo en español. Reglas:
-- Responde como si le hablaras al dueño del negocio
+- Habla como si le hablaras al dueño del negocio, con buena onda y confianza
 - Usa los datos reales, no digas "se encontraron X registros"
-- Si es un número, ponlo en contexto: "Vendiste $1.250 hoy"
+- Si es un número, ponlo en contexto: "Hoy vendiste $1.250 💰"
 - Si es una tabla de productos, muéstralos como lista
-- Si no hay datos, di "No hay datos para esa consulta"
-- Sé breve: máximo 4-5 oraciones
+- Si NO hay datos, NUNCA digas "No hay datos para esa consulta". En su lugar responde algo natural:
+  * "Todavía no hay registros de eso, pero cuando empieces a usar el sistema acá vas a tener todo 📊"
+  * "Parece que eso no se registró todavía en el sistema"
+  * "No encontré nada sobre eso por ahora, ¿querés que revise otra cosa?"
+  * "Eso no aparece en los datos actuales, podemos buscar por otro lado"
+- Sé breve: máximo 3-4 oraciones
 - Puedes usar **negrita** para resaltar números importantes
 - NO menciones SQL ni tecnicismos
 - Si el dato es un total de dinero, usa formato de moneda ($)
-- Si el usuario pregunta qué sucursal vende más, di el nombre directamente
-- Si el usuario pregunta qué productos venden más, lista los nombres con cantidades
-- SI el usuario pide un archivo, CSV, Excel, exportar, descargar, o类似 "dame un reporte", "hazme un archivo", "exporta esto": responde con "EXPORT_DATA" al inicio de tu respuesta, seguido de una tabla con los datos. Ejemplo: "EXPORT_DATA\nProducto | Cantidad | Total\nCloro 1L | 20 | $22\nPapitas | 5 | $5". El sistema detectará EXPORT_DATA y generará el archivo automáticamente.`;
+- Usa emojis con moderación para darle vida a la respuesta
+- SI el usuario pide un archivo, CSV, Excel, exportar, descargar: responde con "EXPORT_DATA" al inicio de tu respuesta, seguido de una tabla con los datos. Ejemplo: "EXPORT_DATA\nProducto | Cantidad | Total\nCloro 1L | 20 | $22". El sistema detectará EXPORT_DATA y generará el archivo automáticamente.`;
 }
 
 // ─── Seguridad: validar que el SQL sea solo SELECT ──────────────────────────
@@ -208,7 +211,7 @@ export const processAiQuestion = async (question: string): Promise<AiChatRespons
 
 // ─── Fallback: formatear datos sin IA ───────────────────────────────────────
 function formatDataFallback(data: any[]): string {
-    if (data.length === 0) return 'No hay datos para esa consulta.';
+    if (data.length === 0) return 'Todavía no hay registros de eso, pero cuando empieces a usar el sistema vas a tener todo acá 📊';
 
     if (data.length === 1) {
         const keys = Object.keys(data[0]);
