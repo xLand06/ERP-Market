@@ -21,10 +21,11 @@ REGLAS ESTRICTAS:
 - Sé conciso y directo.
 - Cuando el usuario pida "estadísticas" o "resumen", muestra números clave.
 - Los precios están en la columna "price" (Decimal(12,2)).
-- Las ventas son transacciones con type='SALE' y status='COMPLETED'.
+- Las ventas son transacciones con type='SALE' AND status='COMPLETED'.
 - Las entradas de inventario son type='INVENTORY_IN'.
 - El stock actual está en branch_inventory.stock.
 - Las fechas usan createdAt con timezone.
+- IMPORTANTE: Los nombres de columnas en PostgreSQL son camelCase y DEBEN ir entre comillas dobles. Ejemplo: "isActive", "subGroupId", "createdAt", "baseUnit", etc. Siempre usa comillas dobles en los nombres de columnas y tablas.
 
 SCHEMA DE LA BASE DE DATOS:
 - users: id, username, nombre, apellido, role, branchId
@@ -56,12 +57,12 @@ RELACIONES CLAVE:
 - customer_payments: abonos de clientes
 - purchase_orders → purchase_order_items: compras a proveedores
 
-EJEMPLOS DE CONSULTAS COMUNES:
-1. "¿Cuánto vendí hoy?" → SELECT SUM(total) FROM transactions WHERE type='SALE' AND status='COMPLETED' AND DATE(createdAt) = CURRENT_DATE
-2. "Top 5 productos más vendidos" → SELECT p.name, SUM(ti.quantity) as qty FROM transaction_items ti JOIN products p ON p.id=ti.productId JOIN transactions t ON t.id=ti.transactionId WHERE t.type='SALE' AND t.status='COMPLETED' GROUP BY p.name ORDER BY qty DESC LIMIT 5
-3. "¿Qué productos tienen bajo stock?" → SELECT p.name, bi.stock, bi.minStock FROM branch_inventory bi JOIN products p ON p.id=bi.productId WHERE bi.stock <= bi.minStock
-4. "¿Quiénes me deben?" → SELECT c.name, c.balance FROM customers c WHERE c.balance > 0
-5. "¿Cuánto facturé esta semana?" → SELECT SUM(total) FROM transactions WHERE type='SALE' AND status='COMPLETED' AND createdAt >= date_trunc('week', NOW())`;
+EJEMPLOS DE CONSULTAS COMUNES (usa SIEMPRE comillas dobles en columnas):
+1. "¿Cuánto vendí hoy?" → SELECT SUM("total") FROM "transactions" WHERE "type"='SALE' AND "status"='COMPLETED' AND DATE("createdAt") = CURRENT_DATE
+2. "Top 5 productos más vendidos" → SELECT p."name", SUM(ti."quantity") as qty FROM "transaction_items" ti JOIN "products" p ON p."id"=ti."productId" JOIN "transactions" t ON t."id"=ti."transactionId" WHERE t."type"='SALE' AND t."status"='COMPLETED' GROUP BY p."name" ORDER BY qty DESC LIMIT 5
+3. "¿Qué productos tienen bajo stock?" → SELECT p."name", bi."stock", bi."minStock" FROM "branch_inventory" bi JOIN "products" p ON p."id"=bi."productId" WHERE bi."stock" <= bi."minStock"
+4. "¿Quiénes me deben?" → SELECT c."name", c."balance" FROM "customers" c WHERE c."balance" > 0
+5. "¿Cuánto facturé esta semana?" → SELECT SUM("total") FROM "transactions" WHERE "type"='SALE' AND "status"='COMPLETED' AND "createdAt" >= date_trunc('week', NOW())`;
 
 // ─── Seguridad: validar que el SQL sea solo SELECT ──────────────────────────
 function validateSql(sql: string): { valid: boolean; error?: string } {
