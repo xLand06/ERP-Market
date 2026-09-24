@@ -1,6 +1,6 @@
 // =============================================================================
 // AI CHAT SERVICE — Asistente IA para consultas del negocio
-// Usa Groq (Llama 3.1 8B) para convertir preguntas en SQL y ejecutarlas.
+// Usa Groq (Qwen 3.8 27B) para convertir preguntas en SQL y ejecutarlas.
 // Solo permite SELECT — nunca INSERT, UPDATE ni DELETE.
 // =============================================================================
 
@@ -9,68 +9,89 @@ import { prisma } from '../../config/prisma';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// ─── System prompt con el schema de la BD ────────────────────────────────────
-const SYSTEM_PROMPT = `Eres un asistente de análisis de negocio para un ERP de tienda/abastos en Venezuela.
-Tu trabajo es convertir preguntas del usuario en consultas SQL PostgreSQL y explicar los resultados.
+// ─── System prompt: solo genera SQL, sin explicaciones ───────────────────────
+const SYSTEM_PROMPT = `Eres un generador de consultas SQL PostgreSQL para un ERP de tienda/abastos en Venezuela.
 
-REGLAS ESTRICTAS:
-- SOLO genera consultas SELECT. NUNCA uses INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, CREATE.
-- NO modifiques datos. Solo lees.
-- Si la pregunta no se puede responder con los datos disponibles, explicalo.
-- Siempre responde en español.
-- Sé conciso y directo.
-- Cuando el usuario pida "estadísticas" o "resumen", muestra números clave.
-- Los precios están en la columna "price" (Decimal(12,2)).
-- Las ventas son transacciones con type='SALE' AND status='COMPLETED'.
-- Las entradas de inventario son type='INVENTORY_IN'.
-- El stock actual está en branch_inventory.stock.
-- Las fechas usan createdAt con timezone.
-- IMPORTANTE: Los nombres de columnas en PostgreSQL son camelCase y DEBEN ir entre comillas dobles. Ejemplo: "isActive", "subGroupId", "createdAt", "baseUnit", etc. Siempre usa comillas dobles en los nombres de columnas y tablas.
+REGLAS:
+- Responde SOLO con el SQL entre bloques \`\`\`sql ... \`\`\`
+- NO expliques, NO describas, NO escribas texto antes o después del SQL
+- SOLO genera SELECT. NUNCA INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, CREATE
+- Los nombres de columnas camelCase DEBEN ir entre comillas dobles: "isActive", "createdAt", etc.
+- Las tablas también entre comillas dobles: "products", "transactions", etc.
+- Precios en "price" (Decimal(12,2)), costos en "cost" (Decimal(12,2))
+- Ventas: "type"='SALE' AND "status"='COMPLETED'
+- Entradas inventario: "type"='INVENTORY_IN'
+- Stock actual: branch_inventory."stock"
+- Fechas: "createdAt" con timezone
 
-SCHEMA DE LA BASE DE DATOS:
-- users: id, username, nombre, apellido, role, branchId
-- branches: id, name, code
-- groups: id, name
-- sub_groups: id, name, groupId
-- products: id, name, price, cost, baseUnit, isActive, subGroupId, trackStock
-- product_presentations: id, name, multiplier, price, productId
-- product_barcodes: id, code, label, productId
-- branch_inventory: id, stock, minStock, productId, branchId
-- transactions: id, type(SALE|INVENTORY_IN|QUOTE), status(COMPLETED|CANCELLED|PENDING), total, currency, createdAt, userId, branchId, customerId
-- transaction_items: id, quantity, unitPrice, subtotal, productId, transactionId, presentationId
-- cash_registers: id, status(OPEN|CLOSED), openingAmount, closingAmount, createdAt, closedAt, userId, branchId
-- customers: id, name, cedula, phone, balance, creditLimit
-- customer_payments: id, amount, method, customerId, createdAt
-- purchase_orders: id, status, total, paidAmount, supplierId, branchId, createdAt
-- purchase_order_items: id, quantity, quantityReceived, unitCost, subtotal, productId, purchaseOrderId
-- suppliers: id, name
-- mermas: id, quantity, reason, productId, branchId, createdAt
-- product_batches: id, batchCode, expiryDate, quantity, productId, branchId
-- bank_accounts: id, name, bankName, initialBalance
-- bank_transactions: id, type(income|expense), amount, concept, accountId, createdAt
+SCHEMA:
+- "products": id, "name", "price", "cost", "baseUnit", "isActive", "subGroupId", "trackStock", "imageUrl"
+- "branches": id, "name", "code"
+- "groups": id, "name"
+- "sub_groups": id, "name", "groupId"
+- "branch_inventory": id, "stock", "minStock", "productId", "branchId"
+- "transactions": id, "type", "status", "total", "currency", "createdAt", "userId", "branchId", "customerId", "paymentMethods"
+- "transaction_items": id, "quantity", "multiplierUsed", "unitPrice", "subtotal", "productId", "transactionId", "presentationId"
+- "product_presentations": id, "name", "multiplier", "price", "productId"
+- "product_barcodes": id, "code", "label", "productId"
+- "cash_registers": id, "status", "openingAmount", "closingAmount", "createdAt", "closedAt", "userId", "branchId"
+- "customers": id, "name", "cedula", "phone", "balance", "creditLimit"
+- "customer_payments": id, "amount", "method", "customerId", "createdAt"
+- "purchase_orders": id, "status", "total", "paidAmount", "supplierId", "branchId", "createdAt"
+- "purchase_order_items": id, "quantity", "quantityReceived", "unitCost", "subtotal", "productId"
+- "suppliers": id, "name", "telefono"
+- "mermas": id, "quantity", "reason", "description", "productId", "branchId", "createdAt"
+- "product_batches": id, "batchCode", "expiryDate", "quantity", "productId", "branchId"
+- "bank_accounts": id, "name", "bankName", "initialBalance"
+- "bank_transactions": id, "type", "amount", "concept", "createdAt", "accountId"
+- "users": id, "username", "nombre", "apellido", "role", "branchId"
+- "kit_components": id, "kitProductId", "componentProductId", "quantity"
 
-RELACIONES CLAVE:
-- products.subGroupId → sub_groups.id → sub_groups.groupId → groups.id
+RELACIONES:
+- products."subGroupId" → sub_groups.id → sub_groups."groupId" → groups.id
 - branch_inventory: stock por producto por sucursal
-- transactions → transaction_items: detalle de cada venta/entrada
-- transactions.customerId: ventas a crédito (fiados)
-- customer_payments: abonos de clientes
-- purchase_orders → purchase_order_items: compras a proveedores
+- transactions → transaction_items: detalle de cada venta
+- transactions."customerId": ventas a crédito (fiados)
 
-EJEMPLOS DE CONSULTAS COMUNES (usa SIEMPRE comillas dobles en columnas):
-1. "¿Cuánto vendí hoy?" → SELECT SUM("total") FROM "transactions" WHERE "type"='SALE' AND "status"='COMPLETED' AND DATE("createdAt") = CURRENT_DATE
-2. "Top 5 productos más vendidos" → SELECT p."name", SUM(ti."quantity") as qty FROM "transaction_items" ti JOIN "products" p ON p."id"=ti."productId" JOIN "transactions" t ON t."id"=ti."transactionId" WHERE t."type"='SALE' AND t."status"='COMPLETED' GROUP BY p."name" ORDER BY qty DESC LIMIT 5
-3. "¿Qué productos tienen bajo stock?" → SELECT p."name", bi."stock", bi."minStock" FROM "branch_inventory" bi JOIN "products" p ON p."id"=bi."productId" WHERE bi."stock" <= bi."minStock"
-4. "¿Quiénes me deben?" → SELECT c."name", c."balance" FROM "customers" c WHERE c."balance" > 0
-5. "¿Cuánto facturé esta semana?" → SELECT SUM("total") FROM "transactions" WHERE "type"='SALE' AND "status"='COMPLETED' AND "createdAt" >= date_trunc('week', NOW())`;
+EJEMPLO de respuesta correcta:
+\`\`\`sql
+SELECT p."name" AS "Producto", SUM(ti."quantity") AS "Unidades vendidas", SUM(ti."subtotal") AS "Total vendido"
+FROM "transaction_items" ti
+JOIN "products" p ON p."id" = ti."productId"
+JOIN "transactions" t ON t."id" = ti."transactionId"
+WHERE t."type" = 'SALE' AND t."status" = 'COMPLETED'
+GROUP BY p."name"
+ORDER BY SUM(ti."subtotal") DESC
+LIMIT 10
+\`\`\``;
+
+// ─── System prompt para formatear la respuesta final ────────────────────────
+function buildFormatPrompt(question: string, sql: string, data: any[]): string {
+    return `Eres un asistente de negocio amigable. El usuario preguntó: "${question}"
+
+Se ejecutó esta consulta SQL y estos son los resultados:
+SQL: ${sql}
+Datos (JSON): ${JSON.stringify(data.slice(0, 30))}
+
+Responde en lenguaje natural y directo en español. Reglas:
+- Responde como si le hablaras al dueño del negocio
+- Usa los datos reales, no digas "se encontraron X registros"
+- Si es un número, ponlo en contexto: "Vendiste $1.250 hoy"
+- Si es una tabla de productos, muéstralos como lista
+- Si no hay datos, di "No hay datos para esa consulta"
+- Sé breve: máximo 4-5 oraciones
+- Puedes usar **negrita** para resaltar números importantes
+- NO menciones SQL ni tecnicismos
+- Si el dato es un total de dinero, usa formato de moneda ($)
+- Si el usuario pregunta qué sucursal vende más, di el nombre directamente
+- Si el usuario pregunta qué productos venden más, lista los nombres con cantidades`;
+}
 
 // ─── Seguridad: validar que el SQL sea solo SELECT ──────────────────────────
 function validateSql(sql: string): { valid: boolean; error?: string } {
     const normalized = sql.trim().toUpperCase();
-    // Bloquear cualquier statement que no sea SELECT
     const forbidden = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'TRUNCATE', 'CREATE', 'GRANT', 'REVOKE', 'EXEC', 'EXECUTE'];
     for (const kw of forbidden) {
-        // Match al inicio o después de punto y coma
         if (normalized.startsWith(kw + ' ') || normalized.startsWith(kw + '\n') || normalized.includes(';' + kw)) {
             return { valid: false, error: `Operación no permitida: solo consultas SELECT.` };
         }
@@ -94,26 +115,26 @@ export interface AiChatResponse {
  */
 export const processAiQuestion = async (question: string): Promise<AiChatResponse> => {
     try {
-        // 1. Enviar pregunta a Groq
+        // ── PASO 1: Generar SQL ──────────────────────────────────────────────
         const completion = await groq.chat.completions.create({
             model: 'qwen/qwen3.8-27b',
             messages: [
                 { role: 'system', content: SYSTEM_PROMPT },
                 { role: 'user', content: question },
             ],
-            temperature: 0.1,
-            max_tokens: 1024,
+            temperature: 0.05,
+            max_tokens: 512,
         });
 
         const responseText = completion.choices[0]?.message?.content || '';
 
-        // 2. Extraer SQL de la respuesta (puede venir en ```sql ... ```)
+        // Extraer SQL del bloque de código
         const sqlMatch = responseText.match(/```sql\s*([\s\S]*?)```/i)
             || responseText.match(/```\s*([\s\S]*?)```/i);
-        
+
         let sql = sqlMatch ? sqlMatch[1].trim() : null;
 
-        // Si no hay bloque de código, intentar extraer cualquier SELECT
+        // Si no hay bloque, buscar SELECT directo
         if (!sql) {
             const selectMatch = responseText.match(/((?:SELECT|WITH)\s[\s\S]*?);?\s*$/i);
             if (selectMatch) {
@@ -122,22 +143,15 @@ export const processAiQuestion = async (question: string): Promise<AiChatRespons
         }
 
         if (!sql) {
-            return {
-                answer: responseText,
-            };
+            return { answer: 'No pude generar una consulta para esa pregunta. Intenta reformularla.' };
         }
 
-        // 3. Validar que sea SELECT
+        // ── PASO 2: Validar y ejecutar SQL ──────────────────────────────────
         const validation = validateSql(sql);
         if (!validation.valid) {
-            return {
-                answer: `No puedo ejecutar esa consulta: ${validation.error}`,
-                sql,
-                error: validation.error,
-            };
+            return { answer: `No puedo ejecutar esa consulta: ${validation.error}`, sql };
         }
 
-        // 4. Ejecutar SQL (BigInt → Number para serialización JSON)
         const rawResult = await prisma.$queryRawUnsafe(sql);
         const data = Array.isArray(rawResult)
             ? rawResult.map((row: any) => {
@@ -149,21 +163,20 @@ export const processAiQuestion = async (question: string): Promise<AiChatRespons
             })
             : [];
 
-        // 5. Generar respuesta con datos
-        const dataSummary = data.length === 0
-            ? 'La consulta no devolvió resultados.'
-            : `Se encontraron ${data.length} registro(s).`;
+        // ── PASO 3: Formatear respuesta natural con IA ──────────────────────
+        const formatCompletion = await groq.chat.completions.create({
+            model: 'qwen/qwen3.8-27b',
+            messages: [
+                { role: 'system', content: buildFormatPrompt(question, sql, data) },
+                { role: 'user', content: 'Dame la respuesta basándote en los datos.' },
+            ],
+            temperature: 0.3,
+            max_tokens: 512,
+        });
 
-        // Si Groq ya dio una buena respuesta, usarla. Sino, formatear los datos.
-        const finalAnswer = responseText.includes('```')
-            ? `${dataSummary}\n\n${responseText.replace(/```[\s\S]*?```/g, '').trim()}`
-            : `${dataSummary}\n\n${formatDataAsText(data)}`;
+        const answer = formatCompletion.choices[0]?.message?.content?.trim() || formatDataFallback(data);
 
-        return {
-            answer: finalAnswer,
-            sql,
-            data,
-        };
+        return { answer, sql, data };
     } catch (error: any) {
         console.error('[ai-chat] Error:', error.message);
 
@@ -171,43 +184,27 @@ export const processAiQuestion = async (question: string): Promise<AiChatRespons
             return { answer: 'Error de configuración: API key de Groq no configurada.', error: 'NO_API_KEY' };
         }
 
-        return {
-            answer: 'Hubo un error al procesar tu pregunta. Intenta de nuevo.',
-            error: error.message,
-        };
+        return { answer: 'Hubo un error al procesar tu pregunta. Intenta de nuevo.', error: error.message };
     }
 };
 
-// ─── Formatear datos como texto legible ──────────────────────────────────────
-function formatDataAsText(data: any[]): string {
-    if (data.length === 0) return '';
+// ─── Fallback: formatear datos sin IA ───────────────────────────────────────
+function formatDataFallback(data: any[]): string {
+    if (data.length === 0) return 'No hay datos para esa consulta.';
 
-    // Si es un solo registro con un solo campo, dar respuesta directa
     if (data.length === 1) {
         const keys = Object.keys(data[0]);
         if (keys.length === 1) {
             const val = data[0][keys[0]];
-            return `**${formatValue(val)}**`;
+            return `El resultado es **${formatValue(val)}**.`;
         }
     }
 
-    // Tabla simple
-    const keys = Object.keys(data[0]);
     const lines: string[] = [];
-
-    // Header
-    lines.push(keys.map(k => `**${k}**`).join(' | '));
-    lines.push(keys.map(() => '---').join(' | '));
-
-    // Rows (max 20)
-    for (const row of data.slice(0, 20)) {
-        lines.push(keys.map(k => String(formatValue(row[k]))).join(' | '));
+    for (const row of data.slice(0, 10)) {
+        const parts = Object.entries(row).map(([k, v]) => `**${k}**: ${formatValue(v)}`);
+        lines.push(parts.join(' · '));
     }
-
-    if (data.length > 20) {
-        lines.push(`\n_... y ${data.length - 20} registros más_`);
-    }
-
     return lines.join('\n');
 }
 
