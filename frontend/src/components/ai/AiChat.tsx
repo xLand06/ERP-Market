@@ -6,12 +6,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/features/auth/store/authStore';
+import toast from 'react-hot-toast';
 
 interface Message {
     role: 'user' | 'assistant';
     content: string;
     sql?: string | null;
     rows?: any[] | null;
+    exportData?: any[] | null;
     timestamp: Date;
 }
 
@@ -87,6 +89,7 @@ export function AiChat() {
                 content: data?.answer || 'No pude procesar tu pregunta.',
                 sql: data?.sql || null,
                 rows: data?.rows || null,
+                exportData: data?.exportData || null,
                 timestamp: new Date(),
             };
 
@@ -106,6 +109,31 @@ export function AiChat() {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         sendMessage(input);
+    };
+
+    // ── Download CSV/Excel ────────────────────────────────────────────────────
+    const downloadFile = async (data: any[], format: 'csv' | 'excel') => {
+        try {
+            const res = await api.post('/ai-chat/export', {
+                data,
+                format,
+                filename: 'reporte_erp',
+            }, {
+                responseType: 'blob',
+            });
+
+            const blob = new Blob([res.data]);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = format === 'excel' ? 'reporte_erp.xlsx' : 'reporte_erp.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch {
+            toast.error('Error al descargar el archivo');
+        }
     };
 
     // Don't render if not logged in
@@ -188,6 +216,33 @@ export function AiChat() {
                                     <p className="text-sm whitespace-pre-wrap leading-relaxed">
                                         {formatMarkdown(msg.content)}
                                     </p>
+
+                                    {/* Export buttons */}
+                                    {msg.exportData && msg.exportData.length > 0 && (
+                                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200">
+                                            <button
+                                                type="button"
+                                                onClick={() => downloadFile(msg.exportData!, 'csv')}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-[11px] font-bold rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer"
+                                            >
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                                                </svg>
+                                                CSV
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => downloadFile(msg.exportData!, 'excel')}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-[11px] font-bold rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+                                            >
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                                                </svg>
+                                                Excel
+                                            </button>
+                                            <span className="text-[10px] text-slate-400">{msg.exportData.length} registros</span>
+                                        </div>
+                                    )}
 
                                     <p className={`text-[10px] mt-1.5 ${msg.role === 'user' ? 'text-indigo-200' : 'text-slate-400'}`}>
                                         {msg.timestamp.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}

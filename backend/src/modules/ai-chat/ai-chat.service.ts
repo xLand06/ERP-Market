@@ -89,7 +89,8 @@ Responde en lenguaje natural y directo en español. Reglas:
 - NO menciones SQL ni tecnicismos
 - Si el dato es un total de dinero, usa formato de moneda ($)
 - Si el usuario pregunta qué sucursal vende más, di el nombre directamente
-- Si el usuario pregunta qué productos venden más, lista los nombres con cantidades`;
+- Si el usuario pregunta qué productos venden más, lista los nombres con cantidades
+- SI el usuario pide un archivo, CSV, Excel, exportar, descargar, o类似 "dame un reporte", "hazme un archivo", "exporta esto": responde con "EXPORT_DATA" al inicio de tu respuesta, seguido de una tabla con los datos. Ejemplo: "EXPORT_DATA\nProducto | Cantidad | Total\nCloro 1L | 20 | $22\nPapitas | 5 | $5". El sistema detectará EXPORT_DATA y generará el archivo automáticamente.`;
 }
 
 // ─── Seguridad: validar que el SQL sea solo SELECT ──────────────────────────
@@ -112,6 +113,7 @@ export interface AiChatResponse {
     answer: string;
     sql?: string;
     data?: any[];
+    exportData?: any[];
     error?: string;
 }
 
@@ -183,6 +185,14 @@ export const processAiQuestion = async (question: string): Promise<AiChatRespons
         });
 
         const answer = formatCompletion.choices[0]?.message?.content?.trim() || formatDataFallback(data);
+
+        // Detectar si el usuario pidió exportar datos
+        const wantsExport = /export|csv|excel|archivo|descargar|reporte|download/i.test(question);
+
+        if (wantsExport && data.length > 0) {
+            const exportAnswer = `📊 **Archivo listo para descargar** — ${data.length} registros encontrados.\n\nUsá el botón de abajo para descargar en CSV o Excel.`;
+            return { answer: exportAnswer, sql, data, exportData: data };
+        }
 
         return { answer, sql, data };
     } catch (error: any) {
