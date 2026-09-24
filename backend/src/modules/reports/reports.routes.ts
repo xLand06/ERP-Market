@@ -6,37 +6,42 @@ import { prisma } from '../../config/prisma';
 const router = Router();
 router.use(authMiddleware, roleGuard('SELLER'));
 
+// Helper: convert Decimal to number
+const toNum = (v: any): number => {
+    if (v === null || v === undefined) return 0;
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') return parseFloat(v) || 0;
+    if (typeof v === 'object' && typeof v.toNumber === 'function') return v.toNumber();
+    return Number(v) || 0;
+};
+
 router.get('/sales-by-day', async (req: Request, res: Response) => {
     const { startDate, endDate, branchId } = req.query as Record<string, string>;
     
     const start = startDate ? new Date(startDate) : new Date(new Date().setDate(new Date().getDate() - 30));
     const end = endDate ? new Date(endDate) : new Date();
 
-    const transactions = await prisma.transaction.groupBy({
-        by: ['createdAt'],
+    const transactions = await prisma.transaction.findMany({
         where: { 
             type: 'SALE',
             status: 'COMPLETED',
             createdAt: { gte: start, lte: end },
             ...(branchId && { branchId }),
         },
-        _sum: { total: true },
-        _count: true,
+        select: { total: true, createdAt: true },
     });
 
-    const grouped = transactions.reduce((acc: any, t) => {
+    const grouped: Record<string, { total: number; count: number }> = {};
+    for (const t of transactions) {
         const date = t.createdAt.toISOString().split('T')[0];
-        if (!acc[date]) {
-            acc[date] = { total: 0, count: 0 };
-        }
-        acc[date].total += t._sum.total || 0;
-        acc[date].count += t._count;
-        return acc;
-    }, {});
+        if (!grouped[date]) grouped[date] = { total: 0, count: 0 };
+        grouped[date].total += toNum(t.total);
+        grouped[date].count += 1;
+    }
 
-    res.json(Object.entries(grouped).map(([date, data]: [string, any]) => ({
+    res.json(Object.entries(grouped).map(([date, data]) => ({
         date,
-        total: data.total,
+        total: Math.round(data.total * 100) / 100,
         count: data.count,
     })));
 });
@@ -65,15 +70,15 @@ router.get('/top-products', async (req: Request, res: Response) => {
 
     const products = await prisma.product.findMany({
         where: { id: { in: results.map(r => r.productId) } },
-        select: { id: true, name: true, price: true },
+        select: { id: true, name: true },
     });
     const productMap = new Map(products.map(p => [p.id, p]));
 
     const enriched = results.map(r => ({
         productId: r.productId,
-        productName: productMap.get(r.productId)?.name || 'Unknown',
-        quantity: r._sum.quantity || 0,
-        total: r._sum.subtotal || 0,
+        productName: productMap.get(r.productId)?.name || 'Desconocido',
+        quantity: toNum(r._sum.quantity),
+        total: toNum(r._sum.subtotal),
     }));
 
     res.json(enriched);
@@ -92,21 +97,15 @@ router.get('/summary', async (req: Request, res: Response) => {
     };
 
     const [totalSales, transactionCount, avgTicket] = await Promise.all([
-        prisma.transaction.aggregate({
-            where,
-            _sum: { total: true },
-        }),
+        prisma.transaction.aggregate({ where, _sum: { total: true } }),
         prisma.transaction.count({ where }),
-        prisma.transaction.aggregate({
-            where,
-            _avg: { total: true },
-        }),
+        prisma.transaction.aggregate({ where, _avg: { total: true } }),
     ]);
 
     res.json({
-        totalSales: totalSales._sum.total || 0,
+        totalSales: toNum(totalSales._sum.total),
         transactionCount,
-        avgTicket: avgTicket._avg.total || 0,
+        avgTicket: toNum(avgTicket._avg.total),
     });
 });
 
@@ -135,8 +134,8 @@ router.get('/by-branch', async (req: Request, res: Response) => {
 
     const enriched = results.map(r => ({
         branchId: r.branchId,
-        branchName: branchMap.get(r.branchId)?.name || 'Unknown',
-        total: r._sum.total || 0,
+        branchName: branchMap.get(r.branchId)?.name || 'Desconocida',
+        total: toNum(r._sum.total),
         count: r._count,
     }));
 
