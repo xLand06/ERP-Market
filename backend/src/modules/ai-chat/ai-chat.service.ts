@@ -1,7 +1,7 @@
 // =============================================================================
-// AI CHAT SERVICE — Asistente IA para consultas del negocio
-// Usa Groq (Qwen 3.8 27B) para convertir preguntas en SQL y ejecutarlas.
-// Solo permite SELECT — nunca INSERT, UPDATE ni DELETE.
+// AI CHAT SERVICE — Asistente IA para gerentes y dueños del negocio
+// Usa Groq (Qwen 3.8 27B) con conocimiento profundo del ERP.
+// Solo SELECT — nunca modifica datos. Rate limiting por usuario.
 // =============================================================================
 
 import Groq from 'groq-sdk';
@@ -10,21 +10,41 @@ import { prisma } from '../../config/prisma';
 const groqApiKey = process.env.GROQ_API_KEY;
 const groq = groqApiKey ? new Groq({ apiKey: groqApiKey }) : null;
 
-// ─── System prompt: detecta intención y genera SQL cuando aplica ──────────────
-const SYSTEM_PROMPT = `Eres el asistente más inteligente de un ERP para tiendas/abastos en Venezuela. Entiendes qué necesita el usuario y respondés de la mejor forma.
+// ─── Rate limiting (30 req/min por usuario) ─────────────────────────────────
+const rateLimitMap = new Map<string, number[]>();
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minuto
 
-## REGLAS GENERALES:
-- Responde en español, natural, como un empleado que conoce el negocio
-- Si el usuario pregunta algo que se responde con datos de la BD, genera SQL entre bloques \`\`\`sql ... \`\`\`
-- Si el usuario quiere HACER algo (crear, vender, agregar), NO generes SQL. En su lugar explicale dónde encontrarlo en el sistema
-- Si no estás seguro, preguntale para entender mejor qué necesita
+function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number } {
+    const now = Date.now();
+    const timestamps = rateLimitMap.get(userId) || [];
+    // Limpiar timestamps viejos
+    const valid = timestamps.filter(t => now - t < RATE_LIMIT_WINDOW);
+    rateLimitMap.set(userId, valid);
 
-## CUÁNDO GENERAR SQL:
-Cuando el usuario pregunta sobre datos, estadísticas, reportes, listados, comparaciones.
-Ejemplos: "¿cuánto vendí?", "¿qué productos tengo?", "dame un reporte", "¿quién me debe?"
+    if (valid.length >= RATE_LIMIT_MAX) {
+        const oldest = valid[0];
+        const retryAfter = Math.ceil((RATE_LIMIT_WINDOW - (now - oldest)) / 1000);
+        return { allowed: false, retryAfter };
+    }
+    valid.push(now);
+    return { allowed: true };
+}
 
-Reglas SQL:
-- SOLO genera SELECT. NUNCA INSERT, UPDATE, DELETE
+// ─── System prompt: asistente de negocio completo para gerentes ──────────────
+const SYSTEM_PROMPT = `Eres el asistente de negocio más inteligente de ALL MARKET. Trabajas para gerentes y dueños de tiendas/abastos en Venezuela. Conocés TODO el sistema ERP.
+
+## TU ROL:
+Sos el consultor de negocio personal del gerente. Respondés preguntas, analizás datos, y lo guiás a tomar mejores decisiones. Hablás con confianza, como un asesor de negocio experimentado.
+
+## CAPACIDADES:
+1. **Consultas de datos** → Generás SQL SELECT para responder preguntas
+2. **Guias del sistema** → Sabés dónde está cada módulo y cómo usarlo
+3. **Análisis de negocio** → Interpretás datos y das recomendaciones
+4. **Exportación** → Podés generar CSV/Excel con los datos
+
+## REGLAS SQL (cuando necesitás consultar datos):
+- SOLO SELECT. NUNCA INSERT, UPDATE, DELETE
 - Nombres de columnas camelCase entre comillas dobles: "isActive", "createdAt"
 - Tablas entre comillas dobles: "products", "transactions"
 - Precios en "price", costos en "cost"
@@ -32,44 +52,90 @@ Reglas SQL:
 - Stock: branch_inventory."stock"
 - Fechas: "createdAt" con timezone
 
-## CUÁNDO NO GENERAR SQL (acciones del sistema):
-Cuando el usuario quiere CREAR, MODIFICAR o ELIMINAR algo, explicale dónde está en el sistema:
+## MÓDULOS DEL SISTEMA (para guiar al usuario):
 
-- "hacer una venta" / "vender" → "Para hacer una venta, andá al módulo de **POS** (Punto de Venta) desde el menú lateral. Ahí podés escanear los productos y cobrar al instante. 💰"
-- "agregar producto" / "crear producto" / "nuevo producto" → "Para agregar un producto nuevo, andá a **Productos** y hacé click en 'Nuevo Producto'. Vas a poder poner nombre, precio, código de barras y hasta foto. 📦"
-- "agregar cliente" / "crear cliente" → "Para agregar un cliente, andá a **Clientes** y crealo nuevo. Si es fiado, vas a poder llevar su balance. 👥"
-- "abrir caja" / "caja" → "Para abrir la caja, andá a **Cajas** y hacé 'Abrir Caja'. Vas a poner el monto inicial. 💵"
-- "hacer inventario" / "contar stock" → "Para hacer inventario físico, andá a **Inventario → Conteo de Stock**. Ahí elegís la sucursal y contás producto por producto. 📋"
-- "agregar proveedor" → "Para agregar un proveedor, andá a **Proveedores** y crealo con sus datos de contacto. 🏪"
-- "facturar" / "factura" → "Para facturar una venta, primero hacé la venta en el POS y después imprimí la factura desde ahí. 🧾"
-- "ver reportes" / "estadísticas" / "dashboard" → "Para ver el resumen completo del negocio, andá al **Dashboard** donde tenés todo en una página: ventas, stock, clientes, etc. 📊"
-- "buscar producto" / "¿tengo?" → Generá SQL para buscar en la BD
+### 🛒 POS (Punto de Venta)
+- Ruta: /pos
+- Función: Vender productos, escanear código de barras, cobrar
+- El gerente puede ver: tickets del día, ventas por cajero
 
-SCHEMA DE LA BASE DE DATOS:
-- "products": id, "name", "price", "cost", "baseUnit", "isActive", "subGroupId", "trackStock", "imageUrl"
+### 📦 Productos
+- Ruta: /products
+- Función: Crear, editar, eliminar productos. Subir fotos (PREMIUM).
+- Cada producto tiene: nombre, precio, costo, código de barras, presentaciones, stock por sucursal
+
+### 📋 Inventario
+- Ruta: /inventory
+- Función: Ver stock por sucursal, ajustar inventario, transferencias entre sucursales
+- Sub-ruta: /inventory/stocktaking para conteo físico
+
+### 💰 Finanzas
+- Ruta: /finance
+- Función: Cajas, flujo de caja, pagos de clientes (fiados), pagos a proveedores
+- Sub-ruta: /finance/cash-register para cajas
+
+### 👥 Clientes
+- Ruta: /customers
+- Función: Gestión de clientes, balances (fiados), historial de compras
+- Los fiados aparecen con balance positivo
+
+### 🏪 Proveedores
+- Ruta: /suppliers
+- Función: Gestión de proveedores, órdenes de compra, pagos
+
+### 📊 Dashboard
+- Ruta: /dashboard
+- Función: Resumen ejecutivo: ventas del día, productos más vendidos, alertas de stock
+
+### 📈 Reportes
+- Ruta: /reports
+- Función: Reportes de ventas, inventario, clientes, productividad
+
+### 🏦 Bancos
+- Ruta: /banks
+- Función: Cuentas bancarias, movimientos
+
+### 💱 Tasas de Cambio
+- Ruta: /settings
+- Función: Configurar tasas USD/VES/COP
+
+## ANÁLISIS DE NEGOCIO (cuando el gerente pregunta):
+
+Cuando pregunte sobre **ventas**: mostrá totales, compará con días anteriores, identificá tendencias
+Cuando pregunte sobre **productos**: mostrá los más/menos vendidos, márgenes, rotación
+Cuando pregunte sobre **stock**: alertá sobre productos bajos, sugerí reorden
+Cuando pregunte sobre **clientes**: mostrá quiénes deben, quiénes son los mejores compradores
+Cuando pregunte sobre **proveedores**: mostrá pagos pendientes, órdenes abiertas
+Cuando pregunte sobre **tasas**: mostrá la tasa actual de VES y conversiones
+
+## RESPUESTAS:
+- Siempre en español, natural, como un asesor de negocio
+- NUNCA menciones SQL, queries, ni tecnicismos técnicos
+- NUNCA exposes la estructura de la base de datos
+- Si el usuario quiere hacer algo (crear, vender, eliminar), guialo al módulo correcto
+- Si no hay datos, respondé naturalmente: "Todavía no hay registros de eso"
+- Usá emojis con moderación
+- Sé breve pero completo
+
+## EXPORTACIÓN:
+Si el usuario pide CSV/Excel, incluí "EXPORT_DATA" al inicio de tu respuesta con una tabla markdown de los datos.
+
+SCHEMA (para generar SQL interno, NUNCA mostrar al usuario):
+- "products": id, "name", "price", "cost", "baseUnit", "isActive", "subGroupId"
 - "branches": id, "name", "code"
 - "groups": id, "name"
 - "sub_groups": id, "name", "groupId"
 - "branch_inventory": id, "stock", "minStock", "productId", "branchId"
-- "transactions": id, "type", "status", "total", "currency", "createdAt", "userId", "branchId", "customerId"
+- "transactions": id, "type"(SALE|INVENTORY_IN), "status"(COMPLETED|CANCELLED), "total", "createdAt", "userId", "branchId", "customerId"
 - "transaction_items": id, "quantity", "unitPrice", "subtotal", "productId", "transactionId"
-- "product_presentations": id, "name", "multiplier", "price", "productId"
 - "customers": id, "name", "cedula", "phone", "balance", "creditLimit"
 - "customer_payments": id, "amount", "method", "customerId", "createdAt"
-- "purchase_orders": id, "status", "total", "paidAmount", "supplierId", "branchId"
+- "purchase_orders": id, "status", "total", "paidAmount", "supplierId"
 - "suppliers": id, "name", "telefono"
-- "mermas": id, "quantity", "reason", "productId", "branchId", "createdAt"
-- "exchange_rates": id, "code", "rate"
-- "users": id, "username", "nombre", "apellido", "role", "branchId"
-
-RELACIONES:
-- products."subGroupId" → sub_groups.id → sub_groups."groupId" → groups.id
-- branch_inventory: stock por producto por sucursal
-- transactions → transaction_items: detalle de cada venta
-- transactions."customerId": ventas a crédito
+- "exchange_rates": id, "code"(USD|VES|COP), "rate"
+- "users": id, "username", "nombre", "role", "branchId"
 
 EJEMPLO de SQL correcto:
-\`\`\`sql
 SELECT p."name" AS "Producto", SUM(ti."quantity") AS "Unidades", SUM(ti."subtotal") AS "Total"
 FROM "transaction_items" ti
 JOIN "products" p ON p."id" = ti."productId"
@@ -77,42 +143,15 @@ JOIN "transactions" t ON t."id" = ti."transactionId"
 WHERE t."type" = 'SALE' AND t."status" = 'COMPLETED'
 GROUP BY p."name"
 ORDER BY SUM(ti."subtotal") DESC
-LIMIT 10
-\`\`\``;
+LIMIT 10`;
 
-// ─── System prompt para formatear la respuesta final ────────────────────────
-function buildFormatPrompt(question: string, sql: string, data: any[]): string {
-    return `Eres el asistente de negocio más amigable del mundo. El usuario preguntó: "${question}"
-
-Se ejecutó esta consulta SQL y estos son los resultados:
-SQL: ${sql}
-Datos (JSON): ${JSON.stringify(data.slice(0, 30))}
-
-Responde en lenguaje natural y directo en español. Reglas:
-- Habla como si le hablaras al dueño del negocio, con buena onda y confianza
-- Usa los datos reales, no digas "se encontraron X registros"
-- Si es un número, ponlo en contexto: "Hoy vendiste $1.250 💰"
-- Si es una tabla de productos, muéstralos como lista
-- Si NO hay datos, NUNCA digas "No hay datos para esa consulta". En su lugar responde algo natural:
-  * "Todavía no hay registros de eso, pero cuando empieces a usar el sistema acá vas a tener todo 📊"
-  * "Parece que eso no se registró todavía en el sistema"
-  * "No encontré nada sobre eso por ahora, ¿querés que revise otra cosa?"
-  * "Eso no aparece en los datos actuales, podemos buscar por otro lado"
-- Sé breve: máximo 3-4 oraciones
-- Puedes usar **negrita** para resaltar números importantes
-- NO menciones SQL ni tecnicismos
-- Si el dato es un total de dinero, usa formato de moneda ($)
-- Usa emojis con moderación para darle vida a la respuesta
-- SI el usuario pide un archivo, CSV, Excel, exportar, descargar: responde con "EXPORT_DATA" al inicio de tu respuesta, seguido de una tabla con los datos. Ejemplo: "EXPORT_DATA\nProducto | Cantidad | Total\nCloro 1L | 20 | $22". El sistema detectará EXPORT_DATA y generará el archivo automáticamente.`;
-}
-
-// ─── Seguridad: validar que el SQL sea solo SELECT ──────────────────────────
+// ─── Seguridad: validar SQL ─────────────────────────────────────────────────
 function validateSql(sql: string): { valid: boolean; error?: string } {
     const normalized = sql.trim().toUpperCase();
-    const forbidden = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'TRUNCATE', 'CREATE', 'GRANT', 'REVOKE', 'EXEC', 'EXECUTE'];
+    const forbidden = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'TRUNCATE', 'CREATE', 'GRANT', 'REVOKE', 'EXEC'];
     for (const kw of forbidden) {
-        if (normalized.startsWith(kw + ' ') || normalized.startsWith(kw + '\n') || normalized.includes(';' + kw)) {
-            return { valid: false, error: `Operación no permitida: solo consultas SELECT.` };
+        if (normalized.startsWith(kw + ' ') || normalized.includes(';' + kw)) {
+            return { valid: false, error: 'Operación no permitida.' };
         }
     }
     if (!normalized.startsWith('SELECT') && !normalized.startsWith('WITH')) {
@@ -124,56 +163,59 @@ function validateSql(sql: string): { valid: boolean; error?: string } {
 // ─── Interfaz de respuesta ───────────────────────────────────────────────────
 export interface AiChatResponse {
     answer: string;
-    sql?: string;
     data?: any[];
     exportData?: any[];
     error?: string;
 }
 
 /**
- * Procesa una pregunta del usuario, genera SQL con Groq, lo ejecuta y retorna la respuesta.
+ * Procesa una pregunta del usuario.
  */
-export const processAiQuestion = async (question: string): Promise<AiChatResponse> => {
-    if (!groq) {
-        return { answer: 'El asistente IA no está configurado. Agregá GROQ_API_KEY en el .env del tenant.' };
+export const processAiQuestion = async (question: string, userId?: string): Promise<AiChatResponse> => {
+    // Rate limit
+    const uid = userId || 'anonymous';
+    const rl = checkRateLimit(uid);
+    if (!rl.allowed) {
+        return { answer: `Estás haciendo muchas preguntas. Esperá ${rl.retryAfter} segundos y probá de nuevo. ⏳` };
     }
+
+    if (!groq) {
+        return { answer: 'El asistente no está disponible temporalmente. Intentá más tarde.' };
+    }
+
     try {
-        // ── PASO 1: Generar SQL ──────────────────────────────────────────────
+        // ── PASO 1: La IA decide si necesita SQL o solo guía ─────────────────
         const completion = await groq.chat.completions.create({
             model: 'qwen/qwen3.8-27b',
             messages: [
                 { role: 'system', content: SYSTEM_PROMPT },
                 { role: 'user', content: question },
             ],
-            temperature: 0.05,
-            max_tokens: 512,
+            temperature: 0.2,
+            max_tokens: 1024,
         });
 
         const responseText = completion.choices[0]?.message?.content || '';
 
-        // Extraer SQL del bloque de código
+        // Extraer SQL si la IA generó uno
         const sqlMatch = responseText.match(/```sql\s*([\s\S]*?)```/i)
             || responseText.match(/```\s*([\s\S]*?)```/i);
-
         let sql = sqlMatch ? sqlMatch[1].trim() : null;
 
-        // Si no hay bloque, buscar SELECT directo
         if (!sql) {
             const selectMatch = responseText.match(/((?:SELECT|WITH)\s[\s\S]*?);?\s*$/i);
-            if (selectMatch) {
-                sql = selectMatch[1].trim().replace(/;$/, '');
-            }
+            if (selectMatch) sql = selectMatch[1].trim().replace(/;$/, '');
         }
 
+        // Si no hay SQL, la IA está dando guía → devolver respuesta directa
         if (!sql) {
-            // La IA respondió sin SQL (ej: guía al usuario al módulo correcto)
             return { answer: responseText };
         }
 
-        // ── PASO 2: Validar y ejecutar SQL ──────────────────────────────────
+        // ── PASO 2: Ejecutar SQL ────────────────────────────────────────────
         const validation = validateSql(sql);
         if (!validation.valid) {
-            return { answer: `No puedo ejecutar esa consulta: ${validation.error}`, sql };
+            return { answer: 'No puedo ejecutar esa consulta. Probá reformulando la pregunta.' };
         }
 
         const rawResult = await prisma.$queryRawUnsafe(sql);
@@ -187,177 +229,122 @@ export const processAiQuestion = async (question: string): Promise<AiChatRespons
             })
             : [];
 
-        // ── PASO 3: Formatear respuesta natural con IA ──────────────────────
+        // ── PASO 3: Formatear respuesta natural ──────────────────────────────
         const formatCompletion = await groq.chat.completions.create({
             model: 'qwen/qwen3.8-27b',
             messages: [
-                { role: 'system', content: buildFormatPrompt(question, sql, data) },
-                { role: 'user', content: 'Dame la respuesta basándote en los datos.' },
+                { role: 'system', content: buildFormatPrompt(question, data) },
+                { role: 'user', content: 'Dame la respuesta.' },
             ],
             temperature: 0.3,
-            max_tokens: 512,
+            max_tokens: 800,
         });
 
         const answer = formatCompletion.choices[0]?.message?.content?.trim() || formatDataFallback(data);
 
-        // Detectar si el usuario pidió exportar datos
-        const wantsExport = /export|csv|excel|archivo|descargar|reporte|download/i.test(question);
+        // Detectar si el usuario pidió exportar
+        const wantsExport = /export|csv|excel|archivo|descargar|reporte/i.test(question);
 
         if (wantsExport && data.length > 0) {
-            const exportAnswer = `📊 **Archivo listo para descargar** — ${data.length} registros encontrados.\n\nUsá el botón de abajo para descargar en CSV o Excel.`;
-            return { answer: exportAnswer, sql, data, exportData: data };
+            return { answer: `📊 **Archivo listo para descargar** — ${data.length} registros.`, data, exportData: data };
         }
 
-        return { answer, sql, data };
+        return { answer, data };
     } catch (error: any) {
         console.error('[ai-chat] Error:', error.message);
-
         if (error.message?.includes('GROQ_API_KEY')) {
-            return { answer: 'Error de configuración: API key de Groq no configurada.', error: 'NO_API_KEY' };
+            return { answer: 'Servicio de IA no disponible temporalmente.' };
         }
-
-        return { answer: 'Hubo un error al procesar tu pregunta. Intenta de nuevo.', error: error.message };
+        return { answer: 'Hubo un error al procesar tu pregunta. Intentá de nuevo.' };
     }
 };
 
-// ─── Fallback: formatear datos sin IA ───────────────────────────────────────
+// ─── Prompt para formatear respuestas naturales ──────────────────────────────
+function buildFormatPrompt(question: string, data: any[]): string {
+    return `Sos el consultor de negocio más amigable del mundo. El gerente preguntó: "${question}"
+
+Estos son los resultados de la consulta:
+${JSON.stringify(data.slice(0, 30))}
+
+Respondé en español, natural, como un asesor experimentado. Reglas:
+- Hablá con confianza y buena onda
+- No digas "se encontraron X registros"
+- Poné los datos en contexto: "Hoy vendiste $1.250 💰"
+- Si NO hay datos, respondé naturalmente:
+  * "Todavía no hay registros de eso, pero cuando empieces a usar el sistema vas a tener todo acá 📊"
+  * "Parece que eso no se registró todavía"
+  * "No encontré nada sobre eso por ahora, ¿querés que revise otra cosa?"
+- Sé breve: máximo 3-4 oraciones
+- Usá **negrita** para resaltar números
+- NO menciones SQL ni tecnicismos
+- Moneda: formato $ para dólares
+- Usá emojis con moderación`;
+}
+
 function formatDataFallback(data: any[]): string {
     if (data.length === 0) return 'Todavía no hay registros de eso, pero cuando empieces a usar el sistema vas a tener todo acá 📊';
-
     if (data.length === 1) {
         const keys = Object.keys(data[0]);
-        if (keys.length === 1) {
-            const val = data[0][keys[0]];
-            return `El resultado es **${formatValue(val)}**.`;
-        }
+        if (keys.length === 1) return `El resultado es **${data[0][keys[0]]}**.`;
     }
-
-    const lines: string[] = [];
-    for (const row of data.slice(0, 10)) {
-        const parts = Object.entries(row).map(([k, v]) => `**${k}**: ${formatValue(v)}`);
-        lines.push(parts.join(' · '));
-    }
-    return lines.join('\n');
+    return data.slice(0, 5).map(r => Object.entries(r).map(([k, v]) => `**${k}**: ${v}`).join(' · ')).join('\n');
 }
 
-function formatValue(val: any): string {
-    if (val === null || val === undefined) return '-';
-    if (typeof val === 'number') {
-        return val % 1 === 0 ? val.toLocaleString('es-VE') : val.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-    if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val)) {
-        return new Date(val).toLocaleDateString('es-VE');
-    }
-    return String(val);
-}
-
-// ─── Análisis de archivos CSV/Excel subidos ──────────────────────────────────
+// ─── Análisis de archivos subidos ────────────────────────────────────────────
 export const analyzeUploadedFile = async (fileBuffer: Buffer, filename: string, question?: string): Promise<AiChatResponse> => {
-    if (!groq) {
-        return { answer: 'El asistente IA no está configurado.' };
-    }
-
+    if (!groq) return { answer: 'El asistente no está disponible.' };
     try {
         const XLSX = await import('xlsx');
         const ext = filename.toLowerCase().split('.').pop();
-
         let data: any[] = [];
-
         if (ext === 'csv') {
-            const text = fileBuffer.toString('utf-8');
-            const wb = XLSX.read(text, { type: 'string' });
-            const ws = wb.Sheets[wb.SheetNames[0]];
-            data = XLSX.utils.sheet_to_json(ws);
-        } else if (ext === 'xlsx' || ext === 'xls') {
+            const wb = XLSX.read(fileBuffer.toString('utf-8'), { type: 'string' });
+            data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+        } else if (['xlsx', 'xls'].includes(ext || '')) {
             const wb = XLSX.read(fileBuffer, { type: 'buffer' });
-            const ws = wb.Sheets[wb.SheetNames[0]];
-            data = XLSX.utils.sheet_to_json(ws);
+            data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
         } else {
-            return { answer: `Formato no soportado: ${ext}. Usa CSV o Excel (.xlsx).` };
+            return { answer: `Formato no soportado: ${ext}. Usa CSV o Excel.` };
         }
-
-        if (data.length === 0) {
-            return { answer: 'El archivo está vacío o no tiene datos legibles.' };
-        }
+        if (data.length === 0) return { answer: 'El archivo está vacío.' };
 
         const headers = Object.keys(data[0]);
-        const preview = data.slice(0, 15);
-
-        // Enviar a IA para análisis
         const userPrompt = question
-            ? `El usuario subió un archivo "${filename}" con ${data.length} registros. Pregunta: "${question}"\n\nColumnas: ${headers.join(', ')}\n\nPrimeros 15 registros:\n${JSON.stringify(preview, null, 2)}`
-            : `El usuario subió un archivo "${filename}" con ${data.length} registros. Analízalo y dame un resumen útil.\n\nColumnas: ${headers.join(', ')}\n\nPrimeros 15 registros:\n${JSON.stringify(preview, null, 2)}`;
+            ? `Archivo "${filename}" con ${data.length} registros. Pregunta: "${question}"\nColumnas: ${headers.join(', ')}\nDatos: ${JSON.stringify(data.slice(0, 15))}`
+            : `Archivo "${filename}" con ${data.length} registros. Analizalo y dame un resumen.\nColumnas: ${headers.join(', ')}\nDatos: ${JSON.stringify(data.slice(0, 15))}`;
 
         const completion = await groq.chat.completions.create({
             model: 'qwen/qwen3.8-27b',
             messages: [
-                {
-                    role: 'system',
-                    content: `Eres un analista de datos. El usuario te sube un archivo CSV/Excel y te pide que lo analices. Responde en español, sé conciso y directo. Muestra datos clave, tendencias, totales. Si el usuario pregunta algo específico sobre los datos, respondelo.`,
-                },
+                { role: 'system', content: 'Sos un analista de datos experto. Analizá archivos del usuario y respondé en español con datos clave, tendencias y totales. Sé conciso.' },
                 { role: 'user', content: userPrompt },
             ],
             temperature: 0.3,
             max_tokens: 1024,
         });
-
-        const answer = completion.choices[0]?.message?.content?.trim() || `El archivo tiene ${data.length} registros con columnas: ${headers.join(', ')}`;
-
-        return { answer, data };
+        return { answer: completion.choices[0]?.message?.content?.trim() || `Archivo con ${data.length} registros.`, data };
     } catch (error: any) {
-        console.error('[ai-chat] File analysis error:', error.message);
-        return { answer: `Error al analizar el archivo: ${error.message}` };
+        return { answer: `Error al analizar: ${error.message}` };
     }
 };
 
-// ─── Persistencia de sesiones de chat ────────────────────────────────────────
-export interface ChatMessage {
-    role: 'user' | 'assistant';
-    content: string;
-    sql?: string | null;
-    exportData?: any[] | null;
-    timestamp: string;
-}
+// ─── Persistencia de sesiones ────────────────────────────────────────────────
+export interface ChatMessage { role: 'user' | 'assistant'; content: string; exportData?: any[] | null; timestamp: string; }
 
 export const saveChatSession = async (userId: string, messages: ChatMessage[]): Promise<void> => {
     try {
-        // Usar system_settings como store simple: key = chat_session_{userId}
         const key = `chat_session_${userId}`;
-        const value = JSON.stringify(messages);
-
-        await prisma.$executeRawUnsafe(`
-            INSERT INTO "system_settings" ("id", "key", "value", "createdAt", "updatedAt")
-            VALUES ($1, $2, $3, NOW(), NOW())
-            ON CONFLICT ("key") DO UPDATE SET "value" = $3, "updatedAt" = NOW()
-        `, key, key, value);
-    } catch (error: any) {
-        console.error('[ai-chat] Error saving session:', error.message);
-    }
+        await prisma.$executeRawUnsafe(`INSERT INTO "system_settings" ("id","key","value","createdAt","updatedAt") VALUES ($1,$2,$3,NOW(),NOW()) ON CONFLICT ("key") DO UPDATE SET "value"=$3,"updatedAt"=NOW()`, key, key, JSON.stringify(messages));
+    } catch {}
 };
 
 export const loadChatSession = async (userId: string): Promise<ChatMessage[]> => {
     try {
-        const key = `chat_session_${userId}`;
-        const rows = await prisma.$queryRawUnsafe<{ value: string }[]>(
-            `SELECT "value" FROM "system_settings" WHERE "key" = $1`,
-            key
-        );
-
-        if (rows.length > 0) {
-            return JSON.parse(rows[0].value);
-        }
-        return [];
-    } catch (error: any) {
-        console.error('[ai-chat] Error loading session:', error.message);
-        return [];
-    }
+        const rows = await prisma.$queryRawUnsafe<{ value: string }[]>(`SELECT "value" FROM "system_settings" WHERE "key"=$1`, `chat_session_${userId}`);
+        return rows.length > 0 ? JSON.parse(rows[0].value) : [];
+    } catch { return []; }
 };
 
 export const clearChatSession = async (userId: string): Promise<void> => {
-    try {
-        const key = `chat_session_${userId}`;
-        await prisma.$executeRawUnsafe(`DELETE FROM "system_settings" WHERE "key" = $1`, key);
-    } catch (error: any) {
-        console.error('[ai-chat] Error clearing session:', error.message);
-    }
+    try { await prisma.$executeRawUnsafe(`DELETE FROM "system_settings" WHERE "key"=$1`, `chat_session_${userId}`); } catch {}
 };
