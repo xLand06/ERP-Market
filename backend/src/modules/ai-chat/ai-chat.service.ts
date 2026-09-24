@@ -95,7 +95,7 @@ export const processAiQuestion = async (question: string): Promise<AiChatRespons
     try {
         // 1. Enviar pregunta a Groq
         const completion = await groq.chat.completions.create({
-            model: 'llama-3.1-8b-versatile',
+            model: 'llama-3.1-8b-instant',
             messages: [
                 { role: 'system', content: SYSTEM_PROMPT },
                 { role: 'user', content: question },
