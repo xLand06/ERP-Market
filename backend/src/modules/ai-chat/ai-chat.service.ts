@@ -137,9 +137,17 @@ export const processAiQuestion = async (question: string): Promise<AiChatRespons
             };
         }
 
-        // 4. Ejecutar SQL
-        const result = await prisma.$queryRawUnsafe(sql);
-        const data = Array.isArray(result) ? result : [];
+        // 4. Ejecutar SQL (BigInt → Number para serialización JSON)
+        const rawResult = await prisma.$queryRawUnsafe(sql);
+        const data = Array.isArray(rawResult)
+            ? rawResult.map((row: any) => {
+                const obj: any = {};
+                for (const [k, v] of Object.entries(row)) {
+                    obj[k] = typeof v === 'bigint' ? Number(v) : v;
+                }
+                return obj;
+            })
+            : [];
 
         // 5. Generar respuesta con datos
         const dataSummary = data.length === 0
