@@ -151,7 +151,7 @@ export const getPublicCatalog = async (slug: string): Promise<PublicCatalog | nu
 
         // 4. Obtener subgrupos asignados a productos
         const productSubGroupsResult = await pool.query(`
-            SELECT "productId", "subGroupId" FROM products
+            SELECT id AS "productId", "subGroupId" FROM products
             WHERE "isActive" = true AND "subGroupId" IS NOT NULL
         `);
         const productSubGroupMap = new Map<string, string>();
