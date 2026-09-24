@@ -218,11 +218,11 @@ export function AiChat() {
                                     </p>
 
                                     {/* Export buttons */}
-                                    {msg.exportData && msg.exportData.length > 0 && (
+                                    {(msg.exportData && msg.exportData.length > 0) || (msg.rows && msg.rows.length > 0 && msg.content.includes('📊')) ? (
                                         <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200">
                                             <button
                                                 type="button"
-                                                onClick={() => downloadFile(msg.exportData!, 'csv')}
+                                                onClick={() => downloadFile(msg.exportData && msg.exportData.length > 0 ? msg.exportData : msg.rows!, 'csv')}
                                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-[11px] font-bold rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer"
                                             >
                                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
@@ -232,7 +232,7 @@ export function AiChat() {
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => downloadFile(msg.exportData!, 'excel')}
+                                                onClick={() => downloadFile(msg.exportData && msg.exportData.length > 0 ? msg.exportData : msg.rows!, 'excel')}
                                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-[11px] font-bold rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
                                             >
                                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
@@ -240,9 +240,9 @@ export function AiChat() {
                                                 </svg>
                                                 Excel
                                             </button>
-                                            <span className="text-[10px] text-slate-400">{msg.exportData.length} registros</span>
+                                            <span className="text-[10px] text-slate-400">{(msg.exportData?.length || msg.rows?.length || 0)} registros</span>
                                         </div>
-                                    )}
+                                    ) : null}
 
                                     <p className={`text-[10px] mt-1.5 ${msg.role === 'user' ? 'text-indigo-200' : 'text-slate-400'}`}>
                                         {msg.timestamp.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
