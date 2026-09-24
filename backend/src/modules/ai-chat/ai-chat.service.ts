@@ -102,7 +102,6 @@ export const processAiQuestion = async (question: string): Promise<AiChatRespons
             ],
             temperature: 0.1,
             max_tokens: 1024,
-            extra_body: { enable_thinking: false },
         });
 
         const responseText = completion.choices[0]?.message?.content || '';
