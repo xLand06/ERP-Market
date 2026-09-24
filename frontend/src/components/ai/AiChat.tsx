@@ -189,18 +189,6 @@ export function AiChat() {
                                         {formatMarkdown(msg.content)}
                                     </p>
 
-                                    {/* SQL query (collapsible) */}
-                                    {msg.sql && (
-                                        <details className="mt-2">
-                                            <summary className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-600 cursor-pointer">
-                                                Ver SQL
-                                            </summary>
-                                            <pre className="mt-1 p-2 bg-slate-900 text-green-400 text-[10px] rounded-lg overflow-x-auto font-mono">
-                                                {msg.sql}
-                                            </pre>
-                                        </details>
-                                    )}
-
                                     <p className={`text-[10px] mt-1.5 ${msg.role === 'user' ? 'text-indigo-200' : 'text-slate-400'}`}>
                                         {msg.timestamp.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
                                     </p>
