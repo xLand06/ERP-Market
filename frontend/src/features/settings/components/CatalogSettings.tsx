@@ -4,7 +4,7 @@
 // redes sociales que se muestran en la página standalone /catalogo/:slug.
 // =============================================================================
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, Copy, Globe, Link2, Save } from 'lucide-react';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { cn } from '@/lib/utils';
@@ -66,16 +66,11 @@ export function CatalogSettings() {
         }
     }, [catalogActive, catalogSlug, socialLinks]);
 
-    // En Electron (protocolo file:) no existe URL pública local — se muestra el enlace relativo
-    const baseUrl = useMemo(() => {
-        if (window.location.protocol === 'file:' || (window as any).erpApi?.isElectron) {
-            return '';
-        }
-        return window.location.origin;
-    }, []);
+    // URL del catálogo público centralizado en allmarket.allcode.site
+    const catalogBaseUrl = 'https://allmarket.allcode.site';
 
     const shareLink = localSlug.trim()
-        ? (baseUrl ? `${baseUrl}/catalogo/${encodeURIComponent(localSlug.trim())}` : `/catalogo/${encodeURIComponent(localSlug.trim())}`)
+        ? `${catalogBaseUrl}/${encodeURIComponent(localSlug.trim())}`
         : '';
 
     const handleCopy = async () => {
@@ -178,7 +173,7 @@ export function CatalogSettings() {
                         Slug del catálogo
                     </label>
                     <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-400 font-semibold shrink-0">{baseUrl || ''}/catalogo/</span>
+                        <span className="text-sm text-slate-400 font-semibold shrink-0">{catalogBaseUrl}/</span>
                         <input
                             id="catalog-slug"
                             type="text"
@@ -189,7 +184,7 @@ export function CatalogSettings() {
                         />
                     </div>
                     <p className="text-xs text-slate-400 mt-1.5 font-medium">
-                        Solo letras, números y guiones. Ej: mi-tienda → {baseUrl || ''}/catalogo/mi-tienda
+                        Solo letras, números y guiones. Ej: mi-tienda → {catalogBaseUrl}/mi-tienda
                     </p>
                 </div>
 
