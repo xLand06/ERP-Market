@@ -46,4 +46,14 @@ router.post('/accounts/:id/transactions',
     ctrl.createTransaction
 );
 
+/** POST /api/banks/transfer — Transferir entre cuentas */
+router.post('/transfer', roleGuard('MANAGER'), ctrl.transfer);
+
+/** POST /api/banks/reconcile/:id — Conciliación bancaria */
+router.post('/reconcile/:id',
+    roleGuard('MANAGER'),
+    validate(idParamSchema, { source: 'params' }),
+    ctrl.reconcile
+);
+
 export default router;

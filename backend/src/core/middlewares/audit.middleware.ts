@@ -59,6 +59,8 @@ export type AuditActionType =
     | 'BANK_ACCOUNT_CREATE'
     | 'BANK_ACCOUNT_UPDATE'
     | 'BANK_TRANSACTION_CREATE'
+    | 'BANK_TRANSFER'
+    | 'BANK_RECONCILIATION'
     | 'SYSTEM_PURGE'
     | 'LOGIN'
     | 'LOGIN_FAILED'

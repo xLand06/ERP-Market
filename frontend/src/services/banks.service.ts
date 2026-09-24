@@ -61,6 +61,22 @@ export const banksApi = {
         const { data } = await api.post<ApiResponse<BankTransaction>>(`/banks/accounts/${accountId}/transactions`, payload);
         return data.data;
     },
+
+    /**
+     * Transferir entre cuentas
+     */
+    transfer: async (payload: { fromAccountId: string; toAccountId: string; amount: number; concept?: string }) => {
+        const { data } = await api.post<ApiResponse<any>>('/banks/transfer', payload);
+        return data.data;
+    },
+
+    /**
+     * Conciliación bancaria
+     */
+    reconcile: async (accountId: string, items: Array<{ date: string; description: string; amount: number; type: 'income' | 'expense'; reference?: string }>) => {
+        const { data } = await api.post<ApiResponse<any>>(`/banks/reconcile/${accountId}`, { items });
+        return data.data;
+    },
 };
 
 export default banksApi;

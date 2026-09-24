@@ -103,3 +103,25 @@ export function useCreateBankTransaction(accountId: string | undefined) {
         },
     });
 }
+
+/**
+ * Transferir entre cuentas bancarias
+ */
+export function useTransferBetweenAccounts() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (payload: { fromAccountId: string; toAccountId: string; amount: number; concept?: string }) => {
+            return banksApi.transfer(payload);
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-summary'] });
+            toast.success(data.message || 'Transferencia realizada');
+        },
+        onError: (error: unknown) => {
+            const err = error as { response?: { data?: { error?: string } } };
+            toast.error(err?.response?.data?.error || 'Error en la transferencia');
+        },
+    });
+}

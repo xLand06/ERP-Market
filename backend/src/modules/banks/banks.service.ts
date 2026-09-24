@@ -171,3 +171,157 @@ export const createTransaction = async (accountId: string, input: BankTransactio
         },
     });
 };
+
+// ─── Transferencia entre cuentas ─────────────────────────────────────────────
+export interface TransferInput {
+    fromAccountId: string;
+    toAccountId: string;
+    amount: number;
+    concept?: string;
+}
+
+/**
+ * Transfiere dinero de una cuenta a otra.
+ * Crea 2 movimientos atómicos: expense en origen + income en destino.
+ */
+export const transferBetweenAccounts = async (input: TransferInput) => {
+    const { fromAccountId, toAccountId, amount, concept } = input;
+
+    if (fromAccountId === toAccountId) {
+        const err: any = new Error('No podés transferir a la misma cuenta');
+        err.status = 422;
+        throw err;
+    }
+
+    if (amount <= 0) {
+        const err: any = new Error('El monto debe ser mayor a 0');
+        err.status = 422;
+        throw err;
+    }
+
+    // Verificar cuentas
+    const [fromAccount, toAccount] = await Promise.all([
+        prisma.bankAccount.findUnique({ where: { id: fromAccountId }, include: { transactions: true } }),
+        prisma.bankAccount.findUnique({ where: { id: toAccountId }, include: { transactions: true } }),
+    ]);
+
+    if (!fromAccount || !toAccount) {
+        const err: any = new Error('Una o ambuentas cuentas no existen');
+        err.status = 404;
+        throw err;
+    }
+
+    if (!fromAccount.isActive || !toAccount.isActive) {
+        const err: any = new Error('Ambas cuentas deben estar activas');
+        err.status = 422;
+        throw err;
+    }
+
+    // Verificar saldo
+    const fromNormalized = normalizeAccount(fromAccount);
+    if (amount > fromNormalized.balance + 0.005) {
+        const err: any = new Error(`Saldo insuficiente. Disponible: $${fromNormalized.balance.toFixed(2)}`);
+        err.status = 422;
+        throw err;
+    }
+
+    const transferConcept = concept || `Transferencia a ${toAccount.name}`;
+
+    // Crear ambos movimientos en transacción
+    const result = await prisma.$transaction(async (tx) => {
+        const expense = await tx.bankTransaction.create({
+            data: {
+                accountId: fromAccountId,
+                type: 'expense',
+                amount,
+                concept: transferConcept,
+                reference: `TRANSF → ${toAccount.name}`,
+            },
+        });
+
+        const income = await tx.bankTransaction.create({
+            data: {
+                accountId: toAccountId,
+                type: 'income',
+                amount,
+                concept: `Transferencia de ${fromAccount.name}`,
+                reference: `TRANSF ← ${fromAccount.name}`,
+            },
+        });
+
+        return { expense, income };
+    });
+
+    return {
+        message: `Transferencia exitosa: $${amount.toFixed(2)} de ${fromAccount.name} a ${toAccount.name}`,
+        from: result.expense,
+        to: result.income,
+    };
+};
+
+// ─── Conciliación bancaria ───────────────────────────────────────────────────
+export interface ReconciliationItem {
+    date: string;
+    description: string;
+    amount: number;
+    type: 'income' | 'expense';
+    reference?: string;
+}
+
+/**
+ * Procesa un extracto bancario (CSV) y busca matches con movimientos del sistema.
+ */
+export const reconcileBankStatement = async (accountId: string, statementItems: ReconciliationItem[]) => {
+    const account = await prisma.bankAccount.findUnique({
+        where: { id: accountId },
+        include: { transactions: true },
+    });
+
+    if (!account) {
+        const err: any = new Error('Cuenta bancaria no encontrada');
+        err.status = 404;
+        throw err;
+    }
+
+    const systemTransactions = await prisma.bankTransaction.findMany({
+        where: { accountId },
+        orderBy: { createdAt: 'asc' },
+    });
+
+    // Buscar matches por monto + tipo + fecha cercana
+    const results = statementItems.map((item) => {
+        const match = systemTransactions.find((st) => {
+            const stDate = new Date(st.createdAt).toISOString().slice(0, 10);
+            const itemDate = item.date.slice(0, 10);
+            const amountMatch = Math.abs(Number(st.amount) - Math.abs(item.amount)) < 0.01;
+            const typeMatch = st.type === item.type;
+            // Fecha dentro de 3 días
+            const dateDiff = Math.abs(new Date(stDate).getTime() - new Date(itemDate).getTime());
+            const dateMatch = dateDiff <= 3 * 24 * 60 * 60 * 1000;
+
+            return amountMatch && typeMatch && dateMatch;
+        });
+
+        return {
+            statement: item,
+            matched: !!match,
+            systemTransaction: match ? {
+                id: match.id,
+                amount: Number(match.amount),
+                concept: match.concept,
+                createdAt: match.createdAt,
+            } : null,
+        };
+    });
+
+    const matched = results.filter(r => r.matched).length;
+    const unmatched = results.filter(r => !r.matched).length;
+
+    return {
+        accountName: account.name,
+        totalStatement: statementItems.length,
+        matched,
+        unmatched,
+        items: results,
+    };
+};
