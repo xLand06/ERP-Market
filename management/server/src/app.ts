@@ -16,6 +16,7 @@ import { createAuditEntry } from './modules/audit/audit.service';
 import { ensureNetwork } from './services/provisioner';
 import billingRoutes from './modules/billing/billing.routes';
 import trialsRoutes from './modules/trials/trials.routes';
+import publicCatalogRoutes from './modules/public-catalog/public-catalog.routes';
 
 const app = express();
 
@@ -66,6 +67,7 @@ app.get('/api/health', async (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/trials', trialsRoutes);
+app.use('/api/public-catalog', publicCatalogRoutes);
 app.use('/api/tenants', authMiddleware, tenantsRoutes);
 app.use('/api/payments', authMiddleware, paymentsRoutes);
 app.use('/api/audit', authMiddleware, auditRoutes);
