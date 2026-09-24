@@ -11,7 +11,8 @@ import auditRoutes from './modules/audit/audit.routes';
 import healthRoutes from './modules/health/health.routes';
 import { startHealthCron, startAuditRetention } from './services/health-cron';
 import { startPaymentCron } from './services/payment-cron';
-import { getVpsStats } from './services/vps-stats';
+import { getVpsStats, pruneDockerSystem } from './services/vps-stats';
+import { createAuditEntry } from './modules/audit/audit.service';
 import { ensureNetwork } from './services/provisioner';
 import billingRoutes from './modules/billing/billing.routes';
 import trialsRoutes from './modules/trials/trials.routes';
@@ -111,6 +112,47 @@ app.get('/api/vps/stats', authMiddleware, (_req, res) => {
     } catch (error) {
         console.error('[mgmt-server] Error obteniendo stats VPS:', error);
         res.status(500).json({ error: 'Error al obtener estadísticas del servidor' });
+    }
+});
+
+// POST /api/vps/docker-prune — Limpieza segura de imágenes huérfanas y caché builder de Docker
+app.post('/api/vps/docker-prune', authMiddleware, async (req, res) => {
+    try {
+        const result = pruneDockerSystem();
+
+        await createAuditEntry({
+            actor: req.user?.username || 'admin',
+            action: 'DOCKER_PRUNE',
+            details: {
+                success: result.success,
+                reclaimedSpace: result.reclaimedSpace || '0B',
+                output: result.output,
+            },
+        });
+
+        if (!result.success) {
+            return res.status(500).json({
+                success: false,
+                error: 'Error durante la limpieza de Docker',
+                output: result.output,
+                reclaimedSpace: result.reclaimedSpace,
+            });
+        }
+
+        const stats = getVpsStats();
+        res.json({
+            success: true,
+            message: 'Limpieza de Docker completada',
+            output: result.output,
+            reclaimedSpace: result.reclaimedSpace,
+            stats,
+        });
+    } catch (error: any) {
+        console.error('[mgmt-server] Error ejecutando docker-prune:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Error al ejecutar la limpieza de Docker',
+        });
     }
 });
 
