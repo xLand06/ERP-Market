@@ -17,6 +17,8 @@ services:
       DOCKER_SOCKET: /var/run/docker.sock
       DEPLOY_DIR: /repo/deploy
       HOST_DEPLOY_DIR: /opt/erp-market/deploy
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-ALL MARKET <notificaciones@allcode.site>}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/erp-market:/repo
