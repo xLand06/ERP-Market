@@ -95,13 +95,14 @@ export const processAiQuestion = async (question: string): Promise<AiChatRespons
     try {
         // 1. Enviar pregunta a Groq
         const completion = await groq.chat.completions.create({
-            model: 'llama-3.1-8b-instant',
+            model: 'qwen/qwen3.8-27b',
             messages: [
                 { role: 'system', content: SYSTEM_PROMPT },
                 { role: 'user', content: question },
             ],
-            temperature: 0.1, // Bajo = más preciso para SQL
+            temperature: 0.1,
             max_tokens: 1024,
+            extra_body: { enable_thinking: false },
         });
 
         const responseText = completion.choices[0]?.message?.content || '';
