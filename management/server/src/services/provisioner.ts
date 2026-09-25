@@ -488,6 +488,13 @@ export async function startProvisioningInBackground(input: ProvisionInput): Prom
             state.finishedAt = Date.now();
             appendLog(`Provisioning completado para ${slug} (id: ${result.tenantId})`);
             console.log(`[provisioner] Background provisioning completado: ${slug}`);
+
+            // 5. Enviar correo de bienvenida
+            const email = input.adminEmail || `admin@${slug}.local`;
+            console.log(`[provisioner] Enviando correo de bienvenida a ${email} para ${slug}...`);
+            sendWelcomeEmail({ slug, adminEmail: email, url: `https://${tenantDomain}` }, plan || 'free')
+                .then(r => console.log(`[provisioner] Correo de bienvenida enviado: ${JSON.stringify(r)}`))
+                .catch(err => console.warn(`[provisioner] Error enviando correo de bienvenida a ${slug}:`, err));
         })
         .catch(async (err: any) => {
             // 5. Error: marcar ERROR y guardar el mensaje en los logs
