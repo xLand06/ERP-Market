@@ -302,3 +302,14 @@ export const getCustomerPayments = async (customerId: string) => {
         include: { transaction: { select: { id: true, total: true, createdAt: true } } },
     });
 };
+
+/**
+ * Desactivar (soft delete) un cliente.
+ * No elimina el registro por integridad referencial.
+ */
+export const deleteCustomer = async (id: string): Promise<void> => {
+    await prisma.customer.update({
+        where: { id },
+        data: { isActive: false },
+    });
+};

@@ -40,4 +40,7 @@ router.put('/:id', roleGuard('MANAGER'), validate(idParamSchema, { source: 'para
 /** POST /api/customers/:id/payments — Registrar abono (SELLER y superiores) */
 router.post('/:id/payments', roleGuard('MANAGER'), validate(idParamSchema, { source: 'params' }), validate(paymentSchema), ctrl.recordPayment);
 
+/** DELETE /api/customers/:id — Desactivar cliente (soft delete) */
+router.delete('/:id', roleGuard('MANAGER'), validate(idParamSchema, { source: 'params' }), ctrl.deleteCustomer);
+
 export default router;

@@ -148,3 +148,16 @@ export const getCustomerPayments = async (req: AuthRequest, res: Response) => {
         res.status(500).json({ success: false, error: error.message });
     }
 };
+
+/**
+ * Desactivar (soft delete) un cliente
+ */
+export const deleteCustomer = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = validatedData(req, 'params');
+        await customersService.deleteCustomer(id);
+        res.json({ success: true, message: 'Cliente desactivado' });
+    } catch (error: any) {
+        res.status(error.status || 500).json({ success: false, error: error.message });
+    }
+};

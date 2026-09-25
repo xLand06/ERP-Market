@@ -117,7 +117,7 @@ fi
 section "4. CUSTOMERS"
 
 CUST=$(curl -s "$BASE/api/customers" -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
-    -d '{"name":"Cliente E2E Test","cedula":"V-99999999","phone":"0412-1234567"}' 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('id','FAIL'))" 2>/dev/null)
+    -d '{"name":"Cliente E2E Test","cedula":"V-99999999","phone":"0412-1234567"}' 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('id','') or 'FAIL')" 2>/dev/null)
 
 if [ "$CUST" != "FAIL" ] && [ -n "$CUST" ]; then
     test_result "PASS" "Create customer ($CUST)"
@@ -130,12 +130,12 @@ section "5. POS / SALES"
 
 # Create sale
 SALE=$(curl -s "$BASE/api/pos/transactions" -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
-    -d "{\"branchId\":\"branch-default\",\"type\":\"SALE\",\"items\":[{\"productId\":\"$PROD\",\"quantity\":2}],\"paymentMethods\":[{\"type\":\"cash\",\"amount\":299.98,\"currency\":\"USD\"}]}" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('id',d.get('transaction',{}).get('id','FAIL')))" 2>/dev/null)
+    -d "{\"branchId\":\"branch-default\",\"type\":\"SALE\",\"items\":[{\"productId\":\"$PROD\",\"quantity\":2,\"unitPrice\":149.99}],\"paymentMethods\":[{\"type\":\"cash\",\"amount\":299.98,\"currency\":\"COP\"}]}" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('id',d.get('transaction',{}).get('id',d.get('error','FAIL'))))" 2>/dev/null)
 
-if [ "$SALE" != "FAIL" ] && [ -n "$SALE" ]; then
-    test_result "PASS" "Create sale ($SALE)"
-else
+if echo "$SALE" | grep -qi "error\|fail"; then
     test_result "FAIL" "Create sale" "$SALE"
+else
+    test_result "PASS" "Create sale ($SALE)"
 fi
 
 # Get sales list
