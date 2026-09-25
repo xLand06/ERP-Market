@@ -10,6 +10,31 @@ import { prisma } from '../../config/prisma';
 const groqApiKey = process.env.GROQ_API_KEY;
 const groq = groqApiKey ? new Groq({ apiKey: groqApiKey }) : null;
 
+// ─── Model rotation: prueba modelos en orden hasta que funcione ──────────────
+const MODELS = [
+    'openai/gpt-oss-20b',
+    'qwen/qwen3.8-27b',
+    'allam-2-7b',
+];
+
+async function callWithRotation(messages: any[], temperature: number, maxTokens: number): Promise<string> {
+    for (const model of MODELS) {
+        try {
+            const completion = await groq!.chat.completions.create({
+                model,
+                messages,
+                temperature,
+                max_tokens: maxTokens,
+            });
+            return completion.choices[0]?.message?.content || '';
+        } catch (error: any) {
+            console.error(`[ai-chat] Model ${model} failed:`, error.message?.slice(0, 100));
+            continue; // Try next model
+        }
+    }
+    throw new Error('Todos los modelos de IA fallaron');
+}
+
 // ─── Rate limiting (30 req/min por usuario) ─────────────────────────────────
 const rateLimitMap = new Map<string, number[]>();
 const RATE_LIMIT_MAX = 30;
@@ -88,17 +113,10 @@ export const processAiQuestion = async (question: string, userId?: string): Prom
 
     try {
         // ── PASO 1: La IA decide si necesita SQL o solo guía ─────────────────
-        const completion = await groq.chat.completions.create({
-            model: 'openai/gpt-oss-20b',
-            messages: [
-                { role: 'system', content: SYSTEM_PROMPT },
-                { role: 'user', content: question },
-            ],
-            temperature: 0.2,
-            max_tokens: 1024,
-        });
-
-        const responseText = completion.choices[0]?.message?.content || '';
+        const responseText = await callWithRotation([
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: question },
+        ], 0.2, 1024);
 
         // Extraer SQL si la IA generó uno
         const sqlMatch = responseText.match(/```sql\s*([\s\S]*?)```/i)
@@ -133,17 +151,10 @@ export const processAiQuestion = async (question: string, userId?: string): Prom
             : [];
 
         // ── PASO 3: Formatear respuesta natural ──────────────────────────────
-        const formatCompletion = await groq.chat.completions.create({
-            model: 'openai/gpt-oss-20b',
-            messages: [
-                { role: 'system', content: buildFormatPrompt(question, data) },
-                { role: 'user', content: 'Dame la respuesta.' },
-            ],
-            temperature: 0.3,
-            max_tokens: 800,
-        });
-
-        const answer = formatCompletion.choices[0]?.message?.content?.trim() || formatDataFallback(data);
+        const answer = (await callWithRotation([
+            { role: 'system', content: buildFormatPrompt(question, data) },
+            { role: 'user', content: 'Dame la respuesta.' },
+        ], 0.3, 800)).trim() || formatDataFallback(data);
 
         // Detectar si el usuario pidió exportar
         const wantsExport = /export|csv|excel|archivo|descargar|reporte/i.test(question);
@@ -201,16 +212,12 @@ export const analyzeUploadedFile = async (fileBuffer: Buffer, filename: string, 
             ? `Archivo "${filename}" con ${data.length} registros. Pregunta: "${question}"\nColumnas: ${headers.join(', ')}\nDatos: ${JSON.stringify(data.slice(0, 15))}`
             : `Archivo "${filename}" con ${data.length} registros. Analizalo y dame un resumen.\nColumnas: ${headers.join(', ')}\nDatos: ${JSON.stringify(data.slice(0, 15))}`;
 
-        const completion = await groq.chat.completions.create({
-            model: 'openai/gpt-oss-20b',
-            messages: [
-                { role: 'system', content: 'Sos un analista de datos experto. Analizá archivos del usuario y respondé en español con datos clave, tendencias y totales. Sé conciso.' },
-                { role: 'user', content: userPrompt },
-            ],
-            temperature: 0.3,
-            max_tokens: 1024,
-        });
-        return { answer: completion.choices[0]?.message?.content?.trim() || `Archivo con ${data.length} registros.`, data };
+        const answer = (await callWithRotation([
+            { role: 'system', content: 'Sos un analista de datos experto. Analizá archivos del usuario y respondé en español con datos clave, tendencias y totales. Sé conciso.' },
+            { role: 'user', content: userPrompt },
+        ], 0.3, 1024)).trim() || `Archivo con ${data.length} registros.`;
+
+        return { answer, data };
     } catch (error: any) {
         return { answer: `Error al analizar: ${error.message}` };
     }
