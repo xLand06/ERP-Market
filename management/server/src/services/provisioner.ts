@@ -243,9 +243,10 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     const result = await registerTenantFromEnv(slug, domain, plan, product, adminEmailFinal, adminPasswordFinal);
 
     // ── 3. Enviar correo de bienvenida ───────────────────────────────
-    sendWelcomeEmail({ slug, adminEmail: adminEmailFinal, url: result.url }, plan).catch(err => {
-        console.warn(`[provisioner] Error enviando correo de bienvenida a ${slug}:`, err);
-    });
+    console.log(`[provisioner] Enviando correo de bienvenida a ${adminEmailFinal} para ${slug}...`);
+    sendWelcomeEmail({ slug, adminEmail: adminEmailFinal, url: result.url }, plan)
+        .then(r => console.log(`[provisioner] Correo de bienvenida enviado: ${JSON.stringify(r)}`))
+        .catch(err => console.warn(`[provisioner] Error enviando correo de bienvenida a ${slug}:`, err));
 
     return result;
 }
