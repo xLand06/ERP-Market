@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store/authStore';
+import { useConfigStore } from '@/hooks/useConfigStore';
 import { isPathAllowed } from '../../lib/planConfig';
 import toast from 'react-hot-toast';
 
@@ -10,6 +12,14 @@ interface PlanGuardProps {
 export function PlanGuard({ children }: PlanGuardProps) {
     const location = useLocation();
     const user = useAuthStore((s) => s.user);
+    const { planTier, fetchSettings } = useConfigStore();
+
+    // Cargar settings si planTier es 'basic' (default) — puede ser real o aún no cargado
+    useEffect(() => {
+        if (planTier === 'basic') {
+            fetchSettings();
+        }
+    }, []);
 
     if (location.pathname === '/') return <>{children}</>;
 
