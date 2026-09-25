@@ -237,3 +237,143 @@ export async function dispatchTenantNotification(payload: NotificationPayload): 
     return true;
 }
 
+// ─── Email Templates ─────────────────────────────────────────────────────────
+
+/**
+ * Envía correo de bienvenida cuando se aprovisiona un tenant nuevo.
+ */
+export async function sendWelcomeEmail(tenant: { slug: string; adminEmail?: string | null; url?: string | null }, plan: string) {
+    const email = tenant.adminEmail;
+    if (!email || !email.includes('@') || email.endsWith('.local')) return;
+
+    const planNames: Record<string, string> = { free: 'Trial 14 días', basic: 'Básico', pro: 'Pro', premium: 'Premium' };
+    const planName = planNames[plan] || plan;
+    const loginUrl = tenant.url || `https://${tenant.slug}.allcode.site`;
+
+    const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1e293b;line-height:1.6;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 16px;">
+<tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.06);border:1px solid #e2e8f0;">
+<tr><td style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#059669 100%);padding:28px 32px;color:#fff;">
+<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#a7f3d0;font-weight:700;margin-bottom:6px;">ALLCODE • ALL MARKET</div>
+<h1 style="margin:0;font-size:20px;font-weight:700;color:#fff;">¡Bienvenido a ALL MARKET!</h1>
+</td></tr>
+<tr><td style="padding:32px;">
+<div style="display:inline-block;padding:4px 12px;border-radius:999px;background:#05966915;color:#059669;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:16px;">CUENTA ACTIVA</div>
+<p style="margin:0 0 16px;font-size:15px;color:#334155;">Hola,</p>
+<p style="margin:0 0 16px;font-size:15px;color:#334155;">Tu cuenta <strong>${tenant.slug}</strong> ha sido creada con el <strong>${planName}</strong>. Ya podés empezar a usar tu ERP.</p>
+<div style="margin:24px 0;text-align:center;">
+<a href="${loginUrl}" style="background:#059669;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;display:inline-block;">Ingresar a mi tienda</a>
+</div>
+<p style="margin:0 0 8px;font-size:13px;color:#64748b;"><strong>Tus datos de acceso:</strong></p>
+<table style="width:100%;background:#f1f5f9;border-radius:8px;padding:12px 16px;font-size:13px;color:#334155;">
+<tr><td style="padding:4px 0;">Usuario:</td><td style="font-weight:700;">admin</td></tr>
+<tr><td style="padding:4px 0;">Contraseña:</td><td style="font-weight:700;">${tenant.adminEmail?.split('@')[0] || 'admin123'}</td></tr>
+<tr><td style="padding:4px 0;">URL:</td><td style="font-weight:700;"><a href="${loginUrl}" style="color:#059669;">${loginUrl}</a></td></tr>
+</table>
+<hr style="border:none;border-top:1px solid #f1f5f9;margin:24px 0;">
+<p style="margin:0;font-size:12px;color:#94a3b8;">Negocio: <strong>${tenant.slug}</strong> • Si necesitas ayuda, responde a este correo.</p>
+</td></tr>
+<tr><td style="background:#f8fafc;padding:16px 32px;text-align:center;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;">
+&copy; ${new Date().getFullYear()} ALLCODE • ALL MARKET
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+
+    await sendEmailWithResend({ to: email, subject: `¡Bienvenido a ALL MARKET! Tu cuenta ${tenant.slug} está lista`, html });
+}
+
+/**
+ * Envía correo de recordatorio de pago próximo a vencer.
+ */
+export async function sendPaymentReminder(tenant: { slug: string; adminEmail?: string | null; url?: string | null }, daysUntilDue: number) {
+    const email = tenant.adminEmail;
+    if (!email || !email.includes('@') || email.endsWith('.local')) return;
+
+    const loginUrl = tenant.url || `https://${tenant.slug}.allcode.site`;
+    const isUrgent = daysUntilDue <= 3;
+
+    const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1e293b;line-height:1.6;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 16px;">
+<tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.06);border:1px solid #e2e8f0;">
+<tr><td style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,${isUrgent ? '#dc2626' : '#d97706'} 100%);padding:28px 32px;color:#fff;">
+<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#a7f3d0;font-weight:700;margin-bottom:6px;">ALLCODE • ALL MARKET</div>
+<h1 style="margin:0;font-size:20px;font-weight:700;color:#fff;">Recordatorio de Pago</h1>
+</td></tr>
+<tr><td style="padding:32px;">
+<div style="display:inline-block;padding:4px 12px;border-radius:999px;background:${isUrgent ? '#dc2626' : '#d97706'}15;color:${isUrgent ? '#dc2626' : '#d97706'};font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:16px;">${isUrgent ? 'VENCE EN ' + daysUntilDue + ' DÍAS' : 'PRÓXIMO A VENCER'}</div>
+<p style="margin:0 0 16px;font-size:15px;color:#334155;">Hola,</p>
+<p style="margin:0 0 16px;font-size:15px;color:#334155;">Tu suscripción de <strong>${tenant.slug}</strong> vence en <strong>${daysUntilDue} días</strong>. Para evitar la suspensión del servicio, realizá el pago antes de la fecha límite.</p>
+<div style="margin:24px 0;text-align:center;">
+<a href="${loginUrl}/settings" style="background:${isUrgent ? '#dc2626' : '#d97706'};color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;display:inline-block;">Ver mi suscripción</a>
+</div>
+<hr style="border:none;border-top:1px solid #f1f5f9;margin:24px 0;">
+<p style="margin:0;font-size:12px;color:#94a3b8;">Negocio: <strong>${tenant.slug}</strong> • Si ya pagaste, podés ignorar este mensaje.</p>
+</td></tr>
+<tr><td style="background:#f8fafc;padding:16px 32px;text-align:center;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;">
+&copy; ${new Date().getFullYear()} ALLCODE • ALL MARKET
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+
+    await sendEmailWithResend({
+        to: email,
+        subject: isUrgent ? `⚠️ URGENTE: Tu suscripción vence en ${daysUntilDue} días` : `Recordatorio: Tu suscripción vence pronto`,
+        html,
+    });
+}
+
+/**
+ * Envía correo cuando se aprueba una suscripción o se confirma un pago.
+ */
+export async function sendPaymentConfirmation(tenant: { slug: string; adminEmail?: string | null; url?: string | null }, amount: number, plan: string) {
+    const email = tenant.adminEmail;
+    if (!email || !email.includes('@') || email.endsWith('.local')) return;
+
+    const loginUrl = tenant.url || `https://${tenant.slug}.allcode.site`;
+    const planNames: Record<string, string> = { free: 'Trial', basic: 'Básico', pro: 'Pro', premium: 'Premium' };
+
+    const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1e293b;line-height:1.6;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 16px;">
+<tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.06);border:1px solid #e2e8f0;">
+<tr><td style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#059669 100%);padding:28px 32px;color:#fff;">
+<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#a7f3d0;font-weight:700;margin-bottom:6px;">ALLCODE • ALL MARKET</div>
+<h1 style="margin:0;font-size:20px;font-weight:700;color:#fff;">¡Pago Confirmado!</h1>
+</td></tr>
+<tr><td style="padding:32px;">
+<div style="display:inline-block;padding:4px 12px;border-radius:999px;background:#05966915;color:#059669;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:16px;">PAGO RECIBIDO</div>
+<p style="margin:0 0 16px;font-size:15px;color:#334155;">Hola,</p>
+<p style="margin:0 0 16px;font-size:15px;color:#334155;">Recibimos tu pago de <strong>$${amount.toFixed(2)}</strong> para el plan <strong>${planNames[plan] || plan}</strong> de <strong>${tenant.slug}</strong>.</p>
+<p style="margin:0 0 16px;font-size:15px;color:#334155;">Tu suscripción está activa. Seguí disfrutando de ALL MARKET.</p>
+<div style="margin:24px 0;text-align:center;">
+<a href="${loginUrl}" style="background:#059669;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;display:inline-block;">Ingresar a mi tienda</a>
+</div>
+<hr style="border:none;border-top:1px solid #f1f5f9;margin:24px 0;">
+<p style="margin:0;font-size:12px;color:#94a3b8;">Negocio: <strong>${tenant.slug}</strong> • Comprobante de pago adjunto.</p>
+</td></tr>
+<tr><td style="background:#f8fafc;padding:16px 32px;text-align:center;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;">
+&copy; ${new Date().getFullYear()} ALLCODE • ALL MARKET
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+
+    await sendEmailWithResend({ to: email, subject: `✅ Pago confirmado — Plan ${planNames[plan] || plan}`, html });
+}
+
