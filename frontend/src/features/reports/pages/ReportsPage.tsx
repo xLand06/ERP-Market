@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BarChart2, TrendingUp, TrendingDown, Package, DollarSign, Download, ArrowRight, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -137,6 +138,7 @@ const BRANCH_COLORS = ['bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-purp
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function ReportsPage() {
+    const navigate = useNavigate();
     const [datePreset, setDatePreset] = useState<DatePreset>('last30');
 
     const summary = useReportSummary(datePreset);
@@ -255,6 +257,7 @@ export default function ReportsPage() {
                     iconBg="bg-emerald-50"
                     iconColor="text-emerald-600"
                     cta="Ver ventas"
+                    onCtaClick={() => navigate('/finance/cash-register')}
                 />
                 <ReportCard
                     icon={BarChart2}
@@ -266,6 +269,7 @@ export default function ReportsPage() {
                     iconBg="bg-blue-50"
                     iconColor="text-blue-600"
                     cta="Ver detalle"
+                    onCtaClick={() => navigate('/finance')}
                 />
                 <ReportCard
                     icon={Package}
@@ -275,6 +279,7 @@ export default function ReportsPage() {
                     iconBg="bg-amber-50"
                     iconColor="text-amber-600"
                     cta="Ver catálogo"
+                    onCtaClick={() => navigate('/products')}
                 />
                 <ReportCard
                     icon={DollarSign}
@@ -286,6 +291,7 @@ export default function ReportsPage() {
                     iconBg="bg-purple-50"
                     iconColor="text-purple-600"
                     cta="Ver finanzas"
+                    onCtaClick={() => navigate('/finance')}
                 />
             </div>
 
