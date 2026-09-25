@@ -61,7 +61,13 @@ interface ReportCardProps {
 function ReportCard({ icon: Icon, title, value, change, sub, spark, sparkColor, iconBg, iconColor, cta, onCtaClick }: ReportCardProps) {
     const up = (change ?? 0) >= 0;
     return (
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col gap-3 hover:shadow-md transition-shadow">
+        <div
+            className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col gap-3 hover:shadow-md hover:border-slate-300 transition-all cursor-pointer"
+            onClick={onCtaClick}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onCtaClick?.(); }}
+        >
             <div className="flex items-start justify-between">
                 <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', iconBg)}>
                     <Icon className={cn('w-5 h-5', iconColor)} />
@@ -84,13 +90,9 @@ function ReportCard({ icon: Icon, title, value, change, sub, spark, sparkColor, 
             {spark && sparkColor && (
                 <SparkBars values={spark} color={sparkColor} />
             )}
-            <button
-                type="button"
-                onClick={onCtaClick}
-                className="flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors mt-auto self-start cursor-pointer"
-            >
+            <span className="flex items-center gap-1 text-xs font-bold text-indigo-500 mt-auto self-start">
                 {cta} <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            </span>
         </div>
     );
 }
