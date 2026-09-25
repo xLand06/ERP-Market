@@ -4,6 +4,7 @@ import Dockerode from 'dockerode';
 import { prisma } from '../config/prisma';
 import { env } from '../config/env';
 import { createAuditEntry } from '../modules/audit/audit.service';
+import { sendWelcomeEmail } from './notifications';
 
 // ── Cliente Docker ───────────────────────────────────────────────────────────
 const docker = new Dockerode({ socketPath: env.DOCKER_SOCKET });
@@ -239,7 +240,14 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     console.log(`[provisioner] add-client.sh completado para ${slug}`);
 
     // ── 2. Registrar/actualizar tenant en la DB ───────────────────────
-    return await registerTenantFromEnv(slug, domain, plan, product, adminEmailFinal, adminPasswordFinal);
+    const result = await registerTenantFromEnv(slug, domain, plan, product, adminEmailFinal, adminPasswordFinal);
+
+    // ── 3. Enviar correo de bienvenida ───────────────────────────────
+    sendWelcomeEmail({ slug, adminEmail: adminEmailFinal, url: result.url }, plan).catch(err => {
+        console.warn(`[provisioner] Error enviando correo de bienvenida a ${slug}:`, err);
+    });
+
+    return result;
 }
 
 /**
