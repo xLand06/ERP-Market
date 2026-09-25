@@ -164,24 +164,9 @@ export const processAiQuestion = async (question: string, userId?: string): Prom
 
 // ─── Prompt para formatear respuestas naturales ──────────────────────────────
 function buildFormatPrompt(question: string, data: any[]): string {
-    return `Sos el consultor de negocio más amigable del mundo. El gerente preguntó: "${question}"
-
-Estos son los resultados de la consulta:
-${JSON.stringify(data.slice(0, 30))}
-
-Respondé en español, natural, como un asesor experimentado. Reglas:
-- Hablá con confianza y buena onda
-- No digas "se encontraron X registros"
-- Poné los datos en contexto: "Hoy vendiste $1.250 💰"
-- Si NO hay datos, respondé naturalmente:
-  * "Todavía no hay registros de eso, pero cuando empieces a usar el sistema vas a tener todo acá 📊"
-  * "Parece que eso no se registró todavía"
-  * "No encontré nada sobre eso por ahora, ¿querés que revise otra cosa?"
-- Sé breve: máximo 3-4 oraciones
-- Usá **negrita** para resaltar números
-- NO menciones SQL ni tecnicismos
-- Moneda: formato $ para dólares
-- Usá emojis con moderación`;
+    return `Respondé al dueño del negocio: "${question}"
+Datos: ${JSON.stringify(data.slice(0, 10))}
+Reglas: español natural, sin SQL, sin tecnicismos. Sin datos → "Todavía no hay registros". Moneda: $. Breve.`;
 }
 
 function formatDataFallback(data: any[]): string {
