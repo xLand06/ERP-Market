@@ -336,6 +336,11 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                         </div>
                     )}
                 </div>
+                {!collapsed && (
+                    <a href="/terms" target="_blank" className="block text-center text-[10px] text-slate-500 hover:text-slate-300 font-medium mt-2 transition-colors">
+                        Términos y Condiciones
+                    </a>
+                )}
             </div>
         </div>
     );

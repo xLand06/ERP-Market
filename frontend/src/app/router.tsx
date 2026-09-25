@@ -64,6 +64,12 @@ export const router = createRouter([
         element: wrap(LoginPage),
         errorElement: <RouteErrorBoundary />
     },
+    // Términos y condiciones: pública, sin auth ni plan guard
+    {
+        path: '/terms',
+        element: <TermsPage />,
+        errorElement: <RouteErrorBoundary />
+    },
     // Catálogo público (F5): standalone, sin PrivateRoute ni AppShell
     {
         path: '/catalogo/:slug',
@@ -96,7 +102,6 @@ export const router = createRouter([
             { path: 'inventory/stocktaking/:id', element: wrap(StockCountView) },
             { path: 'audit',               element: wrap(AuditLogsPage) },
             { path: 'settings',          element: wrap(SettingsPage) },
-            { path: 'terms',             element: wrap(TermsPage) },
             { path: 'merma',              element: wrap(MermaPage) },
             { path: 'quotes',             element: wrap(QuotesPage) },
             { path: 'customers',          element: wrap(CustomersPage) },
