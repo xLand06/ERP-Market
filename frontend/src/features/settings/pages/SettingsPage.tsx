@@ -347,6 +347,16 @@ export default function SettingsPage() {
             <main className="transition-opacity duration-200">
                 {renderContent()}
             </main>
+
+            {/* Terms & Conditions link */}
+            <div className="text-center pt-4 border-t border-slate-100">
+                <a
+                    href="/terms"
+                    className="text-xs text-slate-400 hover:text-slate-600 font-medium transition-colors"
+                >
+                    Términos y Condiciones · Política de Privacidad
+                </a>
+            </div>
         </div>
     );
 }

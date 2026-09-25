@@ -26,6 +26,7 @@ const PurchasesPage          = lazy(() => import('../features/purchases/pages/Pu
 const EmployeeDirectoryPage  = lazy(() => import('../features/users/pages/EmployeeDirectoryPage'));
 const AuditLogsPage          = lazy(() => import('../features/audit/pages/AuditLogsPage'));
 const SettingsPage           = lazy(() => import('../features/settings/pages/SettingsPage'));
+const TermsPage              = lazy(() => import('../features/settings/pages/TermsPage'));
 const MermaPage             = lazy(() => import('../features/merma/pages/MermaPage'));
 const StocktakingPage        = lazy(() => import('../features/stocktaking/pages/StocktakingPage'));
 const StockCountView        = lazy(() => import('../features/stocktaking/pages/StockCountView'));
@@ -95,6 +96,7 @@ export const router = createRouter([
             { path: 'inventory/stocktaking/:id', element: wrap(StockCountView) },
             { path: 'audit',               element: wrap(AuditLogsPage) },
             { path: 'settings',          element: wrap(SettingsPage) },
+            { path: 'terms',             element: wrap(TermsPage) },
             { path: 'merma',              element: wrap(MermaPage) },
             { path: 'quotes',             element: wrap(QuotesPage) },
             { path: 'customers',          element: wrap(CustomersPage) },
