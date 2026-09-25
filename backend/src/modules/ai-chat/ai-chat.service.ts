@@ -89,7 +89,7 @@ export const processAiQuestion = async (question: string, userId?: string): Prom
     try {
         // ── PASO 1: La IA decide si necesita SQL o solo guía ─────────────────
         const completion = await groq.chat.completions.create({
-            model: 'qwen/qwen3.8-27b',
+            model: 'openai/gpt-oss-20b',
             messages: [
                 { role: 'system', content: SYSTEM_PROMPT },
                 { role: 'user', content: question },
@@ -134,7 +134,7 @@ export const processAiQuestion = async (question: string, userId?: string): Prom
 
         // ── PASO 3: Formatear respuesta natural ──────────────────────────────
         const formatCompletion = await groq.chat.completions.create({
-            model: 'qwen/qwen3.8-27b',
+            model: 'openai/gpt-oss-20b',
             messages: [
                 { role: 'system', content: buildFormatPrompt(question, data) },
                 { role: 'user', content: 'Dame la respuesta.' },
@@ -202,7 +202,7 @@ export const analyzeUploadedFile = async (fileBuffer: Buffer, filename: string, 
             : `Archivo "${filename}" con ${data.length} registros. Analizalo y dame un resumen.\nColumnas: ${headers.join(', ')}\nDatos: ${JSON.stringify(data.slice(0, 15))}`;
 
         const completion = await groq.chat.completions.create({
-            model: 'qwen/qwen3.8-27b',
+            model: 'openai/gpt-oss-20b',
             messages: [
                 { role: 'system', content: 'Sos un analista de datos experto. Analizá archivos del usuario y respondé en español con datos clave, tendencias y totales. Sé conciso.' },
                 { role: 'user', content: userPrompt },
