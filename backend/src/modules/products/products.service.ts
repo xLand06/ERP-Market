@@ -494,7 +494,11 @@ export const updateProduct = async (id: string, data: UpdateProductInput): Promi
 };
 
 export const deleteProduct = async (id: string): Promise<void> => {
-    await prisma.product.delete({ where: { id } });
+    // Soft delete: desactivar en vez de eliminar (evita FK constraint de branch_inventory)
+    await prisma.product.update({
+        where: { id },
+        data: { isActive: false },
+    });
 };
 
 // =========================================================================
