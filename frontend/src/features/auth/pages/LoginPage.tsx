@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Eye, EyeOff, Lock, User, Loader2, Cloud, CloudOff, RefreshCw, Smartphone, Monitor, Download, QrCode, Camera, Shield, AlertTriangle, ArrowRight, Zap, BarChart3, ShoppingCart } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useLoginForm, useLogin } from '@/features/auth/hooks';
-import { useConfigStore } from '@/hooks/useConfigStore';
 import { AppStorage } from '@/services/app-storage';
 import { MathCaptcha, getLoginRateLimit, recordLoginAttempt, resetLoginAttempts, getShowCaptcha } from '@/components/auth/MathCaptcha';
 import { AnimatedMeshBg } from '@/components/ui/AnimatedMeshBg';
@@ -15,7 +14,6 @@ const isCapacitor = !!(window as any).Capacitor;
 const DESKTOP_WINDOWS_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Setup-Windows.exe';
 const DESKTOP_LINUX_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Linux.AppImage';
 
-// ── Ecosistema ALLCODE ────────────────────────────────────────────────────
 const ECOSYSTEM = [
     { name: 'ALL MARKET', desc: 'ERP para bodegas y supermercados', icon: ShoppingCart, color: 'from-emerald-500 to-emerald-700', active: true },
     { name: 'ALL REPAIR', desc: 'Gestión para talleres y reparaciones', icon: Zap, color: 'from-amber-500 to-orange-600', active: false },
@@ -27,8 +25,6 @@ export default function LoginPage() {
     const { form, errors, validate, updateField } = useLoginForm();
     const { login, loading, parseError } = useLogin();
     const [generalError, setGeneralError] = useState<string>('');
-    const activeTheme = useConfigStore((s) => s.activeTheme);
-    const isDark = activeTheme === 'dark';
 
     const [captchaValid, setCaptchaValid] = useState(false);
     const [captchaKey, setCaptchaKey] = useState(0);
@@ -137,25 +133,23 @@ export default function LoginPage() {
         <>
         <AnimatedMeshBg />
 
-        <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
-            <div className="w-full max-w-5xl flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
+        <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 relative z-10">
+            <div className="w-full max-w-5xl flex flex-col lg:flex-row items-center gap-6 lg:gap-16">
 
-                {/* ── Left: Branding ──────────────────────────────────────── */}
-                <div className="flex-1 text-center lg:text-left space-y-8 lg:max-w-lg">
-                    {/* Logo */}
+                {/* ── Left: Branding (hidden on mobile) ────────────────────── */}
+                <div className="hidden lg:flex flex-1 text-left space-y-8 lg:max-w-lg">
                     <div className="animate-fadeInUp">
-                        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center mx-auto lg:mx-0 mb-6 shadow-2xl shadow-emerald-500/30 animate-pulseGlow">
+                        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center mb-6 shadow-2xl shadow-emerald-500/30 animate-pulseGlow">
                             <span className="text-3xl font-black text-white tracking-tight">AM</span>
                         </div>
                         <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight">
                             ALL <span className="text-emerald-400">MARKET</span>
                         </h1>
-                        <p className="text-slate-400 text-sm sm:text-base mt-3 max-w-md mx-auto lg:mx-0 leading-relaxed">
+                        <p className="text-slate-400 text-sm sm:text-base mt-3 max-w-md leading-relaxed">
                             Sistema de gestión inteligente para bodegas, supermercados y negocios de retail en Latinoamérica.
                         </p>
                     </div>
 
-                    {/* Ecosystem cards */}
                     <div className="space-y-3 animate-fadeInUp delay-200">
                         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Ecosistema ALLCODE</p>
                         {ECOSYSTEM.map((p) => (
@@ -173,24 +167,34 @@ export default function LoginPage() {
                     </div>
                 </div>
 
+                {/* ── Mobile: Mini logo ────────────────────────────────────── */}
+                <div className="lg:hidden text-center mb-2 animate-fadeInUp">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center mx-auto mb-3 shadow-xl shadow-emerald-500/30">
+                        <span className="text-xl font-black text-white">AM</span>
+                    </div>
+                    <h1 className="text-2xl font-black text-white tracking-tight">
+                        ALL <span className="text-emerald-400">MARKET</span>
+                    </h1>
+                </div>
+
                 {/* ── Right: Login Form ───────────────────────────────────── */}
                 <div className="w-full max-w-md animate-fadeInUp delay-100">
-                    <div className="glass-strong rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/20">
+                    <div className="glass-strong rounded-3xl p-5 sm:p-8 shadow-2xl shadow-black/20">
                         {/* Header */}
-                        <div className="mb-8">
-                            <h2 className="text-xl font-black text-white">Iniciar sesión</h2>
-                            <p className="text-sm text-slate-400 mt-1">Accedé a tu panel de gestión</p>
+                        <div className="mb-6 sm:mb-8">
+                            <h2 className="text-lg sm:text-xl font-black text-white">Iniciar sesión</h2>
+                            <p className="text-xs sm:text-sm text-slate-400 mt-1">Accedé a tu panel de gestión</p>
                         </div>
 
                         {/* Error */}
                         {(generalError || rateState.blocked) && (
-                            <div className="mb-5 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-center gap-2 animate-slideDown">
+                            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs sm:text-sm flex items-center gap-2 animate-slideDown">
                                 <AlertTriangle className="w-4 h-4 shrink-0" />
                                 {rateState.blocked ? `Bloqueado ${Math.ceil(rateState.remainingMs / 1000)}s` : generalError}
                             </div>
                         )}
 
-                        <form onSubmit={handleSubmit} className="space-y-5">
+                        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
                             {/* Username */}
                             <div className="animate-fadeInUp delay-200">
                                 <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Usuario</label>
@@ -201,7 +205,7 @@ export default function LoginPage() {
                                         placeholder="admin o V-12345678"
                                         value={form.username} onChange={(e) => updateField('username', e.target.value)}
                                         disabled={rateState.blocked}
-                                        className={`pl-10 h-12 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-emerald-500/50 focus:ring-emerald-500/20 focus:bg-white/[0.08] transition-all ${errors.username ? 'border-red-500/50' : ''}`}
+                                        className={`pl-10 h-12 sm:h-12 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-emerald-500/50 focus:ring-emerald-500/20 focus:bg-white/[0.08] transition-all text-sm sm:text-base ${errors.username ? 'border-red-500/50' : ''}`}
                                     />
                                 </div>
                                 {errors.username && <p className="text-red-400 text-xs mt-1.5">{errors.username}</p>}
@@ -217,9 +221,9 @@ export default function LoginPage() {
                                         placeholder="Tu contraseña"
                                         value={form.password} onChange={(e) => updateField('password', e.target.value)}
                                         disabled={rateState.blocked}
-                                        className={`pl-10 pr-10 h-12 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-emerald-500/50 focus:ring-emerald-500/20 focus:bg-white/[0.08] transition-all ${errors.password ? 'border-red-500/50' : ''}`}
+                                        className={`pl-10 pr-10 h-12 sm:h-12 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-emerald-500/50 focus:ring-emerald-500/20 focus:bg-white/[0.08] transition-all text-sm sm:text-base ${errors.password ? 'border-red-500/50' : ''}`}
                                     />
-                                    <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-all">
+                                    <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-all">
                                         {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                     </button>
                                 </div>
@@ -237,7 +241,7 @@ export default function LoginPage() {
                             <button
                                 type="submit"
                                 disabled={loading || rateState.blocked || (showCaptcha && !captchaValid)}
-                                className="w-full h-12 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-sm shadow-lg shadow-emerald-500/25 transition-all duration-300 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
+                                className="w-full h-12 sm:h-13 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-sm shadow-lg shadow-emerald-500/25 transition-all duration-300 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
                             >
                                 {loading ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -264,10 +268,10 @@ export default function LoginPage() {
                         </form>
                     </div>
 
-                    {/* Sync + Connect */}
-                    <div className="mt-4 space-y-3 animate-fadeInUp delay-400">
+                    {/* Sync + Connect — simplified on mobile */}
+                    <div className="mt-3 sm:mt-4 space-y-2 sm:space-y-3 animate-fadeInUp delay-400">
                         {/* Sync */}
-                        <div className="glass rounded-2xl px-4 py-3 flex items-center justify-between">
+                        <div className="glass rounded-2xl px-4 py-2.5 sm:py-3 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 {cloudOnline === null ? <Loader2 className="w-3 h-3 animate-spin text-slate-500" /> : cloudOnline ? <Cloud className="w-3 h-3 text-emerald-400" /> : <CloudOff className="w-3 h-3 text-amber-400" />}
                                 <span className={`text-[11px] font-medium ${cloudOnline === null ? 'text-slate-500' : cloudOnline ? 'text-emerald-400' : 'text-amber-400'}`}>
@@ -281,7 +285,7 @@ export default function LoginPage() {
                         </div>
 
                         {/* Connect + QR */}
-                        <div className="glass rounded-2xl p-4 space-y-3">
+                        <div className="glass rounded-2xl p-3 sm:p-4 space-y-2.5">
                             <button onClick={connectDesktop} className="w-full h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md shadow-emerald-600/20">
                                 <Monitor className="w-3.5 h-3.5" /> Conectar app de escritorio
                             </button>
@@ -292,14 +296,14 @@ export default function LoginPage() {
 
                             {showQr && qrDataUrl && (
                                 <div className="flex flex-col items-center gap-2 p-4 bg-white/5 rounded-xl border border-white/10 animate-slideDown">
-                                    <img src={qrDataUrl} alt="QR" className="w-40 h-40 rounded-xl" />
+                                    <img src={qrDataUrl} alt="QR" className="w-36 h-36 sm:w-40 sm:h-40 rounded-xl" />
                                     <p className="text-[10px] text-slate-500 text-center">Escaneá con la APK para conectarte</p>
                                 </div>
                             )}
 
                             <div className="flex gap-2">
                                 {[{ href: DESKTOP_WINDOWS_URL, label: 'Win', icon: Download }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download }, { href: '/apk/app.apk', label: 'APK', icon: Smartphone }].map(d => (
-                                    <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')} className="flex-1 flex items-center justify-center gap-1 text-[10px] font-semibold text-slate-500 hover:text-emerald-400 border border-white/5 hover:border-emerald-500/30 rounded-lg py-2 transition-all">
+                                    <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')} className="flex-1 flex items-center justify-center gap-1 text-[10px] font-semibold text-slate-500 hover:text-emerald-400 border border-white/5 hover:border-emerald-500/30 rounded-lg py-2.5 transition-all">
                                         <d.icon className="w-3 h-3" /> {d.label}
                                     </a>
                                 ))}
