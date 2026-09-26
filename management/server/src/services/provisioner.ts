@@ -7,7 +7,7 @@ import { createAuditEntry } from '../modules/audit/audit.service';
 import { sendWelcomeEmail } from './notifications';
 
 // ── Cliente Docker ───────────────────────────────────────────────────────────
-const docker = new Dockerode({ socketPath: env.DOCKER_SOCKET });
+export const docker = new Dockerode({ socketPath: env.DOCKER_SOCKET });
 
 // ── Constantes ───────────────────────────────────────────────────────────────
 const NETWORK_NAME = 'erp_proxy';
@@ -712,11 +712,20 @@ export async function deleteTenant(slug: string, options?: { skipArchive?: boole
     console.log(`[provisioner] Eliminando tenant: ${slug}`);
 
     // Resguardo preventivo en Cold Storage antes de destruir el volumen
+    // CRÍTICO: si el backup falla, NO eliminar (evitar pérdida permanente)
     if (!options?.skipArchive) {
+        let archiveOk = false;
         try {
-            await createColdArchiveSnapshot(slug);
+            const snapshot = await createColdArchiveSnapshot(slug);
+            archiveOk = snapshot !== null && snapshot !== undefined;
         } catch (e) {
-            console.warn(`[provisioner] Advertencia al generar snapshot frío previo a borrar ${slug}:`, e);
+            console.error(`[provisioner] ERROR: No se pudo crear snapshot de ${slug}. Abortando eliminación:`, e);
+        }
+        if (!archiveOk) {
+            throw new Error(
+                `No se puede eliminar ${slug}: falló el Cold Archive Snapshot. ` +
+                `Verificá que Docker CLI y la BD estén accesibles, o usá skipArchive si es intencional.`
+            );
         }
     }
 
@@ -734,12 +743,15 @@ export async function deleteTenant(slug: string, options?: { skipArchive?: boole
         }
     }
 
-    // Eliminar volumen
-    try {
-        await docker.getVolume(`erp-db-${slug}`).remove();
-        console.log(`[provisioner] Volumen erp-db-${slug} eliminado`);
-    } catch {
-        // No existia
+    // Eliminar volumen — CRÍTICO: el nombre real es <slug>_erp-db-<slug> (project name = slug)
+    const volumeNames = [`erp-db-${slug}`, `${slug}_erp-db-${slug}`];
+    for (const volName of volumeNames) {
+        try {
+            await docker.getVolume(volName).remove();
+            console.log(`[provisioner] Volumen ${volName} eliminado`);
+        } catch {
+            // No existia con este nombre
+        }
     }
 
     // Eliminar directorio del cliente
