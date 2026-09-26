@@ -135,15 +135,15 @@ export default function LoginPage() {
 
         {/* ── Desktop: split layout ─────────────────────────────────────── */}
         <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 relative z-10">
-            <div className="w-full max-w-5xl flex flex-col lg:flex-row items-center gap-6 lg:gap-16">
+            <div className="w-full max-w-6xl flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
 
                 {/* Left: Branding (desktop only) */}
-                <div className="hidden lg:flex flex-1 text-left space-y-8 lg:max-w-lg">
+                <div className="hidden lg:flex flex-1 flex-col justify-center space-y-8 max-w-md">
                     <div className="animate-fadeInUp">
                         <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center mb-6 shadow-2xl shadow-emerald-500/30">
                             <span className="text-3xl font-black text-white tracking-tight">AM</span>
                         </div>
-                        <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight">
+                        <h1 className="text-4xl xl:text-5xl font-black text-white tracking-tight leading-tight">
                             ALL <span className="text-emerald-400">MARKET</span>
                         </h1>
                         <p className="text-slate-400 text-sm sm:text-base mt-3 max-w-md leading-relaxed">
@@ -169,7 +169,7 @@ export default function LoginPage() {
                 </div>
 
                 {/* ── Center: Form ────────────────────────────────────────── */}
-                <div className="w-full max-w-md">
+                <div className="w-full max-w-lg lg:max-w-md">
                     {/* Mobile: minimal logo */}
                     <div className="lg:hidden text-center mb-6">
                         <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center mx-auto mb-3 shadow-xl shadow-emerald-500/30">
@@ -181,7 +181,7 @@ export default function LoginPage() {
                         <p className="text-sm text-slate-400 mt-1">Iniciá sesión para continuar</p>
                     </div>
 
-                    <div className="glass-strong rounded-3xl p-5 sm:p-7 shadow-2xl shadow-black/20">
+                    <div className="glass-strong rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/20">
                         {/* Error */}
                         {(generalError || rateState.blocked) && (
                             <div className="mb-4 p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-center gap-2 animate-slideDown">
@@ -266,7 +266,7 @@ export default function LoginPage() {
                 </div>
 
                 {/* ── Right: Connect + Sync (desktop only) ────────────────── */}
-                <div className="hidden lg:block w-full max-w-xs space-y-3 animate-fadeInUp delay-300">
+                <div className="hidden lg:flex flex-col w-full max-w-xs space-y-3 animate-fadeInUp delay-300">
                     {/* Sync */}
                     <div className="glass rounded-2xl px-4 py-3.5 flex items-center justify-between">
                         <div className="flex items-center gap-2">
