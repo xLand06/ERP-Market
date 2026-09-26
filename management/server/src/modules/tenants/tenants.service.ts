@@ -255,7 +255,9 @@ export async function suspendTenant(slug: string) {
     await dockerSuspend(slug);
     return prisma.tenant.update({
         where: { slug },
-        data: { status: 'SUSPENDED' },
+        // FIX #9: reloj de custodia estable (dockerSuspend ya lo fija; se reafirma
+        // aquí para que esta ruta quede explícita si se reordena el flujo)
+        data: { status: 'SUSPENDED', suspendedAt: new Date() },
     });
 }
 

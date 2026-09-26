@@ -30,6 +30,10 @@ model Tenant {
     domain        String       @unique
     url           String
     status        TenantStatus @default(ACTIVE)
+    // Momento exacto en que el tenant paso a SUSPENDED.
+    // NO se usa updatedAt: las notificaciones/avisos escriben sobre el tenant
+    // y lo renuevan cada ciclo, lo que reiniciaba el reloj de custodia (45 dias).
+    suspendedAt   DateTime?
     plan          String       @default("free")
     billingCycle  String       @default("MONTHLY")  // MONTHLY | ANNUAL
     product       String       @default("market")   // ALL MARKET, ALL REPAIR, ...

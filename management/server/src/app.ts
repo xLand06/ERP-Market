@@ -13,7 +13,7 @@ import { startHealthCron, startAuditRetention } from './services/health-cron';
 import { startPaymentCron } from './services/payment-cron';
 import { getVpsStats, pruneDockerSystem } from './services/vps-stats';
 import { createAuditEntry } from './modules/audit/audit.service';
-import { ensureNetwork } from './services/provisioner';
+import { ensureNetwork, recoverStaleProvisioning } from './services/provisioner';
 import billingRoutes from './modules/billing/billing.routes';
 import trialsRoutes from './modules/trials/trials.routes';
 import publicCatalogRoutes from './modules/public-catalog/public-catalog.routes';
@@ -239,6 +239,10 @@ app.listen(env.PORT, async () => {
     } catch (err) {
         console.error('[mgmt-server] Error asegurando red erp_proxy:', err);
     }
+
+    // FIX #5: recuperar tenants quedados en PROVISIONING por un reinicio a mitad
+    // de alta y visibilizar los que quedaron en ERROR (sin auto-retry en loop).
+    await recoverStaleProvisioning();
 
     // Iniciar crons solo en producción o desarrollo (no en tests)
     startHealthCron();

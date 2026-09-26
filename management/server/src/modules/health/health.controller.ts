@@ -49,14 +49,18 @@ export async function triggerCheckHandler(_req: Request, res: Response): Promise
             await healthService.recordHealthCheck(result);
             results.push(result);
 
-            // Auto-suspend después de 3 fallos consecutivos
-            if (await healthService.shouldAutoSuspend(tenant.tenantId)) {
+            // Auto-suspend después de 3 fallos consecutivos.
+            // FIX #8: el updatedAt del tenant hace de corte — no se contabilizan
+            // checks anteriores al último cambio de estado (evita re-suspender
+            // apenas reanudado).
+            if (await healthService.shouldAutoSuspend(tenant.tenantId, tenant.updatedAt)) {
                 const { prisma } = await import('../../config/prisma');
                 const { createAuditEntry } = await import('../audit/audit.service');
 
                 await prisma.tenant.update({
                     where: { id: tenant.tenantId },
-                    data: { status: 'SUSPENDED' },
+                    // FIX #9: timestamp estable de custodia (updatedAt cambia con notificaciones)
+                    data: { status: 'SUSPENDED', suspendedAt: new Date() },
                 });
 
                 await createAuditEntry({

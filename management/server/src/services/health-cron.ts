@@ -79,10 +79,15 @@ export async function runHealthCheckCycle(): Promise<{
                     continue;
                 }
 
-                if (await shouldAutoSuspend(r.id)) {
+                // FIX #8: se pasa el updatedAt del tenant como corte de cooldown —
+                // solo se miran health checks posteriores al último cambio de estado,
+                // así los registros fallidos previos a un resume no re-suspenden.
+                if (await shouldAutoSuspend(r.id, r.updatedAt)) {
                     await prisma.tenant.update({
                         where: { id: r.id },
-                        data: { status: 'SUSPENDED' },
+                        // FIX #9: `suspendedAt` deja un timestamp estable de custodia;
+                        // updatedAt se renueva con cada notificación y reiniciaba el reloj.
+                        data: { status: 'SUSPENDED', suspendedAt: new Date() },
                     });
 
                     // Detener contenedores para ahorrar recursos
