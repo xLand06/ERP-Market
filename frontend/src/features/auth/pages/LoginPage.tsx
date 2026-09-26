@@ -133,13 +133,14 @@ export default function LoginPage() {
         <>
         <AnimatedMeshBg />
 
+        {/* ── Desktop: split layout ─────────────────────────────────────── */}
         <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 relative z-10">
             <div className="w-full max-w-5xl flex flex-col lg:flex-row items-center gap-6 lg:gap-16">
 
-                {/* ── Left: Branding (hidden on mobile) ────────────────────── */}
+                {/* Left: Branding (desktop only) */}
                 <div className="hidden lg:flex flex-1 text-left space-y-8 lg:max-w-lg">
                     <div className="animate-fadeInUp">
-                        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center mb-6 shadow-2xl shadow-emerald-500/30 animate-pulseGlow">
+                        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center mb-6 shadow-2xl shadow-emerald-500/30">
                             <span className="text-3xl font-black text-white tracking-tight">AM</span>
                         </div>
                         <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight">
@@ -150,7 +151,7 @@ export default function LoginPage() {
                         </p>
                     </div>
 
-                    <div className="space-y-3 animate-fadeInUp delay-200">
+                    <div className="space-y-3">
                         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Ecosistema ALLCODE</p>
                         {ECOSYSTEM.map((p) => (
                             <div key={p.name} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${p.active ? 'glass-strong ring-1 ring-emerald-500/30' : 'glass opacity-50'}`}>
@@ -167,67 +168,62 @@ export default function LoginPage() {
                     </div>
                 </div>
 
-                {/* ── Mobile: Mini logo ────────────────────────────────────── */}
-                <div className="lg:hidden text-center mb-2 animate-fadeInUp">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center mx-auto mb-3 shadow-xl shadow-emerald-500/30">
-                        <span className="text-xl font-black text-white">AM</span>
-                    </div>
-                    <h1 className="text-2xl font-black text-white tracking-tight">
-                        ALL <span className="text-emerald-400">MARKET</span>
-                    </h1>
-                </div>
-
-                {/* ── Right: Login Form ───────────────────────────────────── */}
-                <div className="w-full max-w-md animate-fadeInUp delay-100">
-                    <div className="glass-strong rounded-3xl p-5 sm:p-8 shadow-2xl shadow-black/20">
-                        {/* Header */}
-                        <div className="mb-6 sm:mb-8">
-                            <h2 className="text-lg sm:text-xl font-black text-white">Iniciar sesión</h2>
-                            <p className="text-xs sm:text-sm text-slate-400 mt-1">Accedé a tu panel de gestión</p>
+                {/* ── Center: Form ────────────────────────────────────────── */}
+                <div className="w-full max-w-md">
+                    {/* Mobile: minimal logo */}
+                    <div className="lg:hidden text-center mb-6">
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center mx-auto mb-3 shadow-xl shadow-emerald-500/30">
+                            <span className="text-2xl font-black text-white">AM</span>
                         </div>
+                        <h1 className="text-3xl font-black text-white tracking-tight">
+                            ALL <span className="text-emerald-400">MARKET</span>
+                        </h1>
+                        <p className="text-sm text-slate-400 mt-1">Iniciá sesión para continuar</p>
+                    </div>
 
+                    <div className="glass-strong rounded-3xl p-5 sm:p-7 shadow-2xl shadow-black/20">
                         {/* Error */}
                         {(generalError || rateState.blocked) && (
-                            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs sm:text-sm flex items-center gap-2 animate-slideDown">
+                            <div className="mb-4 p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-center gap-2 animate-slideDown">
                                 <AlertTriangle className="w-4 h-4 shrink-0" />
                                 {rateState.blocked ? `Bloqueado ${Math.ceil(rateState.remainingMs / 1000)}s` : generalError}
                             </div>
                         )}
 
-                        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
+                        <form onSubmit={handleSubmit} className="space-y-5">
                             {/* Username */}
-                            <div className="animate-fadeInUp delay-200">
-                                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Usuario</label>
+                            <div>
+                                <label htmlFor="username" className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2.5 block">Usuario</label>
                                 <div className="relative group">
-                                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-emerald-400 transition-colors" />
+                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-500 group-focus-within:text-emerald-400 transition-colors" />
                                     <Input
                                         id="username" type="text" autoFocus autoComplete="username"
                                         placeholder="admin o V-12345678"
                                         value={form.username} onChange={(e) => updateField('username', e.target.value)}
                                         disabled={rateState.blocked}
-                                        className={`pl-10 h-12 sm:h-12 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-emerald-500/50 focus:ring-emerald-500/20 focus:bg-white/[0.08] transition-all text-sm sm:text-base ${errors.username ? 'border-red-500/50' : ''}`}
+                                        className={`pl-11 h-13 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-emerald-500/50 focus:ring-emerald-500/20 focus:bg-white/[0.08] transition-all text-base ${errors.username ? 'border-red-500/50' : ''}`}
                                     />
                                 </div>
-                                {errors.username && <p className="text-red-400 text-xs mt-1.5">{errors.username}</p>}
+                                {errors.username && <p className="text-red-400 text-xs mt-2">{errors.username}</p>}
                             </div>
 
                             {/* Password */}
-                            <div className="animate-fadeInUp delay-300">
-                                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Contraseña</label>
+                            <div>
+                                <label htmlFor="password" className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2.5 block">Contraseña</label>
                                 <div className="relative group">
-                                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-emerald-400 transition-colors" />
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-500 group-focus-within:text-emerald-400 transition-colors" />
                                     <Input
                                         id="password" type={showPw ? 'text' : 'password'} autoComplete="current-password"
                                         placeholder="Tu contraseña"
                                         value={form.password} onChange={(e) => updateField('password', e.target.value)}
                                         disabled={rateState.blocked}
-                                        className={`pl-10 pr-10 h-12 sm:h-12 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-emerald-500/50 focus:ring-emerald-500/20 focus:bg-white/[0.08] transition-all text-sm sm:text-base ${errors.password ? 'border-red-500/50' : ''}`}
+                                        className={`pl-11 pr-12 h-13 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-emerald-500/50 focus:ring-emerald-500/20 focus:bg-white/[0.08] transition-all text-base ${errors.password ? 'border-red-500/50' : ''}`}
                                     />
-                                    <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-all">
-                                        {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    <button type="button" onClick={() => setShowPw(!showPw)} aria-label="Mostrar contraseña" className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-all">
+                                        {showPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                                     </button>
                                 </div>
-                                {errors.password && <p className="text-red-400 text-xs mt-1.5">{errors.password}</p>}
+                                {errors.password && <p className="text-red-400 text-xs mt-2">{errors.password}</p>}
                             </div>
 
                             {/* CAPTCHA */}
@@ -241,78 +237,123 @@ export default function LoginPage() {
                             <button
                                 type="submit"
                                 disabled={loading || rateState.blocked || (showCaptcha && !captchaValid)}
-                                className="w-full h-12 sm:h-13 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-sm shadow-lg shadow-emerald-500/25 transition-all duration-300 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
+                                className="w-full h-14 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-base shadow-lg shadow-emerald-500/25 transition-all duration-300 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 group"
                             >
                                 {loading ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <Loader2 className="w-5 h-5 animate-spin" />
                                 ) : (
                                     <>
-                                        <Shield className="w-4 h-4" />
+                                        <Shield className="w-5 h-5" />
                                         Ingresar
-                                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                        <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                                     </>
                                 )}
                             </button>
 
                             {/* Attempts indicator */}
                             {rateState.attempts > 0 && !rateState.blocked && (
-                                <p className="text-center text-[10px] text-amber-500/80">{rateState.attempts}/5 intentos — {rateState.attempts >= 3 ? 'CAPTCHA activado' : 'CAPTCHA después de 3'}</p>
+                                <p className="text-center text-xs text-amber-500/80">{rateState.attempts}/5 intentos — {rateState.attempts >= 3 ? 'CAPTCHA activado' : 'CAPTCHA después de 3'}</p>
                             )}
 
-                            {/* QR Scanner — APK */}
+                            {/* QR Scanner — APK only */}
                             {isCapacitor && (
-                                <button type="button" onClick={() => setScannerOpen(true)} className="w-full h-11 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-500/20 transition-all active:scale-95">
+                                <button type="button" onClick={() => setScannerOpen(true)} className="w-full h-12 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-500/20 transition-all active:scale-95">
                                     <Camera className="w-4 h-4" /> Escanear QR
                                 </button>
                             )}
                         </form>
                     </div>
+                </div>
 
-                    {/* Sync + Connect — simplified on mobile */}
-                    <div className="mt-3 sm:mt-4 space-y-2 sm:space-y-3 animate-fadeInUp delay-400">
-                        {/* Sync */}
-                        <div className="glass rounded-2xl px-4 py-2.5 sm:py-3 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                {cloudOnline === null ? <Loader2 className="w-3 h-3 animate-spin text-slate-500" /> : cloudOnline ? <Cloud className="w-3 h-3 text-emerald-400" /> : <CloudOff className="w-3 h-3 text-amber-400" />}
-                                <span className={`text-[11px] font-medium ${cloudOnline === null ? 'text-slate-500' : cloudOnline ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                    {cloudOnline === null ? 'Verificando...' : cloudOnline ? 'Conectado' : 'Sin conexión'}
-                                </span>
-                            </div>
-                            <button onClick={handleSync} disabled={syncing} className="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 disabled:text-slate-600 flex items-center gap-1 transition-colors">
-                                {syncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                                {syncing ? 'Sync...' : 'Sincronizar'}
-                            </button>
+                {/* ── Right: Connect + Sync (desktop only) ────────────────── */}
+                <div className="hidden lg:block w-full max-w-xs space-y-3 animate-fadeInUp delay-300">
+                    {/* Sync */}
+                    <div className="glass rounded-2xl px-4 py-3.5 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            {cloudOnline === null ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" /> : cloudOnline ? <Cloud className="w-3.5 h-3.5 text-emerald-400" /> : <CloudOff className="w-3.5 h-3.5 text-amber-400" />}
+                            <span className={`text-xs font-semibold ${cloudOnline === null ? 'text-slate-500' : cloudOnline ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                {cloudOnline === null ? 'Verificando...' : cloudOnline ? 'Conectado' : 'Sin conexión'}
+                            </span>
                         </div>
-
-                        {/* Connect + QR */}
-                        <div className="glass rounded-2xl p-3 sm:p-4 space-y-2.5">
-                            <button onClick={connectDesktop} className="w-full h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md shadow-emerald-600/20">
-                                <Monitor className="w-3.5 h-3.5" /> Conectar app de escritorio
-                            </button>
-
-                            <button onClick={() => setShowQr(!showQr)} className="w-full h-10 rounded-xl border border-white/10 text-slate-300 text-xs font-bold flex items-center justify-center gap-2 hover:border-emerald-500/40 hover:text-emerald-400 transition-all active:scale-95">
-                                <QrCode className="w-3.5 h-3.5" /> {showQr ? 'Ocultar QR' : 'QR para conectar APK'}
-                            </button>
-
-                            {showQr && qrDataUrl && (
-                                <div className="flex flex-col items-center gap-2 p-4 bg-white/5 rounded-xl border border-white/10 animate-slideDown">
-                                    <img src={qrDataUrl} alt="QR" className="w-36 h-36 sm:w-40 sm:h-40 rounded-xl" />
-                                    <p className="text-[10px] text-slate-500 text-center">Escaneá con la APK para conectarte</p>
-                                </div>
-                            )}
-
-                            <div className="flex gap-2">
-                                {[{ href: DESKTOP_WINDOWS_URL, label: 'Win', icon: Download }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download }, { href: '/apk/app.apk', label: 'APK', icon: Smartphone }].map(d => (
-                                    <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')} className="flex-1 flex items-center justify-center gap-1 text-[10px] font-semibold text-slate-500 hover:text-emerald-400 border border-white/5 hover:border-emerald-500/30 rounded-lg py-2.5 transition-all">
-                                        <d.icon className="w-3 h-3" /> {d.label}
-                                    </a>
-                                ))}
-                            </div>
-                        </div>
-
-                        {lastSync && <p className="text-center text-[10px] text-slate-600">Última sync: {new Date(lastSync).toLocaleString('es-VE')}</p>}
-                        <p className="text-center text-[10px] text-slate-600">ALL MARKET · ALLCODE</p>
+                        <button onClick={handleSync} disabled={syncing} className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 disabled:text-slate-600 flex items-center gap-1.5 transition-colors">
+                            {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                            {syncing ? 'Sync...' : 'Sincronizar'}
+                        </button>
                     </div>
+
+                    {/* Connect */}
+                    <div className="glass rounded-2xl p-4 space-y-3">
+                        <button onClick={connectDesktop} className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md shadow-emerald-600/20">
+                            <Monitor className="w-4 h-4" /> Conectar escritorio
+                        </button>
+
+                        <button onClick={() => setShowQr(!showQr)} className="w-full h-11 rounded-xl border border-white/10 text-slate-300 text-sm font-bold flex items-center justify-center gap-2 hover:border-emerald-500/40 hover:text-emerald-400 transition-all active:scale-95">
+                            <QrCode className="w-4 h-4" /> {showQr ? 'Ocultar QR' : 'QR para APK'}
+                        </button>
+
+                        {showQr && qrDataUrl && (
+                            <div className="flex flex-col items-center gap-2 p-4 bg-white/5 rounded-xl border border-white/10 animate-slideDown">
+                                <img src={qrDataUrl} alt="QR" className="w-40 h-40 rounded-xl" />
+                                <p className="text-[10px] text-slate-500 text-center">Escaneá con la APK</p>
+                            </div>
+                        )}
+
+                        <div className="flex gap-2">
+                            {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download }, { href: '/apk/app.apk', label: 'APK', icon: Smartphone }].map(d => (
+                                <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')} className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-emerald-400 border border-white/5 hover:border-emerald-500/30 rounded-lg py-2.5 transition-all">
+                                    <d.icon className="w-3.5 h-3.5" /> {d.label}
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+
+                    {lastSync && <p className="text-center text-[10px] text-slate-600">Última sync: {new Date(lastSync).toLocaleString('es-VE')}</p>}
+                    <p className="text-center text-[10px] text-slate-600">ALL MARKET · ALLCODE</p>
+                </div>
+
+                {/* ── Mobile: compact connect bar ─────────────────────────── */}
+                <div className="lg:hidden w-full max-w-md space-y-3">
+                    {/* Sync compact */}
+                    <div className="glass rounded-2xl px-4 py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            {cloudOnline === null ? <Loader2 className="w-3 h-3 animate-spin text-slate-500" /> : cloudOnline ? <Cloud className="w-3 h-3 text-emerald-400" /> : <CloudOff className="w-3 h-3 text-amber-400" />}
+                            <span className={`text-[11px] font-semibold ${cloudOnline === null ? 'text-slate-500' : cloudOnline ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                {cloudOnline === null ? 'Verificando...' : cloudOnline ? 'Conectado' : 'Sin conexión'}
+                            </span>
+                        </div>
+                        <button onClick={handleSync} disabled={syncing} className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
+                            {syncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                            {syncing ? 'Sync...' : 'Sincronizar'}
+                        </button>
+                    </div>
+
+                    {/* Connect buttons compact */}
+                    <div className="flex gap-2">
+                        <button onClick={connectDesktop} className="flex-1 h-11 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+                            <Monitor className="w-3.5 h-3.5" /> Escritorio
+                        </button>
+                        <button onClick={() => setShowQr(!showQr)} className="flex-1 h-11 rounded-xl border border-white/10 text-slate-300 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+                            <QrCode className="w-3.5 h-3.5" /> QR
+                        </button>
+                    </div>
+
+                    {showQr && qrDataUrl && (
+                        <div className="flex flex-col items-center gap-2 p-4 bg-white/5 rounded-xl border border-white/10 animate-slideDown">
+                            <img src={qrDataUrl} alt="QR" className="w-36 h-36 rounded-xl" />
+                            <p className="text-[10px] text-slate-500 text-center">Escaneá con la APK</p>
+                        </div>
+                    )}
+
+                    {/* Downloads compact */}
+                    <div className="flex gap-2">
+                        {[{ href: DESKTOP_WINDOWS_URL, label: 'Win', icon: Download }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download }, { href: '/apk/app.apk', label: 'APK', icon: Smartphone }].map(d => (
+                            <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')} className="flex-1 flex items-center justify-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-emerald-400 border border-white/5 rounded-lg py-2.5 transition-all">
+                                <d.icon className="w-3 h-3" /> {d.label}
+                            </a>
+                        ))}
+                    </div>
+
+                    <p className="text-center text-[10px] text-slate-600">ALL MARKET · ALLCODE</p>
                 </div>
             </div>
         </div>
