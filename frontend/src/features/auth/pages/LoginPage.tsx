@@ -344,11 +344,15 @@ export default function LoginPage() {
                         </div>
                     )}
 
-                    {/* Downloads compact */}
-                    <div className="flex gap-2">
-                        {[{ href: DESKTOP_WINDOWS_URL, label: 'Win', icon: Download }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download }, { href: '/apk/app.apk', label: 'APK', icon: Smartphone }].map(d => (
-                            <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')} className="flex-1 flex items-center justify-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-emerald-400 border border-white/5 rounded-lg py-2.5 transition-all">
-                                <d.icon className="w-3 h-3" /> {d.label}
+                    {/* Downloads */}
+                    <div className="glass rounded-2xl p-3 space-y-2">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">Descargar app</p>
+                        {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/app.apk', label: 'Android APK', icon: Smartphone, color: 'text-emerald-400' }].map(d => (
+                            <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')}
+                                className="flex items-center gap-3 w-full px-4 py-3 rounded-xl border border-white/10 text-slate-300 hover:border-emerald-500/40 hover:text-white hover:bg-white/5 transition-all active:scale-95">
+                                <d.icon className={`w-5 h-5 ${d.color} shrink-0`} />
+                                <span className="text-sm font-bold">{d.label}</span>
+                                <Download className="w-4 h-4 text-slate-600 ml-auto" />
                             </a>
                         ))}
                     </div>
