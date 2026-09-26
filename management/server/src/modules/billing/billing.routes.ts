@@ -21,10 +21,17 @@ function tenantAuth(req: Request, res: Response, next: Function) {
         return;
     }
 
-    // El secret debe coincadir con el JWT secret del tenant
+    // El secret debe coincadir con el BILLING_SECRET del mgmt
     const expected = process.env.BILLING_SECRET || process.env.JWT_SECRET || 'dev-secret-change-in-production';
     if (secret !== expected) {
         res.status(401).json({ error: 'Secret inválido' });
+        return;
+    }
+
+    // CRÍTICO: validar que el slug del header coincida con el slug de la ruta
+    const paramSlug = (req.params as any)?.slug;
+    if (paramSlug && paramSlug !== slug) {
+        res.status(403).json({ error: 'Slug no autorizado' });
         return;
     }
 
