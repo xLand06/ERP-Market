@@ -22,6 +22,56 @@ const PAID_CUSTODY_PURGE_DAYS = 45; // 45 días de custodia para cuentas regular
 let cronTimer: ReturnType<typeof setInterval> | null = null;
 
 /**
+ * FIX #9 — Backfill del reloj de custodia.
+ *
+ * Los tenants suspendidos antes de existir la columna `suspendedAt` quedan con el
+ * campo en null y caerían al fallback `updatedAt` (que las notificaciones siguen
+ * renuevando, así que el bug original persistiría para ellos). Se reconstruye el
+ * momento de la suspensión desde la última entrada de auditoría de suspensión;
+ * si no hay registro, se conserva updatedAt (comportamiento previo, sin regresión).
+ */
+async function backfillSuspendedAt(): Promise<void> {
+    const pending = await prisma.tenant.findMany({
+        where: { status: 'SUSPENDED', suspendedAt: null },
+        select: { id: true, updatedAt: true },
+    });
+    if (pending.length === 0) return;
+
+    const suspensions = await prisma.auditLog.findMany({
+        where: {
+            tenantId: { in: pending.map((t) => t.id) },
+            action: {
+                in: [
+                    'TENANT_SUSPENDED',             // manual / provisioner
+                    'TENANT_AUTO_SUSPENDED',        // health-cron
+                    'TENANT_SUSPENDED_PAYMENT',     // payment-cron (regular)
+                    'TENANT_TRIAL_EXPIRED',         // payment-cron (trial)
+                ],
+            },
+        },
+        select: { tenantId: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+    });
+
+    // La entrada más reciente por tenant es la última suspensión vigente
+    const latestByTenant = new Map<string, Date>();
+    for (const a of suspensions) {
+        // AuditLog.tenantId es opcional en el esquema
+        if (a.tenantId && !latestByTenant.has(a.tenantId)) latestByTenant.set(a.tenantId, a.createdAt);
+    }
+
+    for (const t of pending) {
+        const suspendedAt = latestByTenant.get(t.id) ?? t.updatedAt;
+        await prisma.tenant.update({
+            where: { id: t.id },
+            data: { suspendedAt },
+        });
+    }
+
+    console.log(`[payment-cron] Backfill de suspendedAt completado para ${pending.length} tenant(s) suspendido(s)`);
+}
+
+/**
  * Ejecuta un ciclo de auto-suspension y garbage collection.
  */
 export async function runPaymentCronCycle(): Promise<{
@@ -32,6 +82,14 @@ export async function runPaymentCronCycle(): Promise<{
     backupsPruned: number;
 }> {
     const now = new Date();
+
+    // FIX #9: asegurar reloj de custodia antes de evaluar purgas (no-op si no hay pendientes)
+    try {
+        await backfillSuspendedAt();
+    } catch (e) {
+        console.warn('[payment-cron] No se pudo hacer backfill de suspendedAt (se continúa con el ciclo):', e);
+    }
+
     const paidCutoff = new Date(now.getTime() - PAID_GRACE_DAYS * 24 * 60 * 60 * 1000);
     const trialCutoff = new Date(now.getTime() - TRIAL_GRACE_DAYS * 24 * 60 * 60 * 1000);
     const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
@@ -75,7 +133,9 @@ export async function runPaymentCronCycle(): Promise<{
                 },
             },
             include: {
-                payments: { where: { status: 'PAID' }, take: 1 },
+                // FIX #10: mismo criterio de "no trial" que en la suspensión —
+                // cualquier pago no cancelado (incluye PENDING) da historial de pago.
+                payments: { where: { status: { in: ['PAID', 'PENDING', 'OVERDUE'] } }, take: 1 },
             },
         });
 
@@ -106,7 +166,11 @@ export async function runPaymentCronCycle(): Promise<{
         },
         include: {
             payments: {
-                where: { status: 'PAID' },
+                // FIX #10: se traen los pagos NO cancelados (PAID, PENDING, OVERDUE).
+                // Antes solo se filtraba por PAID, así que un tenant con un pago
+                // PENDING tenía payments = [] y se clasificaba como TRIAL,
+                // recibiendo la gracia de 24 h en vez de la de 7 días.
+                where: { status: { in: ['PAID', 'PENDING', 'OVERDUE'] } },
                 take: 1,
             },
         },
@@ -118,6 +182,7 @@ export async function runPaymentCronCycle(): Promise<{
     let backupsPruned = 0;
 
     for (const tenant of activeTenants) {
+        // TRIAL = sin ningún pago vigente (cancelados/failed/refunded no cuentan)
         const isTrial = tenant.payments.length === 0;
         const cutoff = isTrial ? trialCutoff : paidCutoff;
 
@@ -162,20 +227,29 @@ export async function runPaymentCronCycle(): Promise<{
     }
 
     // ── Garbage Collection: Purga definitiva post-periodo de custodia ───────
+    // FIX #9: el reloj de custodia es `suspendedAt` (fijado al suspender), no
+    // `updatedAt` — las notificaciones escriben sobre el tenant y lo renuevan en
+    // cada ciclo, reiniciando el conteo de 14/45 días indefinidamente.
+    // Los registros suspendidos antes de existir el campo caen en el fallback updatedAt.
     // 1. Trials suspendidos > 14 días sin pago
     const trialPurgeCutoff = new Date(now.getTime() - TRIAL_PURGE_DAYS * 24 * 60 * 60 * 1000);
     const abandonedTrials = await prisma.tenant.findMany({
         where: {
             status: 'SUSPENDED',
-            updatedAt: { lt: trialPurgeCutoff },
+            OR: [
+                { suspendedAt: null, updatedAt: { lt: trialPurgeCutoff } },
+                { suspendedAt: { lt: trialPurgeCutoff } },
+            ],
+            // Mismo criterio de "trial" que en la suspensión (FIX #10)
             payments: {
-                none: { status: 'PAID' },
+                none: { status: { in: ['PAID', 'PENDING', 'OVERDUE'] } },
             },
         },
-        select: { id: true, slug: true, updatedAt: true },
+        select: { id: true, slug: true, updatedAt: true, suspendedAt: true },
     });
 
     for (const abandoned of abandonedTrials) {
+        const suspendedSince = abandoned.suspendedAt ?? abandoned.updatedAt;
         try {
             console.log(`[payment-cron] Purgando trial abandonado tras ${TRIAL_PURGE_DAYS} días: ${abandoned.slug}`);
             await deleteTenant(abandoned.slug);
@@ -183,7 +257,7 @@ export async function runPaymentCronCycle(): Promise<{
                 actor: 'system',
                 action: 'TENANT_PURGED_ABANDONED_TRIAL',
                 tenantId: abandoned.id,
-                details: { slug: abandoned.slug, suspendedSince: abandoned.updatedAt.toISOString() },
+                details: { slug: abandoned.slug, suspendedSince: suspendedSince.toISOString() },
             });
             purged++;
         } catch (err) {
@@ -199,16 +273,18 @@ export async function runPaymentCronCycle(): Promise<{
         const warningTenants = await prisma.tenant.findMany({
             where: {
                 status: 'SUSPENDED',
-                updatedAt: {
-                    lt: warningCutoff,
-                    gte: paidPurgeCutoff,
-                },
-                payments: { some: { status: 'PAID' } },
+                OR: [
+                    { suspendedAt: null, updatedAt: { lt: warningCutoff, gte: paidPurgeCutoff } },
+                    { suspendedAt: { lt: warningCutoff, gte: paidPurgeCutoff } },
+                ],
+                payments: { some: { status: { in: ['PAID', 'PENDING', 'OVERDUE'] } } },
             },
+            select: { id: true, slug: true, adminEmail: true, updatedAt: true, suspendedAt: true },
         });
 
         for (const t of warningTenants) {
-            const daysSuspended = Math.floor((now.getTime() - t.updatedAt.getTime()) / (24 * 60 * 60 * 1000));
+            const suspendedSince = t.suspendedAt ?? t.updatedAt;
+            const daysSuspended = Math.floor((now.getTime() - suspendedSince.getTime()) / (24 * 60 * 60 * 1000));
             const daysLeft = Math.max(1, PAID_CUSTODY_PURGE_DAYS - daysSuspended);
             await dispatchTenantNotification({
                 type: 'PURGE_WARNING',
@@ -217,7 +293,7 @@ export async function runPaymentCronCycle(): Promise<{
                 subject: `ÚLTIMO AVISO DE CUSTODIA: Purga programada en ${daysLeft} días`,
                 message: `Tu instancia lleva ${daysSuspended} días suspendida. Quedan ${daysLeft} días de custodia antes de la eliminación definitiva. Regulariza tu cuenta o solicita tu respaldo Takeout de inmediato.`,
                 daysContext: daysLeft,
-                metadata: { suspendedSince: t.updatedAt.toISOString() },
+                metadata: { suspendedSince: suspendedSince.toISOString() },
             });
         }
     } catch (e) {
@@ -228,15 +304,19 @@ export async function runPaymentCronCycle(): Promise<{
     const abandonedPaidTenants = await prisma.tenant.findMany({
         where: {
             status: 'SUSPENDED',
-            updatedAt: { lt: paidPurgeCutoff },
+            OR: [
+                { suspendedAt: null, updatedAt: { lt: paidPurgeCutoff } },
+                { suspendedAt: { lt: paidPurgeCutoff } },
+            ],
             payments: {
-                some: { status: 'PAID' },
+                some: { status: { in: ['PAID', 'PENDING', 'OVERDUE'] } },
             },
         },
-        select: { id: true, slug: true, updatedAt: true },
+        select: { id: true, slug: true, updatedAt: true, suspendedAt: true },
     });
 
     for (const abandoned of abandonedPaidTenants) {
+        const suspendedSince = abandoned.suspendedAt ?? abandoned.updatedAt;
         try {
             console.log(`[payment-cron] Purgando cliente regular tras ${PAID_CUSTODY_PURGE_DAYS} días de custodia: ${abandoned.slug}`);
             await deleteTenant(abandoned.slug);
@@ -244,7 +324,7 @@ export async function runPaymentCronCycle(): Promise<{
                 actor: 'system',
                 action: 'TENANT_PURGED_CUSTODY_EXPIRED',
                 tenantId: abandoned.id,
-                details: { slug: abandoned.slug, suspendedSince: abandoned.updatedAt.toISOString() },
+                details: { slug: abandoned.slug, suspendedSince: suspendedSince.toISOString() },
             });
             purged++;
         } catch (err) {

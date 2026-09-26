@@ -119,9 +119,12 @@ export async function ensureNetwork(): Promise<void> {
 
 /**
  * Espera a que un contenedor este healthy.
+ * La unidad de `timeoutMs` es MILISEGUNDOS: los call sites pasan valores tipo
+ * 15000 / DB_HEALTH_TIMEOUT * 1000. Antes se interpretaba como segundos y un
+ * `waitForHealthy(db, 15000)` terminaba en un timeout de ~4.2 horas.
  */
-async function waitForHealthy(containerName: string, timeoutSec: number): Promise<boolean> {
-    const deadline = Date.now() + timeoutSec * 1000;
+async function waitForHealthy(containerName: string, timeoutMs: number): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
 
     while (Date.now() < deadline) {
         try {
@@ -143,7 +146,7 @@ async function waitForHealthy(containerName: string, timeoutSec: number): Promis
         await sleep(HEALTH_POLL_INTERVAL * 1000);
     }
 
-    console.error(`[provisioner] Timeout esperando health de ${containerName} (${timeoutSec}s)`);
+    console.error(`[provisioner] Timeout esperando health de ${containerName} (${Math.round(timeoutMs / 1000)}s)`);
     return false;
 }
 
@@ -354,7 +357,10 @@ export async function provisionWithLogs(
 ): Promise<ProvisionResult> {
     const { spawn } = await import('child_process');
 
-    const args = [slug, domain || '', adminEmail || '', adminUser || 'admin', adminPassword || ''];
+    // add-client.sh: add-client.sh <slug> [domain] [admin-email] [admin-user] [admin-password] [plan]
+    // El plan es el 6to argumento: sin el, add-client.sh cae al default y el
+    // tenant recibe un plan distinto al elegido en el formulario de alta.
+    const args = [slug, domain || '', adminEmail || '', adminUser || 'admin', adminPassword || '', plan || 'pro'];
     const scriptPath = `${DEPLOY_DIR}/scripts/add-client.sh`;
 
     sendLog(`Ejecutando add-client.sh para ${slug}...`);
@@ -430,6 +436,18 @@ export async function startProvisioningInBackground(input: ProvisionInput): Prom
     const product = input.product || 'market';
 
     // 1. Crear/actualizar el tenant con status PROVISIONING
+    // FIX #7: un upsert ciego "secuestraba" el slug de un tenant existente y lo
+    // pasaba a PROVISIONING/ACTIVE sin permiso, reviviendo cuentas suspendidas o
+    // borradas. Primero validamos el estado actual y solo upserteamos si es seguro.
+    const existing = await prisma.tenant.findUnique({ where: { slug } });
+    if (existing && (existing.status === 'SUSPENDED' || existing.status === 'DELETED')) {
+        throw new Error(
+            `No se puede reprovisionar ${slug}: el tenant existe con status ${existing.status}. ` +
+            `Reactivá la cuenta desde el panel o elegí otro slug.`
+        );
+    }
+
+    // Solo se llega acá si el tenant no existe o su status es ACTIVE / PROVISIONING / ERROR
     await prisma.tenant.upsert({
         where: { slug },
         update: {
@@ -515,6 +533,75 @@ export async function startProvisioningInBackground(input: ProvisionInput): Prom
 }
 
 /**
+ * FIX #5 — Watchdog de arranque.
+ *
+ * El estado de provisioning vive SOLO en memoria (`provisioningState`), asi que
+ * si el server se reinicia a mitad de un alta, el tenant queda con status
+ * PROVISIONING para siempre: nadie lo va a completar ni a marcar como fallido.
+ *
+ * Se ejecuta una unica vez desde app.ts al hacer listen():
+ *  - PROVISIONING con mas de 10 minutos sin actividad → se marca ERROR
+ *    (10 min de tolerancia para no pisar un alta que esta corriendo ahora).
+ *  - ERROR → solo se loguean. NO se reintenta automaticamente, porque un retry
+ *    automatico en loop puede repetir add-client.sh indefinidamente y dejar el
+ *    sistema en un ciclo de fallos.
+ */
+export async function recoverStaleProvisioning(): Promise<void> {
+    const STALE_PROVISIONING_MS = 10 * 60 * 1000; // 10 minutos
+    const cutoff = new Date(Date.now() - STALE_PROVISIONING_MS);
+
+    try {
+        // 1. PROVISIONING huérfanos (proceso reiniciado a mitad de alta)
+        const staleTenants = await prisma.tenant.findMany({
+            where: { status: 'PROVISIONING', updatedAt: { lt: cutoff } },
+            select: { id: true, slug: true, updatedAt: true },
+        });
+
+        for (const t of staleTenants) {
+            await prisma.tenant.update({
+                where: { id: t.id },
+                data: { status: 'ERROR' },
+            });
+
+            await createAuditEntry({
+                actor: 'provisioner',
+                action: 'TENANT_PROVISIONING_STALE',
+                tenantId: t.id,
+                details: {
+                    slug: t.slug,
+                    previousStatus: 'PROVISIONING',
+                    lastUpdate: t.updatedAt.toISOString(),
+                    reason: 'Provisioning huérfano detectado al reiniciar el server (>10 min sin completar)',
+                },
+            });
+
+            console.warn(
+                `[provisioner] Recover: tenant ${t.slug} estaba PROVISIONING desde ` +
+                `${t.updatedAt.toISOString()} → marcado ERROR`
+            );
+        }
+
+        // 2. ERROR → solo visibilidad, sin auto-retry (evita loops de reprovisionamiento)
+        const errorTenants = await prisma.tenant.findMany({
+            where: { status: 'ERROR' },
+            select: { slug: true, updatedAt: true },
+        });
+
+        if (staleTenants.length > 0 || errorTenants.length > 0) {
+            console.warn(
+                `[provisioner] Recover completado: ${staleTenants.length} PROVISIONING huérfanos → ERROR, ` +
+                `${errorTenants.length} tenant(s) en ERROR (requieren reprovisionamiento manual): ` +
+                `${errorTenants.map((t) => t.slug).join(', ') || '-'}`
+            );
+        } else {
+            console.log('[provisioner] Recover: sin tenants PROVISIONING huérfanos ni en ERROR');
+        }
+    } catch (err) {
+        console.error('[provisioner] Error en recoverStaleProvisioning:', err);
+    }
+}
+
+/**
  * Obtiene las ultimas lineas de log de un contenedor Docker.
  * Util para la consola de tenant detail.
  */
@@ -564,9 +651,12 @@ export async function suspendTenant(slug: string): Promise<void> {
     }
 
     // Actualizar DB
+    // FIX #9: `suspendedAt` queda fijado en el momento exacto de la suspensión.
+    // updatedAt NO sirve como reloj de custodia porque las notificaciones escriben
+    // sobre el tenant y lo renuevan en cada ciclo del cron.
     const tenant = await prisma.tenant.update({
         where: { slug },
-        data: { status: 'SUSPENDED' },
+        data: { status: 'SUSPENDED', suspendedAt: new Date() },
     });
 
     await createAuditEntry({
@@ -599,8 +689,8 @@ export async function resumeTenant(slug: string): Promise<void> {
         }
     }
 
-    // Esperar a que DB este healthy
-    const dbHealthy = await waitForHealthy(`db-${slug}`, DB_HEALTH_TIMEOUT);
+    // Esperar a que DB este healthy (DB_HEALTH_TIMEOUT esta en segundos)
+    const dbHealthy = await waitForHealthy(`db-${slug}`, DB_HEALTH_TIMEOUT * 1000);
     if (!dbHealthy) {
         console.error(`[provisioner] DB no se recupero al reanudar ${slug}`);
     }
@@ -608,7 +698,8 @@ export async function resumeTenant(slug: string): Promise<void> {
     // Actualizar DB
     const tenant = await prisma.tenant.update({
         where: { slug },
-        data: { status: 'ACTIVE' },
+        // Al reanudar se limpia `suspendedAt`; la proxima suspension lo vuelve a fijar
+        data: { status: 'ACTIVE', suspendedAt: null },
     });
 
     await createAuditEntry({
@@ -639,6 +730,7 @@ export async function createColdArchiveSnapshot(slug: string): Promise<string | 
         if (!info.State.Running) {
             await container.start();
             startedTempDb = true;
+            // waitForHealthy espera MILISEGUNDOS: 15000 = 15 segundos (antes se leía como 15000 s ≈ 4.2 h)
             await waitForHealthy(`db-${slug}`, 15000);
         }
     } catch {

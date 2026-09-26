@@ -3,6 +3,8 @@ import { inspectContainer, getContainerStats } from '../../services/docker';
 
 // Dockerode para exec en contenedores (reemplaza child_process.execSync)
 import Dockerode from 'dockerode';
+import fs from 'fs/promises';
+import path from 'path';
 import { env } from '../../config/env';
 
 const docker = new Dockerode({ socketPath: env.DOCKER_SOCKET });
@@ -33,6 +35,8 @@ export async function getLatestHealthForAll() {
             slug: true,
             domain: true,
             status: true,
+            // usado como corte de cooldown en shouldAutoSuspend (FIX #8)
+            updatedAt: true,
             healthChecks: {
                 orderBy: { checkedAt: 'desc' },
                 take: 1,
@@ -45,6 +49,7 @@ export async function getLatestHealthForAll() {
         slug: t.slug,
         domain: t.domain,
         status: t.status,
+        updatedAt: t.updatedAt,
         lastCheck: t.healthChecks[0] || null,
     }));
 }
@@ -122,6 +127,43 @@ async function execInContainer(containerName: string, cmd: string[]): Promise<nu
 }
 
 /**
+ * Credenciales de la DB de un tenant, leidas de su archivo .env generado por
+ * add-client.sh (<DEPLOY_DIR>/clients/<slug>/.env).
+ *
+ * FIX #12: antes se hardcodeaban `-U erp -d erp_market`, lo que hacia fallar el
+ * pg_isready de todo tenant cuyo DB_USER/DB_NAME difiera de esos defaults.
+ * Si el .env no existe o el valor no es un identificador seguro, se cae a los
+ * defaults históricos (o a TENANT_DB_USER / TENANT_DB_NAME de configuración).
+ */
+const SAFE_IDENTIFIER = /^[a-zA-Z0-9_-]+$/;
+const DEPLOY_DIR = process.env.DEPLOY_DIR || '/repo/deploy';
+
+async function readTenantDbCredentials(slug: string): Promise<{ user: string; database: string }> {
+    let user = process.env.TENANT_DB_USER || 'erp';
+    let database = process.env.TENANT_DB_NAME || 'erp_market';
+
+    try {
+        const content = await fs.readFile(path.join(DEPLOY_DIR, 'clients', slug, '.env'), 'utf-8');
+        for (const line of content.split('\n')) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith('#')) continue;
+            const eqIdx = trimmed.indexOf('=');
+            if (eqIdx === -1) continue;
+            const key = trimmed.slice(0, eqIdx).trim();
+            const value = trimmed.slice(eqIdx + 1).trim();
+
+            // Solo se aceptan valores seguros (nada de shelling/inyección accidental)
+            if (key === 'DB_USER' && SAFE_IDENTIFIER.test(value)) user = value;
+            if (key === 'DB_NAME' && SAFE_IDENTIFIER.test(value)) database = value;
+        }
+    } catch {
+        // Sin .env (tenant recién dado de baja o path no montado) → defaults
+    }
+
+    return { user, database };
+}
+
+/**
  * Realiza health check de un tenant específico.
  * Verifica: contenedor, API, DB, memoria.
  * Usa dockerode para todo — sin shelling out a bash.
@@ -169,8 +211,10 @@ export async function checkTenantHealth(tenantId: string, slug: string): Promise
             const dbContainer = await inspectContainer(dbName).catch(() => null);
             if (dbContainer && dbContainer.State.Running) {
                 // pg_isready via dockerode API (sin child_process)
+                // FIX #12: user/db salen del .env del tenant, no de valores hardcodeados
+                const { user, database } = await readTenantDbCredentials(slug);
                 const exitCode = await execInContainer(dbName, [
-                    'pg_isready', '-U', 'erp', '-d', 'erp_market',
+                    'pg_isready', '-U', user, '-d', database,
                 ]);
                 result.dbHealthy = exitCode === 0;
             }
@@ -202,10 +246,20 @@ export async function recordHealthCheck(result: HealthResult) {
 /**
  * Verifica si un tenant tiene 3+ health checks consecutivos fallidos.
  * Retorna true si debe ser suspendido.
+ *
+ * FIX #8: `resumeCooldown` (opcional) descarta los health checks anteriores a esa
+ * fecha. Sin este corte, después de un suspend/resume seguían contándose los
+ * registros fallidos viejos → el tenant se volvía a suspender de inmediato.
+ * El health-cron pasa el `updatedAt` del tenant (equivalente al último cambio de
+ * estado) como corte.
  */
-export async function shouldAutoSuspend(tenantId: string): Promise<boolean> {
+export async function shouldAutoSuspend(tenantId: string, resumeCooldown?: Date): Promise<boolean> {
     const recentChecks = await prisma.healthCheck.findMany({
-        where: { tenantId },
+        where: {
+            tenantId,
+            // Solo se consideran checks posteriores al resume
+            ...(resumeCooldown ? { checkedAt: { gte: resumeCooldown } } : {}),
+        },
         orderBy: { checkedAt: 'desc' },
         take: 3,
     });
