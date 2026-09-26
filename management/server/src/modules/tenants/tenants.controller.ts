@@ -238,4 +238,21 @@ export async function backupDownloadHandler(req: Request, res: Response): Promis
     }
 }
 
+/**
+ * GET /api/tenants/:slug/activity
+ * Obtiene actividad reciente de un tenant (logins, transacciones, auditoría).
+ */
+export async function activityHandler(req: Request, res: Response): Promise<void> {
+    try {
+        const data = await tenantsService.getTenantActivity(req.params.slug);
+        res.json(data);
+    } catch (error: any) {
+        if (error.message === 'Tenant no encontrado') {
+            res.status(404).json({ error: 'Tenant no encontrado' });
+            return;
+        }
+        res.status(500).json({ error: error.message || 'Error al obtener actividad' });
+    }
+}
+
 

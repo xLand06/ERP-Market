@@ -146,3 +146,18 @@ export async function confirmHandler(req: Request, res: Response): Promise<void>
         res.status(errorStatus(error)).json({ error: messageOf(error) });
     }
 }
+
+/**
+ * GET /api/payments/stats/daily
+ * Revenue de los ultimos N dias (para el mini-chart del dashboard).
+ */
+export async function dailyStatsHandler(req: Request, res: Response): Promise<void> {
+    try {
+        const days = req.query.days ? parseInt(req.query.days as string, 10) : 7;
+        const data = await paymentsService.getDailyRevenue(Math.min(days, 30));
+        res.json(data);
+    } catch (error) {
+        console.error('[payments] Error obteniendo stats diarios:', error);
+        res.status(500).json({ error: 'Error al obtener estadísticas diarias' });
+    }
+}

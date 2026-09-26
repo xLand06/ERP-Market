@@ -305,6 +305,8 @@ export default function Tenants() {
         onConfirm: () => Promise<void>;
     } | null>(null);
     const [confirmLoading, setConfirmLoading] = useState(false);
+    const [page, setPage] = useState(1);
+    const PAGE_SIZE = 15;
 
     const addToast = useCallback((message: string, type: 'success' | 'error') => {
         const id = ++toastCounter;
@@ -436,6 +438,16 @@ export default function Tenants() {
     const filtered = filter
         ? tenants.filter((t) => t.status === filter)
         : tenants.filter((t) => t.status !== 'DELETED');
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    const safePage = Math.min(page, totalPages);
+    const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+    // Reset page when filter changes
+    const handleFilterChange = useCallback((newFilter: string) => {
+        setFilter(newFilter);
+        setPage(1);
+    }, []);
 
     const healthyTenants = tenants.filter((t) => {
         const h = healthMap.get(t.slug);
@@ -655,7 +667,7 @@ export default function Tenants() {
                     ].map(({ value, label }) => (
                         <button
                             key={value}
-                            onClick={() => setFilter(value)}
+                            onClick={() => handleFilterChange(value)}
                             style={{
                                 padding: '0.4rem 0.9rem',
                                 borderRadius: 999,
@@ -718,7 +730,7 @@ export default function Tenants() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map((t) => {
+                            {paginated.map((t) => {
                                 const health = healthMap.get(t.slug);
                                 const lastCheck = health?.lastCheck ?? null;
                                 const dockerStatus = getHealthStatus(lastCheck);
@@ -928,9 +940,69 @@ export default function Tenants() {
                 </div>
             </div>
 
+            {/* Pagination */}
+            {filtered.length > PAGE_SIZE && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', marginTop: '1rem' }}>
+                    <button
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={safePage <= 1}
+                        style={{
+                            padding: '0.4rem 0.8rem',
+                            borderRadius: 8,
+                            border: '1px solid #e2e8f0',
+                            background: safePage <= 1 ? '#f8fafc' : '#fff',
+                            color: safePage <= 1 ? '#94a3b8' : '#475569',
+                            cursor: safePage <= 1 ? 'not-allowed' : 'pointer',
+                            fontSize: '0.8rem',
+                            fontWeight: 500,
+                        }}
+                    >
+                        Anterior
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                        <button
+                            key={p}
+                            onClick={() => setPage(p)}
+                            style={{
+                                padding: '0.4rem 0.65rem',
+                                borderRadius: 8,
+                                border: p === safePage ? `1px solid ${COLORS.primary}` : '1px solid #e2e8f0',
+                                background: p === safePage ? COLORS.primary : '#fff',
+                                color: p === safePage ? '#fff' : '#475569',
+                                cursor: 'pointer',
+                                fontSize: '0.8rem',
+                                fontWeight: p === safePage ? 600 : 400,
+                                minWidth: 36,
+                            }}
+                        >
+                            {p}
+                        </button>
+                    ))}
+                    <button
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={safePage >= totalPages}
+                        style={{
+                            padding: '0.4rem 0.8rem',
+                            borderRadius: 8,
+                            border: '1px solid #e2e8f0',
+                            background: safePage >= totalPages ? '#f8fafc' : '#fff',
+                            color: safePage >= totalPages ? '#94a3b8' : '#475569',
+                            cursor: safePage >= totalPages ? 'not-allowed' : 'pointer',
+                            fontSize: '0.8rem',
+                            fontWeight: 500,
+                        }}
+                    >
+                        Siguiente
+                    </button>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginLeft: '0.5rem' }}>
+                        {filtered.length} tenant(s)
+                    </span>
+                </div>
+            )}
+
             {/* ── Cards mobile ──────────────────────────────────────────────── */}
             <div className="tenant-mobile-cards" style={{ display: 'none', flexDirection: 'column', gap: '0.75rem' }}>
-                {filtered.map((t) => {
+                {paginated.map((t) => {
                     const health = healthMap.get(t.slug);
                     const lastCheck = health?.lastCheck ?? null;
                     const dockerStatus = getHealthStatus(lastCheck);
@@ -1092,6 +1164,13 @@ export default function Tenants() {
                         <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
                             {filter ? `No hay tenants con estado "${filter}"` : 'Crea tu primer tenant para comenzar'}
                         </div>
+                    </div>
+                )}
+                {filtered.length > PAGE_SIZE && (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}>
+                        <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1} style={{ padding: '0.4rem 0.8rem', borderRadius: 8, border: '1px solid #e2e8f0', background: safePage <= 1 ? '#f8fafc' : '#fff', color: safePage <= 1 ? '#94a3b8' : '#475569', cursor: safePage <= 1 ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontWeight: 500 }}>Anterior</button>
+                        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{safePage} / {totalPages}</span>
+                        <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages} style={{ padding: '0.4rem 0.8rem', borderRadius: 8, border: '1px solid #e2e8f0', background: safePage >= totalPages ? '#f8fafc' : '#fff', color: safePage >= totalPages ? '#94a3b8' : '#475569', cursor: safePage >= totalPages ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontWeight: 500 }}>Siguiente</button>
                     </div>
                 )}
             </div>

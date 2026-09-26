@@ -9,6 +9,7 @@ import {
     createHandler,
     updateHandler,
     confirmHandler,
+    dailyStatsHandler,
 } from './payments.controller';
 
 const router = Router();
@@ -52,6 +53,9 @@ const querySchema = z.object({
     provider: z.string().optional(),
     overdueDays: z.coerce.number().int().positive().max(365).optional(),
 }).passthrough();
+
+// GET /api/payments/stats/daily — revenue de los ultimos N dias (va antes de /stats)
+router.get('/stats/daily', dailyStatsHandler);
 
 // GET /api/payments/stats — va ANTES de /:id para evitar conflicto
 router.get('/stats', statsHandler);

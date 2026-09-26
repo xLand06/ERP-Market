@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import StatsCard from '../components/StatsCard';
 import HealthBadge from '../components/HealthBadge';
 import { apiFetch } from '../api';
+import { COLORS } from '../lib/design-tokens';
 
 /* ── Estilos inyectados ─────────────────────────────────────────────────── */
 
@@ -85,6 +86,22 @@ interface VpsStats {
     uptime: string;
 }
 
+interface DailyRevenue {
+    date: string;
+    revenueCents: number;
+    count: number;
+}
+
+interface AuditLogEntry {
+    id: string;
+    actor: string;
+    action: string;
+    tenantId: string | null;
+    details: any;
+    createdAt: string;
+    tenant?: { slug: string } | null;
+}
+
 const STATUS_PALETTE: Record<string, { bg: string; text: string; dot: string }> = {
     ACTIVE: { bg: '#ecfdf5', text: '#065f46', dot: '#059669' },
     PROVISIONING: { bg: '#eff6ff', text: '#1e40af', dot: '#2563eb' },
@@ -139,6 +156,8 @@ export default function Dashboard() {
     const [showPruneModal, setShowPruneModal] = useState(false);
     const [pruneLoading, setPruneLoading] = useState(false);
     const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const [dailyRevenue, setDailyRevenue] = useState<DailyRevenue[]>([]);
+    const [recentAudit, setRecentAudit] = useState<AuditLogEntry[]>([]);
 
     function showToast(type: 'success' | 'error', message: string) {
         setToast({ type, message });
@@ -182,8 +201,10 @@ export default function Dashboard() {
             apiFetch<PaymentStats>('/api/payments/stats'),
             apiFetch<any[]>('/api/tenants'),
             apiFetch<VpsStats>('/api/vps/stats'),
+            apiFetch<DailyRevenue[]>('/api/payments/stats/daily?days=7').catch(() => []),
+            apiFetch<AuditLogEntry[]>('/api/audit?limit=10').catch(() => []),
         ])
-            .then(([healthData, statsData, tenantsData, vpsData]) => {
+            .then(([healthData, statsData, tenantsData, vpsData, dailyData, auditData]) => {
                 setHealth(Array.isArray(healthData) ? healthData : []);
                 setPaymentStats(statsData);
 
@@ -195,6 +216,8 @@ export default function Dashboard() {
                 });
 
                 setVpsStats(vpsData);
+                setDailyRevenue(Array.isArray(dailyData) ? dailyData : []);
+                setRecentAudit(Array.isArray(auditData) ? auditData : []);
             })
             .catch((err) => {
                 console.error('[Dashboard] Error cargando datos:', err);
@@ -293,12 +316,13 @@ export default function Dashboard() {
                 <StatsCard
                     title="Ingresos Totales"
                     value={`$${((paymentStats?.totalRevenueCents || 0) / 100).toFixed(2)}`}
-                    subtitle={`${paymentStats?.paidCount || 0} pagos`}
+                    subtitle={`${paymentStats?.paidCount || 0} pagos confirmados`}
                     color="#059669"
                 />
                 <StatsCard
                     title="Pagos Vencidos"
                     value={paymentStats?.overdueCount || 0}
+                    subtitle={paymentStats?.overdueCount ? 'Requieren atención' : 'Ninguno pendiente'}
                     color="#dc2626"
                 />
                 <StatsCard
@@ -307,6 +331,167 @@ export default function Dashboard() {
                     subtitle="tenants saludables"
                     color={healthyCount === health.length ? '#059669' : '#d97706'}
                 />
+            </div>
+
+            {/* Revenue Trend + Activity Feed */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                {/* Revenue trend - last 7 days */}
+                <div style={{
+                    background: '#fff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 12,
+                    padding: '1.25rem',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                }}>
+                    <h3 style={{ margin: '0 0 1rem', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 4, height: 16, borderRadius: 2, background: COLORS.primary, flexShrink: 0 }} />
+                        Ingresos - Ultimos 7 Dias
+                    </h3>
+                    {dailyRevenue.length > 0 ? (
+                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 100, paddingTop: '0.5rem' }}>
+                            {dailyRevenue.map((day) => {
+                                const maxRevenue = Math.max(...dailyRevenue.map((d) => d.revenueCents), 1);
+                                const barHeight = Math.max(4, (day.revenueCents / maxRevenue) * 80);
+                                const barColor = day.revenueCents > 0 ? COLORS.primary : '#e2e8f0';
+                                return (
+                                    <div key={day.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                                        <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                                            {day.revenueCents > 0 ? `$${(day.revenueCents / 100).toFixed(0)}` : '-'}
+                                        </span>
+                                        <div style={{
+                                            width: '100%',
+                                            maxWidth: 40,
+                                            height: barHeight,
+                                            background: barColor,
+                                            borderRadius: 4,
+                                            transition: 'height 0.3s ease',
+                                        }} />
+                                        <span style={{ fontSize: '0.62rem', color: '#94a3b8' }}>
+                                            {new Date(day.date + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'short' })}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div style={{ height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
+                            Sin datos de ingresos recientes
+                        </div>
+                    )}
+                    <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
+                        <span style={{ color: '#64748b' }}>
+                            Total 7 dias: <strong style={{ color: '#1e293b' }}>${(dailyRevenue.reduce((s, d) => s + d.revenueCents, 0) / 100).toFixed(2)}</strong>
+                        </span>
+                        <span style={{ color: '#64748b' }}>
+                            {dailyRevenue.reduce((s, d) => s + d.count, 0)} pagos
+                        </span>
+                    </div>
+                </div>
+
+                {/* Recent Activity Feed */}
+                <div style={{
+                    background: '#fff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 12,
+                    padding: '1.25rem',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                }}>
+                    <h3 style={{ margin: '0 0 1rem', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 4, height: 16, borderRadius: 2, background: '#8b5cf6', flexShrink: 0 }} />
+                        Actividad Reciente
+                    </h3>
+                    {recentAudit.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: 220, overflowY: 'auto' }}>
+                            {recentAudit.map((entry) => {
+                                const actionLabels: Record<string, { label: string; color: string; bg: string }> = {
+                                    TENANT_CREATED: { label: 'Tenant creado', color: '#065f46', bg: '#ecfdf5' },
+                                    TENANT_UPDATED: { label: 'Actualizado', color: '#6d28d9', bg: '#f5f3ff' },
+                                    SUBSCRIPTION_EXTENDED: { label: 'Suscripción extendida', color: '#1e40af', bg: '#eff6ff' },
+                                    PAYMENT_CREATED: { label: 'Pago registrado', color: '#166534', bg: '#dcfce7' },
+                                    PAYMENT_CONFIRMED: { label: 'Pago confirmado', color: '#166534', bg: '#dcfce7' },
+                                    SUPPORT_IMPERSONATION: { label: 'Acceso soporte', color: '#b45309', bg: '#fef3c7' },
+                                    BACKUP_CREATED: { label: 'Backup creado', color: '#1e40af', bg: '#dbeafe' },
+                                    DOCKER_PRUNE: { label: 'Limpieza Docker', color: '#475569', bg: '#f1f5f9' },
+                                    NOTICE_UPDATED: { label: 'Aviso actualizado', color: '#92400e', bg: '#fffbeb' },
+                                };
+                                const info = actionLabels[entry.action] || { label: entry.action, color: '#475569', bg: '#f1f5f9' };
+                                return (
+                                    <div key={entry.id} style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.6rem',
+                                        padding: '0.4rem 0.6rem',
+                                        borderRadius: 8,
+                                        background: '#f8fafc',
+                                        fontSize: '0.8rem',
+                                    }}>
+                                        <span style={{
+                                            padding: '2px 8px',
+                                            borderRadius: 6,
+                                            fontSize: '0.68rem',
+                                            fontWeight: 600,
+                                            background: info.bg,
+                                            color: info.color,
+                                            whiteSpace: 'nowrap',
+                                            flexShrink: 0,
+                                        }}>
+                                            {info.label}
+                                        </span>
+                                        {entry.tenant?.slug && (
+                                            <span style={{ color: COLORS.info, fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                                                {entry.tenant.slug}
+                                            </span>
+                                        )}
+                                        <span style={{ color: '#94a3b8', fontSize: '0.72rem', marginLeft: 'auto', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                                            {new Date(entry.createdAt).toLocaleString('es-AR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div style={{ height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
+                            Sin actividad reciente
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Tenant Activity Overview */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                gap: '0.75rem',
+                marginBottom: '1.5rem',
+            }}>
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `3px solid ${COLORS.primary}` }}>
+                    <div style={{ fontSize: '0.68rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Activos</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: COLORS.primary }}>{tenantsSummary?.active || 0}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                        {tenantsSummary?.total ? Math.round(((tenantsSummary.active || 0) / tenantsSummary.total) * 100) : 0}% del total
+                    </div>
+                </div>
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `3px solid ${COLORS.warning}` }}>
+                    <div style={{ fontSize: '0.68rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Suspendidos</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: COLORS.warning }}>{tenantsSummary?.suspended || 0}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                        {tenantsSummary?.total ? Math.round(((tenantsSummary.suspended || 0) / tenantsSummary.total) * 100) : 0}% del total
+                    </div>
+                </div>
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `3px solid ${COLORS.info}` }}>
+                    <div style={{ fontSize: '0.68rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Pagos Mes</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: COLORS.info }}>{paymentStats?.paidCount || 0}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>confirmados</div>
+                </div>
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.75rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: `3px solid ${healthyCount === health.length && health.length > 0 ? COLORS.primary : COLORS.warning}` }}>
+                    <div style={{ fontSize: '0.68rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Salud</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: healthyCount === health.length && health.length > 0 ? COLORS.primary : COLORS.warning }}>
+                        {healthyCount === health.length && health.length > 0 ? 'OK' : `${health.length - healthyCount} down`}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                        {health.length > 0 ? `${healthyCount}/${health.length} healthy` : 'Sin datos'}
+                    </div>
+                </div>
             </div>
 
             {/* Estadisticas VPS */}
