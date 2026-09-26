@@ -203,6 +203,26 @@ export async function checkTenantHealth(tenantId: string, slug: string): Promise
             } catch {
                 result.apiHealthy = false;
             }
+
+            // FIX #11: Verificar también el path público (Caddy/DNS)
+            // Solo si el tenant tiene dominio configurado
+            try {
+                const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { domain: true } });
+                if (tenant?.domain) {
+                    const publicUrl = `https://${tenant.domain}/api/health`;
+                    const publicRes = await fetch(publicUrl, {
+                        signal: AbortSignal.timeout(8000),
+                    });
+                    if (!publicRes.ok) {
+                        result.apiHealthy = false;
+                        console.warn(`[health] ${slug}: path público ${publicUrl} no responde (${publicRes.status})`);
+                    }
+                }
+            } catch {
+                // Si el path público falla pero el interno funciona, marcar como no saludable
+                // (Caddy/DNS caído = clientes no pueden acceder)
+                result.apiHealthy = false;
+            }
         }
 
         // Verificar DB — usa dockerode exec en vez de execSync
