@@ -25,7 +25,8 @@ const router = Router();
 
 // Schemas de validación
 const createTenantSchema = z.object({
-    slug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/),
+// FIX #14: Slug debe coincidir con add-client.sh: ^[a-z0-9-]{3,32}$ + sin guiones al inicio/final
+slug: z.string().min(3, 'Mínimo 3 caracteres').max(32, 'Máximo 32 caracteres').regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, 'Solo letras minúsculas, números y guiones intermedios'),
     domain: z.string().min(1).optional().or(z.literal('')).transform(v => v || undefined),
     url: z.string().url().optional(),
     plan: z.string().optional(),
