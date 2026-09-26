@@ -18,6 +18,7 @@ import {
     backupCreateHandler,
     backupListHandler,
     backupDownloadHandler,
+    activityHandler,
 } from './tenants.controller';
 
 const router = Router();
@@ -144,5 +145,8 @@ router.get('/:slug/backups', validate(slugParam, 'params'), backupListHandler);
 
 // GET /api/tenants/:slug/backups/:filename/download — descargar archivo de backup
 router.get('/:slug/backups/:filename/download', backupDownloadHandler);
+
+// GET /api/tenants/:slug/activity — actividad reciente del tenant
+router.get('/:slug/activity', validate(slugParam, 'params'), activityHandler);
 
 export default router;

@@ -88,8 +88,11 @@ export default function Payments() {
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState<string>('');
     const [providerFilter, setProviderFilter] = useState<string>('');
+    const [page, setPage] = useState(1);
+    const PAGE_SIZE = 20;
 
     useEffect(() => {
+        setPage(1);
         const params = new URLSearchParams();
         if (statusFilter) params.set('status', statusFilter);
         if (providerFilter) params.set('provider', providerFilter);
@@ -100,6 +103,10 @@ export default function Payments() {
             .catch(console.error)
             .finally(() => setLoading(false));
     }, [statusFilter, providerFilter]);
+
+    const totalPages = Math.max(1, Math.ceil(payments.length / PAGE_SIZE));
+    const safePage = Math.min(page, totalPages);
+    const paginated = payments.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
     if (loading) return <p style={{ color: '#64748b' }}>Cargando pagos...</p>;
 
@@ -176,7 +183,7 @@ export default function Payments() {
                             </tr>
                         </thead>
                         <tbody>
-                            {payments.map((p) => {
+                            {paginated.map((p) => {
                                 const st = STATUS_STYLES[p.status] || STATUS_STYLES.PENDING;
                                 return (
                                     <tr key={p.id} className="pay-row" style={{
@@ -224,6 +231,66 @@ export default function Payments() {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination */}
+                {payments.length > PAGE_SIZE && (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #f1f5f9' }}>
+                        <button
+                            onClick={() => setPage((p) => Math.max(1, p - 1))}
+                            disabled={safePage <= 1}
+                            style={{
+                                padding: '0.4rem 0.8rem',
+                                borderRadius: 8,
+                                border: '1px solid #e2e8f0',
+                                background: safePage <= 1 ? '#f8fafc' : '#fff',
+                                color: safePage <= 1 ? '#94a3b8' : '#475569',
+                                cursor: safePage <= 1 ? 'not-allowed' : 'pointer',
+                                fontSize: '0.8rem',
+                                fontWeight: 500,
+                            }}
+                        >
+                            Anterior
+                        </button>
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                            <button
+                                key={p}
+                                onClick={() => setPage(p)}
+                                style={{
+                                    padding: '0.4rem 0.65rem',
+                                    borderRadius: 8,
+                                    border: p === safePage ? '1px solid #059669' : '1px solid #e2e8f0',
+                                    background: p === safePage ? '#059669' : '#fff',
+                                    color: p === safePage ? '#fff' : '#475569',
+                                    cursor: 'pointer',
+                                    fontSize: '0.8rem',
+                                    fontWeight: p === safePage ? 600 : 400,
+                                    minWidth: 36,
+                                }}
+                            >
+                                {p}
+                            </button>
+                        ))}
+                        <button
+                            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                            disabled={safePage >= totalPages}
+                            style={{
+                                padding: '0.4rem 0.8rem',
+                                borderRadius: 8,
+                                border: '1px solid #e2e8f0',
+                                background: safePage >= totalPages ? '#f8fafc' : '#fff',
+                                color: safePage >= totalPages ? '#94a3b8' : '#475569',
+                                cursor: safePage >= totalPages ? 'not-allowed' : 'pointer',
+                                fontSize: '0.8rem',
+                                fontWeight: 500,
+                            }}
+                        >
+                            Siguiente
+                        </button>
+                        <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginLeft: '0.5rem' }}>
+                            {payments.length} pago(s)
+                        </span>
+                    </div>
+                )}
             </div>
         </div>
     );

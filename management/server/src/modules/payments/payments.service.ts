@@ -427,3 +427,49 @@ export class PaymentError extends Error {
         this.code = code;
     }
 }
+
+/**
+ * Revenue de los ultimos N dias (para el mini-chart del dashboard).
+ * Retorna un array de { date, revenue, count } ordenado por fecha asc.
+ */
+export async function getDailyRevenue(days: number = 7) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    cutoff.setHours(0, 0, 0, 0);
+
+    const payments = await prisma.payment.findMany({
+        where: {
+            status: 'PAID',
+            paidAt: { gte: cutoff },
+        },
+        select: {
+            amountCents: true,
+            paidAt: true,
+        },
+    });
+
+    // Inicializar mapa con los ultimos N dias (incluir dias sin pagos)
+    const dailyMap = new Map<string, { revenueCents: number; count: number }>();
+    for (let i = days - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0, 10); // YYYY-MM-DD
+        dailyMap.set(key, { revenueCents: 0, count: 0 });
+    }
+
+    for (const p of payments) {
+        if (!p.paidAt) continue;
+        const key = p.paidAt.toISOString().slice(0, 10);
+        const entry = dailyMap.get(key);
+        if (entry) {
+            entry.revenueCents += p.amountCents;
+            entry.count += 1;
+        }
+    }
+
+    return Array.from(dailyMap.entries()).map(([date, data]) => ({
+        date,
+        revenueCents: data.revenueCents,
+        count: data.count,
+    }));
+}

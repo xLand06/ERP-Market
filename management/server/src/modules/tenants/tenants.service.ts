@@ -361,4 +361,69 @@ export async function getTenantBackupDownload(slug: string, filename: string) {
     return getTenantBackupPath(slug, filename);
 }
 
+/**
+ * Obtiene actividad reciente de un tenant para el dashboard.
+ * Incluye: ultimo login, ultima transaccion, usuarios activos, metricas del mes.
+ */
+export async function getTenantActivity(slug: string) {
+    const tenant = await prisma.tenant.findUnique({ where: { slug } });
+    if (!tenant) throw new Error('Tenant no encontrado');
+
+    // Ultimo login (impersonacion de soporte)
+    const lastImpersonation = await prisma.auditLog.findFirst({
+        where: { tenantId: tenant.id, action: 'SUPPORT_IMPERSONATION' },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
+    });
+
+    // Ultima transaccion pagada
+    const lastPaidPayment = await prisma.payment.findFirst({
+        where: { tenantId: tenant.id, status: 'PAID' },
+        orderBy: { paidAt: 'desc' },
+        select: { paidAt: true },
+    });
+
+    // Metricas de uso
+    let activeUsers = 0;
+    try {
+        const metrics = await getTenantUsageMetrics(slug);
+        activeUsers = metrics?.usersCount ?? 0;
+    } catch {
+        // Metricas no disponibles si el contenedor esta caido
+    }
+
+    // Resumen del mes actual
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const monthlyPayments = await prisma.payment.aggregate({
+        where: {
+            tenantId: tenant.id,
+            status: 'PAID',
+            paidAt: { gte: startOfMonth },
+        },
+        _sum: { amountCents: true },
+        _count: true,
+    });
+
+    // Ultimos 10 eventos de auditoria
+    const recentAudit = await prisma.auditLog.findMany({
+        where: { tenantId: tenant.id },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+    });
+
+    return {
+        tenantId: tenant.id,
+        slug: tenant.slug,
+        lastLoginAt: lastImpersonation?.createdAt ?? null,
+        lastTransactionAt: lastPaidPayment?.paidAt ?? null,
+        activeUsers,
+        monthlyTransactions: monthlyPayments._count,
+        monthlyRevenueCents: monthlyPayments._sum.amountCents ?? 0,
+        recentAudit,
+    };
+}
+
 

@@ -91,6 +91,17 @@ interface AuditLogItem {
     createdAt: string;
 }
 
+interface TenantActivity {
+    tenantId: string;
+    slug: string;
+    lastLoginAt: string | null;
+    lastTransactionAt: string | null;
+    activeUsers: number;
+    monthlyTransactions: number;
+    monthlyRevenueCents: number;
+    recentAudit: AuditLogItem[];
+}
+
 const PLAN_CANONICAL_LIMITS: Record<string, { maxUsers: number; maxBranches: number; maxProducts: number }> = {
     free: { maxUsers: 1, maxBranches: 1, maxProducts: 50 },
     basic: { maxUsers: 3, maxBranches: 1, maxProducts: 250 },
@@ -282,6 +293,9 @@ export default function TenantDetailPage() {
     const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
     const [auditLoading, setAuditLoading] = useState(false);
 
+    const [activity, setActivity] = useState<TenantActivity | null>(null);
+    const [activityLoading, setActivityLoading] = useState(false);
+
     const [impersonating, setImpersonating] = useState(false);
 
     const addToast = useCallback((message: string, type: 'success' | 'error') => {
@@ -351,6 +365,19 @@ export default function TenantDetailPage() {
         }
     }, [tenant?.id]);
 
+    const fetchActivity = useCallback(async () => {
+        if (!slug) return;
+        setActivityLoading(true);
+        try {
+            const data = await apiFetch<TenantActivity>(`/api/tenants/${slug}/activity`);
+            setActivity(data);
+        } catch {
+            setActivity(null);
+        } finally {
+            setActivityLoading(false);
+        }
+    }, [slug]);
+
     async function handleCreateBackup() {
         if (!slug) return;
         setCreatingBackup(true);
@@ -400,6 +427,7 @@ export default function TenantDetailPage() {
                 fetchMetrics();
                 fetchBackups();
                 fetchAudit(data.id);
+                fetchActivity();
             })
             .catch(console.error)
             .finally(() => setLoading(false));
@@ -1275,6 +1303,131 @@ export default function TenantDetailPage() {
                             </div>
                         );
                     })()}
+                </div>
+
+                {/* ── Actividad Reciente del Tenant ──────────────────────────────── */}
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ width: 4, height: 16, borderRadius: 2, background: '#f59e0b', flexShrink: 0 }} />
+                            Actividad Reciente
+                        </h3>
+                        <button
+                            onClick={fetchActivity}
+                            disabled={activityLoading}
+                            style={{
+                                padding: '0.35rem 0.75rem',
+                                borderRadius: 8,
+                                border: '1px solid #e2e8f0',
+                                background: '#f8fafc',
+                                color: '#475569',
+                                fontSize: '0.75rem',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 5,
+                            }}
+                        >
+                            <RefreshIcon size={13} color="#475569" spin={activityLoading} />
+                            {activityLoading ? 'Cargando...' : 'Refrescar'}
+                        </button>
+                    </div>
+
+                    {activity ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            {/* KPIs de actividad */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+                                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '0.6rem 0.75rem' }}>
+                                    <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Ultimo Login</span>
+                                    <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: activity.lastLoginAt ? '#1e293b' : '#94a3b8', marginTop: 2 }}>
+                                        {activity.lastLoginAt
+                                            ? new Date(activity.lastLoginAt).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                                            : 'Sin registros'}
+                                    </span>
+                                </div>
+                                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '0.6rem 0.75rem' }}>
+                                    <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Ultima Transaccion</span>
+                                    <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: activity.lastTransactionAt ? '#1e293b' : '#94a3b8', marginTop: 2 }}>
+                                        {activity.lastTransactionAt
+                                            ? new Date(activity.lastTransactionAt).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                                            : 'Sin pagos'}
+                                    </span>
+                                </div>
+                                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '0.6rem 0.75rem' }}>
+                                    <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Usuarios Activos</span>
+                                    <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', marginTop: 2 }}>
+                                        {activity.activeUsers}
+                                    </span>
+                                </div>
+                                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '0.6rem 0.75rem' }}>
+                                    <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Transacciones Mes</span>
+                                    <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', marginTop: 2 }}>
+                                        {activity.monthlyTransactions}
+                                    </span>
+                                </div>
+                                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '0.6rem 0.75rem' }}>
+                                    <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Ingresos Mes</span>
+                                    <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#059669', marginTop: 2 }}>
+                                        ${(activity.monthlyRevenueCents / 100).toFixed(2)}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Ultimos eventos de auditoria */}
+                            {activity.recentAudit.length > 0 && (
+                                <div>
+                                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '0.5rem' }}>Ultimos eventos de auditoria</div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                        {activity.recentAudit.map((log) => {
+                                            const actionColors: Record<string, { bg: string; text: string }> = {
+                                                SUBSCRIPTION_EXTENDED: { bg: '#ecfdf5', text: '#065f46' },
+                                                SUBSCRIPTION_DATES_SET: { bg: '#eff6ff', text: '#1e40af' },
+                                                NOTICE_UPDATED: { bg: '#fffbeb', text: '#92400e' },
+                                                TENANT_UPDATED: { bg: '#f5f3ff', text: '#6d28d9' },
+                                                SUPPORT_IMPERSONATION: { bg: '#fef3c7', text: '#b45309' },
+                                                BACKUP_CREATED: { bg: '#dbeafe', text: '#1e40af' },
+                                                PAYMENT_CONFIRMED: { bg: '#dcfce7', text: '#166534' },
+                                                PAYMENT_CREATED: { bg: '#dcfce7', text: '#166534' },
+                                            };
+                                            const ac = actionColors[log.action] || { bg: '#f1f5f9', text: '#475569' };
+                                            return (
+                                                <div key={log.id} style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.6rem',
+                                                    padding: '0.35rem 0.5rem',
+                                                    borderRadius: 6,
+                                                    background: '#f8fafc',
+                                                    fontSize: '0.78rem',
+                                                }}>
+                                                    <span style={{
+                                                        padding: '1px 6px',
+                                                        borderRadius: 4,
+                                                        fontSize: '0.68rem',
+                                                        fontWeight: 600,
+                                                        background: ac.bg,
+                                                        color: ac.text,
+                                                        whiteSpace: 'nowrap',
+                                                    }}>
+                                                        {log.action}
+                                                    </span>
+                                                    <span style={{ color: '#1e293b', fontWeight: 500 }}>{log.actor}</span>
+                                                    <span style={{ color: '#94a3b8', fontSize: '0.72rem', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                                                        {new Date(log.createdAt).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                            {activityLoading ? 'Cargando actividad...' : 'Sin datos de actividad disponibles'}
+                        </p>
+                    )}
                 </div>
 
                 {/* Health history */}
