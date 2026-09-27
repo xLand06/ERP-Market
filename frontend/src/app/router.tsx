@@ -67,7 +67,7 @@ export const router = createRouter([
     // Términos y condiciones: pública, sin auth ni plan guard
     {
         path: '/terms',
-        element: <TermsPage />,
+        element: wrap(TermsPage),
         errorElement: <RouteErrorBoundary />
     },
     // Catálogo público (F5): standalone, sin PrivateRoute ni AppShell
