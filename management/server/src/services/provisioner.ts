@@ -80,27 +80,46 @@ async function runAddClientScript(
     adminPassword: string,
     plan?: string,
 ): Promise<string> {
-    const { execSync } = await import('child_process');
+    const { spawnSync } = await import('child_process');
+
+    // CRÍTICO #3: el email viene del registro público y puede contener
+    // metacaracteres de shell. Aunque spawnSync no invoca shell, lo
+    // sanitizamos igual por defecto en profundidad.
+    const sanitize = (v: string) => String(v).replace(/[;&|`$><"'\\\n\r]/g, '');
+    const safeEmail = sanitize(adminEmail || '');
 
     // add-client.sh: add-client.sh <slug> [domain] [admin-email] [admin-user] [admin-password] [plan]
     // IMPORTANTE: siempre pasar los args en orden (aunque sean vacíos),
     // sino los argumentos se corren de posición y el script falla.
-    const args = [slug, domain || '', adminEmail || '', adminUser || 'admin', adminPassword || '', plan || 'pro'];
+    const args = [slug, domain || '', safeEmail, adminUser || 'admin', adminPassword || '', plan || 'pro'];
+    const scriptPath = path.join(DEPLOY_DIR, 'scripts', 'add-client.sh');
 
-    const cmd = `BUILD_CONTEXT=/repo HOST_TLS_DIR=/opt/erp-market/deploy/clients/${slug}/tls /repo/deploy/scripts/add-client.sh ${args.join(' ')}`;
-    console.log(`[provisioner] Ejecutando: ${cmd}`);
+    console.log(`[provisioner] Ejecutando add-client.sh para ${slug}`);
 
-    try {
-        const output = execSync(cmd, {
-            encoding: 'utf-8',
-            timeout: 10 * 60 * 1000, // 10 minutos
-            maxBuffer: 10 * 1024 * 1024, // 10MB
-            env: { ...process.env, PATH: process.env.PATH },
-        });
-        return output;
-    } catch (err: any) {
-        throw new Error(`add-client.sh fallo (exit ${err.status}):\n${err.stdout || ''}${err.stderr || ''}`);
+    // spawnSync NO invoca una shell: los argumentos van como array, así que
+    // no hay interpretación de metacaracteres (evita RCE vía email).
+    const result = spawnSync('bash', [scriptPath, ...args], {
+        cwd: '/repo',
+        env: {
+            ...process.env,
+            PATH: process.env.PATH,
+            BUILD_CONTEXT: '/repo',
+            HOST_TLS_DIR: `/opt/erp-market/deploy/clients/${slug}/tls`,
+        },
+        timeout: 10 * 60 * 1000, // 10 minutos
+        maxBuffer: 10 * 1024 * 1024, // 10MB
+        encoding: 'utf-8',
+    });
+
+    if (result.error) {
+        throw new Error(`add-client.sh fallo: ${result.error.message}`);
     }
+    if (result.status !== 0) {
+        throw new Error(
+            `add-client.sh fallo (exit ${result.status}):\n${result.stdout || ''}${result.stderr || ''}`,
+        );
+    }
+    return result.stdout || '';
 }
 
 // ── Docker helpers ───────────────────────────────────────────────────────────

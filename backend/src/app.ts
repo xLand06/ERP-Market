@@ -211,6 +211,18 @@ app.post('/api/electron/clear-pending', async (_req, res) => {
     }
 });
 
+// ─── RATE LIMITING (HIGH #7) ─────────────────────────────────────────────────
+// Los limiters estaban definidos en rate-limit.middleware.ts pero nunca se
+// montaban. apiLimiter cubre toda la API; strictLimiter protege los endpoints
+// más sensibles (login, refresh, IA). /api/health queda fuera porque se
+// registra antes de este bloque (el healthcheck del contenedor no debe
+// consumir cuota).
+import { apiLimiter, strictLimiter } from './core/middlewares/rate-limit.middleware';
+app.use('/api/', apiLimiter);
+app.use('/api/auth/login', strictLimiter);
+app.use('/api/auth/refresh', strictLimiter);
+app.use('/api/ai-chat', strictLimiter);
+
 // ─── API ROUTES ───────────────────────────────────────────────────────────
 app.use('/api/auth',       authRouter);
 app.use('/api/users',      usersRouter);

@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import path from 'path';
 import { env } from './config/env';
 import { prisma } from './config/prisma';
@@ -22,6 +23,16 @@ import { sendEmailWithResend } from './services/notifications';
 const app = express();
 
 // Middleware global
+// MEDIUM: cabeceras de seguridad HTTP (X-Frame-Options, HSTS, etc.)
+// img-src permite https: porque el panel carga códigos QR externos
+// (api.qrserver.com); el resto del CSP queda en default-src 'self'.
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            imgSrc: ["'self'", 'data:', 'https:'],
+        },
+    },
+}));
 app.use(cors({
     origin: (origin, callback) => {
         // Permitir requests sin origin (Electron, server-to-server, curl)
@@ -43,7 +54,8 @@ app.use(cors({
     },
     credentials: true,
 }));
-app.use(express.json());
+// MEDIUM: límite de tamaño del body para mitigar DoS por payloads grandes
+app.use(express.json({ limit: '1mb' }));
 
 // Health check público (sin auth)
 app.get('/api/health', async (_req, res) => {
