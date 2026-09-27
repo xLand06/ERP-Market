@@ -74,7 +74,71 @@ MÓDULOS: POS(/pos) · Productos(/products) · Inventario(/inventory) · Finanza
 SCHEMA: "products":id,"name","price","cost" · "branches":id,"name" · "branch_inventory":id,"stock","minStock","productId","branchId" · "transactions":id,"type","status","total","createdAt","branchId" · "transaction_items":id,"quantity","subtotal","productId" · "customers":id,"name","balance" · "exchange_rates":id,"code","rate"`;
 
 // ─── Seguridad: validar SQL ─────────────────────────────────────────────────
-function validateSql(sql: string): { valid: boolean; error?: string } {
+
+// HIGH #8: allowlist de tablas. El enfoque de blacklist era bypaseable
+// (SELECT * FROM pg_shadow, pg_settings, etc.). Ahora solo se permite
+// consultar tablas conocidas del esquema del ERP.
+const ALLOWED_TABLES = [
+    'products', 'branches', 'groups', 'sub_groups', 'branch_inventory',
+    'transactions', 'transaction_items', 'product_presentations', 'product_barcodes',
+    'customers', 'customer_payments', 'purchase_orders', 'purchase_order_items',
+    'suppliers', 'mermas', 'product_batches', 'exchange_rates', 'users',
+    'system_settings', 'bank_accounts', 'bank_transactions', 'cash_registers', 'kit_components',
+];
+const ALLOWED_TABLES_SET = new Set(ALLOWED_TABLES);
+
+// Tablas del sistema de PostgreSQL / Prisma a las que NUNCA se debe acceder
+const FORBIDDEN_TABLES = [
+    'pg_shadow', 'pg_authid', 'pg_settings', 'pg_roles', 'pg_stat_activity',
+    'pg_catalog', 'information_schema',
+];
+
+// Columnas/secretos sensibles que jamás deben aparecer en una consulta
+const FORBIDDEN_PATTERNS = ['PASSWORD', 'JWT_SECRET', 'ADMIN_PASSWORD', 'DB_PASSWORD'];
+
+interface SqlValidation {
+    valid: boolean;
+    error?: string;
+    /** SQL final a ejecutar (puede incluir un LIMIT auto-agregado) */
+    sql?: string;
+}
+
+/**
+ * Extrae los nombres de tabla referenciados en FROM/JOIN y los CTEs.
+ * Cubre alias, esquema explícito ("public"."products") y subqueries.
+ * Los CTEs (WITH x AS (...)) se devuelven aparte: son derivados de tablas ya
+ * validadas dentro de su propia definición, así que se aceptan en FROM/JOIN.
+ */
+function extractTables(sql: string): { ctes: string[]; tables: string[] } {
+    const ctes: string[] = [];
+    const tables: string[] = [];
+
+    // CTEs: "WITH name AS (" o "WITH a AS (..., b AS ("
+    const cteRe = /\b([a-zA-Z_][a-zA-Z0-9_]*)\s+AS\s*\(/gi;
+    let cteMatch: RegExpExecArray | null;
+    while ((cteMatch = cteRe.exec(sql)) !== null) {
+        ctes.push(cteMatch[1].toLowerCase());
+    }
+
+    const re = /\b(?:FROM|JOIN)\s+(?:"?([a-zA-Z_][a-zA-Z0-9_]*)"?\s*\.\s*)?"?([a-zA-Z_][a-zA-Z0-9_]*)"?/gi;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(sql)) !== null) {
+        // match[1] = esquema (opcional), match[2] = tabla
+        tables.push((match[2] || '').toLowerCase());
+    }
+    return { ctes, tables };
+}
+
+export function validateSql(rawSql: string): SqlValidation {
+    // Las consultas del asistente son siempre de UNA sola sentencia. Cualquier
+    // ';' interno habilita inyección multi-statement (el chequeo clásico de
+    // ';' + palabra perdía "; DROP" con espacio). Se tolera solo el ';' final.
+    const singleStatement = rawSql.trim().replace(/;+$/, '');
+    if (singleStatement.includes(';')) {
+        return { valid: false, error: 'Operación no permitida.' };
+    }
+
+    let sql = singleStatement;
     const normalized = sql.trim().toUpperCase();
     const forbidden = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'TRUNCATE', 'CREATE', 'GRANT', 'REVOKE', 'EXEC'];
     for (const kw of forbidden) {
@@ -85,7 +149,34 @@ function validateSql(sql: string): { valid: boolean; error?: string } {
     if (!normalized.startsWith('SELECT') && !normalized.startsWith('WITH')) {
         return { valid: false, error: 'Solo se permiten consultas SELECT.' };
     }
-    return { valid: true };
+
+    // HIGH #8: chequeo de columnas/secretos sensibles
+    for (const p of FORBIDDEN_PATTERNS) {
+        if (normalized.includes(p)) {
+            return { valid: false, error: 'Acceso denegado a columnas sensibles.' };
+        }
+    }
+
+    // HIGH #8: allowlist de tablas (bloquea tablas del sistema de PG)
+    const { ctes, tables } = extractTables(sql);
+    const cteSet = new Set(ctes);
+    for (const table of tables) {
+        if (FORBIDDEN_TABLES.includes(table)) {
+            return { valid: false, error: 'Acceso denegado a tablas del sistema.' };
+        }
+        // Un nombre referenciado puede ser un CTE definido en la misma consulta
+        if (cteSet.has(table)) continue;
+        if (!ALLOWED_TABLES_SET.has(table)) {
+            return { valid: false, error: `Tabla no permitida: ${table}` };
+        }
+    }
+
+    // HIGH #8: forzar LIMIT para no volcar tablas enteras en memoria
+    if (!/\bLIMIT\b/i.test(sql)) {
+        sql = sql.trim().replace(/;+$/, '') + ' LIMIT 100';
+    }
+
+    return { valid: true, sql };
 }
 
 // ─── Interfaz de respuesta ───────────────────────────────────────────────────
@@ -138,8 +229,10 @@ export const processAiQuestion = async (question: string, userId?: string): Prom
         if (!validation.valid) {
             return { answer: 'No puedo ejecutar esa consulta. Probá reformulando la pregunta.' };
         }
+        // validation.sql puede incluir un LIMIT auto-agregado (HIGH #8)
+        const safeSql = validation.sql || sql;
 
-        const rawResult = await prisma.$queryRawUnsafe(sql);
+        const rawResult = await prisma.$queryRawUnsafe(safeSql);
         const data = Array.isArray(rawResult)
             ? rawResult.map((row: any) => {
                 const obj: any = {};
