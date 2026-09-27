@@ -4,7 +4,6 @@ import { Input } from '@/components/ui/input';
 import { useLoginForm, useLogin } from '@/features/auth/hooks';
 import { AppStorage } from '@/services/app-storage';
 import { MathCaptcha, getLoginRateLimit, recordLoginAttempt, resetLoginAttempts, getShowCaptcha } from '@/components/auth/MathCaptcha';
-import { AnimatedMeshBg } from '@/components/ui/AnimatedMeshBg';
 import type { LoginPayload } from '@/features/auth/types';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -131,7 +130,12 @@ export default function LoginPage() {
 
     return (
         <>
-        <AnimatedMeshBg />
+        {/* ── Background: landing page theme (cream + navy) ─────────────── */}
+        <div className="fixed inset-0 bg-gradient-to-br from-[#faf9f6] via-white to-[#f0f4f8] z-0">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#0f1c38]/5 via-transparent to-[#3a7d89]/5" />
+            <div className="absolute top-0 right-0 w-96 h-96 bg-[#4ecdc4]/10 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-80 h-80 bg-[#3a7d89]/10 rounded-full blur-3xl" />
+        </div>
 
         {/* ── Desktop: split layout ─────────────────────────────────────── */}
         <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 relative z-10">
@@ -140,29 +144,29 @@ export default function LoginPage() {
                 {/* Left: Branding (desktop only) */}
                 <div className="hidden lg:flex flex-1 flex-col justify-center space-y-8 max-w-md">
                     <div className="animate-fadeInUp">
-                        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center mb-6 shadow-2xl shadow-emerald-500/30">
+                        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#3a7d89] to-[#0f1c38] flex items-center justify-center mb-6 shadow-2xl shadow-[#3a7d89]/30">
                             <span className="text-3xl font-black text-white tracking-tight">AM</span>
                         </div>
-                        <h1 className="text-4xl xl:text-5xl font-black text-white tracking-tight leading-tight">
-                            ALL <span className="text-emerald-400">MARKET</span>
+                        <h1 className="text-4xl xl:text-5xl font-black text-[#0f1c38] tracking-tight leading-tight">
+                            ALL <span className="text-[#3a7d89]">MARKET</span>
                         </h1>
-                        <p className="text-slate-400 text-sm sm:text-base mt-3 max-w-md leading-relaxed">
+                        <p className="text-slate-500 text-sm sm:text-base mt-3 max-w-md leading-relaxed">
                             Sistema de gestión inteligente para bodegas, supermercados y negocios de retail en Latinoamérica.
                         </p>
                     </div>
 
                     <div className="space-y-3">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Ecosistema ALLCODE</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Ecosistema ALLCODE</p>
                         {ECOSYSTEM.map((p) => (
-                            <div key={p.name} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${p.active ? 'glass-strong ring-1 ring-emerald-500/30' : 'glass opacity-50'}`}>
+                            <div key={p.name} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${p.active ? 'bg-white shadow-sm ring-1 ring-[#4ecdc4]/30' : 'bg-slate-500 opacity-60'}`}>
                                 <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${p.color} flex items-center justify-center shrink-0 shadow-lg`}>
                                     <p.icon className="w-5 h-5 text-white" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-white">{p.name}</p>
+                                    <p className="text-sm font-bold text-[#0f1c38]">{p.name}</p>
                                     <p className="text-[11px] text-slate-400 truncate">{p.desc}</p>
                                 </div>
-                                {p.active && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">ACTIVO</span>}
+                                {p.active && <span className="text-[9px] font-bold text-[#3a7d89] bg-[#4ecdc4]/10 px-2 py-0.5 rounded-full">ACTIVO</span>}
                             </div>
                         ))}
                     </div>
@@ -172,16 +176,16 @@ export default function LoginPage() {
                 <div className="w-full max-w-lg lg:max-w-md">
                     {/* Mobile: minimal logo */}
                     <div className="lg:hidden text-center mb-6">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center mx-auto mb-3 shadow-xl shadow-emerald-500/30">
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#3a7d89] to-[#0f1c38] flex items-center justify-center mx-auto mb-3 shadow-xl shadow-[#3a7d89]/30">
                             <span className="text-2xl font-black text-white">AM</span>
                         </div>
-                        <h1 className="text-3xl font-black text-white tracking-tight">
-                            ALL <span className="text-emerald-400">MARKET</span>
+                        <h1 className="text-3xl font-black text-[#0f1c38] tracking-tight">
+                            ALL <span className="text-[#3a7d89]">MARKET</span>
                         </h1>
-                        <p className="text-sm text-slate-400 mt-1">Iniciá sesión para continuar</p>
+                        <p className="text-sm text-slate-500 mt-1">Iniciá sesión para continuar</p>
                     </div>
 
-                    <div className="glass-strong rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/20">
+                    <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl shadow-slate-900/5 border border-slate-200/60">
                         {/* Error */}
                         {(generalError || rateState.blocked) && (
                             <div className="mb-4 p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-center gap-2 animate-slideDown">
@@ -193,37 +197,37 @@ export default function LoginPage() {
                         <form onSubmit={handleSubmit} className="space-y-5">
                             {/* Username */}
                             <div>
-                                <label htmlFor="username" className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2.5 block">Usuario</label>
+                                <label htmlFor="username" className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2.5 block">Usuario</label>
                                 <div className="relative group">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-500 group-focus-within:text-emerald-400 transition-colors" />
+                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 group-focus-within:text-[#3a7d89] transition-colors" />
                                     <Input
                                         id="username" type="text" autoFocus autoComplete="username"
                                         placeholder="admin o V-12345678"
                                         value={form.username} onChange={(e) => updateField('username', e.target.value)}
                                         disabled={rateState.blocked}
-                                        className={`pl-11 h-13 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-emerald-500/50 focus:ring-emerald-500/20 focus:bg-white/[0.08] transition-all text-base ${errors.username ? 'border-red-500/50' : ''}`}
+                                        className={`pl-11 h-13 rounded-xl bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-[#3a7d89] focus:ring-[#3a7d89]/20 focus:bg-white transition-all text-base ${errors.username ? 'border-red-400' : ''}`}
                                     />
                                 </div>
-                                {errors.username && <p className="text-red-400 text-xs mt-2">{errors.username}</p>}
+                                {errors.username && <p className="text-red-500 text-xs mt-2">{errors.username}</p>}
                             </div>
 
                             {/* Password */}
                             <div>
-                                <label htmlFor="password" className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2.5 block">Contraseña</label>
+                                <label htmlFor="password" className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2.5 block">Contraseña</label>
                                 <div className="relative group">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-500 group-focus-within:text-emerald-400 transition-colors" />
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 group-focus-within:text-[#3a7d89] transition-colors" />
                                     <Input
                                         id="password" type={showPw ? 'text' : 'password'} autoComplete="current-password"
                                         placeholder="Tu contraseña"
                                         value={form.password} onChange={(e) => updateField('password', e.target.value)}
                                         disabled={rateState.blocked}
-                                        className={`pl-11 pr-12 h-13 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-emerald-500/50 focus:ring-emerald-500/20 focus:bg-white/[0.08] transition-all text-base ${errors.password ? 'border-red-500/50' : ''}`}
+                                        className={`pl-11 pr-12 h-13 rounded-xl bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-[#3a7d89] focus:ring-[#3a7d89]/20 focus:bg-white transition-all text-base ${errors.password ? 'border-red-400' : ''}`}
                                     />
-                                    <button type="button" onClick={() => setShowPw(!showPw)} aria-label="Mostrar contraseña" className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-all">
+                                    <button type="button" onClick={() => setShowPw(!showPw)} aria-label="Mostrar contraseña" className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-[#0f1c38] hover:bg-slate-100 transition-all">
                                         {showPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                                     </button>
                                 </div>
-                                {errors.password && <p className="text-red-400 text-xs mt-2">{errors.password}</p>}
+                                {errors.password && <p className="text-red-500 text-xs mt-2">{errors.password}</p>}
                             </div>
 
                             {/* CAPTCHA */}
@@ -237,7 +241,7 @@ export default function LoginPage() {
                             <button
                                 type="submit"
                                 disabled={loading || rateState.blocked || (showCaptcha && !captchaValid)}
-                                className="w-full h-14 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-base shadow-lg shadow-emerald-500/25 transition-all duration-300 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 group"
+                                className="w-full h-14 rounded-xl bg-gradient-to-r from-[#3a7d89] to-[#0f1c38] hover:from-[#0f1c38] hover:to-[#0f1c38] text-white font-bold text-base shadow-lg shadow-[#3a7d89]/25 transition-all duration-300 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 group"
                             >
                                 {loading ? (
                                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -252,12 +256,12 @@ export default function LoginPage() {
 
                             {/* Attempts indicator */}
                             {rateState.attempts > 0 && !rateState.blocked && (
-                                <p className="text-center text-xs text-amber-500/80">{rateState.attempts}/5 intentos — {rateState.attempts >= 3 ? 'CAPTCHA activado' : 'CAPTCHA después de 3'}</p>
+                                <p className="text-center text-xs text-amber-600">{rateState.attempts}/5 intentos — {rateState.attempts >= 3 ? 'CAPTCHA activado' : 'CAPTCHA después de 3'}</p>
                             )}
 
                             {/* QR Scanner — APK only */}
                             {isCapacitor && (
-                                <button type="button" onClick={() => setScannerOpen(true)} className="w-full h-12 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-500/20 transition-all active:scale-95">
+                                <button type="button" onClick={() => setScannerOpen(true)} className="w-full h-12 rounded-xl border border-[#3a7d89]/30 bg-[#4ecdc4]/10 text-[#3a7d89] font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#4ecdc4]/20 transition-all active:scale-95">
                                     <Camera className="w-4 h-4" /> Escanear QR
                                 </button>
                             )}
@@ -268,65 +272,65 @@ export default function LoginPage() {
                 {/* ── Right: Connect + Sync (desktop only) ────────────────── */}
                 <div className="hidden lg:flex flex-col w-full max-w-xs space-y-3 animate-fadeInUp delay-300">
                     {/* Sync */}
-                    <div className="glass rounded-2xl px-4 py-3.5 flex items-center justify-between">
+                    <div className="bg-white rounded-2xl px-4 py-3.5 flex items-center justify-between shadow-sm border border-slate-200/60">
                         <div className="flex items-center gap-2">
-                            {cloudOnline === null ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" /> : cloudOnline ? <Cloud className="w-3.5 h-3.5 text-emerald-400" /> : <CloudOff className="w-3.5 h-3.5 text-amber-400" />}
-                            <span className={`text-xs font-semibold ${cloudOnline === null ? 'text-slate-500' : cloudOnline ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {cloudOnline === null ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" /> : cloudOnline ? <Cloud className="w-3.5 h-3.5 text-[#3a7d89]" /> : <CloudOff className="w-3.5 h-3.5 text-amber-500" />}
+                            <span className={`text-xs font-semibold ${cloudOnline === null ? 'text-slate-400' : cloudOnline ? 'text-[#3a7d89]' : 'text-amber-500'}`}>
                                 {cloudOnline === null ? 'Verificando...' : cloudOnline ? 'Conectado' : 'Sin conexión'}
                             </span>
                         </div>
-                        <button onClick={handleSync} disabled={syncing} className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 disabled:text-slate-600 flex items-center gap-1.5 transition-colors">
+                        <button onClick={handleSync} disabled={syncing} className="text-xs font-semibold text-[#3a7d89] hover:text-[#0f1c38] disabled:text-slate-400 flex items-center gap-1.5 transition-colors">
                             {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                             {syncing ? 'Sync...' : 'Sincronizar'}
                         </button>
                     </div>
 
                     {/* Connect */}
-                    <div className="glass rounded-2xl p-4 space-y-3">
-                        <button onClick={connectDesktop} className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md shadow-emerald-600/20">
+                    <div className="bg-white rounded-2xl p-4 space-y-3 shadow-sm border border-slate-200/60">
+                        <button onClick={connectDesktop} className="w-full h-11 rounded-xl bg-[#3a7d89] hover:bg-[#0f1c38] text-white text-sm font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md shadow-[#3a7d89]/20">
                             <Monitor className="w-4 h-4" /> Conectar escritorio
                         </button>
 
-                        <button onClick={() => setShowQr(!showQr)} className="w-full h-11 rounded-xl border border-white/10 text-slate-300 text-sm font-bold flex items-center justify-center gap-2 hover:border-emerald-500/40 hover:text-emerald-400 transition-all active:scale-95">
+                        <button onClick={() => setShowQr(!showQr)} className="w-full h-11 rounded-xl border border-slate-200 text-slate-700 text-sm font-bold flex items-center justify-center gap-2 hover:border-[#3a7d89]/40 hover:text-[#3a7d89] transition-all active:scale-95">
                             <QrCode className="w-4 h-4" /> {showQr ? 'Ocultar QR' : 'QR para APK'}
                         </button>
 
                         {showQr && qrDataUrl && (
-                            <div className="flex flex-col items-center gap-2 p-4 bg-white/5 rounded-xl border border-white/10 animate-slideDown">
+                            <div className="flex flex-col items-center gap-2 p-4 bg-slate-50 rounded-xl border border-slate-200 animate-slideDown">
                                 <img src={qrDataUrl} alt="QR" className="w-40 h-40 rounded-xl" />
                                 <p className="text-[10px] text-slate-500 text-center">Escaneá con la APK</p>
                             </div>
                         )}
 
                         {/* Downloads desktop */}
-                        <div className="pt-2 border-t border-white/5">
+                        <div className="pt-2 border-t border-slate-200">
                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-2">Descargar app</p>
-                            {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/app.apk', label: 'Android APK', icon: Smartphone, color: 'text-emerald-400' }].map(d => (
+                            {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/app.apk', label: 'Android APK', icon: Smartphone, color: 'text-[#3a7d89]' }].map(d => (
                                 <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')}
-                                    className="flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl border border-white/10 text-slate-300 hover:border-emerald-500/40 hover:text-white hover:bg-white/5 transition-all active:scale-95">
+                                    className="flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl border border-slate-200 text-slate-700 hover:border-emerald-500/40 hover:text-white hover:bg-slate-50 transition-all active:scale-95">
                                     <d.icon className={`w-5 h-5 ${d.color} shrink-0`} />
                                     <span className="text-sm font-bold">{d.label}</span>
-                                    <Download className="w-4 h-4 text-slate-600 ml-auto" />
+                                    <Download className="w-4 h-4 text-slate-400 ml-auto" />
                                 </a>
                             ))}
                         </div>
                     </div>
 
-                    {lastSync && <p className="text-center text-[10px] text-slate-600">Última sync: {new Date(lastSync).toLocaleString('es-VE')}</p>}
-                    <p className="text-center text-[10px] text-slate-600">ALL MARKET · ALLCODE</p>
+                    {lastSync && <p className="text-center text-[10px] text-slate-400">Última sync: {new Date(lastSync).toLocaleString('es-VE')}</p>}
+                    <p className="text-center text-[10px] text-slate-400">ALL MARKET · ALLCODE</p>
                 </div>
 
                 {/* ── Mobile: compact connect bar ─────────────────────────── */}
                 <div className="lg:hidden w-full max-w-md space-y-3">
                     {/* Sync compact */}
-                    <div className="glass rounded-2xl px-4 py-3 flex items-center justify-between">
+                    <div className="bg-white rounded-2xl px-4 py-3 shadow-sm border border-slate-200/60 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            {cloudOnline === null ? <Loader2 className="w-3 h-3 animate-spin text-slate-500" /> : cloudOnline ? <Cloud className="w-3 h-3 text-emerald-400" /> : <CloudOff className="w-3 h-3 text-amber-400" />}
-                            <span className={`text-[11px] font-semibold ${cloudOnline === null ? 'text-slate-500' : cloudOnline ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {cloudOnline === null ? <Loader2 className="w-3 h-3 animate-spin text-slate-500" /> : cloudOnline ? <Cloud className="w-3 h-3 text-[#3a7d89]" /> : <CloudOff className="w-3 h-3 text-amber-400" />}
+                            <span className={`text-[11px] font-semibold ${cloudOnline === null ? 'text-slate-500' : cloudOnline ? 'text-[#3a7d89]' : 'text-amber-400'}`}>
                                 {cloudOnline === null ? 'Verificando...' : cloudOnline ? 'Conectado' : 'Sin conexión'}
                             </span>
                         </div>
-                        <button onClick={handleSync} disabled={syncing} className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
+                        <button onClick={handleSync} disabled={syncing} className="text-[11px] font-semibold text-[#3a7d89] flex items-center gap-1">
                             {syncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                             {syncing ? 'Sync...' : 'Sincronizar'}
                         </button>
@@ -337,32 +341,32 @@ export default function LoginPage() {
                         <button onClick={connectDesktop} className="flex-1 h-11 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all">
                             <Monitor className="w-3.5 h-3.5" /> Escritorio
                         </button>
-                        <button onClick={() => setShowQr(!showQr)} className="flex-1 h-11 rounded-xl border border-white/10 text-slate-300 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+                        <button onClick={() => setShowQr(!showQr)} className="flex-1 h-11 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all">
                             <QrCode className="w-3.5 h-3.5" /> QR
                         </button>
                     </div>
 
                     {showQr && qrDataUrl && (
-                        <div className="flex flex-col items-center gap-2 p-4 bg-white/5 rounded-xl border border-white/10 animate-slideDown">
+                        <div className="flex flex-col items-center gap-2 p-4 bg-slate-50 rounded-xl border border-slate-200 animate-slideDown">
                             <img src={qrDataUrl} alt="QR" className="w-36 h-36 rounded-xl" />
                             <p className="text-[10px] text-slate-500 text-center">Escaneá con la APK</p>
                         </div>
                     )}
 
                     {/* Downloads */}
-                    <div className="glass rounded-2xl p-3 space-y-2">
+                    <div className="bg-white rounded-2xl p-3 space-y-2 shadow-sm border border-slate-200/60">
                         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">Descargar app</p>
-                        {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/app.apk', label: 'Android APK', icon: Smartphone, color: 'text-emerald-400' }].map(d => (
+                        {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/app.apk', label: 'Android APK', icon: Smartphone, color: 'text-[#3a7d89]' }].map(d => (
                             <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')}
-                                className="flex items-center gap-3 w-full px-4 py-3 rounded-xl border border-white/10 text-slate-300 hover:border-emerald-500/40 hover:text-white hover:bg-white/5 transition-all active:scale-95">
+                                className="flex items-center gap-3 w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-700 hover:border-emerald-500/40 hover:text-white hover:bg-slate-50 transition-all active:scale-95">
                                 <d.icon className={`w-5 h-5 ${d.color} shrink-0`} />
                                 <span className="text-sm font-bold">{d.label}</span>
-                                <Download className="w-4 h-4 text-slate-600 ml-auto" />
+                                <Download className="w-4 h-4 text-slate-400 ml-auto" />
                             </a>
                         ))}
                     </div>
 
-                    <p className="text-center text-[10px] text-slate-600">ALL MARKET · ALLCODE</p>
+                    <p className="text-center text-[10px] text-slate-400">ALL MARKET · ALLCODE</p>
                 </div>
             </div>
         </div>
@@ -370,10 +374,10 @@ export default function LoginPage() {
         {/* QR Scanner Modal */}
         {scannerOpen && (
             <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-                <div className="w-full max-w-sm bg-[#0a0f1a] rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                <div className="w-full max-w-sm bg-[#0a0f1a] rounded-2xl overflow-hidden border border-slate-200 shadow-2xl">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
                         <div className="flex items-center gap-2">
-                            {connectingServer ? <Loader2 className="w-4 h-4 text-amber-400 animate-spin" /> : <Camera className="w-4 h-4 text-emerald-400" />}
+                            {connectingServer ? <Loader2 className="w-4 h-4 text-amber-400 animate-spin" /> : <Camera className="w-4 h-4 text-[#3a7d89]" />}
                             <span className="text-sm font-bold text-white">{connectingServer ? 'Conectando...' : 'Escanear QR'}</span>
                         </div>
                         {!connectingServer && <button onClick={() => setScannerOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors">✕</button>}
@@ -399,7 +403,7 @@ export default function LoginPage() {
                             </div>
                         )}
                     </div>
-                    <div className="px-4 py-3 border-t border-white/10 text-center">
+                    <div className="px-4 py-3 border-t border-slate-200 text-center">
                         <p className="text-[10px] text-slate-500">{connectingServer ? 'Esperando respuesta...' : 'Apuntá al QR del panel web'}</p>
                     </div>
                 </div>
