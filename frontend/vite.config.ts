@@ -73,6 +73,59 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split third-party code out of the entry chunk so the app shell stays
+        // small and vendor code is cached independently between deploys.
+        // Function form (instead of the object form) because bare specifier
+        // matching is unreliable with pnpm's nested `node_modules/.pnpm/...` paths.
+        manualChunks(id: string) {
+          const posix = id.replace(/\\/g, '/');
+          if (!posix.includes('/node_modules/')) return undefined;
+
+          const matches = posix.match(/\/node_modules\/((?:@[^/]+\/)?[^/]+)/g);
+          const pkg = matches?.[matches.length - 1]?.replace('/node_modules/', '');
+
+          switch (pkg) {
+            // React core (+ its scheduler and store shim)
+            case 'react':
+            case 'react-dom':
+            case 'scheduler':
+            case 'use-sync-external-store':
+              return 'vendor-react';
+            // Data fetching
+            case '@tanstack/react-query':
+            case '@tanstack/query-core':
+              return 'vendor-query';
+            // Client state
+            case 'zustand':
+              return 'vendor-store';
+            // Icon set (lucide-react icons are individually tree-shaken)
+            case 'lucide-react':
+              return 'vendor-icons';
+            // Routing
+            case 'react-router':
+            case 'react-router-dom':
+            case '@remix-run/router':
+              return 'vendor-router';
+            // Internationalization
+            case 'i18next':
+            case 'i18next-browser-languagedetector':
+            case 'i18next-http-backend':
+            case 'react-i18next':
+              return 'vendor-i18n';
+            // HTTP client
+            case 'axios':
+              return 'vendor-http';
+            default:
+              return undefined;
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 600,
+  },
   server: {
     host: true,
     port: 5175,
