@@ -60,6 +60,7 @@ const QUICK_QUESTIONS = [
     { icon: '📦', text: '¿Qué productos tienen bajo stock?' },
     { icon: '👥', text: '¿Quiénes me deben?' },
     { icon: '📊', text: 'Resumen de esta semana' },
+    { icon: '📈', text: 'Analizar mis ventas y cómo vender más' },
 ];
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -249,35 +250,18 @@ export function AiChat() {
                                 } px-4 py-3`}>
                                     <p className="text-sm whitespace-pre-wrap leading-relaxed">{formatMarkdown(msg.content)}</p>
 
-                                    {/* Export buttons */}
-                                    {((msg.exportData && msg.exportData.length > 0) || (msg.rows && msg.rows.length > 0 && msg.content.includes('📊'))) && (
+                                    {/* Export buttons — solo cuando el usuario pidió exportar explícitamente */}
+                                    {msg.exportData && msg.exportData.length > 0 && (
                                         <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200/60">
-                                            <button type="button" onClick={() => downloadFile(msg.exportData?.length ? msg.exportData : msg.rows!, 'csv')}
+                                            <button type="button" onClick={() => downloadFile(msg.exportData!, 'csv')}
                                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 text-[11px] font-bold rounded-xl border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer">
                                                 <IconDownload /> CSV
                                             </button>
-                                            <button type="button" onClick={() => downloadFile(msg.exportData?.length ? msg.exportData : msg.rows!, 'excel')}
+                                            <button type="button" onClick={() => downloadFile(msg.exportData!, 'excel')}
                                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-xl border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer">
                                                 <IconDownload /> Excel
                                             </button>
-                                            <span className="text-[10px] text-slate-400 font-medium">{(msg.exportData?.length || msg.rows?.length || 0)} registros</span>
-                                        </div>
-                                    )}
-
-                                    {/* Row data preview */}
-                                    {msg.rows && msg.rows.length > 0 && !msg.content.includes('📊') && msg.role === 'assistant' && (
-                                        <div className="mt-3 pt-3 border-t border-slate-100">
-                                            <p className="text-[10px] text-slate-400 font-medium mb-2">{msg.rows.length} registros</p>
-                                            <div className="flex gap-1.5">
-                                                <button type="button" onClick={() => downloadFile(msg.rows!, 'csv')}
-                                                    className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-lg hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 border border-transparent transition-all cursor-pointer">
-                                                    <IconDownload className="w-3 h-3" /> CSV
-                                                </button>
-                                                <button type="button" onClick={() => downloadFile(msg.rows!, 'excel')}
-                                                    className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 border border-transparent transition-all cursor-pointer">
-                                                    <IconDownload className="w-3 h-3" /> Excel
-                                                </button>
-                                            </div>
+                                            <span className="text-[10px] text-slate-400 font-medium">{msg.exportData.length} registros</span>
                                         </div>
                                     )}
 
