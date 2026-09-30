@@ -59,19 +59,49 @@ function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number
 // ─── System prompt: asistente de negocio para gerentes ──────────────────────
 const SYSTEM_PROMPT = `Sos el asistente de ALL MARKET para gerentes de tiendas en Venezuela.
 
-1. Datos → genera SQL SELECT entre \`\`\`sql ... \`\`\`
-2. Acciones → guialo al módulo correcto (POS, Productos, Inventario, etc.)
-3. Sin datos → decí "Todavía no hay registros"
-4. Exportación → "EXPORT_DATA" al inicio + tabla markdown
+FLUJO:
+1. Datos/análisis → SIEMPRE generá un SQL SELECT dentro de \`\`\`sql ... \`\`\`
+2. Acciones / cómo usar el sistema → guialo al módulo correcto (POS, Productos, Inventario, etc.), sin SQL
+3. Exportación → SOLO si el usuario lo pidió explícitamente (exportar, csv, excel, descargar). Entonces empezá la respuesta con "EXPORT_DATA" seguido de una tabla markdown. NUNCA lo hagas en respuestas de datos normales.
+4. NUNCA digas "Todavía no hay registros" sin haber ejecutado un query. Solo repetí esa frase si el SQL realmente devolvió 0 filas.
+
+PREGUNTAS ANALÍTICAS:
+Cuando pregunten cosas como "analiza mis ventas", "cómo vender más", "qué puedo hacer para vender más", "dame recomendaciones", "consejos para vender": SIEMPRE generá un SQL analítico que traiga contexto real (productos más vendidos por ingreso, tendencia de ventas por día, ticket promedio, categorías, stock bajo). NUNCA respondas preguntas de recomendación con consejos genéricos sin datos.
+
+Ejemplo de SQL analítico (plantilla):
+\`\`\`sql
+WITH ventas_30 AS (
+  SELECT ti."productId", SUM(ti."subtotal") AS revenue, SUM(ti."quantity") AS units
+  FROM "transaction_items" ti
+  JOIN "transactions" t ON t."id" = ti."transactionId"
+  WHERE t."type"='SALE' AND t."status"='COMPLETED'
+    AND t."createdAt" >= NOW() - INTERVAL '30 days'
+  GROUP BY ti."productId"
+)
+SELECT p."name", g."name" AS category, v.revenue, v.units
+FROM ventas_30 v
+JOIN "products" p ON p."id" = v."productId"
+LEFT JOIN "groups" g ON g."id" = p."groupId"
+ORDER BY v.revenue DESC
+LIMIT 10
+\`\`\`
 
 REGLAS SQL:
-- SOLO SELECT. Columnas camelCase con comillas dobles
-- Ventas: "type"='SALE' AND "status"='COMPLETED'
-- Stock: branch_inventory."stock"
+- SOLO SELECT. Columnas camelCase entre comillas dobles: "name", "createdAt"
+- Ventas completadas: "type"='SALE' AND "status"='COMPLETED'
+- Fechas: "createdAt" >= NOW() - INTERVAL '7 days' (también '30 days', '90 days')
+- Stock: branch_inventory."stock", branch_inventory."minStock"
+- Categorías: groups."name" y sub_groups."name" a través de products."groupId" / products."subGroupId"
 
 MÓDULOS: POS(/pos) · Productos(/products) · Inventario(/inventory) · Finanzas(/finance) · Clientes(/customers) · Proveedores(/suppliers) · Dashboard(/dashboard) · Reportes(/reports) · Bancos(/banks) · Cotizaciones(/quotes)
 
-SCHEMA: "products":id,"name","price","cost" · "branches":id,"name" · "branch_inventory":id,"stock","minStock","productId","branchId" · "transactions":id,"type","status","total","createdAt","branchId" · "transaction_items":id,"quantity","subtotal","productId" · "customers":id,"name","balance" · "exchange_rates":id,"code","rate"`;
+SCHEMA:
+- "transactions": id, type (SALE | INVENTORY_IN | QUOTE), status (COMPLETED | CANCELLED | PENDING), total, createdAt, branchId, customerId, currency
+- "transaction_items": id, quantity, unitPrice, subtotal, transactionId, productId
+- "products": id, name, price, cost, groupId, subGroupId
+- "groups": id, name · "sub_groups": id, name, groupId
+- "branches": id, name · "branch_inventory": id, stock, minStock, productId, branchId
+- "customers": id, name, balance`;
 
 // ─── Seguridad: validar SQL ─────────────────────────────────────────────────
 
@@ -244,15 +274,14 @@ export const processAiQuestion = async (question: string, userId?: string): Prom
             : [];
 
         // ── PASO 3: Formatear respuesta natural ──────────────────────────────
+        // max_tokens 1200: las respuestas analíticas (recomendaciones) son más largas
         const answer = (await callWithRotation([
             { role: 'system', content: buildFormatPrompt(question, data) },
             { role: 'user', content: 'Dame la respuesta.' },
-        ], 0.3, 800)).trim() || formatDataFallback(data);
+        ], 0.3, 1200)).trim() || formatDataFallback(data);
 
-        // Detectar si el usuario pidió exportar
-        const wantsExport = /export|csv|excel|archivo|descargar|reporte/i.test(question);
-
-        if (wantsExport && data.length > 0) {
+        // Detectar si el usuario pidió exportar explícitamente
+        if (wantsExport(question) && data.length > 0) {
             return { answer: `📊 **Archivo listo para descargar** — ${data.length} registros.`, data, exportData: data };
         }
 
@@ -267,19 +296,47 @@ export const processAiQuestion = async (question: string, userId?: string): Prom
 };
 
 // ─── Prompt para formatear respuestas naturales ──────────────────────────────
+// Intención analítica: el usuario pide análisis, tendencias o recomendaciones.
+function isAdvisoryQuestion(question: string): boolean {
+    return /analiza|analiz|vender m[áa]s|recomend|consejo|c[óo]mo puedo|sugerenc|estrateg/i.test(question);
+}
+
 function buildFormatPrompt(question: string, data: any[]): string {
+    const dataBlock = data.length > 0
+        ? JSON.stringify(data.slice(0, 10))
+        : 'La consulta no devolvió registros.';
+
+    if (isAdvisoryQuestion(question)) {
+        return `Sos un analista de negocio. Respondé al dueño del negocio: "${question}"
+Datos: ${dataBlock}
+
+Estructura obligatoria:
+1. Qué muestran los datos — con números concretos ($).
+2. Tendencias o hallazgos.
+3. Entre 3 y 5 recomendaciones ACCIONABLES para vender más.
+
+Reglas: español natural de dueño de tienda, sin SQL, sin tecnicismos, moneda $, máximo ~200 palabras. NO menciones CSV, Excel ni exportación.`;
+    }
+
     return `Respondé al dueño del negocio: "${question}"
-Datos: ${JSON.stringify(data.slice(0, 10))}
-Reglas: español natural, sin SQL, sin tecnicismos. Sin datos → "Todavía no hay registros". Moneda: $. Breve.`;
+Datos: ${dataBlock}
+Reglas: español natural, sin SQL, sin tecnicismos. Si la consulta no devolvió registros, decí "No encontré registros para esa consulta". Moneda: $. Breve. NO menciones CSV, Excel ni exportación salvo que el usuario lo haya pedido explícitamente.`;
 }
 
 function formatDataFallback(data: any[]): string {
-    if (data.length === 0) return 'Todavía no hay registros de eso, pero cuando empieces a usar el sistema vas a tener todo acá 📊';
+    if (data.length === 0) return 'No encontré registros para esa consulta, pero cuando empieces a usar el sistema vas a tener todo acá';
     if (data.length === 1) {
         const keys = Object.keys(data[0]);
         if (keys.length === 1) return `El resultado es **${data[0][keys[0]]}**.`;
     }
     return data.slice(0, 5).map(r => Object.entries(r).map(([k, v]) => `**${k}**: ${v}`).join(' · ')).join('\n');
+}
+
+// ─── Intención de exportación ────────────────────────────────────────────────
+// "reporte" se eliminó a propósito: es demasiado amplio y matchea preguntas
+// de negocio comunes que no quieren descargar nada.
+export function wantsExport(question: string): boolean {
+    return /export|csv|excel|archivo|descargar/i.test(question);
 }
 
 // ─── Análisis de archivos subidos ────────────────────────────────────────────
