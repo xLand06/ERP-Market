@@ -62,3 +62,20 @@ de prueba (landing → management API), como primer bloque de cumplimiento legal
 ## Orden de despliegue (requisito)
 - La landing debe desplegarse ANTES (o junto) al management server: el form viejo no envía
   `acceptTerms` y recibiría 400 `ACCEPT_TERMS_REQUIRED` del endpoint nuevo.
+
+## Resultados de verificación (gatekeeper + RDD) — T1
+- Gatekeeper: PASS. Commits verificados en disco; hunk-staging de schema.prisma correcto
+  (billingSecret preservado fuera del commit); doc leído de vuelta.
+- Builds: `management/server pnpm prisma generate && pnpm build` → exit 0;
+  landing `pnpm build` (astro) → 1 page built OK.
+- RDD (on, global):
+  - ERP-Market @ base 638bd18: risk=medium (executable_change schema.prisma),
+    review_due=false, reason=under_budget (90 líneas).
+  - allmarket-landing @ base eba2e78: risk=medium (executable_change FinalCTA.astro),
+    review_due=false, reason=under_budget (30 líneas).
+  - Outcome registrado: "under budget" — review nativa pendiente al alcanzar el presupuesto del slice.
+- Nota: esta sección se registró en un commit docs propio antes de subir la rama.
+- Hallazgo operativo: `trust proxy` no está configurado en management/server/app.ts →
+  `consentIp` guardará la IP del proxy (no del cliente) detrás de reverse proxy. Pendiente T2/post-T2.
+- Hallazgo de precios (para T2): landing = $12/$20/$40 (commit eba2e78) vs TermsPage = $10/$20/$30
+  → TermsPage está desactualizado; unificar al precio vigente de landing.
