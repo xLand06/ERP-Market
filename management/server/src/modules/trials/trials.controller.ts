@@ -7,7 +7,10 @@ import * as trialsService from './trials.service';
  */
 export async function createHandler(req: Request, res: Response): Promise<void> {
     try {
-        const registration = await trialsService.createTrialRegistration(req.body);
+        const registration = await trialsService.createTrialRegistration({
+            ...req.body,
+            consentIp: req.ip,
+        });
         res.status(201).json({
             ok: true,
             id: registration.id,
@@ -15,6 +18,10 @@ export async function createHandler(req: Request, res: Response): Promise<void> 
             status: registration.status,
         });
     } catch (error: any) {
+        if (error.message === 'ACCEPT_TERMS_REQUIRED') {
+            res.status(400).json({ error: 'Debes aceptar los Términos y Condiciones y la Política de Privacidad.' });
+            return;
+        }
         if (error.message === 'TAX_ID_REQUIRED') {
             res.status(400).json({ error: 'El RIF o Documento de Identidad es obligatorio para solicitar la prueba gratis.' });
             return;
