@@ -1,6 +1,9 @@
 import { prisma } from '../../config/prisma';
 import { createTenant } from '../tenants/tenants.service';
 
+// Versión de los Términos y Condiciones vigentes para el consentimiento capturado.
+const TERMS_VERSION = '2026-09';
+
 export interface CreateTrialInput {
     businessName: string;
     ownerName: string;
@@ -9,6 +12,8 @@ export interface CreateTrialInput {
     email: string;
     plan?: string;
     notes?: string;
+    acceptedTerms?: boolean;
+    consentIp?: string;
 }
 
 export interface ApproveTrialInput {
@@ -44,6 +49,10 @@ export function slugify(text: string): string {
  * Crea una nueva solicitud de prueba gratis (Lead) con validación estricta anti-abuso.
  */
 export async function createTrialRegistration(input: CreateTrialInput) {
+    if (input.acceptedTerms !== true) {
+        throw new Error('ACCEPT_TERMS_REQUIRED');
+    }
+
     const cleanTaxId = normalizeTaxId(input.taxId);
     if (!cleanTaxId || cleanTaxId.length < 5) {
         throw new Error('TAX_ID_REQUIRED');
@@ -78,6 +87,10 @@ export async function createTrialRegistration(input: CreateTrialInput) {
             email: input.email.trim().toLowerCase(),
             plan: (input.plan || 'pro').toLowerCase(),
             notes: input.notes?.trim() || null,
+            acceptedTerms: true,
+            termsVersion: TERMS_VERSION,
+            acceptedAt: new Date(),
+            consentIp: input.consentIp ?? null,
         },
     });
 }

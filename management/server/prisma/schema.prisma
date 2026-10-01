@@ -125,6 +125,10 @@ model TrialRegistration {
     status       RegistrationStatus @default(PENDING)
     tenantSlug   String?
     notes        String?
+    acceptedTerms Boolean  @default(false)
+    termsVersion  String?   // versión de los T&C aceptados, ej. "2026-09"
+    acceptedAt    DateTime? // timestamp de aceptación
+    consentIp     String?   // IP desde la que se aceptó
     createdAt    DateTime           @default(now())
     updatedAt    DateTime           @updatedAt
 }
