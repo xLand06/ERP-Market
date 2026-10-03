@@ -89,16 +89,18 @@ export default function LoginPage() {
     const [connectingServer, setConnectingServer] = useState<string | null>(null);
     const scannerRef = useRef<any>(null);
     const streamRef = useRef<MediaStream | null>(null);
+    const rafRef = useRef<number | null>(null);
     const connectingRef = useRef(false);
 
     const stopScanner = async () => {
+        if (rafRef.current != null) {
+            cancelAnimationFrame(rafRef.current);
+            rafRef.current = null;
+        }
         const s = scannerRef.current;
         scannerRef.current = null;
         try {
-            if (s) {
-                if (typeof s.stop === 'function' && s.isScanning) await s.stop();
-                if (typeof s.clear === 'function') s.clear();
-            }
+            if (s && typeof s.stop === 'function' && s.isScanning) await s.stop();
         } catch { /* already stopped */ }
         streamRef.current?.getTracks().forEach(t => t.stop());
         streamRef.current = null;
@@ -180,63 +182,92 @@ export default function LoginPage() {
                 const container = document.getElementById('login-qr-scanner');
                 if (!container) throw new Error('Contenedor QR no encontrado');
 
-                // html5-qrcode decodeFromStream owns the <video> inside the container
+                // Manual <video> + jsQR — html5-qrcode black-screens on Capacitor Android
                 container.innerHTML = '';
+                const video = document.createElement('video');
+                video.setAttribute('playsinline', 'true');
+                video.setAttribute('webkit-playsinline', 'true');
+                video.muted = true;
+                video.autoplay = true;
+                video.setAttribute('autoplay', 'true');
+                video.style.cssText = 'width:100%;height:280px;object-fit:cover;display:block;background:#000;';
+                video.srcObject = stream;
+                container.appendChild(video);
                 streamRef.current = stream;
 
-                // Wait a frame so the element is measurable
-                await new Promise(r => requestAnimationFrame(() => r(null)));
+                await video.play().catch(() => { /* autoplay may need user gesture on some WebViews */ });
+
+                // Poll until the WebView actually paints frames (up to 2s)
+                let framesReady = false;
+                for (let i = 0; i < 20; i++) {
+                    if (cancelled) break;
+                    if (video.readyState >= 2 && video.videoWidth > 0) {
+                        framesReady = true;
+                        break;
+                    }
+                    await new Promise(r => setTimeout(r, 100));
+                }
 
                 if (cancelled) {
                     stream.getTracks().forEach(t => t.stop());
                     return;
                 }
+                if (!framesReady) {
+                    stream.getTracks().forEach(t => t.stop());
+                    fail('La cámara abrió pero no mostró imagen. Revisá permisos o reinstalá la APK.');
+                    return;
+                }
 
-                const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
-                const decoder = new Html5Qrcode('login-qr-scanner', {
-                    verbose: false,
-                    formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-                });
-                scannerRef.current = decoder;
+                const jsQR = (await import('jsqr')).default;
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                if (!ctx) throw new Error('Canvas no disponible');
 
-                await decoder.decodeFromStream(
-                    stream,
-                    {
-                        fps: 10,
-                        qrbox: { width: 220, height: 220 },
-                    },
-                    (decoded) => {
-                        if (connectingRef.current) return;
-                        const t = decoded.trim();
-                        let s: string | null = null;
-                        if (t.startsWith('allmarket://')) {
-                            try { s = new URL(t).searchParams.get('server'); } catch { /* ignore */ }
+                const tick = () => {
+                    if (cancelled || connectingRef.current) return;
+                    if (video.readyState >= 2 && video.videoWidth > 0) {
+                        const w = Math.min(video.videoWidth, 480);
+                        const scale = w / video.videoWidth;
+                        canvas.width = w;
+                        canvas.height = Math.round(video.videoHeight * scale);
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                            inversionAttempts: 'dontInvert',
+                        });
+                        if (code?.data) {
+                            const t = code.data.trim();
+                            let s: string | null = null;
+                            if (t.startsWith('allmarket://')) {
+                                try { s = new URL(t).searchParams.get('server'); } catch { /* ignore */ }
+                            }
+                            if (!s && /^https?:\/\//.test(t)) s = t;
+                            if (s) {
+                                if (navigator.vibrate) try { navigator.vibrate(100); } catch { /* ignore */ }
+                                try {
+                                    const actx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                                    const o = actx.createOscillator();
+                                    const g = actx.createGain();
+                                    o.connect(g); g.connect(actx.destination);
+                                    o.frequency.value = 1000;
+                                    g.gain.setValueAtTime(0.1, actx.currentTime);
+                                    o.start(); o.stop(actx.currentTime + 0.1);
+                                } catch { /* ignore */ }
+                                void validateAndConnect(s);
+                                return;
+                            }
                         }
-                        if (!s && /^https?:\/\//.test(t)) s = t;
-                        if (s) {
-                            if (navigator.vibrate) try { navigator.vibrate(100); } catch { /* ignore */ }
-                            try {
-                                const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-                                const o = ctx.createOscillator();
-                                const g = ctx.createGain();
-                                o.connect(g); g.connect(ctx.destination);
-                                o.frequency.value = 1000;
-                                g.gain.setValueAtTime(0.1, ctx.currentTime);
-                                o.start(); o.stop(ctx.currentTime + 0.1);
-                            } catch { /* ignore */ }
-                            void validateAndConnect(s);
-                        }
-                    },
-                    () => { /* per-frame miss */ },
-                );
+                    }
+                    rafRef.current = requestAnimationFrame(tick);
+                };
+                rafRef.current = requestAnimationFrame(tick);
 
                 if (!cancelled) setScannerStatus('ready');
             } catch (err: any) {
                 stream?.getTracks().forEach(t => t.stop());
                 if (cancelled) return;
                 const msg = String(err?.message || '');
-                if (/start-timeout|timeout/i.test(msg)) fail('La cámara tardó demasiado en iniciar. Probá de nuevo.');
-                else fail(msg || 'Error al iniciar la cámara.');
+                fail(msg || 'Error al iniciar la cámara.');
             }
         };
 
