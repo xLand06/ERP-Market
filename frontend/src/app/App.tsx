@@ -33,13 +33,26 @@ async function applyDeepLinkServer(rawUrl: string): Promise<boolean> {
     try {
         server = new URL(rawUrl).searchParams.get('server');
     } catch { /* ignore */ }
-    if (!server) return false;
+    if (!server) {
+        toast.error('QR sin servidor');
+        return false;
+    }
     const normalized = normalizeServerUrl(server);
-    if (!normalized) return false;
-    await AppStorage.setItem('serverUrl', normalized);
-    setServerUrlCache(normalized);
+    if (!normalized) {
+        toast.error('URL de servidor inválida en el QR');
+        return false;
+    }
+    try {
+        await AppStorage.setItem('serverUrl', normalized);
+        setServerUrlCache(normalized);
+    } catch (e: any) {
+        toast.error('No se pudo guardar el servidor: ' + String(e?.message || e));
+        // still try cache-only
+        setServerUrlCache(normalized);
+    }
     toast.success(`Conectado a ${normalized.replace(/^https?:\/\//, '')}`);
-    window.location.href = '/login';
+    // Force login route (not dashboard)
+    window.location.replace('/login');
     return true;
 }
 

@@ -3,8 +3,10 @@ package com.erpmarket.app;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.webkit.WebView;
+import android.os.Handler;
+import android.os.Looper;
 import android.webkit.WebSettings;
+import android.webkit.WebView;
 import android.widget.Toast;
 import android.util.Log;
 
@@ -15,23 +17,13 @@ import org.json.JSONObject;
 
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "MainActivity";
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(QrScannerPlugin.class);
         super.onCreate(savedInstanceState);
 
-        // Huawei WebView HTTP cache can survive uninstall — wipe after bridge exists
-        try {
-            WebView wb = getBridge() != null ? getBridge().getWebView() : null;
-            if (wb != null) {
-                wb.clearCache(true);
-                WebSettings s = wb.getSettings();
-                s.setCacheMode(WebSettings.LOAD_NO_CACHE);
-            }
-        } catch (Exception ignored) { }
-
-        // Visible package version proof
         try {
             final String ver = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
             getWindow().getDecorView().post(() ->
@@ -39,7 +31,11 @@ public class MainActivity extends BridgeActivity {
             );
         } catch (Exception ignored) { }
 
-        // Cold-start deep link: allmarket://connect?server=...
+        // WebView may not exist yet in onCreate — retry a few times
+        wipeWebViewCache();
+        mainHandler.postDelayed(this::wipeWebViewCache, 500);
+        mainHandler.postDelayed(this::wipeWebViewCache, 1500);
+
         handleDeepLink(getIntent());
     }
 
@@ -48,6 +44,29 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         handleDeepLink(intent);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        wipeWebViewCache();
+        handleDeepLink(getIntent());
+    }
+
+    private void wipeWebViewCache() {
+        try {
+            Bridge bridge = getBridge();
+            if (bridge == null) return;
+            WebView wb = bridge.getWebView();
+            if (wb == null) return;
+            wb.clearCache(true);
+            wb.clearHistory();
+            WebSettings s = wb.getSettings();
+            s.setCacheMode(WebSettings.LOAD_NO_CACHE);
+            s.setAppCacheEnabled(false);
+        } catch (Throwable t) {
+            Log.w(TAG, "wipeWebViewCache", t);
+        }
     }
 
     private void handleDeepLink(Intent intent) {
@@ -59,17 +78,14 @@ public class MainActivity extends BridgeActivity {
 
         final String url = data.toString();
         Log.i(TAG, "Deep link: " + url);
-        try {
-            final Bridge bridge = getBridge();
-            if (bridge == null || bridge.getWebView() == null) {
-                // Bridge not ready yet — stash and retry shortly
-                getWindow().getDecorView().postDelayed(() -> injectDeepLink(url), 800);
-                return;
-            }
-            injectDeepLink(url);
-        } catch (Exception e) {
-            Log.e(TAG, "deep link inject failed", e);
-        }
+        runOnUiThread(() ->
+            Toast.makeText(this, "QR: " + url, Toast.LENGTH_LONG).show()
+        );
+
+        // Inject now and again after WebView is definitely up
+        injectDeepLink(url);
+        mainHandler.postDelayed(() -> injectDeepLink(url), 700);
+        mainHandler.postDelayed(() -> injectDeepLink(url), 2000);
     }
 
     private void injectDeepLink(final String url) {
@@ -77,8 +93,8 @@ public class MainActivity extends BridgeActivity {
             final Bridge bridge = getBridge();
             if (bridge == null || bridge.getWebView() == null) return;
             final String js =
-                "try{window.dispatchEvent(new CustomEvent('appUrlOpen',{detail:{url:" + JSONObject.quote(url) + "}}));}catch(e){}";
-            bridge.getWebView().post(() -> {
+                "try{window.dispatchEvent(new CustomEvent('appUrlOpen',{detail:{url:" + JSONObject.quote(url) + "}}));}catch(e){console.error(e);}";
+            runOnUiThread(() -> {
                 try {
                     bridge.getWebView().evaluateJavascript(js, null);
                 } catch (Exception e) {
