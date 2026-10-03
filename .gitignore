@@ -52,3 +52,4 @@ backend/prisma/test-auth.db*
 # Large binaries
 deploy/downloads/
 desktop/tsconfig.node.tsbuildinfo
+artifacts/
