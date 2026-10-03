@@ -33,10 +33,13 @@ public class MainActivity extends BridgeActivity {
 
         // WebView may not exist yet in onCreate — retry a few times
         wipeWebViewCache();
-        mainHandler.postDelayed(this::wipeWebViewCache, 500);
-        mainHandler.postDelayed(this::wipeWebViewCache, 1500);
+        mainHandler.postDelayed(this::wipeWebViewCache, 400);
+        mainHandler.postDelayed(this::wipeWebViewCache, 1200);
+        mainHandler.postDelayed(this::wipeWebViewCache, 2500);
 
         handleDeepLink(getIntent());
+        mainHandler.postDelayed(() -> handleDeepLink(getIntent()), 600);
+        mainHandler.postDelayed(() -> handleDeepLink(getIntent()), 1800);
     }
 
     @Override
@@ -44,13 +47,6 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         handleDeepLink(intent);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        wipeWebViewCache();
-        handleDeepLink(getIntent());
     }
 
     private void wipeWebViewCache() {
@@ -63,7 +59,6 @@ public class MainActivity extends BridgeActivity {
             wb.clearHistory();
             WebSettings s = wb.getSettings();
             s.setCacheMode(WebSettings.LOAD_NO_CACHE);
-            s.setAppCacheEnabled(false);
         } catch (Throwable t) {
             Log.w(TAG, "wipeWebViewCache", t);
         }
@@ -82,7 +77,6 @@ public class MainActivity extends BridgeActivity {
             Toast.makeText(this, "QR: " + url, Toast.LENGTH_LONG).show()
         );
 
-        // Inject now and again after WebView is definitely up
         injectDeepLink(url);
         mainHandler.postDelayed(() -> injectDeepLink(url), 700);
         mainHandler.postDelayed(() -> injectDeepLink(url), 2000);
