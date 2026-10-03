@@ -8,7 +8,7 @@ import type { LoginPayload } from '@/features/auth/types';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
-import { normalizeServerUrl, setServerUrlCache } from '@/lib/server-url';
+import { normalizeServerUrl, setServerUrlCache, getServerUrlCache } from '@/lib/server-url';
 import { isOnline } from '@/lib/api';
 
 const isCapacitor = !!(window as any).Capacitor;
@@ -33,6 +33,11 @@ export default function LoginPage() {
     const showCaptcha = getShowCaptcha();
 
     const [cloudOnline, setCloudOnline] = useState<boolean | null>(null);
+    const [activeServer, setActiveServer] = useState<string | null>(null);
+
+    useEffect(() => {
+        setActiveServer(getServerUrlCache());
+    }, []);
     const [syncing, setSyncing] = useState(false);
     const [lastSync, setLastSync] = useState<string | null>(null);
 
@@ -602,6 +607,15 @@ export default function LoginPage() {
                             {syncing ? 'Sync...' : 'Sincronizar'}
                         </button>
                     </div>
+                    {activeServer ? (
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 text-center font-mono px-2 truncate">
+                            API: {activeServer.replace(/^https?:\/\//, '')}/api
+                        </p>
+                    ) : (
+                        <p className="text-[10px] text-amber-600 dark:text-amber-400 text-center font-semibold px-2">
+                            Sin servidor configurado — escaneá el QR del panel
+                        </p>
+                    )}
 
                     {/* Connect */}
                     <div className="bg-white dark:bg-[#161B22] rounded-2xl p-4 space-y-3 shadow-sm border border-slate-200/60 dark:border-[#30363D]">
@@ -653,6 +667,9 @@ export default function LoginPage() {
                             {syncing ? 'Sync...' : 'Sincronizar'}
                         </button>
                     </div>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 text-center font-mono px-2 truncate">
+                        {activeServer ? `API: ${activeServer.replace(/^https?:\/\//, '')}/api` : 'Sin servidor — escaneá el QR'}
+                    </p>
 
                     {/* Connect buttons compact */}
                     <div className="flex gap-2">

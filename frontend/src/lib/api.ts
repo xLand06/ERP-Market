@@ -8,7 +8,10 @@ import { useAuthStore } from '../features/auth/store/authStore';
 import toast from 'react-hot-toast';
 
 import { AppStorage } from '../services/app-storage';
-import { getServerUrlCache, setServerUrlCache } from './server-url';
+import { getServerUrlCache, setServerUrlCache, hydrateServerUrlFromStorage } from './server-url';
+
+// Sync-hydrate BEFORE any axios call (App useEffect order)
+hydrateServerUrlFromStorage();
 
 // ── Capacitor HTTP Adapter ──────────────────────────────────────────────────
 // En Capacitor, fetch() está bloqueado por cross-origin en el WebView.

@@ -22,6 +22,7 @@ import { useAuthStore } from '@/features/auth/store/authStore';
 import InitialSyncScreen from '@/components/loading/InitialSyncScreen';
 import ConnectScreen from '@/components/loading/ConnectScreen';
 import { AppStorage } from '@/services/app-storage';
+import { getServerUrlCache } from '@/lib/server-url';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
@@ -50,16 +51,26 @@ export default function App() {
         }
     }, []);
 
+    // Fetch settings ONLY after serverUrl is known on native — otherwise
+    // axios hits /api on capacitor://localhost and the user sees Network Error.
     useEffect(() => {
-        fetchSettings();
-    }, [fetchSettings]);
+        if (!serverUrlReady) return;
+        const isNative = !!(window as any).Capacitor?.isNativePlatform?.()
+            || window.location.protocol === 'capacitor:'
+            || window.location.hostname === 'localhost';
+        if (isNative && !getServerUrlCache() && !(window as any).erpApi?.serverUrl) {
+            return; // ConnectScreen will handle it
+        }
+        void fetchSettings();
+    }, [fetchSettings, serverUrlReady]);
 
     // ── Inicializar serverUrl desde SQLite/localStorage ─────────────────────
     useEffect(() => {
         (async () => {
             const url = await AppStorage.initServerUrl();
             const electronUrl = (window as any).erpApi?.serverUrl;
-            setHasServerUrl(!!url || !!electronUrl);
+            const cached = getServerUrlCache() || url;
+            setHasServerUrl(!!cached || !!electronUrl);
             setServerUrlReady(true);
         })();
     }, []);

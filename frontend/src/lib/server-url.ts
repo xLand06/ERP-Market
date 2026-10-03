@@ -31,3 +31,23 @@ export function setServerUrlCache(url: string | null | undefined) {
 export function getServerUrlCache(): string | null {
     return cachedServerUrl;
 }
+
+/**
+ * Hydrate cache SYNCHRONOUSLY from localStorage at module import time.
+ * App effects (fetchSettings) can fire before async SQLite init finishes —
+ * without this, the first requests hit /api on capacitor://localhost → Network Error.
+ */
+export function hydrateServerUrlFromStorage() {
+    if (cachedServerUrl) return cachedServerUrl;
+    try {
+        const raw = localStorage.getItem('serverUrl');
+        const normalized = normalizeServerUrl(raw);
+        if (normalized) {
+            cachedServerUrl = normalized;
+            try { localStorage.setItem('serverUrl', normalized); } catch { /* ignore */ }
+        }
+    } catch { /* private mode */ }
+    return cachedServerUrl;
+}
+
+hydrateServerUrlFromStorage();
