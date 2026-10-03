@@ -99,6 +99,21 @@ export default function App() {
         (async () => {
             const url = await AppStorage.initServerUrl();
             const electronUrl = (window as any).erpApi?.serverUrl;
+            const isNative = !!(window as any).Capacitor?.isNativePlatform?.()
+                || window.location.protocol === 'capacitor:'
+                || window.location.hostname === 'localhost';
+
+            // Test APK: force test tenant, skip ConnectScreen/QR entirely
+            if (isNative && !getServerUrlCache() && !electronUrl) {
+                const { TEST_SERVER_URL, normalizeServerUrl } = await import('@/lib/server-url');
+                const forced = normalizeServerUrl(TEST_SERVER_URL);
+                if (forced) {
+                    await AppStorage.setItem('serverUrl', forced);
+                    const { setServerUrlCache } = await import('@/lib/server-url');
+                    setServerUrlCache(forced);
+                }
+            }
+
             const cached = getServerUrlCache() || url;
             setHasServerUrl(!!cached || !!electronUrl);
             setServerUrlReady(true);
@@ -227,13 +242,14 @@ export default function App() {
     // Thin client sin servidor: mostrar ConnectScreen
     // Web normal → NUNCA (usa /api relativo del mismo origen)
     // Electron → cuando no tiene serverUrl
-    // Capacitor APK → cuando no tiene serverUrl (carga desde https://localhost)
+    // Capacitor APK test → serverUrl forzado a test.allcode.site (sin QR)
     const isElectron = !!(window as any).erpApi?.isElectron;
     const isCapacitorNative = !!(window as any).Capacitor?.isNativePlatform?.()
         || window.location.protocol === 'capacitor:'
         || window.location.hostname === 'localhost';
-    const needsConnectScreen = isElectron || isCapacitorNative;
-    if (needsConnectScreen && !hasServerUrl) {
+    // Test APK never shows ConnectScreen — server is hardcoded
+    const needsConnectScreen = isElectron && !hasServerUrl;
+    if (needsConnectScreen) {
         return <ConnectScreen />;
     }
 

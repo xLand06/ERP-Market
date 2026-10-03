@@ -705,7 +705,7 @@ export default function LoginPage() {
                             )}
 
                             {/* QR Scanner — APK only */}
-                            {isCapacitor && (
+                            {isCapacitor && false && (
                                 <button type="button" onClick={openScanner} className="w-full h-12 rounded-xl border border-[#3a7d89]/30 dark:border-teal-500/40 bg-[#4ecdc4]/10 dark:bg-teal-500/15 text-[#3a7d89] dark:text-teal-300 font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#4ecdc4]/20 dark:hover:bg-teal-500/25 transition-all active:scale-95">
                                     <Camera className="w-4 h-4" /> Escanear QR
                                 </button>

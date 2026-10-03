@@ -3,6 +3,9 @@
 
 let cachedServerUrl: string | null = null;
 
+/** Default tenant for APK test builds — always points to test API. */
+export const TEST_SERVER_URL = 'https://test.allcode.site';
+
 export function normalizeServerUrl(url: string | null | undefined): string | null {
     if (!url) return null;
     let u = String(url).trim();
@@ -32,10 +35,21 @@ export function getServerUrlCache(): string | null {
     return cachedServerUrl;
 }
 
+function isNativeAppEnv(): boolean {
+    try {
+        const c = (window as any).Capacitor;
+        if (!c) return false;
+        if (typeof c.isNativePlatform === 'function') return !!c.isNativePlatform();
+        return !!c.platform && c.platform !== 'web';
+    } catch {
+        return false;
+    }
+}
+
 /**
  * Hydrate cache SYNCHRONOUSLY from localStorage at module import time.
- * App effects (fetchSettings) can fire before async SQLite init finishes —
- * without this, the first requests hit /api on capacitor://localhost → Network Error.
+ * APK test builds: if nothing stored, force TEST_SERVER_URL so login opens
+ * immediately without QR/connect step.
  */
 export function hydrateServerUrlFromStorage() {
     if (cachedServerUrl) return cachedServerUrl;
@@ -45,6 +59,10 @@ export function hydrateServerUrlFromStorage() {
         if (normalized) {
             cachedServerUrl = normalized;
             try { localStorage.setItem('serverUrl', normalized); } catch { /* ignore */ }
+        } else if (isNativeAppEnv()) {
+            // Test APK: always use test tenant, skip connect/QR
+            cachedServerUrl = TEST_SERVER_URL;
+            try { localStorage.setItem('serverUrl', TEST_SERVER_URL); } catch { /* ignore */ }
         }
     } catch { /* private mode */ }
     return cachedServerUrl;
