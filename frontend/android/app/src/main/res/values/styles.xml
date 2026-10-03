@@ -17,6 +17,12 @@
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <!-- Android 12+ system splash -->
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+        <!-- Pre-12 full-screen splash drawable (Allmark cream + logo) -->
+        <item name="android:windowBackground">@drawable/splash</item>
+        <item name="android:background">@color/splash_background</item>
     </style>
 </resources>
