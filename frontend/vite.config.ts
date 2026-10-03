@@ -10,7 +10,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.webp', 'favicon.svg', 'logo-allmarket.webp', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.ico', 'favicon.webp', 'favicon-32x32.png', 'favicon-16x16.png', 'logo-allmarket.webp', 'apple-touch-icon.png'],
       manifest: {
         name: 'ALL MARKET — ERP para Bodegas',
         short_name: 'ALL MARKET',
@@ -20,6 +20,12 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'portrait',
         icons: [
+          {
+            src: 'favicon-32x32.png',
+            sizes: '32x32',
+            type: 'image/png',
+            purpose: 'any',
+          },
           {
             src: 'favicon.webp',
             sizes: '96x96',
