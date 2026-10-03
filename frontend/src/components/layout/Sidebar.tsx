@@ -231,7 +231,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                         <img
                             src="/isotipo-white.webp"
                             alt="ALLMARKET"
-                            className="h-7 lg:h-8 w-auto max-w-[140px] shrink-0 animate-in fade-in duration-300 delay-150"
+                            className="h-9 lg:h-10 w-auto max-w-[160px] shrink-0 animate-in fade-in duration-300 delay-150"
                             draggable={false}
                         />
                     )}
