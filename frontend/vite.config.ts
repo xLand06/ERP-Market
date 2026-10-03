@@ -4,10 +4,14 @@ import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
 
+// APK builds: no service worker (PWA cache shows stale UI inside Capacitor WebView)
+const isApkBuild = process.env.CAPACITOR_BUILD === "1" || process.env.ANDROID === "1";
+
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    ...(isApkBuild ? [] : [
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'favicon.webp', 'favicon-32x32.png', 'favicon-16x16.png', 'logo-allmarket.webp', 'apple-touch-icon.png'],
@@ -85,6 +89,7 @@ export default defineConfig({
         ],
       },
     }),
+    ]),
   ],
   resolve: {
     alias: {

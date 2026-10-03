@@ -9,7 +9,7 @@
         "preview": "vite preview",
         "test": "vitest run",
         "test:watch": "vitest",
-        "build:apk": "vite build && cap sync android",
+        "build:apk": "CAPACITOR_BUILD=1 vite build && cap sync android",
         "open:android": "CAPACITOR_ANDROID_STUDIO_PATH=/home/adrianvergel/.local/bin/studio.sh cap open android"
     },
     "dependencies": {
