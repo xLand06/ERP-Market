@@ -742,7 +742,7 @@ export default function LoginPage() {
                         {/* Downloads desktop */}
                         <div className="pt-2 border-t border-slate-200 dark:border-[#30363D]">
                             <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center mb-2">Descargar app</p>
-                            {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/app.apk', label: 'Android APK', icon: Smartphone, color: 'text-[#3a7d89] dark:text-teal-400' }].map(d => (
+                            {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/allmarket.apk', label: 'Android APK', icon: Smartphone, color: 'text-[#3a7d89] dark:text-teal-400' }].map(d => (
                                 <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')}
                                     className="flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl border border-slate-200 dark:border-[#30363D] text-slate-700 dark:text-slate-200 hover:border-emerald-500/40 hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all active:scale-95">
                                     <d.icon className={`w-5 h-5 ${d.color} shrink-0`} />
@@ -796,7 +796,7 @@ export default function LoginPage() {
                     {/* Downloads */}
                     <div className="bg-white dark:bg-[#161B22] rounded-2xl p-3 space-y-2 shadow-sm border border-slate-200/60 dark:border-[#30363D]">
                         <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Descargar app</p>
-                        {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/app.apk', label: 'Android APK', icon: Smartphone, color: 'text-[#3a7d89] dark:text-teal-400' }].map(d => (
+                        {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/allmarket.apk', label: 'Android APK', icon: Smartphone, color: 'text-[#3a7d89] dark:text-teal-400' }].map(d => (
                             <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')}
                                 className="flex items-center gap-3 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-[#30363D] text-slate-700 dark:text-slate-200 hover:border-emerald-500/40 hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all active:scale-95">
                                 <d.icon className={`w-5 h-5 ${d.color} shrink-0`} />
