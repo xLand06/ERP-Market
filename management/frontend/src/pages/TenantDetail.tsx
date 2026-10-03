@@ -1511,7 +1511,7 @@ export default function TenantDetailPage() {
                                     Abrir panel web
                                 </a>
                                 <a
-                                    href={`${tenant.url}/apk/app.apk`}
+                                    href={`${tenant.url}/apk/allmarket.apk`}
                                     download
                                     style={{
                                         padding: '0.35rem 0.75rem',
