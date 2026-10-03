@@ -143,7 +143,7 @@ export default function LoginPage() {
             try {
                 const stream = await Promise.race([
                     navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+                        video: { facingMode: { ideal: 'environment' } },
                         audio: false,
                     }),
                     new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000)),
@@ -160,11 +160,31 @@ export default function LoginPage() {
             }
             if (cancelled) return;
 
-            // 2) Start scanner with facingMode (more reliable on Android than camera IDs)
+            // 2) Prefer rear camera by deviceId — Android WebViews often ignore facingMode
             try {
                 setScannerStatus('starting');
                 const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
                 if (cancelled) return;
+
+                let camera: string | { facingMode: string } = { facingMode: 'environment' };
+                try {
+                    const cameras = await Html5Qrcode.getCameras();
+                    if (cameras?.length) {
+                        const backRe = /back|rear|environment|trasera|posterior|cámara trasera|camera2.*back/i;
+                        const frontRe = /front|user|delantera|selfie/i;
+                        const scored = cameras.map((c: any, i: number) => {
+                            const label = String(c?.label || '');
+                            let score = 0;
+                            if (backRe.test(label)) score += 100;
+                            if (frontRe.test(label)) score -= 50;
+                            // Many Android devices list front first, rear last
+                            if (cameras.length > 1) score += i;
+                            return { id: c.id as string, label, score, i };
+                        });
+                        scored.sort((a, b) => b.score - a.score);
+                        camera = scored[0].id;
+                    }
+                } catch { /* keep facingMode fallback */ }
 
                 await stopScanner();
                 const scanner = new Html5Qrcode('login-qr-scanner', {
@@ -175,7 +195,7 @@ export default function LoginPage() {
 
                 await Promise.race([
                     scanner.start(
-                        { facingMode: 'environment' },
+                        camera,
                         {
                             fps: 10,
                             qrbox: { width: 220, height: 220 },
