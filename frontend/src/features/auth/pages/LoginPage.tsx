@@ -11,6 +11,7 @@ import QRCode from 'qrcode';
 import { normalizeServerUrl, setServerUrlCache, getServerUrlCache } from '@/lib/server-url';
 import { isOnline } from '@/lib/api';
 import { collectConnectionDebug, formatDebugLines, type ConnectionDebug } from '@/lib/connection-debug';
+import { nativeGet, nativePost, isNativeApp, humanNetError, requireServerOrigin } from '@/lib/native-http';
 import { Bug, Play, ChevronDown, ChevronUp } from 'lucide-react';
 
 const isCapacitor = !!(window as any).Capacitor;
@@ -120,22 +121,50 @@ export default function LoginPage() {
         if (rl.blocked) { setGeneralError(`Demasiados intentos fallidos. Esperá ${Math.ceil(rl.remainingMs / 1000)} segundos.`); return; }
         if (showCaptcha && !captchaValid) { setGeneralError('Resolvé la operación matemática para continuar.'); return; }
         if (!validate()) return;
-        try { await login(form as LoginPayload); resetLoginAttempts(); } catch (err) {
+        try {
+            if (isNativeApp()) {
+                const res = await nativePost('/auth/login', {
+                    username: form.username,
+                    password: form.password,
+                    email: form.username,
+                });
+                if (!res.ok) {
+                    const apiMsg = res.data?.error || res.data?.message || `HTTP ${res.status}`;
+                    throw new Error(typeof apiMsg === 'string' ? apiMsg : JSON.stringify(apiMsg));
+                }
+                const payload = res.data?.data ?? res.data;
+                const token = payload?.token || payload?.accessToken;
+                const user = payload?.user || payload?.data?.user;
+                if (token && user) {
+                    useAuthStore.getState().setAuth(token, user);
+                    resetLoginAttempts();
+                    window.location.reload();
+                    return;
+                }
+                await login(form as LoginPayload);
+                resetLoginAttempts();
+                return;
+            }
+            await login(form as LoginPayload);
+            resetLoginAttempts();
+        } catch (err) {
             if (err instanceof Error) {
                 const parsed = parseError(err);
                 if (parsed.username || parsed.password) return;
                 const server = getServerUrlCache();
                 const host = server ? server.replace(/^https?:\/\//, '') : 'sin servidor';
-                const isNet = /network|failed to fetch|timeout/i.test(err.message);
+                const isNet = /network|failed to fetch|timeout|CAP_HTTP/i.test(err.message);
                 setGeneralError(
                     isNet
-                        ? `${err.message} — API: ${host}/api. Tocá "Diagnosticar" abajo.`
+                        ? `${err.message} — API: ${host}/api. Abrí Diagnosticar conexión.`
                         : err.message
                 );
+                if (isNet) setDebugOpen(true);
+                void runDiagnostics();
                 recordLoginAttempt(); setRateState(getLoginRateLimit()); setCaptchaKey(k => k + 1);
             }
         }
-    }, [form, validate, login, parseError, captchaValid, showCaptcha]);
+    }, [form, validate, login, parseError, captchaValid, showCaptcha, runDiagnostics]);
 
     const connectDesktop = () => { window.location.href = `allmarket://connect?server=${encodeURIComponent(window.location.origin)}`; };
 

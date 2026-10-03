@@ -49,12 +49,22 @@ function ensureCapacitorHttp(): Promise<any> {
 
 /**
  * Custom axios adapter para Capacitor — usa HTTP nativo en vez de fetch.
+ * Retries plugin init once; never leaves "not initialized" as Network Error.
  */
 function createCapacitorAdapter() {
     return async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
-        const http = await ensureCapacitorHttp();
+        let http = capacitorHttp;
         if (!http) {
-            throw new Error('Capacitor HTTP not initialized');
+            try {
+                http = await ensureCapacitorHttp();
+            } catch {
+                http = await ensureCapacitorHttp();
+            }
+        }
+        if (!http) {
+            const err: any = new Error('Capacitor HTTP plugin no disponible');
+            err.code = 'CAP_HTTP_MISSING';
+            throw err;
         }
 
         const method = (config.method || 'get').toUpperCase();

@@ -79,7 +79,7 @@ app.use(cors({
         const isLocalNetwork = /^http:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+):51[7-8][0-9]$/.test(origin);
 
         // Origenes de Capacitor (WebView Android: https://localhost, iOS: capacitor://localhost)
-        const isCapacitorOrigin = /^(https?|capacitor|ionic):\/\/localhost$/.test(origin);
+        const isCapacitorOrigin = /^(https?|capacitor|ionic):\/\/localhost(:\d+)?$/i.test(origin);
 
         if (allowedUrls.includes(origin) || allowedUrls.includes('*') || isLocalDevelopment || isLocalNetwork || isCapacitorOrigin) {
             callback(null, true);
