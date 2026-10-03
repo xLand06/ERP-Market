@@ -13,13 +13,35 @@ import { getServerUrlCache, setServerUrlCache } from './server-url';
 // ── Capacitor HTTP Adapter ──────────────────────────────────────────────────
 // En Capacitor, fetch() está bloqueado por cross-origin en el WebView.
 // Usamos CapacitorHttp de @capacitor/core que bypass el WebView y usa HTTP nativo.
-const isCapacitor = !!(window as any).Capacitor || window.location.hostname === 'localhost';
+function detectNative(): boolean {
+    try {
+        const c = (window as any).Capacitor;
+        if (!c) return false;
+        if (typeof c.isNativePlatform === 'function') return !!c.isNativePlatform();
+        return !!c.platform && c.platform !== 'web';
+    } catch {
+        return false;
+    }
+}
+
+const isCapacitor = detectNative() || window.location.hostname === 'localhost';
 
 let capacitorHttp: any = null;
-if (isCapacitor) {
-    import('@capacitor/core').then(({ CapacitorHttp }) => {
-        capacitorHttp = CapacitorHttp;
-    }).catch(() => {});
+let capacitorHttpReady: Promise<any> | null = null;
+function ensureCapacitorHttp(): Promise<any> {
+    if (capacitorHttp) return Promise.resolve(capacitorHttp);
+    if (!capacitorHttpReady) {
+        capacitorHttpReady = import('@capacitor/core')
+            .then(({ CapacitorHttp }) => {
+                capacitorHttp = CapacitorHttp;
+                return capacitorHttp;
+            })
+            .catch((e) => {
+                capacitorHttpReady = null;
+                throw e;
+            });
+    }
+    return capacitorHttpReady;
 }
 
 /**
@@ -27,7 +49,8 @@ if (isCapacitor) {
  */
 function createCapacitorAdapter() {
     return async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
-        if (!capacitorHttp) {
+        const http = await ensureCapacitorHttp();
+        if (!http) {
             throw new Error('Capacitor HTTP not initialized');
         }
 
@@ -60,7 +83,7 @@ function createCapacitorAdapter() {
             options.url += (url.includes('?') ? '&' : '?') + qs;
         }
 
-        const response = await capacitorHttp.request(options);
+        const response = await http.request(options);
 
         return {
             data: response.data,
@@ -94,8 +117,10 @@ const isElectron = window.location.protocol === 'file:' || (window as any).erpAp
 // Se llena en AppStorage.initServerUrl() / setServerUrlCache (QR scan)
 export { setServerUrlCache, getServerUrlCache };
 
-// VITE_API_URL anula todo si está definida (builds web con API externa)
-const envBaseURL = import.meta.env.VITE_API_URL as string | undefined;
+// VITE_API_URL — SOLO web/dev. En APK/Capacitor NUNCA debe pisar el serverUrl del QR.
+// (.env local trae http://localhost:3000/api — inútil y dañino en el teléfono)
+const envBaseURL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, '');
+const envBaseIsLocalhost = !!envBaseURL && /localhost|127\.0\.0\.1/i.test(envBaseURL);
 
 // La instancia usa HTTP nativo en Capacitor, fetch normal en web/Electron
 export const api = axios.create({
@@ -104,17 +129,23 @@ export const api = axios.create({
     adapter: isCapacitor ? createCapacitorAdapter() as any : undefined,
 });
 
-// Prefijo dinámico de la base URL — preserva el comportamiento web (relativo /api).
+// Prefijo dinámico de la base URL.
+// Prioridad APK: serverUrl QR > Electron > relativo /api
+// Prioridad web: env (si no es localhost basura) > relativo
 api.interceptors.request.use((config) => {
-    // Prioridad: env > cache SQLite (QR scan) > Electron > relativo
     const cached = getServerUrlCache();
-    const base = envBaseURL
-        ? envBaseURL.replace(/\/+$/, '')
-        : cached
-            ? `${cached.replace(/\/+$/, '')}/api`
-            : isElectron
-                ? getElectronBase()
-                : '/api';
+    let base: string;
+    if (cached) {
+        base = `${cached.replace(/\/+$/, '')}/api`;
+    } else if (isElectron) {
+        base = getElectronBase();
+    } else if (envBaseURL && !envBaseIsLocalhost && !isCapacitor) {
+        base = envBaseURL;
+    } else if (isCapacitor && envBaseURL && !envBaseIsLocalhost) {
+        base = envBaseURL;
+    } else {
+        base = '/api';
+    }
     if (config.url && !/^https?:\/\//.test(config.url)) {
         config.url = base + config.url;
     }

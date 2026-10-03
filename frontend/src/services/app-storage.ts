@@ -11,9 +11,11 @@ const TABLE = 'kv_store';
 const isNative = Capacitor.getPlatform() === 'android' || Capacitor.getPlatform() === 'ios';
 
 let dbReady = false;
+let dbConn: any = null;
 
 async function getDb(): Promise<any> {
-    if (dbReady) return true;
+    if (dbConn) return dbConn;
+    if (dbReady && dbConn) return dbConn;
 
     if (!isNative) return null;
 
@@ -35,6 +37,7 @@ async function getDb(): Promise<any> {
             );
         `);
 
+        dbConn = conn;
         dbReady = true;
         return conn;
     } catch (err) {
@@ -58,34 +61,40 @@ export const AppStorage = {
     },
 
     async getItem(key: string): Promise<string | null> {
+        // Always try localStorage first (mirror) — survives SQLite quirks
+        const mirror = localStorage.getItem(key);
         const conn = await getDb();
         if (!conn) {
-            return localStorage.getItem(key);
+            return mirror;
         }
         try {
             const res = await conn.query(`SELECT value FROM ${TABLE} WHERE key = ?`, [key]);
-            return res.values?.[0]?.value ?? null;
-        } catch {
-            return null;
+            const dbValue = res.values?.[0]?.value ?? null;
+            if (dbValue) {
+                if (mirror !== dbValue) localStorage.setItem(key, dbValue);
+                return dbValue;
+            }
+            return mirror;
+        } catch (err) {
+            console.error('[AppStorage] getItem failed:', err);
+            return mirror;
         }
     },
 
     async setItem(key: string, value: string): Promise<void> {
         const stored = key === 'serverUrl' ? (normalizeServerUrl(value) || value) : value;
+        // Mirror first so the value survives even if SQLite fails
+        try { localStorage.setItem(key, stored); } catch { /* quota */ }
+        updateCache(key, stored);
         const conn = await getDb();
-        if (!conn) {
-            localStorage.setItem(key, stored);
-            updateCache(key, stored);
-            return;
-        }
+        if (!conn) return;
         try {
             await conn.run(
                 `INSERT OR REPLACE INTO ${TABLE} (key, value) VALUES (?, ?)`,
                 [key, stored]
             );
-            updateCache(key, stored);
         } catch (err) {
-            console.error('[AppStorage] setItem failed:', err);
+            console.error('[AppStorage] setItem SQLite failed (localStorage kept):', err);
         }
     },
 

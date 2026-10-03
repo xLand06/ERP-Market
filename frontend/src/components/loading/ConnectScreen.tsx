@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Monitor, Link2, Loader2, QrCode, Camera, Hash } from 'lucide-react';
 import { AppStorage } from '@/services/app-storage';
+import { normalizeServerUrl } from '@/lib/server-url';
 
 // =============================================================================
 // CONNECT SCREEN — Pantalla de conexión (Electron / APK / web).
@@ -34,6 +35,15 @@ export default function ConnectScreen() {
 
         const initScanner = async () => {
             try {
+                // Native ZXing/CameraX on Capacitor — WebView html5-qrcode is black on Huawei
+                const native = (window as any)?.Capacitor?.Plugins?.QrScanner;
+                if (native?.scan) {
+                    setQrReady(true);
+                    const result = await native.scan();
+                    handleQrScan(String(result?.text || '').trim());
+                    return;
+                }
+
                 const { Html5Qrcode } = await import('html5-qrcode');
                 if (cancelled || !scannerContainerRef.current) return;
 
@@ -202,7 +212,43 @@ export default function ConnectScreen() {
                 }
                 return;
             }
-            await AppStorage.setItem('serverUrl', server);
+
+            const normalized = normalizeServerUrl(server);
+            if (!normalized) {
+                setError('URL del servidor inválida');
+                setConnecting(false);
+                return;
+            }
+
+            // Health-check BEFORE persisting — never save a dead URL
+            const { CapacitorHttp } = await import('@capacitor/core').catch(() => ({ CapacitorHttp: null } as any));
+            let ok = false;
+            let detail = '';
+            for (const path of ['/api/health', '/health']) {
+                const url = `${normalized}${path}`;
+                try {
+                    if (CapacitorHttp) {
+                        const res = await CapacitorHttp.get({ url, connectTimeout: 5000, readTimeout: 5000 });
+                        ok = res.status >= 200 && res.status < 300;
+                        detail = `HTTP ${res.status}`;
+                    } else {
+                        const res = await fetch(url);
+                        ok = res.ok;
+                        detail = `HTTP ${res.status}`;
+                    }
+                } catch (e: any) {
+                    detail = String(e?.message || e);
+                }
+                if (ok) break;
+            }
+
+            if (!ok) {
+                setError(`No responde en ${normalized.replace(/^https?:\/\//, '')} (${detail})`);
+                setConnecting(false);
+                return;
+            }
+
+            await AppStorage.setItem('serverUrl', normalized);
             window.location.reload();
         } catch (err: any) {
             setError(err?.message || 'Error al conectar');
