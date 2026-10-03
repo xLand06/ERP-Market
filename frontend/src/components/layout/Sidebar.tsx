@@ -218,7 +218,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
             {/* Branding Header */}
             <div className={cn("h-16 flex items-center justify-between px-3 lg:px-4 border-b mb-4 overflow-hidden shrink-0", themeStyles.headerBorder)}>
                 <div className="flex items-center gap-3">
-                    <div className={cn("w-9 h-9 rounded-xl overflow-hidden shrink-0 transition-all duration-300 shadow-md bg-white ring-1 ring-white/20")}>
+                    <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 transition-all duration-300 shadow-md bg-white ring-1 ring-white/20">
                         <img
                             src="/logo-allmarket.webp"
                             alt="ALLMARKET"

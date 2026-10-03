@@ -144,7 +144,7 @@ export default function LoginPage() {
                 {/* Left: Branding (desktop only) */}
                 <div className="hidden lg:flex flex-1 flex-col justify-center space-y-8 max-w-md">
                     <div className="animate-fadeInUp">
-                        <div className="w-20 h-20 rounded-3xl overflow-hidden mb-6 shadow-2xl shadow-[#3a7d89]/30 dark:shadow-teal-500/20 bg-white dark:bg-[#161B22] ring-1 ring-slate-200 dark:ring-[#30363D]">
+                        <div className="w-20 h-20 rounded-full overflow-hidden mb-6 shadow-2xl shadow-[#3a7d89]/30 dark:shadow-teal-500/20 bg-white dark:bg-[#161B22] ring-1 ring-slate-200 dark:ring-[#30363D]">
                             <img src="/logo-allmarket.webp" alt="ALLMARKET" className="w-full h-full object-cover" draggable={false} />
                         </div>
                         <h1 className="text-4xl xl:text-5xl font-black text-[#0f1c38] dark:text-white tracking-tight leading-tight">
@@ -176,7 +176,7 @@ export default function LoginPage() {
                 <div className="w-full max-w-lg lg:max-w-md">
                     {/* Mobile: minimal logo */}
                     <div className="lg:hidden text-center mb-6">
-                        <div className="w-16 h-16 rounded-2xl overflow-hidden mx-auto mb-3 shadow-xl shadow-[#3a7d89]/30 dark:shadow-teal-500/20 bg-white dark:bg-[#161B22] ring-1 ring-slate-200 dark:ring-[#30363D]">
+                        <div className="w-16 h-16 rounded-full overflow-hidden mx-auto mb-3 shadow-xl shadow-[#3a7d89]/30 dark:shadow-teal-500/20 bg-white dark:bg-[#161B22] ring-1 ring-slate-200 dark:ring-[#30363D]">
                             <img src="/logo-allmarket.webp" alt="ALLMARKET" className="w-full h-full object-cover" draggable={false} />
                         </div>
                         <h1 className="text-3xl font-black text-[#0f1c38] dark:text-white tracking-tight">
