@@ -8,6 +8,7 @@ import type { LoginPayload } from '@/features/auth/types';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
+import { normalizeServerUrl, setServerUrlCache } from '@/lib/server-url';
 
 const isCapacitor = !!(window as any).Capacitor;
 const DESKTOP_WINDOWS_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Setup-Windows.exe';
@@ -238,18 +239,65 @@ export default function LoginPage() {
     const validateAndConnect = async (server: string) => {
         if (connectingRef.current) return;
         connectingRef.current = true;
-        setConnectingServer(server);
-        const checkHealth = async (url: string): Promise<boolean> => {
-            if (isCapacitor) { try { const { CapacitorHttp } = await import('@capacitor/core'); const res = await CapacitorHttp.get({ url, connectTimeout: 5000, readTimeout: 5000 }); return res.status >= 200 && res.status < 300; } catch { return false; } }
-            const c = new AbortController(); const t = setTimeout(() => c.abort(), 5000);
-            try { const r = await fetch(url, { signal: c.signal }); clearTimeout(t); return r.ok; } catch { clearTimeout(t); return false; }
-        };
-        for (let i = 1; i <= 8; i++) {
-            if (await checkHealth(`${server}/api/health`)) { toast.success('Negocio conectado'); await AppStorage.setItem('serverUrl', server); setTimeout(() => window.location.reload(), 300); return; }
-            if (i < 8) setConnectingServer(`${server} (intento ${i + 1}/8)`);
-            await new Promise(r => setTimeout(r, 2000));
+        const normalized = normalizeServerUrl(server);
+        if (!normalized) {
+            connectingRef.current = false;
+            toast.error('URL del servidor inválida en el QR');
+            return;
         }
-        connectingRef.current = false; setConnectingServer(null); toast.error('No se pudo conectar. Verificá tu conexión.');
+        setConnectingServer(normalized);
+        const checkHealth = async (url: string): Promise<{ ok: boolean; detail?: string }> => {
+            if (isCapacitor) {
+                try {
+                    const { CapacitorHttp } = await import('@capacitor/core');
+                    const res = await CapacitorHttp.get({ url, connectTimeout: 5000, readTimeout: 5000 });
+                    return { ok: res.status >= 200 && res.status < 300, detail: `HTTP ${res.status}` };
+                } catch (e: any) {
+                    return { ok: false, detail: String(e?.message || e) };
+                }
+            }
+            const c = new AbortController();
+            const t = setTimeout(() => c.abort(), 5000);
+            try {
+                const r = await fetch(url, { signal: c.signal });
+                clearTimeout(t);
+                return { ok: r.ok, detail: `HTTP ${r.status}` };
+            } catch (e: any) {
+                clearTimeout(t);
+                return { ok: false, detail: String(e?.message || e) };
+            }
+        };
+
+        const candidates = [
+            `${normalized}/api/health`,
+            `${normalized}/health`,
+        ];
+
+        let lastDetail = '';
+        for (let i = 1; i <= 5; i++) {
+            for (const url of candidates) {
+                const result = await checkHealth(url);
+                if (result.ok) {
+                    // Persist origin immediately so api.ts interceptor works after reload
+                    await AppStorage.setItem('serverUrl', normalized);
+                    setServerUrlCache(normalized);
+                    toast.success(`Conectado a ${normalized.replace(/^https?:\/\//, '')}`);
+                    setTimeout(() => window.location.reload(), 400);
+                    return;
+                }
+                lastDetail = result.detail || '';
+            }
+            if (i < 5) setConnectingServer(`${normalized} (intento ${i}/5)`);
+            await new Promise(r => setTimeout(r, 1500));
+        }
+        connectingRef.current = false;
+        setConnectingServer(null);
+        console.error('[QR connect] failed', { server: normalized, lastDetail });
+        toast.error(
+            lastDetail
+                ? `No se pudo conectar a ${normalized.replace(/^https?:\/\//, '')} (${lastDetail})`
+                : 'No se pudo conectar. Verificá que la URL sea la del panel web.'
+        );
     };
 
     const handleQrPayload = useCallback((raw: string) => {

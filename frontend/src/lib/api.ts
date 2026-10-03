@@ -8,6 +8,7 @@ import { useAuthStore } from '../features/auth/store/authStore';
 import toast from 'react-hot-toast';
 
 import { AppStorage } from '../services/app-storage';
+import { getServerUrlCache, setServerUrlCache } from './server-url';
 
 // ── Capacitor HTTP Adapter ──────────────────────────────────────────────────
 // En Capacitor, fetch() está bloqueado por cross-origin en el WebView.
@@ -90,16 +91,8 @@ function getElectronBase(): string {
 const isElectron = window.location.protocol === 'file:' || (window as any).erpApi?.isElectron;
 
 // Cache del serverUrl para acceso síncrono en el interceptor
-// Se llena en AppStorage.initServerUrl() al arrancar la app
-let cachedServerUrl: string | null = null;
-
-export function setCachedServerUrl(url: string | null) {
-    cachedServerUrl = url;
-}
-
-export function getCachedServerUrl(): string | null {
-    return cachedServerUrl;
-}
+// Se llena en AppStorage.initServerUrl() / setServerUrlCache (QR scan)
+export { setServerUrlCache, getServerUrlCache };
 
 // VITE_API_URL anula todo si está definida (builds web con API externa)
 const envBaseURL = import.meta.env.VITE_API_URL as string | undefined;
@@ -114,10 +107,11 @@ export const api = axios.create({
 // Prefijo dinámico de la base URL — preserva el comportamiento web (relativo /api).
 api.interceptors.request.use((config) => {
     // Prioridad: env > cache SQLite (QR scan) > Electron > relativo
+    const cached = getServerUrlCache();
     const base = envBaseURL
         ? envBaseURL.replace(/\/+$/, '')
-        : cachedServerUrl
-            ? `${cachedServerUrl.replace(/\/+$/, '')}/api`
+        : cached
+            ? `${cached.replace(/\/+$/, '')}/api`
             : isElectron
                 ? getElectronBase()
                 : '/api';

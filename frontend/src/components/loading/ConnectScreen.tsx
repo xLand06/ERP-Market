@@ -157,12 +157,24 @@ export default function ConnectScreen() {
                     return;
                 }
             } else {
-                const res = await fetch(url);
-                data = await res.json();
-                if (!res.ok || !data.url) {
-                    setError(data.error || 'Negocio no encontrado.');
-                    setResolving(false);
-                    return;
+                // Capacitor WebView fetch is blocked cross-origin — use native HTTP
+                if ((window as any).Capacitor?.Plugins || (window as any).Capacitor?.isNativePlatform?.()) {
+                    const { CapacitorHttp } = await import('@capacitor/core');
+                    const res = await CapacitorHttp.get({ url, connectTimeout: 8000, readTimeout: 8000 });
+                    data = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+                    if (res.status < 200 || res.status >= 300 || !data?.url) {
+                        setError(data?.error || 'Negocio no encontrado.');
+                        setResolving(false);
+                        return;
+                    }
+                } else {
+                    const res = await fetch(url);
+                    data = await res.json();
+                    if (!res.ok || !data.url) {
+                        setError(data.error || 'Negocio no encontrado.');
+                        setResolving(false);
+                        return;
+                    }
                 }
             }
             if (!data.url) {

@@ -4,6 +4,7 @@
 // =============================================================================
 
 import { Capacitor } from '@capacitor/core';
+import { setServerUrlCache, normalizeServerUrl } from '../lib/server-url';
 
 const DB_NAME = 'app_config';
 const TABLE = 'kv_store';
@@ -42,24 +43,16 @@ async function getDb(): Promise<any> {
     }
 }
 
-// ── Cache para acceso síncrono (api.ts interceptor) ──────────────────────
-let _serverUrlCache: string | null = null;
-
 function updateCache(key: string, value: string | null) {
     if (key === 'serverUrl') {
-        _serverUrlCache = value;
-        // Sync con el interceptor de api.ts
-        try {
-            const { setCachedServerUrl } = require('../lib/api');
-            setCachedServerUrl(value);
-        } catch {}
+        setServerUrlCache(value);
     }
 }
 
 export const AppStorage = {
     /** Inicializar: cargar serverUrl del storage al cache síncrono */
     async initServerUrl(): Promise<string | null> {
-        const value = await this.getItem('serverUrl');
+        const value = normalizeServerUrl(await this.getItem('serverUrl'));
         updateCache('serverUrl', value);
         return value;
     },
@@ -78,18 +71,19 @@ export const AppStorage = {
     },
 
     async setItem(key: string, value: string): Promise<void> {
+        const stored = key === 'serverUrl' ? (normalizeServerUrl(value) || value) : value;
         const conn = await getDb();
         if (!conn) {
-            localStorage.setItem(key, value);
-            updateCache(key, value);
+            localStorage.setItem(key, stored);
+            updateCache(key, stored);
             return;
         }
         try {
             await conn.run(
                 `INSERT OR REPLACE INTO ${TABLE} (key, value) VALUES (?, ?)`,
-                [key, value]
+                [key, stored]
             );
-            updateCache(key, value);
+            updateCache(key, stored);
         } catch (err) {
             console.error('[AppStorage] setItem failed:', err);
         }
