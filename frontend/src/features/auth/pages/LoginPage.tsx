@@ -84,10 +84,10 @@ export default function LoginPage() {
     useEffect(() => { if (showQr && !qrDataUrl) { QRCode.toDataURL(`allmarket://connect?server=${encodeURIComponent(window.location.origin)}`, { width: 200, margin: 2, color: { dark: '#ffffff', light: '#00000000' } }).then(setQrDataUrl); } }, [showQr, qrDataUrl]);
 
     const [scannerOpen, setScannerOpen] = useState(false);
-    const [scannerStatus, setScannerStatus] = useState<'idle' | 'requesting' | 'starting' | 'ready' | 'error'>('idle');
+    const [scannerStatus, setScannerStatus] = useState<'idle' | 'requesting' | 'starting' | 'ready' | 'error' | 'pick-camera'>('idle');
     const [scannerError, setScannerError] = useState<string | null>(null);
+    const [cameras, setCameras] = useState<{ deviceId: string; label: string; kind: 'front' | 'back' | 'other' }[]>([]);
     const [connectingServer, setConnectingServer] = useState<string | null>(null);
-    const scannerRef = useRef<any>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const rafRef = useRef<number | null>(null);
     const connectingRef = useRef(false);
@@ -97,15 +97,142 @@ export default function LoginPage() {
             cancelAnimationFrame(rafRef.current);
             rafRef.current = null;
         }
-        const s = scannerRef.current;
-        scannerRef.current = null;
-        try {
-            if (s && typeof s.stop === 'function' && s.isScanning) await s.stop();
-        } catch { /* already stopped */ }
         streamRef.current?.getTracks().forEach(t => t.stop());
         streamRef.current = null;
         const box = document.getElementById('login-qr-scanner');
         if (box) box.innerHTML = '';
+    };
+
+    const classifyCameras = (list: MediaDeviceInfo[]) => list
+        .filter(d => d.kind === 'videoinput')
+        .map((d, i) => {
+            const label = (d.label || '').trim();
+            const l = label.toLowerCase();
+            let kind: 'front' | 'back' | 'other' = 'other';
+            if (/front|user|selfie|delanter|cámara frontal|cámara delantera/i.test(l)) kind = 'front';
+            else if (/back|rear|environment|trasera|posterior|cámara trasera/i.test(l)) kind = 'back';
+            else if (!label && i === 0) kind = 'front'; // Huawei often leaves labels empty
+            else if (!label) kind = 'back';
+            return {
+                deviceId: d.deviceId,
+                label: label || (kind === 'front' ? `Cámara frontal (${i + 1})` : kind === 'back' ? `Cámara trasera (${i + 1})` : `Cámara ${i + 1}`),
+                kind,
+            };
+        });
+
+    const openCamera = async (deviceId?: string, facing?: 'environment' | 'user'): Promise<MediaStream> => {
+        const base: MediaStreamConstraints = deviceId
+            ? { video: { deviceId: { exact: deviceId } }, audio: false }
+            : { video: { facingMode: facing || 'environment' }, audio: false };
+        try {
+            return await navigator.mediaDevices.getUserMedia(base);
+        } catch {
+            if (deviceId) return navigator.mediaDevices.getUserMedia({ video: { facingMode: facing || 'environment' }, audio: false });
+            if (facing === 'environment') return navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+            throw new Error('camera-fail');
+        }
+    };
+
+    const waitForFrames = async (video: HTMLVideoElement, ms = 1800) => {
+        const start = performance.now();
+        while (performance.now() - start < ms) {
+            if (video.readyState >= 2 && video.videoWidth > 0) return true;
+            await new Promise(r => setTimeout(r, 80));
+        }
+        return video.readyState >= 2 && video.videoWidth > 0;
+    };
+
+    const startDecodeLoop = (video: HTMLVideoElement, jsQR: any) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return;
+        const tick = () => {
+            if (connectingRef.current) return;
+            if (video.readyState >= 2 && video.videoWidth > 0) {
+                const w = Math.min(video.videoWidth, 480);
+                const scale = w / video.videoWidth;
+                canvas.width = w;
+                canvas.height = Math.round(video.videoHeight * scale);
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+                if (code?.data) {
+                    const t = code.data.trim();
+                    let s: string | null = null;
+                    if (t.startsWith('allmarket://')) {
+                        try { s = new URL(t).searchParams.get('server'); } catch { /* ignore */ }
+                    }
+                    if (!s && /^https?:\/\//.test(t)) s = t;
+                    if (s) {
+                        if (navigator.vibrate) try { navigator.vibrate(100); } catch { /* ignore */ }
+                        try {
+                            const actx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                            const o = actx.createOscillator();
+                            const g = actx.createGain();
+                            o.connect(g); g.connect(actx.destination);
+                            o.frequency.value = 1000;
+                            g.gain.setValueAtTime(0.1, actx.currentTime);
+                            o.start(); o.stop(actx.currentTime + 0.1);
+                        } catch { /* ignore */ }
+                        void validateAndConnect(s);
+                        return;
+                    }
+                }
+            }
+            rafRef.current = requestAnimationFrame(tick);
+        };
+        rafRef.current = requestAnimationFrame(tick);
+    };
+
+    const launchCamera = async (deviceId?: string, facing?: 'environment' | 'user'): Promise<boolean> => {
+        setScannerStatus('starting');
+        setScannerError(null);
+        await stopScanner();
+        let stream: MediaStream;
+        try {
+            stream = await openCamera(deviceId, facing);
+        } catch {
+            fail('No se pudo abrir la cámara.');
+            return false;
+        }
+        streamRef.current = stream;
+
+        const container = document.getElementById('login-qr-scanner');
+        if (!container) {
+            stream.getTracks().forEach(t => t.stop());
+            fail('Contenedor QR no encontrado.');
+            return false;
+        }
+        container.innerHTML = '';
+        const video = document.createElement('video');
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('webkit-playsinline', 'true');
+        video.muted = true;
+        video.autoplay = true;
+        video.style.cssText = 'width:100%;height:280px;object-fit:cover;display:block;background:#000;';
+        video.srcObject = stream;
+        container.appendChild(video);
+        await video.play().catch(() => { /* ignore */ });
+
+        const ok = await waitForFrames(video);
+        if (!ok) {
+            // Huawei P40 Pro: rear often opens black — offer picker / try front
+            stream.getTracks().forEach(t => t.stop());
+            streamRef.current = null;
+            setScannerStatus('pick-camera');
+            return false;
+        }
+
+        try {
+            const jsQR = (await import('jsqr')).default;
+            startDecodeLoop(video, jsQR);
+            setScannerStatus('ready');
+            return true;
+        } catch {
+            stream.getTracks().forEach(t => t.stop());
+            fail('Error al iniciar el decodificador QR.');
+            return false;
+        }
     };
 
     const validateAndConnect = async (server: string) => {
@@ -125,11 +252,17 @@ export default function LoginPage() {
         connectingRef.current = false; setConnectingServer(null); toast.error('No se pudo conectar. Verificá tu conexión.');
     };
 
+    const fail = (msg: string) => {
+        setScannerStatus('error');
+        setScannerError(msg);
+    };
+
     useEffect(() => {
         if (!scannerOpen) {
             void stopScanner();
             setScannerStatus('idle');
             setScannerError(null);
+            setCameras([]);
             setConnectingServer(null);
             connectingRef.current = false;
             return;
@@ -137,148 +270,65 @@ export default function LoginPage() {
 
         let cancelled = false;
 
-        const fail = (msg: string) => {
-            if (cancelled) return;
-            setScannerStatus('error');
-            setScannerError(msg);
-        };
-
         const boot = async () => {
             setScannerStatus('requesting');
             setScannerError(null);
 
-            // Capacitor Android WebView: html5-qrcode.start(cameraId) often shows a black
-            // preview. Own the camera: getUserMedia → <video> we control → decodeFromStream.
-            let stream: MediaStream | null = null;
+            // Permission kick (any camera) then list devices
             try {
-                stream = await Promise.race([
-                    navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: { exact: 'environment' } },
-                        audio: false,
-                    }).catch(() =>
-                        navigator.mediaDevices.getUserMedia({
-                            video: { facingMode: 'environment' },
-                            audio: false,
-                        })
-                    ),
+                const tmp = await Promise.race([
+                    navigator.mediaDevices.getUserMedia({ video: true, audio: false }),
                     new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000)),
                 ]);
+                tmp.getTracks().forEach(t => t.stop());
             } catch (e: any) {
                 if (cancelled) return;
                 const msg = String(e?.message || e?.name || '');
-                if (/timeout/i.test(msg)) fail('La cámara no respondió. Cerrá y volvé a abrir, o revisá permisos de la app.');
+                if (/timeout/i.test(msg)) fail('La cámara no respondió. Cerrá y volvé a abrir.');
                 else if (/NotAllowed|Permission|denied/i.test(msg)) fail('Permiso de cámara denegado. Activalo en Ajustes de la app → Cámara.');
-                else if (/NotFound|DevicesNotFound|no camera|Overconstrained/i.test(msg)) fail('No se encontró cámara en este dispositivo.');
                 else fail('No se pudo abrir la cámara.');
                 return;
             }
-            if (cancelled) {
-                stream?.getTracks().forEach(t => t.stop());
+            if (cancelled) return;
+
+            let list: { deviceId: string; label: string; kind: 'front' | 'back' | 'other' }[] = [];
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                list = classifyCameras(devices);
+                setCameras(list);
+            } catch { /* keep empty */ }
+            if (cancelled) return;
+
+            // Prefer rear; Huawei P40 Pro often paints black → fall back to front, then picker
+            const back = list.find(c => c.kind === 'back');
+            const front = list.find(c => c.kind === 'front');
+            const first = back || list[0];
+
+            if (!first) {
+                fail('No se encontró ninguna cámara.');
                 return;
             }
 
-            try {
-                setScannerStatus('starting');
-                const container = document.getElementById('login-qr-scanner');
-                if (!container) throw new Error('Contenedor QR no encontrado');
+            const ok = await launchCamera(first.deviceId, first.kind === 'front' ? 'user' : 'environment');
+            if (cancelled) return;
 
-                // Manual <video> + jsQR — html5-qrcode black-screens on Capacitor Android
-                container.innerHTML = '';
-                const video = document.createElement('video');
-                video.setAttribute('playsinline', 'true');
-                video.setAttribute('webkit-playsinline', 'true');
-                video.muted = true;
-                video.autoplay = true;
-                video.setAttribute('autoplay', 'true');
-                video.style.cssText = 'width:100%;height:280px;object-fit:cover;display:block;background:#000;';
-                video.srcObject = stream;
-                container.appendChild(video);
-                streamRef.current = stream;
-
-                await video.play().catch(() => { /* autoplay may need user gesture on some WebViews */ });
-
-                // Poll until the WebView actually paints frames (up to 2s)
-                let framesReady = false;
-                for (let i = 0; i < 20; i++) {
-                    if (cancelled) break;
-                    if (video.readyState >= 2 && video.videoWidth > 0) {
-                        framesReady = true;
-                        break;
-                    }
-                    await new Promise(r => setTimeout(r, 100));
-                }
-
-                if (cancelled) {
-                    stream.getTracks().forEach(t => t.stop());
-                    return;
-                }
-                if (!framesReady) {
-                    stream.getTracks().forEach(t => t.stop());
-                    fail('La cámara abrió pero no mostró imagen. Revisá permisos o reinstalá la APK.');
-                    return;
-                }
-
-                const jsQR = (await import('jsqr')).default;
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d', { willReadFrequently: true });
-                if (!ctx) throw new Error('Canvas no disponible');
-
-                const tick = () => {
-                    if (cancelled || connectingRef.current) return;
-                    if (video.readyState >= 2 && video.videoWidth > 0) {
-                        const w = Math.min(video.videoWidth, 480);
-                        const scale = w / video.videoWidth;
-                        canvas.width = w;
-                        canvas.height = Math.round(video.videoHeight * scale);
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                            inversionAttempts: 'dontInvert',
-                        });
-                        if (code?.data) {
-                            const t = code.data.trim();
-                            let s: string | null = null;
-                            if (t.startsWith('allmarket://')) {
-                                try { s = new URL(t).searchParams.get('server'); } catch { /* ignore */ }
-                            }
-                            if (!s && /^https?:\/\//.test(t)) s = t;
-                            if (s) {
-                                if (navigator.vibrate) try { navigator.vibrate(100); } catch { /* ignore */ }
-                                try {
-                                    const actx = new (window.AudioContext || (window as any).webkitAudioContext)();
-                                    const o = actx.createOscillator();
-                                    const g = actx.createGain();
-                                    o.connect(g); g.connect(actx.destination);
-                                    o.frequency.value = 1000;
-                                    g.gain.setValueAtTime(0.1, actx.currentTime);
-                                    o.start(); o.stop(actx.currentTime + 0.1);
-                                } catch { /* ignore */ }
-                                void validateAndConnect(s);
-                                return;
-                            }
-                        }
-                    }
-                    rafRef.current = requestAnimationFrame(tick);
-                };
-                rafRef.current = requestAnimationFrame(tick);
-
-                if (!cancelled) setScannerStatus('ready');
-            } catch (err: any) {
-                stream?.getTracks().forEach(t => t.stop());
+            // Rear black on Huawei — try front once, then show picker
+            if (!ok && front && first.kind !== 'front') {
+                const okFront = await launchCamera(front.deviceId, 'user');
                 if (cancelled) return;
-                const msg = String(err?.message || '');
-                fail(msg || 'Error al iniciar la cámara.');
+                if (!okFront) setScannerStatus('pick-camera');
+            } else if (!ok) {
+                setScannerStatus('pick-camera');
             }
         };
 
-        // Wait a frame so #login-qr-scanner exists in the DOM
         const raf = requestAnimationFrame(() => { void boot(); });
-
         return () => {
             cancelled = true;
             cancelAnimationFrame(raf);
             void stopScanner();
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scannerOpen]);
 
     return (
@@ -540,22 +590,57 @@ export default function LoginPage() {
                                         ? 'Solicitando cámara...'
                                         : scannerStatus === 'starting'
                                             ? 'Iniciando cámara...'
-                                            : scannerStatus === 'error'
-                                                ? 'Error de cámara'
-                                                : 'Escanear QR'}
+                                            : scannerStatus === 'pick-camera'
+                                                ? 'Elegí una cámara'
+                                                : scannerStatus === 'error'
+                                                    ? 'Error de cámara'
+                                                    : 'Escanear QR'}
                             </span>
                         </div>
-                        {!connectingServer && (
-                            <button onClick={() => setScannerOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors">✕</button>
-                        )}
+                        <div className="flex items-center gap-1">
+                            {scannerStatus === 'ready' && cameras.length > 1 && (
+                                <button
+                                    type="button"
+                                    onClick={() => { void stopScanner(); setScannerStatus('pick-camera'); }}
+                                    className="px-2 py-1 rounded-lg text-[11px] font-bold text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+                                >
+                                    Cámara
+                                </button>
+                            )}
+                            {!connectingServer && (
+                                <button onClick={() => setScannerOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors">✕</button>
+                            )}
+                        </div>
                     </div>
                     <div className="relative min-h-[280px] bg-black">
                         <div id="login-qr-scanner" className="w-full h-[280px] min-h-[280px]" />
+                        {scannerStatus === 'pick-camera' && (
+                            <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-3 z-10 px-4">
+                                <Camera className="w-8 h-8 text-teal-400" />
+                                <p className="text-sm text-white font-bold text-center">Elegí la cámara</p>
+                                <p className="text-[11px] text-slate-400 text-center leading-relaxed">
+                                    En algunos teléfonos (ej. Huawei) la trasera sale negra. Probá con la frontal.
+                                </p>
+                                <div className="w-full max-w-[260px] space-y-2 mt-1">
+                                    {(cameras.length ? cameras : [{ deviceId: '', label: 'Cámara predeterminada', kind: 'other' as const }]).map((c) => (
+                                        <button
+                                            key={c.deviceId || c.label}
+                                            type="button"
+                                            onClick={() => { void launchCamera(c.deviceId || undefined, c.kind === 'front' ? 'user' : 'environment'); }}
+                                            className="w-full px-4 py-3 rounded-xl bg-white/10 hover:bg-teal-600 text-white text-sm font-bold transition-colors text-left"
+                                        >
+                                            {c.kind === 'front' ? '📷 ' : c.kind === 'back' ? '📹 ' : '🎥 '}
+                                            {c.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                         {(scannerStatus === 'requesting' || scannerStatus === 'starting') && (
                             <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-3 z-10">
                                 <div className="w-14 h-14 rounded-full border-4 border-teal-500/20 border-t-teal-400 animate-spin" />
                                 <p className="text-xs text-slate-300 font-medium">
-                                    {scannerStatus === 'requesting' ? 'Pedí permiso de cámara...' : 'Abriendo cámara trasera...'}
+                                    {scannerStatus === 'requesting' ? 'Pedí permiso de cámara...' : 'Abriendo cámara...'}
                                 </p>
                             </div>
                         )}
@@ -597,7 +682,9 @@ export default function LoginPage() {
                                 ? 'Esperando respuesta...'
                                 : scannerStatus === 'error'
                                     ? 'Revisá permisos de cámara en Ajustes'
-                                    : 'Apuntá al QR del panel web'}
+                                    : scannerStatus === 'pick-camera'
+                                        ? 'Elegí frontal si la trasera sale negra'
+                                        : 'Apuntá al QR del panel web'}
                         </p>
                     </div>
                 </div>
