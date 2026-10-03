@@ -84,10 +84,21 @@ export default function LoginPage() {
     useEffect(() => { if (showQr && !qrDataUrl) { QRCode.toDataURL(`allmarket://connect?server=${encodeURIComponent(window.location.origin)}`, { width: 200, margin: 2, color: { dark: '#ffffff', light: '#00000000' } }).then(setQrDataUrl); } }, [showQr, qrDataUrl]);
 
     const [scannerOpen, setScannerOpen] = useState(false);
-    const [scannerReady, setScannerReady] = useState(false);
+    const [scannerStatus, setScannerStatus] = useState<'idle' | 'requesting' | 'starting' | 'ready' | 'error'>('idle');
+    const [scannerError, setScannerError] = useState<string | null>(null);
     const [connectingServer, setConnectingServer] = useState<string | null>(null);
     const scannerRef = useRef<any>(null);
     const connectingRef = useRef(false);
+
+    const stopScanner = async () => {
+        const s = scannerRef.current;
+        scannerRef.current = null;
+        if (!s) return;
+        try {
+            if (s.isScanning) await s.stop();
+            s.clear();
+        } catch { /* already stopped */ }
+    };
 
     const validateAndConnect = async (server: string) => {
         if (connectingRef.current) return;
@@ -107,25 +118,113 @@ export default function LoginPage() {
     };
 
     useEffect(() => {
-        if (!scannerOpen) { if (scannerRef.current) { (async () => { try { if (scannerRef.current.isScanning) await scannerRef.current.stop(); scannerRef.current.clear(); } catch {} scannerRef.current = null; })(); } setScannerReady(false); setConnectingServer(null); connectingRef.current = false; return; }
+        if (!scannerOpen) {
+            void stopScanner();
+            setScannerStatus('idle');
+            setScannerError(null);
+            setConnectingServer(null);
+            connectingRef.current = false;
+            return;
+        }
+
         let cancelled = false;
-        const timer = setTimeout(async () => {
+
+        const fail = (msg: string) => {
+            if (cancelled) return;
+            setScannerStatus('error');
+            setScannerError(msg);
+        };
+
+        const boot = async () => {
+            setScannerStatus('requesting');
+            setScannerError(null);
+
+            // 1) Kick WebView permission + verify camera before html5-qrcode
             try {
-                const { Html5Qrcode } = await import('html5-qrcode'); if (cancelled) return;
-                const scanner = new Html5Qrcode('login-qr-scanner', { verbose: false }); scannerRef.current = scanner;
-                const cameras = await Html5Qrcode.getCameras(); if (cancelled || !cameras?.length) { toast.error('Sin cámara'); setScannerOpen(false); return; }
-                const back = cameras.find((d: any) => /back|trasera|environment/i.test(d.label));
-                await scanner.start(back?.id || cameras[0].id, { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 }, (decoded) => {
-                    if (connectingRef.current) return;
-                    const t = decoded.trim(); let s: string | null = null;
-                    if (t.startsWith('allmarket://')) { try { s = new URL(t).searchParams.get('server'); } catch {} }
-                    if (!s && /^https?:\/\//.test(t)) s = t;
-                    if (s) { if (navigator.vibrate) try { navigator.vibrate(100); } catch {} try { const ctx = new (window.AudioContext || (window as any).webkitAudioContext)(); const o = ctx.createOscillator(); const g = ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.value = 1000; g.gain.setValueAtTime(0.1, ctx.currentTime); o.start(); o.stop(ctx.currentTime + 0.1); } catch {} validateAndConnect(s); }
-                }, () => {});
-                if (!cancelled) setScannerReady(true);
-            } catch (err: any) { if (!cancelled) { toast.error(err?.message || 'Error cámara'); setScannerOpen(false); } }
-        }, 300);
-        return () => { cancelled = true; clearTimeout(timer); };
+                const stream = await Promise.race([
+                    navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+                        audio: false,
+                    }),
+                    new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000)),
+                ]);
+                stream.getTracks().forEach(t => t.stop());
+            } catch (e: any) {
+                if (cancelled) return;
+                const msg = String(e?.message || e?.name || '');
+                if (/timeout/i.test(msg)) fail('La cámara no respondió. Cerrá y volvé a abrir, o revisá permisos de la app.');
+                else if (/NotAllowed|Permission|denied/i.test(msg)) fail('Permiso de cámara denegado. Activalo en Ajustes de la app.');
+                else if (/NotFound|DevicesNotFound|no camera/i.test(msg)) fail('No se encontró cámara en este dispositivo.');
+                else fail('No se pudo abrir la cámara.');
+                return;
+            }
+            if (cancelled) return;
+
+            // 2) Start scanner with facingMode (more reliable on Android than camera IDs)
+            try {
+                setScannerStatus('starting');
+                const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
+                if (cancelled) return;
+
+                await stopScanner();
+                const scanner = new Html5Qrcode('login-qr-scanner', {
+                    verbose: false,
+                    formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+                });
+                scannerRef.current = scanner;
+
+                await Promise.race([
+                    scanner.start(
+                        { facingMode: 'environment' },
+                        {
+                            fps: 10,
+                            qrbox: { width: 220, height: 220 },
+                            aspectRatio: 1.333334,
+                        },
+                        (decoded) => {
+                            if (connectingRef.current) return;
+                            const t = decoded.trim();
+                            let s: string | null = null;
+                            if (t.startsWith('allmarket://')) {
+                                try { s = new URL(t).searchParams.get('server'); } catch { /* ignore */ }
+                            }
+                            if (!s && /^https?:\/\//.test(t)) s = t;
+                            if (s) {
+                                if (navigator.vibrate) try { navigator.vibrate(100); } catch { /* ignore */ }
+                                try {
+                                    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                                    const o = ctx.createOscillator();
+                                    const g = ctx.createGain();
+                                    o.connect(g); g.connect(ctx.destination);
+                                    o.frequency.value = 1000;
+                                    g.gain.setValueAtTime(0.1, ctx.currentTime);
+                                    o.start(); o.stop(ctx.currentTime + 0.1);
+                                } catch { /* ignore */ }
+                                void validateAndConnect(s);
+                            }
+                        },
+                        () => { /* per-frame decode miss — ignore */ },
+                    ),
+                    new Promise<never>((_, rej) => setTimeout(() => rej(new Error('start-timeout')), 12000)),
+                ]);
+
+                if (!cancelled) setScannerStatus('ready');
+            } catch (err: any) {
+                if (cancelled) return;
+                const msg = String(err?.message || '');
+                if (/start-timeout|timeout/i.test(msg)) fail('La cámara tardó demasiado en iniciar. Probá de nuevo.');
+                else fail(msg || 'Error al iniciar la cámara.');
+            }
+        };
+
+        // Wait a frame so #login-qr-scanner exists in the DOM
+        const raf = requestAnimationFrame(() => { void boot(); });
+
+        return () => {
+            cancelled = true;
+            cancelAnimationFrame(raf);
+            void stopScanner();
+        };
     }, [scannerOpen]);
 
     return (
@@ -377,13 +476,48 @@ export default function LoginPage() {
                 <div className="w-full max-w-sm bg-[#0a0f1a] rounded-2xl overflow-hidden border border-slate-200 shadow-2xl">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
                         <div className="flex items-center gap-2">
-                            {connectingServer ? <Loader2 className="w-4 h-4 text-amber-400 animate-spin" /> : <Camera className="w-4 h-4 text-[#3a7d89]" />}
-                            <span className="text-sm font-bold text-white">{connectingServer ? 'Conectando...' : 'Escanear QR'}</span>
+                            {connectingServer || scannerStatus === 'requesting' || scannerStatus === 'starting'
+                                ? <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
+                                : <Camera className="w-4 h-4 text-[#3a7d89]" />}
+                            <span className="text-sm font-bold text-white">
+                                {connectingServer
+                                    ? 'Conectando...'
+                                    : scannerStatus === 'requesting'
+                                        ? 'Solicitando cámara...'
+                                        : scannerStatus === 'starting'
+                                            ? 'Iniciando cámara...'
+                                            : scannerStatus === 'error'
+                                                ? 'Error de cámara'
+                                                : 'Escanear QR'}
+                            </span>
                         </div>
-                        {!connectingServer && <button onClick={() => setScannerOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors">✕</button>}
+                        {!connectingServer && (
+                            <button onClick={() => setScannerOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors">✕</button>
+                        )}
                     </div>
                     <div className="relative min-h-[280px] bg-black">
-                        <div id="login-qr-scanner" className="w-full min-h-[280px]" />
+                        <div id="login-qr-scanner" className="w-full h-[280px] min-h-[280px]" />
+                        {(scannerStatus === 'requesting' || scannerStatus === 'starting') && (
+                            <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-3 z-10">
+                                <div className="w-14 h-14 rounded-full border-4 border-teal-500/20 border-t-teal-400 animate-spin" />
+                                <p className="text-xs text-slate-300 font-medium">
+                                    {scannerStatus === 'requesting' ? 'Pedí permiso de cámara...' : 'Abriendo cámara trasera...'}
+                                </p>
+                            </div>
+                        )}
+                        {scannerStatus === 'error' && scannerError && (
+                            <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-3 z-10 px-6 text-center">
+                                <AlertTriangle className="w-8 h-8 text-amber-400" />
+                                <p className="text-sm text-white leading-relaxed">{scannerError}</p>
+                                <button
+                                    type="button"
+                                    onClick={() => setScannerOpen(false)}
+                                    className="mt-1 px-4 py-2 rounded-lg bg-white/10 text-white text-xs font-bold hover:bg-white/20 transition-colors"
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
+                        )}
                         {connectingServer && (
                             <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 z-10">
                                 <div className="w-16 h-16 rounded-full border-4 border-amber-500/20 border-t-amber-400 animate-spin" />
@@ -393,7 +527,7 @@ export default function LoginPage() {
                                 </div>
                             </div>
                         )}
-                        {scannerReady && !connectingServer && (
+                        {scannerStatus === 'ready' && !connectingServer && (
                             <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                                 <div className="w-[220px] h-[220px] border-2 border-emerald-400/80 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] flex flex-col justify-between p-2">
                                     <div className="flex justify-between"><span className="w-5 h-5 border-t-4 border-l-4 border-emerald-400 rounded-tl-sm" /><span className="w-5 h-5 border-t-4 border-r-4 border-emerald-400 rounded-tr-sm" /></div>
@@ -404,7 +538,13 @@ export default function LoginPage() {
                         )}
                     </div>
                     <div className="px-4 py-3 border-t border-slate-200 text-center">
-                        <p className="text-[10px] text-slate-500">{connectingServer ? 'Esperando respuesta...' : 'Apuntá al QR del panel web'}</p>
+                        <p className="text-[10px] text-slate-500">
+                            {connectingServer
+                                ? 'Esperando respuesta...'
+                                : scannerStatus === 'error'
+                                    ? 'Revisá permisos de cámara en Ajustes'
+                                    : 'Apuntá al QR del panel web'}
+                        </p>
                     </div>
                 </div>
             </div>
