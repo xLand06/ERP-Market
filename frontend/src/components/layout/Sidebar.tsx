@@ -215,21 +215,25 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
 
     return (
         <div className={cn("flex flex-col h-full w-full border-r z-10 transition-all duration-300 relative", themeStyles.bg)}>
-            {/* Branding Header */}
+            {/* Branding Header — isotipo when expanded, circular mark when collapsed */}
             <div className={cn("h-16 flex items-center justify-between px-3 lg:px-4 border-b mb-4 overflow-hidden shrink-0", themeStyles.headerBorder)}>
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 transition-all duration-300 shadow-md bg-white ring-1 ring-white/20">
+                <div className="flex items-center gap-3 min-w-0">
+                    {collapsed ? (
+                        <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 transition-all duration-300 shadow-md bg-white ring-1 ring-white/20">
+                            <img
+                                src="/logo-allmarket.webp"
+                                alt="ALLMARKET"
+                                className="w-full h-full object-cover"
+                                draggable={false}
+                            />
+                        </div>
+                    ) : (
                         <img
-                            src="/logo-allmarket.webp"
+                            src="/isotipo-white.webp"
                             alt="ALLMARKET"
-                            className="w-full h-full object-cover"
+                            className="h-7 lg:h-8 w-auto max-w-[140px] shrink-0 animate-in fade-in duration-300 delay-150"
                             draggable={false}
                         />
-                    </div>
-                    {!collapsed && (
-                        <span className={cn("text-base lg:text-lg uppercase whitespace-nowrap animate-in fade-in duration-300 delay-150", themeStyles.logoTextColor)}>
-                            ALLMARKET
-                        </span>
                     )}
                 </div>
                 {!collapsed && (
