@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { 
+import {
     ArrowLeftRight, ChevronDown, LogOut, Settings, User, Menu, Keyboard,
-    ShoppingCart, Package, Layers, Banknote, Store, Bell, Palette, Sun, Moon, Check, X
+    ShoppingCart, Package, Layers, Banknote, Bell, Palette, Check, X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -127,10 +127,10 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     ];
 
     return (
-        <header className="pt-safe h-14 lg:h-16 bg-white border-b border-slate-200 flex items-center justify-between px-2 sm:px-3 lg:px-6 gap-2 sm:gap-3 transition-all duration-300 shadow-2xs relative z-30 min-w-0">
+        <header className="pt-safe h-14 lg:h-16 bg-white border-b border-slate-200 flex items-center justify-between px-2 sm:px-3 lg:px-6 gap-2 sm:gap-3 transition-all duration-300 shadow-2xs relative z-30 min-w-0 overflow-hidden">
             {/* Left – Sidebar Toggle */}
             <div className="flex items-center gap-2 shrink-0">
-                <button 
+                <button
                     onClick={onToggleSidebar}
                     className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all active:scale-95 flex items-center justify-center"
                     aria-label={collapsed ? 'Abrir menú' : 'Cerrar menú'}
@@ -139,10 +139,16 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                 </button>
             </div>
 
-            {/* Center – Exchange Rate Widget */}
-            <div className="flex items-center shrink-0">
+            {/* Center – Exchange Rate Widget
+                When the sidebar is expanded on desktop the topbar loses ~180px,
+                so the full rates bar only fits at xl. On lg we fall back to the
+                compact trigger so the right side never overflows the navbar. */}
+            <div className="flex items-center justify-center min-w-0 flex-1">
                 {/* Desktop Full Rates Bar */}
-                <div className="hidden lg:flex items-center gap-0 bg-slate-50 border border-slate-200/80 rounded-xl p-1 text-xs">
+                <div className={cn(
+                    'hidden items-center gap-0 bg-slate-50 border border-slate-200/80 rounded-xl p-1 text-xs max-w-full',
+                    collapsed ? 'lg:flex' : 'xl:flex'
+                )}>
                     <div className="flex items-center gap-1.5 px-2 text-slate-400">
                         <ArrowLeftRight className="w-3.5 h-3.5 text-indigo-600" />
                         <span className="font-semibold text-slate-600">Tasa</span>
@@ -170,13 +176,13 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                     <div className="w-px h-4 bg-slate-200 mx-1.5" />
 
                     {/* Rates display */}
-                    <div className="flex items-center">
+                    <div className="flex items-center min-w-0 overflow-hidden">
                         {others.map((cur, i) => {
                             const pair = getPairInfo(base, cur);
                             return (
-                                <div key={cur} className="flex items-center">
+                                <div key={cur} className="flex items-center min-w-0">
                                     {i > 0 && <div className="w-px h-3.5 bg-slate-200 mx-2" />}
-                                    <span className="px-1.5 tabular-nums text-slate-600 text-xs font-medium">
+                                    <span className="px-1.5 tabular-nums text-slate-600 text-xs font-medium truncate">
                                         <span className="text-slate-400">{pair.left}</span>
                                         <span className="font-extrabold text-slate-900">{pair.right}</span>
                                     </span>
@@ -187,7 +193,10 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                 </div>
 
                 {/* Mobile / Tablet Compact Rate Trigger */}
-                <div className="relative lg:hidden">
+                <div className={cn(
+                    'relative',
+                    collapsed ? 'lg:hidden' : 'xl:hidden'
+                )}>
                     <button
                         onClick={() => setRatePopoverOpen(!ratePopoverOpen)}
                         className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-1 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-all active:scale-95"
@@ -235,12 +244,16 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                 </div>
             </div>
 
-            {/* Right – BranchSelector + Shortcuts + Profile */}
-            <div className="flex items-center gap-1 sm:gap-2 lg:gap-3 shrink-0">
-                <div className="hidden sm:block">
+            {/* Right – BranchSelector + Shortcuts + Profile
+                Hidden secondary controls when the sidebar is open on lg so the
+                user block stays inside the navbar instead of overflowing right. */}
+            <div className="flex items-center gap-1 sm:gap-2 lg:gap-3 shrink-0 min-w-0">
+                <div className={cn('min-w-0', collapsed ? 'hidden sm:block' : 'hidden xl:block')}>
                     <CloudSyncWidget />
                 </div>
-                <BranchSelector />
+                <div className="min-w-0 max-w-[28vw] sm:max-w-[180px] lg:max-w-[160px]">
+                    <BranchSelector />
+                </div>
 
                 <div className="relative shrink-0">
                     <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-100/80 p-0.5 sm:p-1 rounded-xl border border-slate-200/50 max-w-full">
@@ -256,7 +269,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                         </button>
 
                         {/* Theme Selector Trigger */}
-                        <button 
+                        <button
                             onClick={() => setThemePopoverOpen(!themePopoverOpen)}
                             className="min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 cursor-pointer shrink-0"
                             title="Cambiar Tema de Interfaz"
@@ -264,16 +277,19 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                             <Palette className="w-5 h-5" />
                         </button>
 
-                        <button 
+                        <button
                             onClick={() => setShortcutsOpen(true)}
-                            className="hidden sm:flex min-w-[44px] min-h-[44px] items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 shrink-0" 
+                            className={cn(
+                                'min-w-[44px] min-h-[44px] items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95 shrink-0',
+                                collapsed ? 'hidden sm:flex' : 'hidden xl:flex'
+                            )}
                             title="Atajos de teclado (K)"
                         >
                             <Keyboard className="w-5 h-5" />
                         </button>
 
                         <div ref={notifRef}>
-                            <button 
+                            <button
                                 onClick={() => setNotifOpen(!notifOpen)}
                                 className="relative min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 rounded-lg transition-all active:scale-95"
                                 aria-label="Notificaciones"
@@ -377,19 +393,19 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                     )}
                 </div>
 
-                <div className="relative shrink-0">
+                <div className="relative shrink-0 min-w-0">
                     <button
                         onClick={() => setProfileOpen(!profileOpen)}
-                        className="flex items-center gap-1.5 py-1 px-1 sm:px-2 rounded-xl hover:bg-slate-100 transition-all active:scale-95"
+                        className="flex items-center gap-1.5 py-1 px-1 sm:px-2 rounded-xl hover:bg-slate-100 transition-all active:scale-95 max-w-full"
                     >
                         <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-xs shrink-0">
                             <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-700 dark:text-slate-200" />
                         </div>
-                        <div className="hidden lg:block text-left">
-                            <p className="text-xs font-bold text-slate-900 leading-none">{user?.nombre || 'Usuario'}</p>
-                            <p className="text-[10px] text-slate-400 mt-0.5 font-medium uppercase tracking-tight italic">{user?.role || 'Invitado'}</p>
+                        <div className="hidden lg:block text-left min-w-0 max-w-[120px] xl:max-w-[160px]">
+                            <p className="text-xs font-bold text-slate-900 leading-none truncate">{user?.nombre || 'Usuario'}</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5 font-medium uppercase tracking-tight italic truncate">{user?.role || 'Invitado'}</p>
                         </div>
-                        <ChevronDown className="w-3 h-3 text-slate-400 hidden lg:block" />
+                        <ChevronDown className="w-3 h-3 text-slate-400 hidden lg:block shrink-0" />
                     </button>
 
                     {profileOpen && (

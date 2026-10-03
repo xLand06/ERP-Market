@@ -140,7 +140,6 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
     const queryClient = useQueryClient();
 
     const themeStyles = getSidebarTheme(activeTheme);
-    const LogoIcon = themeStyles.LogoIcon;
 
     // Effective branch used by feature hooks (null/undefined → all-branches queries)
     const effectiveBranch = selectedBranch && selectedBranch !== 'all' ? selectedBranch : undefined;
@@ -219,8 +218,13 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
             {/* Branding Header */}
             <div className={cn("h-16 flex items-center justify-between px-3 lg:px-4 border-b mb-4 overflow-hidden shrink-0", themeStyles.headerBorder)}>
                 <div className="flex items-center gap-3">
-                    <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shadow-md shrink-0 transition-all duration-300", themeStyles.logoBg)}>
-                        <LogoIcon className="w-5 h-5 text-white" />
+                    <div className={cn("w-9 h-9 rounded-xl overflow-hidden shrink-0 transition-all duration-300 shadow-md bg-white ring-1 ring-white/20")}>
+                        <img
+                            src="/logo-allmarket.webp"
+                            alt="ALLMARKET"
+                            className="w-full h-full object-cover"
+                            draggable={false}
+                        />
                     </div>
                     {!collapsed && (
                         <span className={cn("text-base lg:text-lg uppercase whitespace-nowrap animate-in fade-in duration-300 delay-150", themeStyles.logoTextColor)}>

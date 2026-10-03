@@ -157,6 +157,9 @@ export default function InitialSyncScreen({ onComplete }: Props) {
         <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center z-50">
             {/* Logo / Marca */}
             <div className="mb-8 text-center">
+                <div className="w-20 h-20 rounded-2xl overflow-hidden mx-auto mb-4 shadow-2xl shadow-emerald-500/20 bg-white ring-1 ring-white/20">
+                    <img src="/logo-allmarket.webp" alt="ALLMARKET" className="w-full h-full object-cover" draggable={false} />
+                </div>
                 <h1 className="text-3xl font-bold text-white tracking-tight">
                     ALL<span className="text-emerald-400">MARKET</span>
                 </h1>

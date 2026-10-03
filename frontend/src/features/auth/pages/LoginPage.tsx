@@ -144,8 +144,8 @@ export default function LoginPage() {
                 {/* Left: Branding (desktop only) */}
                 <div className="hidden lg:flex flex-1 flex-col justify-center space-y-8 max-w-md">
                     <div className="animate-fadeInUp">
-                        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#3a7d89] to-[#0f1c38] flex items-center justify-center mb-6 shadow-2xl shadow-[#3a7d89]/30">
-                            <span className="text-3xl font-black text-white tracking-tight">AM</span>
+                        <div className="w-20 h-20 rounded-3xl overflow-hidden mb-6 shadow-2xl shadow-[#3a7d89]/30 bg-white ring-1 ring-slate-200">
+                            <img src="/logo-allmarket.webp" alt="ALLMARKET" className="w-full h-full object-cover" draggable={false} />
                         </div>
                         <h1 className="text-4xl xl:text-5xl font-black text-[#0f1c38] tracking-tight leading-tight">
                             ALL <span className="text-[#3a7d89]">MARKET</span>
@@ -176,8 +176,8 @@ export default function LoginPage() {
                 <div className="w-full max-w-lg lg:max-w-md">
                     {/* Mobile: minimal logo */}
                     <div className="lg:hidden text-center mb-6">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#3a7d89] to-[#0f1c38] flex items-center justify-center mx-auto mb-3 shadow-xl shadow-[#3a7d89]/30">
-                            <span className="text-2xl font-black text-white">AM</span>
+                        <div className="w-16 h-16 rounded-2xl overflow-hidden mx-auto mb-3 shadow-xl shadow-[#3a7d89]/30 bg-white ring-1 ring-slate-200">
+                            <img src="/logo-allmarket.webp" alt="ALLMARKET" className="w-full h-full object-cover" draggable={false} />
                         </div>
                         <h1 className="text-3xl font-black text-[#0f1c38] tracking-tight">
                             ALL <span className="text-[#3a7d89]">MARKET</span>

@@ -10,7 +10,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.webp', 'favicon.svg', 'logo-allmarket.webp', 'apple-touch-icon.png'],
       manifest: {
         name: 'ALL MARKET — ERP para Bodegas',
         short_name: 'ALL MARKET',
@@ -21,16 +21,28 @@ export default defineConfig({
         orientation: 'portrait',
         icons: [
           {
-            src: 'favicon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: 'favicon.webp',
+            sizes: '96x96',
+            type: 'image/webp',
+            purpose: 'any',
+          },
+          {
+            src: 'logo-allmarket.webp',
+            sizes: '512x512',
+            type: 'image/webp',
             purpose: 'any maskable',
+          },
+          {
+            src: 'apple-touch-icon.png',
+            sizes: '180x180',
+            type: 'image/png',
+            purpose: 'any',
           },
         ],
       },
       workbox: {
         // Cache the SPA shell and all static assets
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
         // Don't cache API calls — those go through the backend
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/api/],

@@ -74,18 +74,18 @@ export function BranchSelector() {
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className={cn(
-                    'flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors',
+                    'flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors max-w-full',
                     'hover:bg-slate-100 text-slate-700',
                     isOpen && 'bg-slate-100'
                 )}
             >
-                <Store className="w-4 h-4 text-indigo-500" />
-                <span className="text-sm font-medium hidden sm:block max-w-[120px] truncate">
+                <Store className="w-4 h-4 text-indigo-500 shrink-0" />
+                <span className="text-sm font-medium hidden sm:block max-w-[100px] lg:max-w-[120px] truncate">
                     {currentOption?.name || 'Seleccionar'}
                 </span>
                 <ChevronDown
                     className={cn(
-                        'w-3 h-3 text-slate-400 transition-transform',
+                        'w-3 h-3 text-slate-400 transition-transform shrink-0',
                         isOpen && 'rotate-180'
                     )}
                 />
