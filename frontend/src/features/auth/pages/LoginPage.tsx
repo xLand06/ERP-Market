@@ -16,6 +16,7 @@ import { nativeGet, nativePost, isNativeApp, humanNetError, requireServerOrigin 
 import { Bug, Play, ChevronDown, ChevronUp } from 'lucide-react';
 
 const isCapacitor = !!(window as any).Capacitor;
+export const APP_BUILD = '2026-10-03.2';
 const DESKTOP_WINDOWS_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Setup-Windows.exe';
 const DESKTOP_LINUX_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Linux.AppImage';
 
@@ -538,6 +539,9 @@ export default function LoginPage() {
                         <h1 className="text-4xl xl:text-5xl font-black text-[#0f1c38] dark:text-white tracking-tight leading-tight">
                             ALL <span className="text-[#3a7d89] dark:text-teal-400">MARKET</span>
                         </h1>
+                        <p className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#3a7d89]/10 dark:bg-teal-500/15 text-[#3a7d89] dark:text-teal-300 font-mono text-[11px] font-bold">
+                            build v{APP_BUILD}
+                        </p>
                         <p className="text-slate-500 dark:text-slate-400 text-sm sm:text-base mt-3 max-w-md leading-relaxed">
                             Sistema de gestión inteligente para bodegas, supermercados y negocios de retail en Latinoamérica.
                         </p>
@@ -570,6 +574,9 @@ export default function LoginPage() {
                         <h1 className="text-3xl font-black text-[#0f1c38] dark:text-white tracking-tight">
                             ALL <span className="text-[#3a7d89] dark:text-teal-400">MARKET</span>
                         </h1>
+                        <p className="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#3a7d89]/10 dark:bg-teal-500/15 text-[#3a7d89] dark:text-teal-300 font-mono text-[10px] font-bold">
+                            v{APP_BUILD}
+                        </p>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Iniciá sesión para continuar</p>
                     </div>
 
