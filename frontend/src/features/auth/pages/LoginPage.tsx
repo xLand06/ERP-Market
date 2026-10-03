@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Eye, EyeOff, Lock, User, Loader2, Cloud, CloudOff, RefreshCw, Smartphone, Monitor, Download, QrCode, Camera, Shield, AlertTriangle, ArrowRight, Zap, BarChart3, ShoppingCart } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useLoginForm, useLogin } from '@/features/auth/hooks';
+import { useAuthStore } from '@/features/auth/store/authStore';
 import { AppStorage } from '@/services/app-storage';
 import { MathCaptcha, getLoginRateLimit, recordLoginAttempt, resetLoginAttempts, getShowCaptcha } from '@/components/auth/MathCaptcha';
 import type { LoginPayload } from '@/features/auth/types';
