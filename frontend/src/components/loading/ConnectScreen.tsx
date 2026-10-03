@@ -274,11 +274,14 @@ export default function ConnectScreen() {
             <div className="w-full max-w-md">
                 {/* Header */}
                 <div className="text-center mb-8">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-900/40">
-                        <Monitor className="w-8 h-8 text-white" />
+                    <div className="w-20 h-20 rounded-full overflow-hidden mx-auto mb-4 shadow-2xl shadow-emerald-500/20 bg-white ring-1 ring-white/20">
+                        <img src="/logo-allmarket.webp" alt="ALLMARKET" className="w-full h-full object-cover" draggable={false} />
                     </div>
-                    <h1 className="text-2xl font-black text-white tracking-tight">ALL MARKET</h1>
-                    <p className="text-slate-400 text-sm mt-1">Conectá con tu negocio</p>
+                    <h1 className="text-2xl font-black text-white tracking-tight">ALLMARKET</h1>
+                    <p className="mt-2 inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 font-mono text-[11px] font-bold">
+                        build v2026-10-03.2
+                    </p>
+                    <p className="text-slate-400 text-sm mt-2">Conectá con tu negocio</p>
                 </div>
 
                 {/* Mode tabs */}
