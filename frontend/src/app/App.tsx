@@ -22,9 +22,26 @@ import { useAuthStore } from '@/features/auth/store/authStore';
 import InitialSyncScreen from '@/components/loading/InitialSyncScreen';
 import ConnectScreen from '@/components/loading/ConnectScreen';
 import { AppStorage } from '@/services/app-storage';
-import { getServerUrlCache } from '@/lib/server-url';
+import { getServerUrlCache, normalizeServerUrl, setServerUrlCache } from '@/lib/server-url';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+
+/** allmarket://connect?server=https://... → persist + jump to login */
+async function applyDeepLinkServer(rawUrl: string): Promise<boolean> {
+    if (!rawUrl || !rawUrl.startsWith('allmarket://')) return false;
+    let server: string | null = null;
+    try {
+        server = new URL(rawUrl).searchParams.get('server');
+    } catch { /* ignore */ }
+    if (!server) return false;
+    const normalized = normalizeServerUrl(server);
+    if (!normalized) return false;
+    await AppStorage.setItem('serverUrl', normalized);
+    setServerUrlCache(normalized);
+    toast.success(`Conectado a ${normalized.replace(/^https?:\/\//, '')}`);
+    window.location.href = '/login';
+    return true;
+}
 
 export default function App() {
     const { fetchSettings, activeTheme, businessName } = useConfigStore();
@@ -73,6 +90,32 @@ export default function App() {
             setHasServerUrl(!!cached || !!electronUrl);
             setServerUrlReady(true);
         })();
+    }, []);
+
+    // ── Deep links: allmarket://connect?server=... (cámara del sistema / cold start) ──
+    useEffect(() => {
+        const onCustom = (e: Event) => {
+            const url = (e as CustomEvent)?.detail?.url;
+            if (url) void applyDeepLinkServer(url);
+        };
+        window.addEventListener('appUrlOpen', onCustom);
+
+        let sub: any = null;
+        (async () => {
+            try {
+                const { App: CapApp } = await import('@capacitor/app');
+                sub = await CapApp.addListener('appUrlOpen', async ({ url }: { url: string }) => {
+                    await applyDeepLinkServer(url);
+                });
+                const launch = await CapApp.getLaunchUrl();
+                if (launch?.url) await applyDeepLinkServer(launch.url);
+            } catch { /* optional */ }
+        })();
+
+        return () => {
+            window.removeEventListener('appUrlOpen', onCustom);
+            sub?.remove?.().catch?.(() => {});
+        };
     }, []);
 
     // Título dinámico: ALLMARKET -- <nombre de la empresa del tenant>
