@@ -125,7 +125,7 @@ export function AppShellLayout() {
             >
                 <div
                     className={cn(
-                        'fixed top-0 right-0 z-30 transition-all duration-300 ease-in-out',
+                        'fixed top-0 right-0 z-[70] transition-all duration-300 ease-in-out',
                         collapsed ? 'left-0 lg:left-20' : 'left-0 lg:left-65'
                     )}
                 >

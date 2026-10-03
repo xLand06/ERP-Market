@@ -127,7 +127,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     ];
 
     return (
-        <header className="pt-safe h-14 lg:h-16 bg-white border-b border-slate-200 flex items-center justify-between px-2 sm:px-3 lg:px-6 gap-2 sm:gap-3 transition-all duration-300 shadow-2xs relative z-30 min-w-0 overflow-hidden">
+        <header className="pt-safe h-14 lg:h-16 bg-white border-b border-slate-200 flex items-center justify-between px-2 sm:px-3 lg:px-6 gap-2 sm:gap-3 transition-all duration-300 shadow-2xs relative z-[70] min-w-0">
             {/* Left – Sidebar Toggle */}
             <div className="flex items-center gap-2 shrink-0">
                 <button
