@@ -601,6 +601,16 @@ export default function LoginPage() {
                                 <span className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
                                     <Bug className="w-3.5 h-3.5" />
                                     Diagnosticar conexión
+                                    {!isCapacitor && (
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                                            WEB
+                                        </span>
+                                    )}
+                                    {isCapacitor && (
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                                            APK
+                                        </span>
+                                    )}
                                     {debugData && (
                                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${debugData.healthOk ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300'}`}>
                                             {debugData.healthOk ? 'OK' : 'FALLA'}

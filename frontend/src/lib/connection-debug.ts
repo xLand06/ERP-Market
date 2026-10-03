@@ -31,6 +31,7 @@ export async function collectConnectionDebug(): Promise<ConnectionDebug> {
     const capacitorNative = isNativeApp() || !!(cap?.platform === 'android' || cap?.platform === 'ios');
     const cache = getServerUrlCache();
     const cacheApiBase = cache ? `${cache}/api` : null;
+    const isWeb = !capacitorNative;
 
     let ls: string | null = null;
     try { ls = localStorage.getItem('serverUrl'); } catch { /* ignore */ }
@@ -43,34 +44,43 @@ export async function collectConnectionDebug(): Promise<ConnectionDebug> {
         sqliteError = String(e?.message || e);
     }
 
-    const healthUrl = cache ? `${cache}/api/health` : null;
+    // Web: health against SAME origin /api/health — no serverUrl required
+    // APK: health against cached tenant serverUrl
+    const healthUrl = capacitorNative
+        ? (cache ? `${cache}/api/health` : null)
+        : `${window.location.origin}/api/health`;
+
     let healthOk: boolean | null = null;
     let healthStatus: number | null = null;
-    let healthDetail = 'no se intentó (sin serverUrl)';
+    let healthDetail = capacitorNative && !cache
+        ? 'no se intentó (APK sin serverUrl — escaneá el QR)'
+        : 'no se intentó';
     let healthDurationMs: number | null = null;
 
-    if (healthUrl && capacitorNative) {
-        const t0 = performance.now();
-        const res = await nativeGet('/api/health', 5000);
-        healthDurationMs = Math.round(performance.now() - t0);
-        healthStatus = res.status;
-        healthOk = res.ok;
-        healthDetail = res.ok
-            ? `OK ${JSON.stringify(res.data).slice(0, 140)}`
-            : (res.error || `HTTP ${res.status}`);
-    } else if (healthUrl) {
+    if (healthUrl) {
         const t0 = performance.now();
         try {
-            const c = new AbortController();
-            const timer = setTimeout(() => c.abort(), 5000);
-            try {
-                const res = await fetch(healthUrl, { signal: c.signal });
+            if (capacitorNative) {
+                const { CapacitorHttp } = await import('@capacitor/core');
+                const res = await CapacitorHttp.get({ url: healthUrl, connectTimeout: 5000, readTimeout: 5000 });
                 healthStatus = res.status;
-                healthOk = res.ok;
-                const body = await res.text().catch(() => '');
-                healthDetail = res.ok ? `OK ${body.slice(0, 120)}` : `HTTP ${res.status} ${body.slice(0, 120)}`;
-            } finally {
-                clearTimeout(timer);
+                healthOk = res.status >= 200 && res.status < 300;
+                const body = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+                healthDetail = healthOk
+                    ? `OK ${body.slice(0, 140)}`
+                    : `HTTP ${res.status} ${body.slice(0, 140)}`;
+            } else {
+                const c = new AbortController();
+                const timer = setTimeout(() => c.abort(), 5000);
+                try {
+                    const res = await fetch(healthUrl, { signal: c.signal });
+                    healthStatus = res.status;
+                    healthOk = res.ok;
+                    const body = await res.text().catch(() => '');
+                    healthDetail = res.ok ? `OK ${body.slice(0, 120)}` : `HTTP ${res.status} ${body.slice(0, 120)}`;
+                } finally {
+                    clearTimeout(timer);
+                }
             }
         } catch (e: any) {
             healthOk = false;
@@ -81,7 +91,7 @@ export async function collectConnectionDebug(): Promise<ConnectionDebug> {
     }
 
     let nativePingOk: boolean | null = null;
-    let nativePingDetail = '—';
+    let nativePingDetail = capacitorNative ? '' : 'web: no aplica';
     if (capacitorNative) {
         const ping = await nativePingExternal('https://www.baidu.com', 5000);
         nativePingOk = ping.ok;
@@ -97,7 +107,7 @@ export async function collectConnectionDebug(): Promise<ConnectionDebug> {
         origin: window.location.origin,
         capacitorNative,
         cacheServerUrl: cache,
-        cacheApiBase,
+        cacheApiBase: cacheApiBase || (isWeb ? `${window.location.origin}/api (mismo origen)` : '/api (relativo — malo en APK)'),
         localstorageServerUrl: normalizeServerUrl(ls),
         sqliteServerUrl: normalizeServerUrl(sqlite) || (sqliteError ? `(sqlite error: ${sqliteError})` : null),
         envApiUrl: (import.meta.env.VITE_API_URL as string | undefined) || null,
@@ -113,12 +123,14 @@ export async function collectConnectionDebug(): Promise<ConnectionDebug> {
 }
 
 export function formatDebugLines(d: ConnectionDebug): string[] {
+    const mode = d.capacitorNative ? 'APK móvil' : 'Web (navegador)';
     return [
+        `Modo: ${mode}`,
         `Plataforma: ${d.platform}${d.capacitorNative ? ' (nativa)' : ' (web)'}`,
         `WebView: ${d.protocol}//${d.hostname}`,
         `Origen: ${d.origin}`,
         `Cache serverUrl: ${d.cacheServerUrl || '—'}`,
-        `API axios usará: ${d.cacheApiBase || '/api (relativo — malo en APK)'}`,
+        `API axios usará: ${d.cacheApiBase || '—'}`,
         `localStorage: ${d.localstorageServerUrl || '—'}`,
         `SQLite: ${d.sqliteServerUrl || '—'}`,
         `VITE_API_URL: ${d.envApiUrl || '—'}`,
@@ -129,5 +141,8 @@ export function formatDebugLines(d: ConnectionDebug): string[] {
         `Detalle health: ${d.healthDetail}`,
         `Internet saliente: ${d.nativePingOk === null ? '—' : d.nativePingOk ? 'OK' : 'FALLA'} (${d.nativePingDetail})`,
         `Hora: ${d.checkedAt}`,
-    ];
+        d.capacitorNative
+            ? ''
+            : 'Nota: en web no hay serverUrl QR; la app usa /api de este mismo dominio.',
+    ].filter(Boolean);
 }
