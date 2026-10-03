@@ -252,6 +252,54 @@ export default function LoginPage() {
         connectingRef.current = false; setConnectingServer(null); toast.error('No se pudo conectar. Verificá tu conexión.');
     };
 
+    const handleQrPayload = useCallback((raw: string) => {
+        const t = raw.trim();
+        let s: string | null = null;
+        if (t.startsWith('allmarket://')) {
+            try { s = new URL(t).searchParams.get('server'); } catch { /* ignore */ }
+        }
+        if (!s && /^https?:\/\//.test(t)) s = t;
+        if (!s) {
+            toast.error('QR no reconocido');
+            return;
+        }
+        if (navigator.vibrate) try { navigator.vibrate(100); } catch { /* ignore */ }
+        void validateAndConnect(s);
+    }, [validateAndConnect]);
+
+    const startNativeScanner = useCallback(async () => {
+        const plugins = (window as any)?.Capacitor?.Plugins;
+        const native = plugins?.QrScanner;
+        if (!native?.scan) {
+            toast.error('Escáner nativo no disponible');
+            return;
+        }
+        setScannerOpen(true);
+        setScannerStatus('starting');
+        setScannerError(null);
+        try {
+            const result = await native.scan();
+            setScannerStatus('ready');
+            handleQrPayload(String(result?.text || ''));
+        } catch (e: any) {
+            const msg = String(e?.message || e);
+            if (/cancelled|cancel/i.test(msg)) {
+                setScannerStatus('idle');
+            } else {
+                setScannerStatus('error');
+                setScannerError('No se pudo abrir el escáner. Probá de nuevo.');
+            }
+        }
+    }, [handleQrPayload]);
+
+    const openScanner = useCallback(() => {
+        if (isCapacitor) {
+            void startNativeScanner();
+            return;
+        }
+        setScannerOpen(true);
+    }, [startNativeScanner]);
+
     const fail = (msg: string) => {
         setScannerStatus('error');
         setScannerError(msg);
@@ -464,7 +512,7 @@ export default function LoginPage() {
 
                             {/* QR Scanner — APK only */}
                             {isCapacitor && (
-                                <button type="button" onClick={() => setScannerOpen(true)} className="w-full h-12 rounded-xl border border-[#3a7d89]/30 dark:border-teal-500/40 bg-[#4ecdc4]/10 dark:bg-teal-500/15 text-[#3a7d89] dark:text-teal-300 font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#4ecdc4]/20 dark:hover:bg-teal-500/25 transition-all active:scale-95">
+                                <button type="button" onClick={openScanner} className="w-full h-12 rounded-xl border border-[#3a7d89]/30 dark:border-teal-500/40 bg-[#4ecdc4]/10 dark:bg-teal-500/15 text-[#3a7d89] dark:text-teal-300 font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#4ecdc4]/20 dark:hover:bg-teal-500/25 transition-all active:scale-95">
                                     <Camera className="w-4 h-4" /> Escanear QR
                                 </button>
                             )}
