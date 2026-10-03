@@ -88,6 +88,7 @@ export default function App() {
             const isElectron = (window as any).erpApi?.isElectron;
 
             // Solo mostrar carga en Electron compilado, no en dev (browser)
+            // Capacitor APK: el thin client se conecta por QR/serverUrl — no hay sync local
             if (!isElectron) {
                 setChecking(false);
                 setInitialSyncDone(true);
@@ -161,8 +162,10 @@ export default function App() {
     // Electron → cuando no tiene serverUrl
     // Capacitor APK → cuando no tiene serverUrl (carga desde https://localhost)
     const isElectron = !!(window as any).erpApi?.isElectron;
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const needsConnectScreen = isElectron || isLocalhost;
+    const isCapacitorNative = !!(window as any).Capacitor?.isNativePlatform?.()
+        || window.location.protocol === 'capacitor:'
+        || window.location.hostname === 'localhost';
+    const needsConnectScreen = isElectron || isCapacitorNative;
     if (needsConnectScreen && !hasServerUrl) {
         return <ConnectScreen />;
     }

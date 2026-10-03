@@ -225,6 +225,15 @@ api.interceptors.response.use(
 
 export const isOnline = async (): Promise<boolean> => {
     try {
+        // Prefer direct health against the tenant server (APK/QR) — does not
+        // depend on axios interceptor cache having been populated yet.
+        const cached = getServerUrlCache();
+        if (isCapacitor && cached) {
+            const { CapacitorHttp } = await import('@capacitor/core');
+            const url = `${cached.replace(/\/+$/, '')}/api/health`;
+            const res = await CapacitorHttp.get({ url, connectTimeout: 4000, readTimeout: 4000 });
+            return res.status >= 200 && res.status < 300;
+        }
         await api.get('/health', { timeout: 3000 });
         return true;
     } catch {

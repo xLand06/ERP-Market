@@ -9,6 +9,7 @@ import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
 import { normalizeServerUrl, setServerUrlCache } from '@/lib/server-url';
+import { isOnline } from '@/lib/api';
 
 const isCapacitor = !!(window as any).Capacitor;
 const DESKTOP_WINDOWS_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Setup-Windows.exe';
@@ -40,8 +41,20 @@ export default function LoginPage() {
         async function check() {
             try {
                 const { data } = await api.get('/sync/initial-status');
-                if (!cancelled) { setCloudOnline(data?.data?.isOnline ?? false); setLastSync(data?.data?.lastSyncAt ?? null); }
-            } catch { if (!cancelled) setCloudOnline(false); }
+                if (!cancelled) {
+                    setCloudOnline(data?.data?.isOnline ?? false);
+                    setLastSync(data?.data?.lastSyncAt ?? null);
+                }
+            } catch {
+                // Fallback: health del tenant (APK/QR) sin depender del interceptor
+                if (cancelled) return;
+                try {
+                    const ok = await isOnline();
+                    setCloudOnline(ok);
+                } catch {
+                    if (!cancelled) setCloudOnline(false);
+                }
+            }
         }
         check();
         const interval = setInterval(check, 30_000);
@@ -52,18 +65,24 @@ export default function LoginPage() {
         if (syncing) return;
         setSyncing(true);
         try {
-            await api.post('/sync/trigger');
-            toast.success('Sincronización iniciada');
-            let attempts = 0;
-            const poll = setInterval(async () => {
-                attempts++;
-                try {
-                    const { data } = await api.get('/sync/initial-status');
-                    if (data?.data?.hasCloudData) { clearInterval(poll); setSyncing(false); setCloudOnline(true); setLastSync(new Date().toISOString()); toast.success('Sincronización completada'); setTimeout(() => window.location.reload(), 1500); return; }
-                } catch {}
-                if (attempts >= 15) { clearInterval(poll); setSyncing(false); toast.success('Sincronización en progreso — recargando...'); setTimeout(() => window.location.reload(), 1000); }
-            }, 1000);
-        } catch (err: any) { setSyncing(false); setCloudOnline(false); toast.error(err?.message || 'Error al sincronizar'); }
+            // Server mode: trigger is a no-op — just re-check health and refresh UI
+            try {
+                await api.post('/sync/trigger');
+            } catch { /* ignore — server mode may reject OWNER guard */ }
+            const { data } = await api.get('/sync/initial-status').catch(() => ({ data: null } as any));
+            const online = data?.data?.isOnline ?? (await isOnline());
+            setCloudOnline(online);
+            if (online) {
+                setLastSync(new Date().toISOString());
+                toast.success('Servidor actualizado');
+            } else {
+                toast.error('Sin conexión al servidor del negocio');
+            }
+            setSyncing(false);
+        } catch (err: any) {
+            setSyncing(false);
+            toast.error(err?.message || 'Error al actualizar estado');
+        }
     }, [syncing]);
 
     const handleSubmit = useCallback(async (e: React.FormEvent) => {

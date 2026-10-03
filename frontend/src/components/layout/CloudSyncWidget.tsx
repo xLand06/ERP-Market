@@ -1,11 +1,13 @@
-import { Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { Cloud, CloudOff, RefreshCw, Server } from 'lucide-react';
 import { useSyncStore, syncApi } from '@/services/sync.service';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
+import { getServerUrlCache } from '@/lib/server-url';
 
 export function CloudSyncWidget() {
     const { isOnline, isSyncing, lastSync } = useSyncStore();
     const [rotating, setRotating] = useState(false);
+    const serverHost = getServerUrlCache()?.replace(/^https?:\/\//, '') || null;
 
     useEffect(() => {
         if (isSyncing) setRotating(true);
@@ -24,7 +26,7 @@ export function CloudSyncWidget() {
         <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100/80 rounded-xl border border-slate-200/50">
             <div className="flex items-center gap-1.5">
                 {isOnline ? (
-                    <Cloud className="w-4 h-4 text-emerald-500" />
+                    <Server className="w-4 h-4 text-emerald-500" />
                 ) : (
                     <CloudOff className="w-4 h-4 text-slate-400" />
                 )}
@@ -33,9 +35,14 @@ export function CloudSyncWidget() {
                         "text-[10px] font-bold uppercase tracking-tight",
                         isOnline ? "text-emerald-600" : "text-slate-500"
                     )}>
-                        {isOnline ? 'En línea' : 'Sin conexión'}
+                        {isOnline ? 'Servidor OK' : 'Sin conexión'}
                     </span>
-                    {lastSync && (
+                    {serverHost && (
+                        <span className="text-[8px] text-slate-400 font-medium whitespace-nowrap max-w-[120px] truncate">
+                            {serverHost}
+                        </span>
+                    )}
+                    {!serverHost && lastSync && (
                         <span className="text-[8px] text-slate-400 font-medium whitespace-nowrap">
                             Sinc: {new Date(lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
@@ -48,7 +55,7 @@ export function CloudSyncWidget() {
             <button
                 onClick={handleManualSync}
                 disabled={!isOnline || isSyncing}
-                title="Sincronizar ahora"
+                title="Actualizar estado del servidor"
                 className={cn(
                     "p-1.5 rounded-lg transition-all active:scale-90",
                     isSyncing ? "bg-indigo-100 text-indigo-600" : "hover:bg-white text-slate-500 hover:text-indigo-600",
