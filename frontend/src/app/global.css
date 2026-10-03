@@ -161,6 +161,7 @@
 
   /* ── 5. MODO OSCURO TOTAL (PURE DARK MODE) ── */
   html[data-theme="dark"], html.theme-dark {
+    color-scheme: dark;
     --background: 13 17 23;            /* #0D1117 */
     --foreground: 240 246 252;          /* #F0F6FC */
     --card: 22 27 34;                   /* #161B22 */
@@ -214,6 +215,17 @@
   html.theme-dark header {
     background-color: #161B22 !important;
     border-color: #30363D !important;
+  }
+
+  /* Login branding: keep navy/teal brand accents readable on pure dark surfaces.
+     Arbitrary hex colors (text-[#0f1c38], text-[#3a7d89]) are not covered by the
+     generic slate/gray remaps above, so without this they stay navy-on-black. */
+  html.theme-dark .text-\[\#0f1c38\] {
+    color: #F0F6FC !important;
+  }
+
+  html.theme-dark .text-\[\#3a7d89\] {
+    color: #2DD4BF !important; /* teal-400 */
   }
 
   /* Typography & High-Contrast Colors (Accessibility > 4.5:1 Ratio) */

@@ -56,14 +56,14 @@ export function MathCaptcha({ onVerify, resetKey }: MathCaptchaProps) {
 
     return (
         <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-medium">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 <span>Verificación de seguridad</span>
             </div>
-            <div className={`flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl ${shake ? 'animate-[shake_0.3s_ease-in-out]' : ''}`}>
+            <div className={`flex items-center gap-3 p-3 bg-slate-50 dark:bg-[#0D1117] border border-slate-200 dark:border-[#30363D] rounded-xl ${shake ? 'animate-[shake_0.3s_ease-in-out]' : ''}`}>
                 <div className="flex-1">
-                    <p className="text-lg font-black text-slate-800 font-mono tracking-wider select-none">
-                        {operation.display} = <span className="text-slate-300">?</span>
+                    <p className="text-lg font-black text-slate-800 dark:text-slate-100 font-mono tracking-wider select-none">
+                        {operation.display} = <span className="text-slate-300 dark:text-slate-500">?</span>
                     </p>
                 </div>
                 <input
@@ -71,7 +71,7 @@ export function MathCaptcha({ onVerify, resetKey }: MathCaptchaProps) {
                     value={userAnswer}
                     onChange={(e) => setUserAnswer(e.target.value)}
                     placeholder="?"
-                    className="w-16 h-10 text-center text-lg font-bold border border-slate-300 rounded-lg bg-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                    className="w-16 h-10 text-center text-lg font-bold border border-slate-300 dark:border-[#30363D] rounded-lg bg-white dark:bg-[#161B22] dark:text-slate-100 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
                     autoComplete="off"
                 />
             </div>
