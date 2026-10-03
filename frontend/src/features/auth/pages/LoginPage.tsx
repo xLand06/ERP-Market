@@ -139,52 +139,76 @@ export default function LoginPage() {
             setScannerStatus('requesting');
             setScannerError(null);
 
-            // 1) Kick WebView permission + verify camera before html5-qrcode
+            // 1) Open REAR camera via getUserMedia — pass MediaStream to html5-qrcode.
+            //    facingMode/deviceId alone is unreliable in Capacitor Android WebView.
+            let mediaStream: MediaStream | null = null;
             try {
-                const stream = await Promise.race([
+                mediaStream = await Promise.race([
                     navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: { ideal: 'environment' } },
+                        video: {
+                            facingMode: { exact: 'environment' },
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 },
+                        },
                         audio: false,
-                    }),
-                    new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000)),
+                    }).catch(() =>
+                        // Some devices reject `exact` — retry with ideal rear
+                        navigator.mediaDevices.getUserMedia({
+                            video: { facingMode: { ideal: 'environment' } },
+                            audio: false,
+                        })
+                    ),
+                    new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000)),
                 ]);
-                stream.getTracks().forEach(t => t.stop());
             } catch (e: any) {
                 if (cancelled) return;
                 const msg = String(e?.message || e?.name || '');
                 if (/timeout/i.test(msg)) fail('La cámara no respondió. Cerrá y volvé a abrir, o revisá permisos de la app.');
                 else if (/NotAllowed|Permission|denied/i.test(msg)) fail('Permiso de cámara denegado. Activalo en Ajustes de la app.');
-                else if (/NotFound|DevicesNotFound|no camera/i.test(msg)) fail('No se encontró cámara en este dispositivo.');
+                else if (/NotFound|DevicesNotFound|no camera|Overconstrained/i.test(msg)) fail('No se encontró cámara trasera en este dispositivo.');
                 else fail('No se pudo abrir la cámara.');
                 return;
             }
-            if (cancelled) return;
+            if (cancelled) {
+                mediaStream?.getTracks().forEach(t => t.stop());
+                return;
+            }
 
-            // 2) Prefer rear camera by deviceId — Android WebViews often ignore facingMode
+            // 1b) If WebView ignored facingMode and gave us the FRONT camera, probe deviceIds
+            try {
+                const track = mediaStream?.getVideoTracks?.()[0];
+                const facing = (track?.getSettings?.() as MediaTrackSettings | undefined)?.facingMode;
+                if (facing === 'user') {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const videos = devices.filter(d => d.kind === 'videoinput');
+                    let rearStream: MediaStream | null = null;
+                    for (const d of videos) {
+                        try {
+                            const s = await navigator.mediaDevices.getUserMedia({
+                                video: { deviceId: { exact: d.deviceId } },
+                                audio: false,
+                            });
+                            const f = (s.getVideoTracks()[0]?.getSettings?.() as MediaTrackSettings | undefined)?.facingMode;
+                            // Prefer explicit environment; accept unknown labels that aren't user
+                            if (f === 'environment' || (f !== 'user' && videos.indexOf(d) > 0)) {
+                                mediaStream?.getTracks().forEach(t => t.stop());
+                                rearStream = s;
+                                break;
+                            }
+                            s.getTracks().forEach(t => t.stop());
+                        } catch { /* try next camera */ }
+                    }
+                    if (rearStream) mediaStream = rearStream;
+                }
+            } catch { /* keep whatever stream we have */ }
+
             try {
                 setScannerStatus('starting');
                 const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
-                if (cancelled) return;
-
-                let camera: string | { facingMode: string } = { facingMode: 'environment' };
-                try {
-                    const cameras = await Html5Qrcode.getCameras();
-                    if (cameras?.length) {
-                        const backRe = /back|rear|environment|trasera|posterior|cámara trasera|camera2.*back/i;
-                        const frontRe = /front|user|delantera|selfie/i;
-                        const scored = cameras.map((c: any, i: number) => {
-                            const label = String(c?.label || '');
-                            let score = 0;
-                            if (backRe.test(label)) score += 100;
-                            if (frontRe.test(label)) score -= 50;
-                            // Many Android devices list front first, rear last
-                            if (cameras.length > 1) score += i;
-                            return { id: c.id as string, label, score, i };
-                        });
-                        scored.sort((a, b) => b.score - a.score);
-                        camera = scored[0].id;
-                    }
-                } catch { /* keep facingMode fallback */ }
+                if (cancelled) {
+                    mediaStream?.getTracks().forEach(t => t.stop());
+                    return;
+                }
 
                 await stopScanner();
                 const scanner = new Html5Qrcode('login-qr-scanner', {
@@ -193,9 +217,12 @@ export default function LoginPage() {
                 });
                 scannerRef.current = scanner;
 
+                // Prefer live MediaStream (rear) over facingMode config
+                const cameraInput: MediaStream | { facingMode: string } = mediaStream ?? { facingMode: 'environment' };
+
                 await Promise.race([
                     scanner.start(
-                        camera,
+                        cameraInput,
                         {
                             fps: 10,
                             qrbox: { width: 220, height: 220 },
@@ -230,6 +257,7 @@ export default function LoginPage() {
 
                 if (!cancelled) setScannerStatus('ready');
             } catch (err: any) {
+                mediaStream?.getTracks().forEach(t => t.stop());
                 if (cancelled) return;
                 const msg = String(err?.message || '');
                 if (/start-timeout|timeout/i.test(msg)) fail('La cámara tardó demasiado en iniciar. Probá de nuevo.');
