@@ -246,16 +246,38 @@ api.interceptors.response.use(
             if (data?.details) {
                 console.log('[API] Validation details found, skipping global toast');
             } else {
-                const message = data?.error || error.message;
-                toast.error(message, { duration: 4000 });
+                const message = data?.error || describeApiError(error, originalRequest);
+                toast.error(message, { duration: 5000 });
             }
         }
 
-        console.error('[API Error]', error.response?.status, originalRequest.url);
+        console.error('[API Error]', error.response?.status, originalRequest.url, error.message, data);
 
         return Promise.reject(error);
     }
 );
+
+function describeApiError(error: AxiosError, config: AxiosRequestConfig): string {
+    const url = config?.url || '';
+    const status = error.response?.status;
+    const server = getServerUrlCache();
+    const host = server ? server.replace(/^https?:\/\//, '') : 'localhost (sin serverUrl)';
+
+    if (status) {
+        return `Error ${status} en ${url.replace(/^https?:\/\/[^/]+/, '') || url}`;
+    }
+    const msg = String(error.message || '');
+    if (/Network Error|Failed to fetch|network/i.test(msg)) {
+        return `Sin respuesta de ${host} — revisá conexión o la URL del servidor en el login`;
+    }
+    if (/timeout/i.test(msg)) {
+        return `Timeout al consultar ${host}`;
+    }
+    if (!server && isCapacitor) {
+        return 'Sin servidor configurado — escaneá el QR del panel web';
+    }
+    return msg || 'Error de red desconocido';
+}
 
 export const isOnline = async (): Promise<boolean> => {
     try {

@@ -10,6 +10,8 @@ import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
 import { normalizeServerUrl, setServerUrlCache, getServerUrlCache } from '@/lib/server-url';
 import { isOnline } from '@/lib/api';
+import { collectConnectionDebug, formatDebugLines, type ConnectionDebug } from '@/lib/connection-debug';
+import { Bug, Play, ChevronDown, ChevronUp } from 'lucide-react';
 
 const isCapacitor = !!(window as any).Capacitor;
 const DESKTOP_WINDOWS_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Setup-Windows.exe';
@@ -34,9 +36,30 @@ export default function LoginPage() {
 
     const [cloudOnline, setCloudOnline] = useState<boolean | null>(null);
     const [activeServer, setActiveServer] = useState<string | null>(null);
+    const [debugOpen, setDebugOpen] = useState(false);
+    const [debugRunning, setDebugRunning] = useState(false);
+    const [debugLines, setDebugLines] = useState<string[]>([]);
+    const [debugData, setDebugData] = useState<ConnectionDebug | null>(null);
+
+    const runDiagnostics = useCallback(async () => {
+        setDebugRunning(true);
+        try {
+            // refresh cache view + live health
+            setActiveServer(getServerUrlCache());
+            const data = await collectConnectionDebug();
+            setDebugData(data);
+            setDebugLines(formatDebugLines(data));
+        } catch (e: any) {
+            setDebugLines(['Error al diagnosticar:', String(e?.message || e)]);
+        } finally {
+            setDebugRunning(false);
+        }
+    }, []);
 
     useEffect(() => {
         setActiveServer(getServerUrlCache());
+        void runDiagnostics();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     const [syncing, setSyncing] = useState(false);
     const [lastSync, setLastSync] = useState<string | null>(null);
@@ -98,7 +121,19 @@ export default function LoginPage() {
         if (showCaptcha && !captchaValid) { setGeneralError('Resolvé la operación matemática para continuar.'); return; }
         if (!validate()) return;
         try { await login(form as LoginPayload); resetLoginAttempts(); } catch (err) {
-            if (err instanceof Error) { const parsed = parseError(err); if (parsed.username || parsed.password) return; setGeneralError(err.message); recordLoginAttempt(); setRateState(getLoginRateLimit()); setCaptchaKey(k => k + 1); }
+            if (err instanceof Error) {
+                const parsed = parseError(err);
+                if (parsed.username || parsed.password) return;
+                const server = getServerUrlCache();
+                const host = server ? server.replace(/^https?:\/\//, '') : 'sin servidor';
+                const isNet = /network|failed to fetch|timeout/i.test(err.message);
+                setGeneralError(
+                    isNet
+                        ? `${err.message} — API: ${host}/api. Tocá "Diagnosticar" abajo.`
+                        : err.message
+                );
+                recordLoginAttempt(); setRateState(getLoginRateLimit()); setCaptchaKey(k => k + 1);
+            }
         }
     }, [form, validate, login, parseError, captchaValid, showCaptcha]);
 
@@ -513,9 +548,49 @@ export default function LoginPage() {
                         {(generalError || rateState.blocked) && (
                             <div className="mb-4 p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-center gap-2 animate-slideDown">
                                 <AlertTriangle className="w-4 h-4 shrink-0" />
-                                {rateState.blocked ? `Bloqueado ${Math.ceil(rateState.remainingMs / 1000)}s` : generalError}
+                                <span className="min-w-0 break-words">
+                                    {rateState.blocked ? `Bloqueado ${Math.ceil(rateState.remainingMs / 1000)}s` : generalError}
+                                </span>
                             </div>
                         )}
+
+                        {/* Connection diagnostics — collapsible */}
+                        <div className="mb-4 border border-slate-200 dark:border-[#30363D] rounded-xl overflow-hidden">
+                            <button
+                                type="button"
+                                onClick={() => { setDebugOpen(v => !v); if (!debugOpen) void runDiagnostics(); }}
+                                className="w-full flex items-center justify-between px-3 py-2.5 bg-slate-50 dark:bg-[#0D1117] text-left"
+                            >
+                                <span className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+                                    <Bug className="w-3.5 h-3.5" />
+                                    Diagnosticar conexión
+                                    {debugData && (
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${debugData.healthOk ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300'}`}>
+                                            {debugData.healthOk ? 'OK' : 'FALLA'}
+                                        </span>
+                                    )}
+                                </span>
+                                {debugOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                            </button>
+                            {debugOpen && (
+                                <div className="px-3 py-3 bg-white dark:bg-[#161B22] border-t border-slate-200 dark:border-[#30363D]">
+                                    <div className="flex gap-2 mb-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => void runDiagnostics()}
+                                            disabled={debugRunning}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-bold hover:bg-teal-500 disabled:opacity-50"
+                                        >
+                                            {debugRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                                            Re-ejecutar
+                                        </button>
+                                    </div>
+                                    <pre className="text-[10px] leading-relaxed font-mono text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
+{debugLines.join('\n') || 'Ejecutá el diagnóstico...'}
+                                    </pre>
+                                </div>
+                            )}
+                        </div>
 
                         <form onSubmit={handleSubmit} className="space-y-5">
                             {/* Username */}
