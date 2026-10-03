@@ -88,16 +88,22 @@ export default function LoginPage() {
     const [scannerError, setScannerError] = useState<string | null>(null);
     const [connectingServer, setConnectingServer] = useState<string | null>(null);
     const scannerRef = useRef<any>(null);
+    const streamRef = useRef<MediaStream | null>(null);
     const connectingRef = useRef(false);
 
     const stopScanner = async () => {
         const s = scannerRef.current;
         scannerRef.current = null;
-        if (!s) return;
         try {
-            if (s.isScanning) await s.stop();
-            s.clear();
+            if (s) {
+                if (typeof s.stop === 'function' && s.isScanning) await s.stop();
+                if (typeof s.clear === 'function') s.clear();
+            }
         } catch { /* already stopped */ }
+        streamRef.current?.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+        const box = document.getElementById('login-qr-scanner');
+        if (box) box.innerHTML = '';
     };
 
     const validateAndConnect = async (server: string) => {
@@ -139,122 +145,94 @@ export default function LoginPage() {
             setScannerStatus('requesting');
             setScannerError(null);
 
-            // 1) Probe REAR camera once, capture deviceId, then RELEASE the camera.
-            //    Passing a live MediaStream into html5-qrcode leaves a black preview
-            //    on Capacitor Android (double-open / unbound stream).
-            let rearDeviceId: string | null = null;
+            // Capacitor Android WebView: html5-qrcode.start(cameraId) often shows a black
+            // preview. Own the camera: getUserMedia → <video> we control → decodeFromStream.
             let stream: MediaStream | null = null;
             try {
                 stream = await Promise.race([
                     navigator.mediaDevices.getUserMedia({
-                        video: {
-                            facingMode: { exact: 'environment' },
-                            width: { ideal: 1280 },
-                            height: { ideal: 720 },
-                        },
+                        video: { facingMode: { exact: 'environment' } },
                         audio: false,
                     }).catch(() =>
                         navigator.mediaDevices.getUserMedia({
-                            video: { facingMode: { ideal: 'environment' } },
+                            video: { facingMode: 'environment' },
                             audio: false,
                         })
                     ),
                     new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000)),
                 ]);
-
-                const track = stream.getVideoTracks()[0];
-                const settings = (track?.getSettings?.() as MediaTrackSettings | undefined) || {};
-                rearDeviceId = settings.deviceId || null;
-
-                // If WebView gave FRONT, pick another videoinput by probing facingMode
-                if (settings.facingMode === 'user') {
-                    const devices = await navigator.mediaDevices.enumerateDevices();
-                    const videos = devices.filter(d => d.kind === 'videoinput' && d.deviceId);
-                    for (const d of videos) {
-                        if (d.deviceId === rearDeviceId) continue;
-                        try {
-                            const probe = await navigator.mediaDevices.getUserMedia({
-                                video: { deviceId: { exact: d.deviceId } },
-                                audio: false,
-                            });
-                            const f = (probe.getVideoTracks()[0]?.getSettings?.() as MediaTrackSettings | undefined)?.facingMode;
-                            const id = probe.getVideoTracks()[0]?.getSettings?.()?.deviceId || d.deviceId;
-                            probe.getTracks().forEach(t => t.stop());
-                            if (f === 'environment') {
-                                rearDeviceId = id;
-                                break;
-                            }
-                        } catch { /* next */ }
-                    }
-                }
             } catch (e: any) {
-                stream?.getTracks().forEach(t => t.stop());
                 if (cancelled) return;
                 const msg = String(e?.message || e?.name || '');
                 if (/timeout/i.test(msg)) fail('La cámara no respondió. Cerrá y volvé a abrir, o revisá permisos de la app.');
-                else if (/NotAllowed|Permission|denied/i.test(msg)) fail('Permiso de cámara denegado. Activalo en Ajustes de la app.');
-                else if (/NotFound|DevicesNotFound|no camera|Overconstrained/i.test(msg)) fail('No se encontró cámara trasera en este dispositivo.');
+                else if (/NotAllowed|Permission|denied/i.test(msg)) fail('Permiso de cámara denegado. Activalo en Ajustes de la app → Cámara.');
+                else if (/NotFound|DevicesNotFound|no camera|Overconstrained/i.test(msg)) fail('No se encontró cámara en este dispositivo.');
                 else fail('No se pudo abrir la cámara.');
                 return;
-            } finally {
-                // Always release probe stream so html5-qrcode can open the camera cleanly
-                stream?.getTracks().forEach(t => t.stop());
             }
-            if (cancelled) return;
+            if (cancelled) {
+                stream?.getTracks().forEach(t => t.stop());
+                return;
+            }
 
             try {
                 setScannerStatus('starting');
-                const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
-                if (cancelled) return;
+                const container = document.getElementById('login-qr-scanner');
+                if (!container) throw new Error('Contenedor QR no encontrado');
 
-                await stopScanner();
-                const scanner = new Html5Qrcode('login-qr-scanner', {
+                // html5-qrcode decodeFromStream owns the <video> inside the container
+                container.innerHTML = '';
+                streamRef.current = stream;
+
+                // Wait a frame so the element is measurable
+                await new Promise(r => requestAnimationFrame(() => r(null)));
+
+                if (cancelled) {
+                    stream.getTracks().forEach(t => t.stop());
+                    return;
+                }
+
+                const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
+                const decoder = new Html5Qrcode('login-qr-scanner', {
                     verbose: false,
                     formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
                 });
-                scannerRef.current = scanner;
+                scannerRef.current = decoder;
 
-                // Pass deviceId string (or facingMode config) — NOT a live MediaStream
-                const cameraInput: string | { facingMode: string } =
-                    rearDeviceId || { facingMode: 'environment' };
-
-                await Promise.race([
-                    scanner.start(
-                        cameraInput,
-                        {
-                            fps: 10,
-                            qrbox: { width: 220, height: 220 },
-                            aspectRatio: 1.333334,
-                        },
-                        (decoded) => {
-                            if (connectingRef.current) return;
-                            const t = decoded.trim();
-                            let s: string | null = null;
-                            if (t.startsWith('allmarket://')) {
-                                try { s = new URL(t).searchParams.get('server'); } catch { /* ignore */ }
-                            }
-                            if (!s && /^https?:\/\//.test(t)) s = t;
-                            if (s) {
-                                if (navigator.vibrate) try { navigator.vibrate(100); } catch { /* ignore */ }
-                                try {
-                                    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-                                    const o = ctx.createOscillator();
-                                    const g = ctx.createGain();
-                                    o.connect(g); g.connect(ctx.destination);
-                                    o.frequency.value = 1000;
-                                    g.gain.setValueAtTime(0.1, ctx.currentTime);
-                                    o.start(); o.stop(ctx.currentTime + 0.1);
-                                } catch { /* ignore */ }
-                                void validateAndConnect(s);
-                            }
-                        },
-                        () => { /* per-frame decode miss — ignore */ },
-                    ),
-                    new Promise<never>((_, rej) => setTimeout(() => rej(new Error('start-timeout')), 12000)),
-                ]);
+                await decoder.decodeFromStream(
+                    stream,
+                    {
+                        fps: 10,
+                        qrbox: { width: 220, height: 220 },
+                    },
+                    (decoded) => {
+                        if (connectingRef.current) return;
+                        const t = decoded.trim();
+                        let s: string | null = null;
+                        if (t.startsWith('allmarket://')) {
+                            try { s = new URL(t).searchParams.get('server'); } catch { /* ignore */ }
+                        }
+                        if (!s && /^https?:\/\//.test(t)) s = t;
+                        if (s) {
+                            if (navigator.vibrate) try { navigator.vibrate(100); } catch { /* ignore */ }
+                            try {
+                                const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                                const o = ctx.createOscillator();
+                                const g = ctx.createGain();
+                                o.connect(g); g.connect(ctx.destination);
+                                o.frequency.value = 1000;
+                                g.gain.setValueAtTime(0.1, ctx.currentTime);
+                                o.start(); o.stop(ctx.currentTime + 0.1);
+                            } catch { /* ignore */ }
+                            void validateAndConnect(s);
+                        }
+                    },
+                    () => { /* per-frame miss */ },
+                );
 
                 if (!cancelled) setScannerStatus('ready');
             } catch (err: any) {
+                stream?.getTracks().forEach(t => t.stop());
                 if (cancelled) return;
                 const msg = String(err?.message || '');
                 if (/start-timeout|timeout/i.test(msg)) fail('La cámara tardó demasiado en iniciar. Probá de nuevo.');
