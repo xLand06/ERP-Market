@@ -277,10 +277,10 @@ public class NativeQrActivity extends AppCompatActivity {
         Preview preview = new Preview.Builder().build();
         preview.setSurfaceProvider(previewView.getSurfaceProvider());
 
-        // Target 720p for fast processing and optimal QR module density
+        // Target 720x1280 portrait for fast processing and optimal QR module density
         ImageAnalysis analysis = new ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .setTargetResolution(new Size(1280, 720))
+                .setTargetResolution(new Size(720, 1280))
                 .build();
         analysis.setAnalyzer(analysisExecutor, this::analyzeFrame);
 
@@ -316,52 +316,58 @@ public class NativeQrActivity extends AppCompatActivity {
             int finalWidth = (rotation == 90 || rotation == 270) ? height : width;
             int finalHeight = (rotation == 90 || rotation == 270) ? width : height;
 
-            PlanarYUVLuminanceSource source = new PlanarYUVLuminanceSource(
-                    rotatedData, finalWidth, finalHeight, 0, 0, finalWidth, finalHeight, false
+            // Center-crop (75% of viewport where the user frames the QR in the green box)
+            int cropSize = (int) (Math.min(finalWidth, finalHeight) * 0.75f);
+            int cropLeft = (finalWidth - cropSize) / 2;
+            int cropTop = (finalHeight - cropSize) / 2;
+            PlanarYUVLuminanceSource centerSource = new PlanarYUVLuminanceSource(
+                    rotatedData, finalWidth, finalHeight, cropLeft, cropTop, cropSize, cropSize, false
             );
 
             Result result = null;
 
-            // Strategy A: Dedicated QRCodeReader with HybridBinarizer on full frame
+            // Strategy 1: Center-crop with HybridBinarizer (fastest and most accurate for framed QR)
             try {
-                BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
+                qrCodeReader.reset();
+                BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(centerSource));
                 result = qrCodeReader.decode(bitmap, hints);
             } catch (Exception ignored) {}
 
-            // Strategy B: GlobalHistogramBinarizer (superior for scanning LCD/LED screens with reflection)
+            // Strategy 2: Center-crop with GlobalHistogramBinarizer (superior for scanning LCD/LED screens with reflection/glare)
             if (result == null) {
                 try {
-                    BinaryBitmap bitmap = new BinaryBitmap(new GlobalHistogramBinarizer(source));
+                    qrCodeReader.reset();
+                    BinaryBitmap bitmap = new BinaryBitmap(new GlobalHistogramBinarizer(centerSource));
                     result = qrCodeReader.decode(bitmap, hints);
                 } catch (Exception ignored) {}
             }
 
-            // Strategy C: Inverted luminance (for dark mode or high contrast screens)
+            // Strategy 3: Full-frame with HybridBinarizer (in case QR is slightly outside the box)
             if (result == null) {
                 try {
-                    BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source.invert()));
-                    result = qrCodeReader.decode(bitmap, hints);
-                } catch (Exception ignored) {}
-            }
-
-            // Strategy D: Center-crop scan (reduces background clutter if user framed code in center)
-            if (result == null) {
-                try {
-                    int cropSize = (int) (Math.min(finalWidth, finalHeight) * 0.70f);
-                    int cropLeft = (finalWidth - cropSize) / 2;
-                    int cropTop = (finalHeight - cropSize) / 2;
-                    PlanarYUVLuminanceSource centerSource = new PlanarYUVLuminanceSource(
-                            rotatedData, finalWidth, finalHeight, cropLeft, cropTop, cropSize, cropSize, false
+                    qrCodeReader.reset();
+                    PlanarYUVLuminanceSource fullSource = new PlanarYUVLuminanceSource(
+                            rotatedData, finalWidth, finalHeight, 0, 0, finalWidth, finalHeight, false
                     );
-                    BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(centerSource));
+                    BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(fullSource));
                     result = qrCodeReader.decode(bitmap, hints);
                 } catch (Exception ignored) {}
             }
 
-            // Strategy E: MultiFormatReader fallback
+            // Strategy 4: Center-crop with Inverted luminance (dark mode or high contrast screens)
             if (result == null) {
                 try {
-                    BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
+                    qrCodeReader.reset();
+                    BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(centerSource.invert()));
+                    result = qrCodeReader.decode(bitmap, hints);
+                } catch (Exception ignored) {}
+            }
+
+            // Strategy 5: MultiFormatReader fallback
+            if (result == null) {
+                try {
+                    multiFormatReader.reset();
+                    BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(centerSource));
                     result = multiFormatReader.decodeWithState(bitmap);
                 } catch (Exception ignored) {}
             }
