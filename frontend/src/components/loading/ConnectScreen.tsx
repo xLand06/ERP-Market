@@ -13,6 +13,9 @@ const MGMT_API = 'https://mgmt.allcode.site';
 type Mode = 'qr' | 'code' | 'url';
 
 export default function ConnectScreen() {
+    if (typeof window !== 'undefined' && !(window as any).erpApi?.isElectron) {
+        return null;
+    }
     const [input, setInput] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [connecting, setConnecting] = useState(false);
