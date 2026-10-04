@@ -7,6 +7,14 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import toast from 'react-hot-toast';
+import {
+    DollarSign,
+    Trophy,
+    Package,
+    Users,
+    BarChart3,
+    TrendingUp,
+} from 'lucide-react';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -56,12 +64,12 @@ const IconDownload = ({ className = 'w-3 h-3' }: { className?: string }) => (
 
 // ─── Quick Questions (Compact 2-col cards for mobile & desktop) ──────────────
 const QUICK_QUESTIONS = [
-    { icon: '💰', text: '¿Cuánto vendí hoy?' },
-    { icon: '🏆', text: 'Top 5 más vendidos' },
-    { icon: '📦', text: 'Productos con bajo stock' },
-    { icon: '👥', text: 'Clientes que me deben' },
-    { icon: '📊', text: 'Resumen semanal' },
-    { icon: '📈', text: 'Cómo vender más' },
+    { icon: DollarSign, text: '¿Cuánto vendí hoy?', color: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40' },
+    { icon: Trophy, text: 'Top 5 más vendidos', color: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40' },
+    { icon: Package, text: 'Productos con bajo stock', color: 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40' },
+    { icon: Users, text: 'Clientes que me deben', color: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40' },
+    { icon: BarChart3, text: 'Resumen semanal', color: 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40' },
+    { icon: TrendingUp, text: 'Cómo vender más', color: 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40' },
 ];
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -157,7 +165,7 @@ export function AiChat() {
         } catch (error: any) {
             setMessages(prev => [...prev, {
                 role: 'assistant',
-                content: `❌ ${error?.response?.data?.error || 'Error de conexión'}`,
+                content: error?.response?.data?.error || 'Error de conexión con el asistente.',
                 timestamp: new Date(),
             }]);
         } finally { setLoading(false); }
@@ -171,7 +179,7 @@ export function AiChat() {
             toast.error('Formato no soportado. Usa CSV o Excel.');
             return;
         }
-        setMessages(prev => [...prev, { role: 'user', content: `📄 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`, timestamp: new Date() }]);
+        setMessages(prev => [...prev, { role: 'user', content: `${file.name} (${(file.size / 1024).toFixed(1)} KB)`, timestamp: new Date() }]);
         setUploading(true);
         try {
             const formData = new FormData();
@@ -180,7 +188,7 @@ export function AiChat() {
             const data = res.data?.data;
             setMessages(prev => [...prev, { role: 'assistant', content: data?.answer || 'No pude analizar el archivo.', rows: data?.rows || null, timestamp: new Date() }]);
         } catch (error: any) {
-            setMessages(prev => [...prev, { role: 'assistant', content: `❌ ${error?.response?.data?.error || 'Error al subir'}`, timestamp: new Date() }]);
+            setMessages(prev => [...prev, { role: 'assistant', content: error?.response?.data?.error || 'Error al procesar el archivo.', timestamp: new Date() }]);
         } finally {
             setUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
@@ -224,7 +232,7 @@ export function AiChat() {
             {!isOpen && messages.length === 0 && (
                 <div className="fixed bottom-[calc(8.25rem+env(safe-area-inset-bottom,0px))] lg:bottom-24 right-4 lg:right-6 z-30 pointer-events-none animate-bounce hidden sm:block">
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg px-3.5 py-2 border border-slate-200 dark:border-slate-700 max-w-[200px]">
-                        <p className="text-xs text-slate-700 dark:text-slate-300 font-bold">¿Necesitás ayuda? 🤖</p>
+                        <p className="text-xs text-slate-700 dark:text-slate-300 font-bold">¿Necesitás ayuda?</p>
                     </div>
                 </div>
             )}
@@ -320,19 +328,24 @@ export function AiChat() {
                                         Preguntame sobre tus ventas, stock o subí un reporte
                                     </p>
                                     <div className="grid grid-cols-2 gap-2 text-left">
-                                        {QUICK_QUESTIONS.map((q) => (
-                                            <button
-                                                key={q.text}
-                                                type="button"
-                                                onClick={() => sendMessage(q.text)}
-                                                className="flex items-center gap-2 p-2.5 sm:p-3 bg-white dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 rounded-2xl hover:border-emerald-400 dark:hover:border-emerald-500 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 active:scale-[0.98] transition-all cursor-pointer group shadow-xs"
-                                            >
-                                                <span className="text-base sm:text-lg shrink-0">{q.icon}</span>
-                                                <span className="text-[11px] sm:text-xs font-semibold text-slate-700 dark:text-slate-200 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors leading-snug line-clamp-2">
-                                                    {q.text}
-                                                </span>
-                                            </button>
-                                        ))}
+                                        {QUICK_QUESTIONS.map((q) => {
+                                            const Icon = q.icon;
+                                            return (
+                                                <button
+                                                    key={q.text}
+                                                    type="button"
+                                                    onClick={() => sendMessage(q.text)}
+                                                    className="flex items-center gap-2.5 p-2.5 sm:p-3 bg-white dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 rounded-2xl hover:border-emerald-400 dark:hover:border-emerald-500 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 active:scale-[0.98] transition-all cursor-pointer group shadow-xs"
+                                                >
+                                                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 ${q.color}`}>
+                                                        <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                                    </div>
+                                                    <span className="text-[11px] sm:text-xs font-semibold text-slate-700 dark:text-slate-200 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors leading-snug line-clamp-2">
+                                                        {q.text}
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}

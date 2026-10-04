@@ -64,6 +64,7 @@ FLUJO:
 2. Acciones / cómo usar el sistema → guialo al módulo correcto (POS, Productos, Inventario, etc.), sin SQL
 3. Exportación → SOLO si el usuario lo pidió explícitamente (exportar, csv, excel, descargar). Entonces empezá la respuesta con "EXPORT_DATA" seguido de una tabla markdown. NUNCA lo hagas en respuestas de datos normales.
 4. NUNCA digas "Todavía no hay registros" sin haber ejecutado un query. Solo repetí esa frase si el SQL realmente devolvió 0 filas.
+5. FORMATO: Español profesional y conciso. NUNCA uses emojis ni emoticones en ninguna respuesta.
 
 PREGUNTAS ANALÍTICAS:
 Cuando pregunten cosas como "analiza mis ventas", "cómo vender más", "qué puedo hacer para vender más", "dame recomendaciones", "consejos para vender": SIEMPRE generá un SQL analítico que traiga contexto real (productos más vendidos por ingreso, tendencia de ventas por día, ticket promedio, categorías, stock bajo). NUNCA respondas preguntas de recomendación con consejos genéricos sin datos.
@@ -315,12 +316,12 @@ Estructura obligatoria:
 2. Tendencias o hallazgos.
 3. Entre 3 y 5 recomendaciones ACCIONABLES para vender más.
 
-Reglas: español natural de dueño de tienda, sin SQL, sin tecnicismos, moneda $, máximo ~200 palabras. NO menciones CSV, Excel ni exportación.`;
+Reglas: español natural de dueño de tienda, sin emojis ni emoticones, sin SQL, sin tecnicismos, moneda $, máximo ~200 palabras. NO menciones CSV, Excel ni exportación.`;
     }
 
     return `Respondé al dueño del negocio: "${question}"
 Datos: ${dataBlock}
-Reglas: español natural, sin SQL, sin tecnicismos. Si la consulta no devolvió registros, decí "No encontré registros para esa consulta". Moneda: $. Breve. NO menciones CSV, Excel ni exportación salvo que el usuario lo haya pedido explícitamente.`;
+Reglas: español natural, sin emojis ni emoticones, sin SQL, sin tecnicismos. Si la consulta no devolvió registros, decí "No encontré registros para esa consulta". Moneda: $. Breve. NO menciones CSV, Excel ni exportación salvo que el usuario lo haya pedido explícitamente.`;
 }
 
 function formatDataFallback(data: any[]): string {
@@ -363,7 +364,7 @@ export const analyzeUploadedFile = async (fileBuffer: Buffer, filename: string, 
             : `Archivo "${filename}" con ${data.length} registros. Analizalo y dame un resumen.\nColumnas: ${headers.join(', ')}\nDatos: ${JSON.stringify(data.slice(0, 15))}`;
 
         const answer = (await callWithRotation([
-            { role: 'system', content: 'Sos un analista de datos experto. Analizá archivos del usuario y respondé en español con datos clave, tendencias y totales. Sé conciso.' },
+            { role: 'system', content: 'Sos un analista de datos experto. Analizá archivos del usuario y respondé en español con datos clave, tendencias y totales. Sé conciso y profesional. NUNCA uses emojis ni emoticones.' },
             { role: 'user', content: userPrompt },
         ], 0.3, 1024)).trim() || `Archivo con ${data.length} registros.`;
 

@@ -209,7 +209,7 @@ function SupportContent() {
                         <p className="text-xs text-slate-500">+58 412-965-7169 — Lunes a Viernes 8am-6pm</p>
                     </div>
                     <div className="p-3 bg-slate-50 rounded-lg">
-                        <p className="font-bold text-slate-800">🤖 Asistente IA</p>
+                        <p className="font-bold text-slate-800">Asistente IA</p>
                         <p className="text-xs text-slate-500">Disponible 24/7 dentro del Sistema</p>
                     </div>
                 </div>
