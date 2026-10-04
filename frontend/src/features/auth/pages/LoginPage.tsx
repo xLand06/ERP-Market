@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Lock, User, Loader2, Cloud, CloudOff, RefreshCw, Smartphone, Monitor, Download, QrCode, Camera, Shield, AlertTriangle, ArrowRight, Zap, BarChart3, ShoppingCart } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useLoginForm, useLogin } from '@/features/auth/hooks';
@@ -29,6 +30,15 @@ const ECOSYSTEM = [
 ];
 
 export default function LoginPage() {
+    const navigate = useNavigate();
+    const token = useAuthStore(s => s.token);
+
+    useEffect(() => {
+        if (token) {
+            navigate('/dashboard', { replace: true });
+        }
+    }, [token, navigate]);
+
     const [showPw, setShowPw] = useState(false);
     const { form, errors, validate, updateField } = useLoginForm();
     const { login, loading, parseError } = useLogin();
@@ -121,7 +131,7 @@ export default function LoginPage() {
                     useAuthStore.getState().setAuth(token, user);
                     resetLoginAttempts();
                     toast.success(`Bienvenido, ${user.nombre || user.username || 'Usuario'}!`);
-                    window.location.reload();
+                    navigate('/dashboard', { replace: true });
                     return;
                 }
                 await login(form as LoginPayload);
