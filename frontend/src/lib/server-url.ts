@@ -10,16 +10,53 @@ export function normalizeServerUrl(url: string | null | undefined): string | nul
     if (!url) return null;
     let u = String(url).trim();
     if (!u) return null;
-    // Accept allmarket://connect?server=... payloads
+
+    // 1. Strip wrapping quotes
+    if ((u.startsWith('"') && u.endsWith('"')) || (u.startsWith("'") && u.endsWith("'"))) {
+        u = u.slice(1, -1).trim();
+    }
+
+    // 2. Parse JSON payload if QR contains JSON
+    if (u.startsWith('{') && u.endsWith('}')) {
+        try {
+            const parsed = JSON.parse(u);
+            const val = parsed.server || parsed.serverUrl || parsed.api || parsed.url || parsed.host;
+            if (val) u = String(val).trim();
+        } catch { /* ignore */ }
+    }
+
+    // 3. Accept allmarket://connect?server=... payloads
     if (u.startsWith('allmarket://')) {
         try {
-            u = new URL(u).searchParams.get('server') || u;
-        } catch { /* keep as-is */ }
+            const parsed = new URL(u);
+            const s = parsed.searchParams.get('server');
+            if (s) {
+                u = decodeURIComponent(s).trim();
+            } else if (parsed.host && parsed.host !== 'connect') {
+                u = parsed.host;
+            }
+        } catch {
+            const match = u.match(/[?&]server=([^&]+)/);
+            if (match && match[1]) {
+                u = decodeURIComponent(match[1]).trim();
+            }
+        }
     }
+
+    // 4. Strip /api or /api/ suffix if included in QR or user input
+    u = u.replace(/\/api\/?$/i, '').trim();
+
+    // 5. Expand bare subdomains like "tenant1" -> "tenant1.allcode.site"
+    if (!u.includes('.') && !u.includes(':') && !u.startsWith('http')) {
+        u = `${u}.allcode.site`;
+    }
+
+    // 6. Ensure protocol
     if (!/^https?:\/\//i.test(u)) {
         u = `https://${u.replace(/^\/+/, '')}`;
     }
-    // Strip path/query/hash and trailing slashes → origin only
+
+    // 7. Strip path/query/hash and trailing slashes → origin only
     try {
         const parsed = new URL(u);
         u = parsed.origin;

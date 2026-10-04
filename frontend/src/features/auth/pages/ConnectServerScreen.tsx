@@ -24,82 +24,18 @@ export function ConnectServerScreen({ onConnected, currentServer, onCancel }: Co
     );
 
     const validateAndSaveServer = useCallback(async (rawInput: string) => {
-        let input = rawInput.trim();
+        const input = rawInput.trim();
         if (!input) return;
-
-        // Parse deep link allmarket://connect?server=...
-        if (input.startsWith('allmarket://')) {
-            try {
-                const parsed = new URL(input);
-                input = parsed.searchParams.get('server') || input;
-            } catch { /* keep raw */ }
-        }
-
-        // If the user only typed a subdomain like "miempresa", expand it
-        if (!input.includes('.') && !input.startsWith('http')) {
-            input = `${input}.allcode.site`;
-        }
 
         const normalized = normalizeServerUrl(input);
         if (!normalized) {
             setStatus('error');
-            setErrorMessage('La dirección ingresada no es válida.');
+            setErrorMessage('La dirección o código QR no contiene un servidor válido.');
             return;
         }
 
         setStatus('validating');
         setErrorMessage(null);
-
-        const candidates = [
-            `${normalized}/api/health`,
-            `${normalized}/health`,
-        ];
-
-        let isOnline = false;
-        let lastErr = '';
-
-        for (const targetUrl of candidates) {
-            try {
-                if (isCapacitor) {
-                    try {
-                        const { CapacitorHttp } = await import('@capacitor/core');
-                        const res = await CapacitorHttp.get({
-                            url: targetUrl,
-                            connectTimeout: 5000,
-                            readTimeout: 5000,
-                            headers: { 'Accept': 'application/json' },
-                        });
-                        if (res.status >= 200 && res.status < 300) {
-                            isOnline = true;
-                            break;
-                        } else {
-                            lastErr = `HTTP ${res.status}`;
-                        }
-                    } catch (nativeErr: any) {
-                        lastErr = nativeErr?.message || 'Error nativo';
-                    }
-                } else {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 5000);
-                    const res = await fetch(targetUrl, {
-                        method: 'GET',
-                        headers: { 'Accept': 'application/json' },
-                        signal: controller.signal,
-                    });
-                    clearTimeout(timeoutId);
-                    if (res.ok) {
-                        isOnline = true;
-                        break;
-                    } else {
-                        lastErr = `HTTP ${res.status}`;
-                    }
-                }
-            } catch (err: any) {
-                lastErr = err?.name === 'AbortError'
-                    ? 'Tiempo de espera agotado'
-                    : (err?.message || 'Error de red');
-            }
-        }
 
         // Persist immediately in SQLite, localStorage, and in-memory cache
         await AppStorage.setItem('serverUrl', normalized);
@@ -107,6 +43,35 @@ export function ConnectServerScreen({ onConnected, currentServer, onCancel }: Co
 
         const cleanHost = normalized.replace(/^https?:\/\//, '');
         setValidatedHost(cleanHost);
+
+        // Fast health verification
+        const targetUrl = `${normalized}/api/health`;
+        let isOnline = false;
+        try {
+            if (isCapacitor) {
+                const { CapacitorHttp } = await import('@capacitor/core');
+                const res = await CapacitorHttp.get({
+                    url: targetUrl,
+                    connectTimeout: 3500,
+                    readTimeout: 3500,
+                    headers: { 'Accept': 'application/json' },
+                });
+                isOnline = res.status >= 200 && res.status < 300;
+            } else {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3500);
+                const res = await fetch(targetUrl, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal,
+                });
+                clearTimeout(timeoutId);
+                isOnline = res.ok;
+            }
+        } catch {
+            isOnline = false;
+        }
+
         setStatus('success');
 
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -116,7 +81,7 @@ export function ConnectServerScreen({ onConnected, currentServer, onCancel }: Co
         toast.success(`Conectado a ${cleanHost}`);
         setTimeout(() => {
             onConnected(normalized);
-        }, 500);
+        }, 400);
     }, [isCapacitor, onConnected]);
 
     const handleNativeScan = async () => {

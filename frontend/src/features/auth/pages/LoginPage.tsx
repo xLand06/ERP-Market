@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Lock, User, Loader2, Cloud, CloudOff, RefreshCw, Smartphone, Monitor, Download, QrCode, Camera, Shield, AlertTriangle, ArrowRight, Zap, BarChart3, ShoppingCart } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, Loader2, Cloud, CloudOff, RefreshCw, Smartphone, Monitor, Download, QrCode, Camera, Shield, AlertTriangle, ArrowRight, Zap, BarChart3, ShoppingCart, Globe } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useLoginForm, useLogin } from '@/features/auth/hooks';
 import { useAuthStore } from '@/features/auth/store/authStore';
@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
 import { normalizeServerUrl, setServerUrlCache, getServerUrlCache } from '@/lib/server-url';
 import { isOnline } from '@/lib/api';
+import { isNativeApp, nativePost } from '@/lib/native-http';
 import { ConnectServerScreen } from './ConnectServerScreen';
 const isCapacitor = typeof window !== 'undefined' && (
     !!(window as any).Capacitor?.isNativePlatform?.() ||
@@ -324,30 +325,49 @@ export default function LoginPage() {
         }
     };
 
-    const validateAndConnect = async (server: string) => {
+    const validateAndConnect = useCallback(async (server: string) => {
         if (connectingRef.current) return;
         connectingRef.current = true;
+
         const normalized = normalizeServerUrl(server);
         if (!normalized) {
             connectingRef.current = false;
             toast.error('URL del servidor inválida en el QR');
             return;
         }
+
+        // 1. Guardar inmediatamente en SQLite y localStorage para no perder la conexión
+        try {
+            await AppStorage.setItem('serverUrl', normalized);
+            setServerUrlCache(normalized);
+            setActiveServer(normalized);
+        } catch (e) {
+            console.error('[QR connect] error saving serverUrl:', e);
+        }
+
+        setScannerOpen(false);
         setConnectingServer(normalized);
+
+        // 2. Comprobación rápida (3.5s) de conectividad
         const checkHealth = async (url: string): Promise<{ ok: boolean; detail?: string }> => {
             if (isCapacitor) {
                 try {
                     const { CapacitorHttp } = await import('@capacitor/core');
-                    const res = await CapacitorHttp.get({ url, connectTimeout: 5000, readTimeout: 5000 });
+                    const res = await CapacitorHttp.get({
+                        url,
+                        connectTimeout: 3500,
+                        readTimeout: 3500,
+                        headers: { Accept: 'application/json' },
+                    });
                     return { ok: res.status >= 200 && res.status < 300, detail: `HTTP ${res.status}` };
                 } catch (e: any) {
                     return { ok: false, detail: String(e?.message || e) };
                 }
             }
             const c = new AbortController();
-            const t = setTimeout(() => c.abort(), 5000);
+            const t = setTimeout(() => c.abort(), 3500);
             try {
-                const r = await fetch(url, { signal: c.signal });
+                const r = await fetch(url, { signal: c.signal, headers: { Accept: 'application/json' } });
                 clearTimeout(t);
                 return { ok: r.ok, detail: `HTTP ${r.status}` };
             } catch (e: any) {
@@ -356,74 +376,50 @@ export default function LoginPage() {
             }
         };
 
-        const candidates = [
-            `${normalized}/api/health`,
-            `${normalized}/health`,
-        ];
-
-        let lastDetail = '';
-        for (let i = 1; i <= 5; i++) {
-            for (const url of candidates) {
-                const result = await checkHealth(url);
-                if (result.ok) {
-                    // Persist origin immediately so api.ts interceptor works after reload
-                    await AppStorage.setItem('serverUrl', normalized);
-                    setServerUrlCache(normalized);
-                    toast.success(`Conectado a ${normalized.replace(/^https?:\/\//, '')}`);
-                    setTimeout(() => window.location.reload(), 400);
-                    return;
-                }
-                lastDetail = result.detail || '';
-            }
-            if (i < 5) setConnectingServer(`${normalized} (intento ${i}/5)`);
-            await new Promise(r => setTimeout(r, 1500));
-        }
+        const result = await checkHealth(`${normalized}/api/health`);
         connectingRef.current = false;
         setConnectingServer(null);
-        console.error('[QR connect] failed', { server: normalized, lastDetail });
-        toast.error(
-            lastDetail
-                ? `No se pudo conectar a ${normalized.replace(/^https?:\/\//, '')} (${lastDetail})`
-                : 'No se pudo conectar. Verificá que la URL sea la del panel web.'
-        );
-    };
+
+        const cleanHost = normalized.replace(/^https?:\/\//, '');
+        if (result.ok) {
+            setCloudOnline(true);
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                try { navigator.vibrate([40, 60, 40]); } catch {}
+            }
+            toast.success(`Conectado a ${cleanHost}`);
+            try { void fetchSettings(); } catch {}
+        } else {
+            toast(`Servidor guardado (${cleanHost}), comprobación: ${result.detail || 'sin respuesta'}`, { icon: '⚠️' });
+        }
+    }, [fetchSettings]);
 
     const handleQrPayload = useCallback((raw: string) => {
-        const t = raw.trim();
-        let s: string | null = null;
-        if (t.startsWith('allmarket://')) {
-            try { s = new URL(t).searchParams.get('server'); } catch { /* ignore */ }
-        }
-        if (!s && /^https?:\/\//.test(t)) s = t;
-        if (!s) {
-            toast.error('QR no reconocido');
+        const normalized = normalizeServerUrl(raw);
+        if (!normalized) {
+            toast.error('El código QR escaneado no contiene una URL o servidor válido');
             return;
         }
-        if (navigator.vibrate) try { navigator.vibrate(100); } catch { /* ignore */ }
-        void validateAndConnect(s);
+        if (navigator.vibrate) try { navigator.vibrate(60); } catch { /* ignore */ }
+        void validateAndConnect(normalized);
     }, [validateAndConnect]);
 
     const startNativeScanner = useCallback(async () => {
         const plugins = (window as any)?.Capacitor?.Plugins;
         const native = plugins?.QrScanner;
         if (!native?.scan) {
-            toast.error('Escáner nativo no disponible');
+            setShowConnectModal(true);
             return;
         }
-        setScannerOpen(true);
-        setScannerStatus('starting');
         setScannerError(null);
         try {
             const result = await native.scan();
-            setScannerStatus('ready');
-            handleQrPayload(String(result?.text || ''));
+            if (result?.text) {
+                handleQrPayload(String(result.text));
+            }
         } catch (e: any) {
             const msg = String(e?.message || e);
-            if (/cancelled|cancel/i.test(msg)) {
-                setScannerStatus('idle');
-            } else {
-                setScannerStatus('error');
-                setScannerError('No se pudo abrir el escáner. Probá de nuevo.');
+            if (!/cancelled|cancel/i.test(msg)) {
+                toast.error('No se pudo abrir el escáner de la cámara');
             }
         }
     }, [handleQrPayload]);
@@ -695,15 +691,22 @@ export default function LoginPage() {
                             {syncing ? 'Sync...' : 'Sincronizar'}
                         </button>
                     </div>
-                    {activeServer ? (
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 text-center font-mono px-2 truncate">
-                            API: {activeServer.replace(/^https?:\/\//, '')}/api
-                        </p>
-                    ) : (
-                        <p className="text-[10px] text-amber-600 dark:text-amber-400 text-center font-semibold px-2">
-                            Sin servidor configurado — escaneá el QR del panel
-                        </p>
-                    )}
+                    <button
+                        type="button"
+                        onClick={() => setShowConnectModal(true)}
+                        className="w-full text-center hover:opacity-80 transition-opacity cursor-pointer"
+                        title="Configurar servidor"
+                    >
+                        {activeServer ? (
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono px-2 truncate hover:underline hover:text-teal-400">
+                                API: {activeServer.replace(/^https?:\/\//, '')}/api
+                            </p>
+                        ) : (
+                            <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold px-2 hover:underline">
+                                Sin servidor configurado — tocá para configurar
+                            </p>
+                        )}
+                    </button>
 
                     {/* Connect */}
                     <div className="bg-white dark:bg-[#161B22] rounded-2xl p-4 space-y-3 shadow-sm border border-slate-200/60 dark:border-[#30363D]">
@@ -757,9 +760,36 @@ export default function LoginPage() {
                             {syncing ? 'Sync...' : 'Sincronizar'}
                         </button>
                     </div>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 text-center font-mono px-2 truncate">
-                        {activeServer ? `API: ${activeServer.replace(/^https?:\/\//, '')}/api` : 'Sin servidor — escaneá el QR'}
-                    </p>
+                    <button
+                        type="button"
+                        onClick={() => setShowConnectModal(true)}
+                        className="w-full text-[10px] text-slate-400 dark:text-slate-500 text-center font-mono px-2 truncate hover:underline hover:text-teal-400 transition-colors cursor-pointer"
+                        title="Tocar para configurar servidor"
+                    >
+                        {activeServer ? `API: ${activeServer.replace(/^https?:\/\//, '')}/api` : 'Sin servidor — tocá para configurar o escanear QR'}
+                    </button>
+
+                    {/* Botones para app móvil (APK) */}
+                    {isCapacitor && (
+                        <div className="space-y-2">
+                            <button
+                                type="button"
+                                onClick={openScanner}
+                                className="w-full h-12 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
+                            >
+                                <QrCode className="w-4 h-4" />
+                                <span>{activeServer ? 'Escanear QR para Cambiar Negocio' : 'Escanear QR de Conexión'}</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setShowConnectModal(true)}
+                                className="w-full h-9 rounded-lg border border-slate-200 dark:border-[#30363D] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                                <Globe className="w-3.5 h-3.5" />
+                                <span>Ingresar servidor manualmente</span>
+                            </button>
+                        </div>
+                    )}
 
                     {!isCapacitor && (
                         <>
