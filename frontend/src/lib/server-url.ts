@@ -59,10 +59,6 @@ export function hydrateServerUrlFromStorage() {
         if (normalized) {
             cachedServerUrl = normalized;
             try { localStorage.setItem('serverUrl', normalized); } catch { /* ignore */ }
-        } else if (isNativeAppEnv()) {
-            // Test APK: always use test tenant, skip connect/QR
-            cachedServerUrl = TEST_SERVER_URL;
-            try { localStorage.setItem('serverUrl', TEST_SERVER_URL); } catch { /* ignore */ }
         }
     } catch { /* private mode */ }
     return cachedServerUrl;

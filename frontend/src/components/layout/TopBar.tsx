@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import {
     ArrowLeftRight, ChevronDown, LogOut, Settings, User, Menu, Keyboard,
-    ShoppingCart, Package, Layers, Banknote, Bell, Palette, Check, X
+    ShoppingCart, Package, Layers, Banknote, Bell, Palette, Check, X,
+    QrCode, Smartphone, Download
 } from 'lucide-react';
+import QRCode from 'qrcode';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { BranchSelector } from '@/components/branch/BranchSelector';
@@ -34,7 +36,20 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
     const [ratePopoverOpen, setRatePopoverOpen] = useState(false);
     const [themePopoverOpen, setThemePopoverOpen] = useState(false);
+    const [mobileQrOpen, setMobileQrOpen] = useState(false);
+    const [mobileQrDataUrl, setMobileQrDataUrl] = useState('');
     const navigate = useNavigate();
+
+    useEffect(() => {
+        if (mobileQrOpen && !mobileQrDataUrl && typeof window !== 'undefined') {
+            const payload = `allmarket://connect?server=${encodeURIComponent(window.location.origin)}`;
+            void QRCode.toDataURL(payload, {
+                width: 256,
+                margin: 2,
+                color: { dark: '#0F172A', light: '#FFFFFF' }
+            }).then(setMobileQrDataUrl);
+        }
+    }, [mobileQrOpen, mobileQrDataUrl]);
 
     const currentLanguage = i18n.language?.slice(0, 2) === 'en' ? 'en' : 'es';
     const toggleLanguage = () => {
@@ -257,6 +272,16 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
 
                 <div className="relative shrink-0">
                     <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-100/80 p-0.5 sm:p-1 rounded-xl border border-slate-200/50 max-w-full">
+                        {/* Mobile App Connect QR */}
+                        <button
+                            onClick={() => setMobileQrOpen(true)}
+                            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 hover:bg-white hover:text-emerald-600 rounded-lg transition-all active:scale-95 cursor-pointer shrink-0"
+                            title="Vincular App Móvil (Código QR)"
+                            aria-label="Vincular App Móvil"
+                        >
+                            <QrCode className="w-5 h-5" />
+                        </button>
+
                         {/* Quick Language Toggle */}
                         <button
                             onClick={toggleLanguage}
@@ -484,6 +509,52 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                                 {currentLanguage === 'es' ? 'Presiona' : 'Press'} <kbd className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border-b-2 border-slate-300 dark:border-slate-600">ESC</kbd> {currentLanguage === 'es' ? 'para salir' : 'to close'}
                             </button>
                         </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Modal: Vincular App Móvil */}
+            <Dialog open={mobileQrOpen} onOpenChange={setMobileQrOpen}>
+                <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 text-center">
+                    <DialogTitle className="text-xl font-black text-slate-900 dark:text-white flex items-center justify-center gap-2">
+                        <Smartphone className="w-5 h-5 text-emerald-500" />
+                        Vincular App Móvil
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        Escaneá este código QR desde la aplicación ALLMARKET en tu teléfono para conectar tu negocio al instante.
+                    </DialogDescription>
+
+                    <div className="my-5 flex flex-col items-center justify-center">
+                        <div className="p-3 bg-white rounded-2xl border-2 border-slate-200 shadow-inner">
+                            {mobileQrDataUrl ? (
+                                <img
+                                    src={mobileQrDataUrl}
+                                    alt="QR Vincular App"
+                                    className="w-52 h-52 object-contain rounded-xl"
+                                />
+                            ) : (
+                                <div className="w-52 h-52 flex items-center justify-center text-slate-400 text-xs">
+                                    Generando QR...
+                                </div>
+                            )}
+                        </div>
+                        <p className="mt-3 text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
+                            {typeof window !== 'undefined' ? window.location.origin : ''}
+                        </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
+                        <a
+                            href="/apk/allmarket.apk"
+                            download="allmarket.apk"
+                            className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
+                        >
+                            <Download className="w-4 h-4" />
+                            <span>Descargar APK para Android</span>
+                        </a>
+                        <p className="text-[11px] text-slate-400">
+                            Un único APK universal compatible con cualquier negocio.
+                        </p>
                     </div>
                 </DialogContent>
             </Dialog>

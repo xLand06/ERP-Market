@@ -20,6 +20,7 @@ import './global.css';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import InitialSyncScreen from '@/components/loading/InitialSyncScreen';
+import { ConnectServerScreen } from '@/features/auth/pages/ConnectServerScreen';
 import { AppStorage } from '@/services/app-storage';
 import { getServerUrlCache, normalizeServerUrl, setServerUrlCache } from '@/lib/server-url';
 import api from '@/lib/api';
@@ -99,22 +100,14 @@ export default function App() {
             const url = await AppStorage.initServerUrl();
             const electronUrl = (window as any).erpApi?.serverUrl;
             const isNative = !!(window as any).Capacitor?.isNativePlatform?.()
-                || window.location.protocol === 'capacitor:'
-                || window.location.hostname === 'localhost';
-
-            // Test APK: force test tenant, skip ConnectScreen/QR entirely
-            if (isNative && !getServerUrlCache() && !electronUrl) {
-                const { TEST_SERVER_URL, normalizeServerUrl } = await import('@/lib/server-url');
-                const forced = normalizeServerUrl(TEST_SERVER_URL);
-                if (forced) {
-                    await AppStorage.setItem('serverUrl', forced);
-                    const { setServerUrlCache } = await import('@/lib/server-url');
-                    setServerUrlCache(forced);
-                }
-            }
+                || window.location.protocol === 'capacitor:';
 
             const cached = getServerUrlCache() || url;
-            setHasServerUrl(!!cached || !!electronUrl);
+            // On web (browser), relative /api on current origin is always ready.
+            // On native mobile (Capacitor), require a configured serverUrl.
+            const isConfigured = (!isNative && !electronUrl) ? true : (!!cached || !!electronUrl);
+
+            setHasServerUrl(isConfigured);
             setServerUrlReady(true);
         })();
     }, []);
@@ -235,6 +228,17 @@ export default function App() {
             <div className="fixed inset-0 bg-slate-900 flex items-center justify-center z-50">
                 <div className="animate-spin w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full" />
             </div>
+        );
+    }
+
+    // En mobile / Electron: si no hay servidor configurado, mostrar pantalla para vincular QR
+    if (!hasServerUrl) {
+        return (
+            <ConnectServerScreen
+                onConnected={(_serverUrl) => {
+                    setHasServerUrl(true);
+                }}
+            />
         );
     }
 

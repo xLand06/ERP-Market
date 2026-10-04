@@ -99,15 +99,12 @@ export const AppStorage = {
     },
 
     async removeItem(key: string): Promise<void> {
+        try { localStorage.removeItem(key); } catch {}
+        updateCache(key, null);
         const conn = await getDb();
-        if (!conn) {
-            localStorage.removeItem(key);
-            updateCache(key, null);
-            return;
-        }
+        if (!conn) return;
         try {
             await conn.run(`DELETE FROM ${TABLE} WHERE key = ?`, [key]);
-            updateCache(key, null);
         } catch {}
     },
 };

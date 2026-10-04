@@ -12,14 +12,14 @@ import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
 import { normalizeServerUrl, setServerUrlCache, getServerUrlCache } from '@/lib/server-url';
 import { isOnline } from '@/lib/api';
-import { isNativeApp, nativePost } from '@/lib/native-http';
+import { ConnectServerScreen } from './ConnectServerScreen';
 const isCapacitor = typeof window !== 'undefined' && (
     !!(window as any).Capacitor?.isNativePlatform?.() ||
     (window as any).Capacitor?.platform === 'android' ||
     (window as any).Capacitor?.platform === 'ios' ||
     window.location.protocol === 'capacitor:'
 );
-export const APP_BUILD = '1.2';
+export const APP_BUILD = '2.1';
 const DESKTOP_WINDOWS_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Setup-Windows.exe';
 const DESKTOP_LINUX_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Linux.AppImage';
 
@@ -40,6 +40,7 @@ export default function LoginPage() {
     }, [token, navigate]);
 
     const [showPw, setShowPw] = useState(false);
+    const [showConnectModal, setShowConnectModal] = useState(false);
     const { form, errors, validate, updateField } = useLoginForm();
     const { login, loading, parseError } = useLogin();
     const [generalError, setGeneralError] = useState<string>('');
@@ -570,6 +571,29 @@ export default function LoginPage() {
                     </div>
 
                     <div className="bg-white dark:bg-[#161B22] rounded-3xl p-6 sm:p-8 shadow-xl shadow-slate-900/5 dark:shadow-black/40 border border-slate-200/60 dark:border-[#30363D]">
+                        {/* Mobile: Connected server indicator + Change button */}
+                        {isCapacitor && (
+                            <div className="mb-5 p-2.5 bg-slate-50 dark:bg-[#0D1117] border border-slate-200/80 dark:border-slate-800 rounded-2xl flex items-center justify-between gap-2 shadow-2xs">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="text-[10px] uppercase font-black tracking-wider text-slate-400 dark:text-slate-500 leading-tight">Servidor conectado</span>
+                                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 font-mono truncate max-w-[170px] sm:max-w-[220px]">
+                                            {getServerUrlCache()?.replace(/^https?:\/\//, '') || 'Sin servidor'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConnectModal(true)}
+                                    className="px-2.5 py-1.5 rounded-xl bg-slate-200/70 dark:bg-slate-800 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shrink-0 cursor-pointer"
+                                >
+                                    <QrCode className="w-3.5 h-3.5" />
+                                    <span>Cambiar</span>
+                                </button>
+                            </div>
+                        )}
+
                         {/* Error */}
                         {(generalError || rateState.blocked) && (
                             <div className="mb-4 p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-center gap-2 animate-slideDown">
@@ -693,7 +717,7 @@ export default function LoginPage() {
                         {/* Downloads desktop */}
                         <div className="pt-2 border-t border-slate-200 dark:border-[#30363D]">
                             <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center mb-2">Descargar app</p>
-                            {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/allmarket-v1.2.apk', label: 'Android APK v1.2', icon: Smartphone, color: 'text-[#3a7d89] dark:text-teal-400' }].map(d => (
+                            {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/allmarket.apk', label: 'Android APK', icon: Smartphone, color: 'text-emerald-500 dark:text-teal-400' }].map(d => (
                                 <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')}
                                     className="flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl border border-slate-200 dark:border-[#30363D] text-slate-700 dark:text-slate-200 hover:border-emerald-500/40 hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all active:scale-95">
                                     <d.icon className={`w-5 h-5 ${d.color} shrink-0`} />
@@ -749,7 +773,7 @@ export default function LoginPage() {
                             {/* Downloads */}
                             <div className="bg-white dark:bg-[#161B22] rounded-2xl p-3 space-y-2 shadow-sm border border-slate-200/60 dark:border-[#30363D]">
                                 <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Descargar app</p>
-                                {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/allmarket-v1.2.apk', label: 'Android APK v1.2', icon: Smartphone, color: 'text-[#3a7d89] dark:text-teal-400' }].map(d => (
+                                {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/allmarket.apk', label: 'Android APK', icon: Smartphone, color: 'text-emerald-500 dark:text-teal-400' }].map(d => (
                                     <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')}
                                         className="flex items-center gap-3 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-[#30363D] text-slate-700 dark:text-slate-200 hover:border-emerald-500/40 hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all active:scale-95">
                                         <d.icon className={`w-5 h-5 ${d.color} shrink-0`} />
@@ -881,6 +905,18 @@ export default function LoginPage() {
                     </div>
                 </div>
             </div>
+        )}
+
+        {showConnectModal && (
+            <ConnectServerScreen
+                currentServer={getServerUrlCache()}
+                onCancel={() => setShowConnectModal(false)}
+                onConnected={(newUrl) => {
+                    setShowConnectModal(false);
+                    toast.success(`Conectado a ${newUrl.replace(/^https?:\/\//, '')}`);
+                    setTimeout(() => window.location.reload(), 300);
+                }}
+            />
         )}
         </>
     );
