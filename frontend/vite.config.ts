@@ -8,8 +8,9 @@ import path from "path";
 const isApkBuild = process.env.CAPACITOR_BUILD === "1" || process.env.ANDROID === "1";
 
 export default defineConfig({
-  // Unique base per APK build busts any leftover WebView HTTP cache of index.html
-  base: isApkBuild ? '/am-20261003c/' : '/',
+  // Relative base so Capacitor WebView resolves assets from bundled public/
+  // (absolute /prefix/ breaks: HTML requests /prefix/assets/* but files live at assets/*)
+  base: isApkBuild ? './' : '/',
   plugins: [
     react(),
     tailwindcss(),

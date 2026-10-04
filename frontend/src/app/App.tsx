@@ -242,14 +242,9 @@ export default function App() {
     // Thin client sin servidor: mostrar ConnectScreen
     // Web normal → NUNCA (usa /api relativo del mismo origen)
     // Electron → cuando no tiene serverUrl
-    // Capacitor APK test → serverUrl forzado a test.allcode.site (sin QR)
+    // Capacitor APK test → serverUrl forzado a test.allcode.site, NUNCA ConnectScreen
     const isElectron = !!(window as any).erpApi?.isElectron;
-    const isCapacitorNative = !!(window as any).Capacitor?.isNativePlatform?.()
-        || window.location.protocol === 'capacitor:'
-        || window.location.hostname === 'localhost';
-    // Test APK never shows ConnectScreen — server is hardcoded
-    const needsConnectScreen = isElectron && !hasServerUrl;
-    if (needsConnectScreen) {
+    if (isElectron && !hasServerUrl) {
         return <ConnectScreen />;
     }
 
