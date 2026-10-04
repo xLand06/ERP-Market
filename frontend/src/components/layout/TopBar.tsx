@@ -38,6 +38,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     const [themePopoverOpen, setThemePopoverOpen] = useState(false);
     const [mobileQrOpen, setMobileQrOpen] = useState(false);
     const [mobileQrDataUrl, setMobileQrDataUrl] = useState('');
+    const [notifOpen, setNotifOpen] = useState(false);
     const [cycleIndex, setCycleIndex] = useState(0);
     const [calcAmount, setCalcAmount] = useState('1');
     const navigate = useNavigate();

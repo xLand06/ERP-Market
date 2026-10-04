@@ -15,6 +15,7 @@ import { isOnline } from '@/lib/api';
 import { isNativeApp, nativePost } from '@/lib/native-http';
 import { ConnectServerScreen } from './ConnectServerScreen';
 import { useConfigStore } from '@/hooks/useConfigStore';
+import { scanNativeQr } from '@/services/qr-scanner';
 const isCapacitor = typeof window !== 'undefined' && (
     !!(window as any).Capacitor?.isNativePlatform?.() ||
     (window as any).Capacitor?.platform === 'android' ||
@@ -406,23 +407,16 @@ export default function LoginPage() {
     }, [validateAndConnect]);
 
     const startNativeScanner = useCallback(async () => {
-        const plugins = (window as any)?.Capacitor?.Plugins;
-        const native = plugins?.QrScanner;
-        if (!native?.scan) {
-            setShowConnectModal(true);
-            return;
-        }
         setScannerError(null);
         try {
-            const result = await native.scan();
-            if (result?.text) {
-                handleQrPayload(String(result.text));
+            const text = await scanNativeQr();
+            if (text) {
+                handleQrPayload(text);
+                return;
             }
         } catch (e: any) {
-            const msg = String(e?.message || e);
-            if (!/cancelled|cancel/i.test(msg)) {
-                toast.error('No se pudo abrir el escáner de la cámara');
-            }
+            console.warn('[LoginPage] native scan failed, falling back to connect modal:', e);
+            setShowConnectModal(true);
         }
     }, [handleQrPayload]);
 

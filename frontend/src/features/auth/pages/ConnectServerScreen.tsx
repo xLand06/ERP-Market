@@ -4,6 +4,8 @@ import { cn } from '@/lib/utils';
 import { AppStorage } from '@/services/app-storage';
 import { normalizeServerUrl, setServerUrlCache, TEST_SERVER_URL } from '@/lib/server-url';
 import toast from 'react-hot-toast';
+import { scanNativeQr } from '@/services/qr-scanner';
+import { CameraBarcodeScannerModal } from '@/components/scanner/CameraBarcodeScannerModal';
 
 interface ConnectServerScreenProps {
     onConnected: (serverUrl: string) => void;
@@ -17,6 +19,7 @@ export function ConnectServerScreen({ onConnected, currentServer, onCancel }: Co
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [showManual, setShowManual] = useState(false);
     const [validatedHost, setValidatedHost] = useState<string | null>(null);
+    const [cameraModalOpen, setCameraModalOpen] = useState(false);
 
     const isCapacitor = typeof window !== 'undefined' && (
         !!(window as any)?.Capacitor?.isNativePlatform?.() ||
@@ -85,36 +88,27 @@ export function ConnectServerScreen({ onConnected, currentServer, onCancel }: Co
     }, [isCapacitor, onConnected]);
 
     const handleNativeScan = async () => {
-        const plugins = (window as any)?.Capacitor?.Plugins;
-        const nativeScanner = plugins?.QrScanner;
-
-        if (!nativeScanner?.scan) {
-            // If native scanner plugin is not present, fall back to manual entry
-            setShowManual(true);
-            toast.error('El escáner nativo no está disponible. Podés ingresar la dirección manualmente.');
-            return;
-        }
-
         setStatus('scanning');
         setErrorMessage(null);
 
-        try {
-            const result = await nativeScanner.scan();
-            const text = result?.text;
-            if (text) {
-                void validateAndSaveServer(text);
-            } else {
-                setStatus('idle');
-            }
-        } catch (e: any) {
-            const msg = String(e?.message || e);
-            if (/cancelled|cancel/i.test(msg)) {
-                setStatus('idle');
-            } else {
-                setStatus('error');
-                setErrorMessage('No se pudo acceder a la cámara para escanear el QR.');
+        // 1. Intentar con el escáner nativo CameraX en Android
+        if (isCapacitor) {
+            try {
+                const text = await scanNativeQr();
+                if (text) {
+                    await validateAndSaveServer(text);
+                } else {
+                    setStatus('idle');
+                }
+                return;
+            } catch (e: any) {
+                console.warn('[ConnectServerScreen] native scan failed, falling back to camera modal:', e);
             }
         }
+
+        // 2. Si no es nativo o falla, abrir modal de cámara web
+        setStatus('idle');
+        setCameraModalOpen(true);
     };
 
     const handleManualSubmit = (e: React.FormEvent) => {
@@ -273,6 +267,17 @@ export function ConnectServerScreen({ onConnected, currentServer, onCancel }: Co
                     <span>Conexión segura cifrada TLS/HTTPS</span>
                 </div>
             </div>
+
+            {cameraModalOpen && (
+                <CameraBarcodeScannerModal
+                    open={cameraModalOpen}
+                    onClose={() => setCameraModalOpen(false)}
+                    onScan={(text) => {
+                        setCameraModalOpen(false);
+                        void validateAndSaveServer(text);
+                    }}
+                />
+            )}
         </div>
     );
 }

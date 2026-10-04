@@ -26,35 +26,6 @@ import { getServerUrlCache, normalizeServerUrl, setServerUrlCache } from '@/lib/
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
-/** allmarket://connect?server=https://... → persist + jump to login */
-async function applyDeepLinkServer(rawUrl: string): Promise<boolean> {
-    if (!rawUrl || !rawUrl.startsWith('allmarket://')) return false;
-    let server: string | null = null;
-    try {
-        server = new URL(rawUrl).searchParams.get('server');
-    } catch { /* ignore */ }
-    if (!server) {
-        toast.error('QR sin servidor');
-        return false;
-    }
-    const normalized = normalizeServerUrl(server);
-    if (!normalized) {
-        toast.error('URL de servidor inválida en el QR');
-        return false;
-    }
-    try {
-        await AppStorage.setItem('serverUrl', normalized);
-        setServerUrlCache(normalized);
-    } catch (e: any) {
-        toast.error('No se pudo guardar el servidor: ' + String(e?.message || e));
-        // still try cache-only
-        setServerUrlCache(normalized);
-    }
-    toast.success(`Conectado a ${normalized.replace(/^https?:\/\//, '')}`);
-    // Force login route (not dashboard)
-    window.location.replace('/login');
-    return true;
-}
 
 export default function App() {
     const { fetchSettings, activeTheme, businessName } = useConfigStore();
@@ -112,11 +83,49 @@ export default function App() {
         })();
     }, []);
 
+    // Conectar y transicionar inmediatamente al login
+    const connectAndNavigateToLogin = useCallback(async (serverInput: string) => {
+        const normalized = normalizeServerUrl(serverInput);
+        if (!normalized) {
+            toast.error('URL o servidor inválido en el QR');
+            return false;
+        }
+
+        try {
+            localStorage.setItem('serverUrl', normalized);
+            await AppStorage.setItem('serverUrl', normalized);
+            setServerUrlCache(normalized);
+        } catch {
+            setServerUrlCache(normalized);
+        }
+
+        setHasServerUrl(true);
+        toast.success(`Conectado a ${normalized.replace(/^https?:\/\//, '')}`);
+
+        try {
+            void router.navigate('/login');
+        } catch {
+            window.location.replace('/login');
+        }
+        return true;
+    }, []);
+
     // ── Deep links: allmarket://connect?server=... (cámara del sistema / cold start) ──
     useEffect(() => {
+        const handleDeepLink = async (rawUrl: string) => {
+            if (!rawUrl || !rawUrl.startsWith('allmarket://')) return;
+            let server: string | null = null;
+            try {
+                server = new URL(rawUrl).searchParams.get('server');
+            } catch {}
+            if (server) {
+                await connectAndNavigateToLogin(server);
+            }
+        };
+
         const onCustom = (e: Event) => {
             const url = (e as CustomEvent)?.detail?.url;
-            if (url) void applyDeepLinkServer(url);
+            if (url) void handleDeepLink(url);
         };
         window.addEventListener('appUrlOpen', onCustom);
 
@@ -125,10 +134,10 @@ export default function App() {
             try {
                 const { App: CapApp } = await import('@capacitor/app');
                 sub = await CapApp.addListener('appUrlOpen', async ({ url }: { url: string }) => {
-                    await applyDeepLinkServer(url);
+                    await handleDeepLink(url);
                 });
                 const launch = await CapApp.getLaunchUrl();
-                if (launch?.url) await applyDeepLinkServer(launch.url);
+                if (launch?.url) await handleDeepLink(launch.url);
             } catch { /* optional */ }
         })();
 
@@ -136,7 +145,7 @@ export default function App() {
             window.removeEventListener('appUrlOpen', onCustom);
             sub?.remove?.().catch?.(() => {});
         };
-    }, []);
+    }, [connectAndNavigateToLogin]);
 
     // Título dinámico: ALLMARKET -- <nombre de la empresa del tenant>
     useEffect(() => {
@@ -235,8 +244,8 @@ export default function App() {
     if (!hasServerUrl) {
         return (
             <ConnectServerScreen
-                onConnected={(_serverUrl) => {
-                    setHasServerUrl(true);
+                onConnected={(serverUrl) => {
+                    void connectAndNavigateToLogin(serverUrl);
                 }}
             />
         );
