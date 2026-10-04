@@ -280,7 +280,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                             />
 
                             {/* Modal Bottom Sheet en Móvil (< sm) */}
-                            <div className="fixed inset-x-0 bottom-0 z-50 p-4 sm:p-5 pb-safe bg-white dark:bg-slate-900 rounded-t-3xl border-t border-slate-200 dark:border-slate-800 shadow-2xl sm:hidden animate-slide-up max-h-[85vh] overflow-y-auto">
+                            <div className="fixed inset-x-0 bottom-16 z-50 p-4 sm:p-5 pb-4 bg-white dark:bg-slate-900 rounded-t-3xl border-t border-slate-200 dark:border-slate-800 shadow-2xl sm:hidden animate-slide-up max-h-[80vh] overflow-y-auto">
                                 <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mb-3" />
                                 
                                 <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-3">
@@ -575,7 +575,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
 
                     {/* ── Notifications Popover (fuera del contenedor de iconos) ── */}
                     {notifOpen && (
-                        <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 animate-slide-up overflow-hidden">
+                        <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 animate-slide-up overflow-hidden max-h-[calc(100vh-8rem)]">
                             <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100">
                                 <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Notificaciones</span>
                                 <span className="text-[10px] font-semibold text-slate-400">
