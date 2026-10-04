@@ -48,6 +48,11 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     const requestId = (req.headers['x-request-id'] as string) || crypto.randomUUID();
     res.setHeader('X-Request-ID', requestId);
     (req as any).requestId = requestId;
+
+    // Backwards-compatibility: rewrite /auth/* to /api/auth/* if called without /api prefix
+    if (req.url.startsWith('/auth/') || req.url === '/auth') {
+        req.url = `/api${req.url}`;
+    }
     next();
 });
 
