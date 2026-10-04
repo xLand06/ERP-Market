@@ -163,14 +163,14 @@ export default function LoginPage() {
     const [qrDataUrl, setQrDataUrl] = useState('');
     const [showQr, setShowQr] = useState(false);
     useEffect(() => {
-        if (showQr && !qrDataUrl && typeof window !== 'undefined') {
+        if (showQr && typeof window !== 'undefined') {
             void QRCode.toDataURL(`allmarket://connect?server=${encodeURIComponent(window.location.origin)}`, {
                 width: 256,
                 margin: 2,
                 color: { dark: '#0F172A', light: '#FFFFFF' },
             }).then(setQrDataUrl);
         }
-    }, [showQr, qrDataUrl]);
+    }, [showQr]);
 
     const [scannerOpen, setScannerOpen] = useState(false);
     const [scannerStatus, setScannerStatus] = useState<'idle' | 'requesting' | 'starting' | 'ready' | 'error' | 'pick-camera'>('idle');
