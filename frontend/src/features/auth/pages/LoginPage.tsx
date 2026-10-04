@@ -162,7 +162,15 @@ export default function LoginPage() {
 
     const [qrDataUrl, setQrDataUrl] = useState('');
     const [showQr, setShowQr] = useState(false);
-    useEffect(() => { if (showQr && !qrDataUrl) { QRCode.toDataURL(`allmarket://connect?server=${encodeURIComponent(window.location.origin)}`, { width: 200, margin: 2, color: { dark: '#ffffff', light: '#00000000' } }).then(setQrDataUrl); } }, [showQr, qrDataUrl]);
+    useEffect(() => {
+        if (showQr && !qrDataUrl && typeof window !== 'undefined') {
+            void QRCode.toDataURL(`allmarket://connect?server=${encodeURIComponent(window.location.origin)}`, {
+                width: 256,
+                margin: 2,
+                color: { dark: '#0F172A', light: '#FFFFFF' },
+            }).then(setQrDataUrl);
+        }
+    }, [showQr, qrDataUrl]);
 
     const [scannerOpen, setScannerOpen] = useState(false);
     const [scannerStatus, setScannerStatus] = useState<'idle' | 'requesting' | 'starting' | 'ready' | 'error' | 'pick-camera'>('idle');
@@ -708,9 +716,11 @@ export default function LoginPage() {
                         </button>
 
                         {showQr && qrDataUrl && (
-                            <div className="flex flex-col items-center gap-2 p-4 bg-slate-50 dark:bg-[#0D1117] rounded-xl border border-slate-200 dark:border-[#30363D] animate-slideDown">
-                                <img src={qrDataUrl} alt="QR" className="w-40 h-40 rounded-xl" />
-                                <p className="text-[10px] text-slate-500 dark:text-slate-400 text-center">Escaneá con la APK</p>
+                            <div className="flex flex-col items-center gap-2.5 p-4 bg-slate-50 dark:bg-[#0D1117] rounded-2xl border border-slate-200 dark:border-[#30363D] animate-slideDown">
+                                <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                                    <img src={qrDataUrl} alt="QR" className="w-40 h-40 object-contain rounded-lg" />
+                                </div>
+                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 text-center">Escaneá con la APK</p>
                             </div>
                         )}
 
@@ -764,9 +774,11 @@ export default function LoginPage() {
                             </div>
 
                             {showQr && qrDataUrl && (
-                                <div className="flex flex-col items-center gap-2 p-4 bg-slate-50 dark:bg-[#0D1117] rounded-xl border border-slate-200 dark:border-[#30363D] animate-slideDown">
-                                    <img src={qrDataUrl} alt="QR" className="w-36 h-36 rounded-xl" />
-                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 text-center">Escaneá con la APK</p>
+                                <div className="flex flex-col items-center gap-2 p-4 bg-slate-50 dark:bg-[#0D1117] rounded-2xl border border-slate-200 dark:border-[#30363D] animate-slideDown">
+                                    <div className="p-2.5 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                        <img src={qrDataUrl} alt="QR" className="w-36 h-36 object-contain rounded-lg" />
+                                    </div>
+                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300 text-center">Escaneá con la APK</p>
                                 </div>
                             )}
 
