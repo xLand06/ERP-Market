@@ -44,9 +44,10 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
         if (mobileQrOpen && !mobileQrDataUrl && typeof window !== 'undefined') {
             const payload = `allmarket://connect?server=${encodeURIComponent(window.location.origin)}`;
             void QRCode.toDataURL(payload, {
-                width: 256,
-                margin: 2,
-                color: { dark: '#0F172A', light: '#FFFFFF' }
+                width: 360,
+                margin: 3,
+                errorCorrectionLevel: 'M',
+                color: { dark: '#000000', light: '#FFFFFF' }
             }).then(setMobileQrDataUrl);
         }
     }, [mobileQrOpen, mobileQrDataUrl]);
@@ -573,10 +574,10 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                                 <img
                                     src={mobileQrDataUrl}
                                     alt="QR Vincular App"
-                                    className="w-52 h-52 object-contain rounded-xl"
+                                    className="w-64 h-64 object-contain rounded-xl"
                                 />
                             ) : (
-                                <div className="w-52 h-52 flex items-center justify-center text-slate-400 text-xs">
+                                <div className="w-64 h-64 flex items-center justify-center text-slate-400 text-xs">
                                     Generando QR...
                                 </div>
                             )}

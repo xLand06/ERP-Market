@@ -167,9 +167,10 @@ export default function LoginPage() {
     useEffect(() => {
         if (showQr && typeof window !== 'undefined') {
             void QRCode.toDataURL(`allmarket://connect?server=${encodeURIComponent(window.location.origin)}`, {
-                width: 256,
-                margin: 2,
-                color: { dark: '#0F172A', light: '#FFFFFF' },
+                width: 360,
+                margin: 3,
+                errorCorrectionLevel: 'M',
+                color: { dark: '#000000', light: '#FFFFFF' },
             }).then(setQrDataUrl);
         }
     }, [showQr]);
@@ -722,7 +723,7 @@ export default function LoginPage() {
                         {showQr && qrDataUrl && (
                             <div className="flex flex-col items-center gap-2.5 p-4 bg-slate-50 dark:bg-[#0D1117] rounded-2xl border border-slate-200 dark:border-[#30363D] animate-slideDown">
                                 <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm">
-                                    <img src={qrDataUrl} alt="QR" className="w-40 h-40 object-contain rounded-lg" />
+                                    <img src={qrDataUrl} alt="QR" className="w-56 h-56 object-contain rounded-lg" />
                                 </div>
                                 <p className="text-xs font-bold text-slate-700 dark:text-slate-300 text-center">Escaneá con la APK</p>
                             </div>
@@ -807,7 +808,7 @@ export default function LoginPage() {
                             {showQr && qrDataUrl && (
                                 <div className="flex flex-col items-center gap-2 p-4 bg-slate-50 dark:bg-[#0D1117] rounded-2xl border border-slate-200 dark:border-[#30363D] animate-slideDown">
                                     <div className="p-2.5 bg-white rounded-xl border border-slate-200 shadow-sm">
-                                        <img src={qrDataUrl} alt="QR" className="w-36 h-36 object-contain rounded-lg" />
+                                        <img src={qrDataUrl} alt="QR" className="w-52 h-52 object-contain rounded-lg" />
                                     </div>
                                     <p className="text-xs font-bold text-slate-700 dark:text-slate-300 text-center">Escaneá con la APK</p>
                                 </div>

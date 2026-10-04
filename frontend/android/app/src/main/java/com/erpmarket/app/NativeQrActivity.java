@@ -8,7 +8,10 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Vibrator;
+import java.util.concurrent.TimeUnit;
 import android.util.Log;
 import android.util.Size;
 import android.view.Gravity;
@@ -271,17 +274,43 @@ public class NativeQrActivity extends AppCompatActivity {
         }, ContextCompat.getMainExecutor(this));
     }
 
+    private byte[] yBufferArray;
+    private byte[] rotatedArray;
+
+    private final Handler autoFocusHandler = new Handler(Looper.getMainLooper());
+    private final Runnable autoFocusRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (isFinishing() || isDestroyed() || camera == null || previewView == null) return;
+            try {
+                if (previewView.getWidth() > 0 && previewView.getHeight() > 0) {
+                    MeteringPointFactory factory = previewView.getMeteringPointFactory();
+                    MeteringPoint point = factory.createPoint(previewView.getWidth() / 2f, previewView.getHeight() / 2f);
+                    FocusMeteringAction action = new FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF)
+                            .setAutoCancelDuration(2, TimeUnit.SECONDS)
+                            .build();
+                    camera.getCameraControl().startFocusAndMetering(action);
+                }
+            } catch (Exception ignored) {}
+            autoFocusHandler.postDelayed(this, 1800);
+        }
+    };
+
     private void bindCamera() {
         if (cameraProvider == null) return;
 
         Preview preview = new Preview.Builder().build();
         preview.setSurfaceProvider(previewView.getSurfaceProvider());
 
-        // Target 720x1280 portrait for fast processing and optimal QR module density
-        ImageAnalysis analysis = new ImageAnalysis.Builder()
+        ImageAnalysis.Builder analysisBuilder = new ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .setTargetResolution(new Size(720, 1280))
-                .build();
+                .setTargetResolution(new Size(1280, 720));
+
+        if (previewView.getDisplay() != null) {
+            analysisBuilder.setTargetRotation(previewView.getDisplay().getRotation());
+        }
+
+        ImageAnalysis analysis = analysisBuilder.build();
         analysis.setAnalyzer(analysisExecutor, this::analyzeFrame);
 
         CameraSelector selector = new CameraSelector.Builder()
@@ -290,6 +319,8 @@ public class NativeQrActivity extends AppCompatActivity {
 
         try {
             camera = cameraProvider.bindToLifecycle(this, selector, preview, analysis);
+            autoFocusHandler.removeCallbacksAndMessages(null);
+            autoFocusHandler.postDelayed(autoFocusRunnable, 600);
         } catch (Exception e) {
             Log.e(TAG, "bind failed", e);
             Toast.makeText(this, "Error al vincular cámara", Toast.LENGTH_LONG).show();
@@ -306,12 +337,21 @@ public class NativeQrActivity extends AppCompatActivity {
             int rotation = image.getImageInfo().getRotationDegrees();
             int width = image.getWidth();
             int height = image.getHeight();
+            int totalPixels = width * height;
+
+            // Reusable buffers to eliminate per-frame GC thrashing
+            if (yBufferArray == null || yBufferArray.length != totalPixels) {
+                yBufferArray = new byte[totalPixels];
+            }
+            if (rotatedArray == null || rotatedArray.length != totalPixels) {
+                rotatedArray = new byte[totalPixels];
+            }
 
             // 1. Extract clean continuous Y plane (compensating for Camera2 rowStride padding)
-            byte[] yData = toContinuousY(image);
+            toContinuousY(image, yBufferArray);
 
             // 2. Rotate pixels to match real display orientation
-            byte[] rotatedData = rotateY(yData, width, height, rotation);
+            rotateY(yBufferArray, rotatedArray, width, height, rotation);
 
             int finalWidth = (rotation == 90 || rotation == 270) ? height : width;
             int finalHeight = (rotation == 90 || rotation == 270) ? width : height;
@@ -321,12 +361,12 @@ public class NativeQrActivity extends AppCompatActivity {
             int cropLeft = (finalWidth - cropSize) / 2;
             int cropTop = (finalHeight - cropSize) / 2;
             PlanarYUVLuminanceSource centerSource = new PlanarYUVLuminanceSource(
-                    rotatedData, finalWidth, finalHeight, cropLeft, cropTop, cropSize, cropSize, false
+                    rotatedArray, finalWidth, finalHeight, cropLeft, cropTop, cropSize, cropSize, false
             );
 
             Result result = null;
 
-            // Strategy 1: Center-crop with HybridBinarizer (fastest and most accurate for framed QR)
+            // Strategy 1: Center-crop with HybridBinarizer (fast and accurate for framed QR)
             try {
                 qrCodeReader.reset();
                 BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(centerSource));
@@ -342,19 +382,31 @@ public class NativeQrActivity extends AppCompatActivity {
                 } catch (Exception ignored) {}
             }
 
-            // Strategy 3: Full-frame with HybridBinarizer (in case QR is slightly outside the box)
+            // Strategy 3: Full-frame with GlobalHistogramBinarizer (for screens when user is further away)
             if (result == null) {
                 try {
                     qrCodeReader.reset();
                     PlanarYUVLuminanceSource fullSource = new PlanarYUVLuminanceSource(
-                            rotatedData, finalWidth, finalHeight, 0, 0, finalWidth, finalHeight, false
+                            rotatedArray, finalWidth, finalHeight, 0, 0, finalWidth, finalHeight, false
+                    );
+                    BinaryBitmap bitmap = new BinaryBitmap(new GlobalHistogramBinarizer(fullSource));
+                    result = qrCodeReader.decode(bitmap, hints);
+                } catch (Exception ignored) {}
+            }
+
+            // Strategy 4: Full-frame with HybridBinarizer
+            if (result == null) {
+                try {
+                    qrCodeReader.reset();
+                    PlanarYUVLuminanceSource fullSource = new PlanarYUVLuminanceSource(
+                            rotatedArray, finalWidth, finalHeight, 0, 0, finalWidth, finalHeight, false
                     );
                     BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(fullSource));
                     result = qrCodeReader.decode(bitmap, hints);
                 } catch (Exception ignored) {}
             }
 
-            // Strategy 4: Center-crop with Inverted luminance (dark mode or high contrast screens)
+            // Strategy 5: Inverted luminance (dark mode screens)
             if (result == null) {
                 try {
                     qrCodeReader.reset();
@@ -363,7 +415,7 @@ public class NativeQrActivity extends AppCompatActivity {
                 } catch (Exception ignored) {}
             }
 
-            // Strategy 5: MultiFormatReader fallback
+            // Strategy 6: MultiFormatReader fallback
             if (result == null) {
                 try {
                     multiFormatReader.reset();
@@ -402,58 +454,54 @@ public class NativeQrActivity extends AppCompatActivity {
     }
 
     /**
-     * Extracts pure 8-bit Y plane data without rowStride padding.
+     * Extracts pure 8-bit Y plane data without rowStride padding into target array.
      */
-    private byte[] toContinuousY(ImageProxy image) {
+    private void toContinuousY(ImageProxy image, byte[] out) {
         ImageProxy.PlaneProxy yPlane = image.getPlanes()[0];
         ByteBuffer yBuffer = yPlane.getBuffer();
         int rowStride = yPlane.getRowStride();
         int width = image.getWidth();
         int height = image.getHeight();
 
-        byte[] yBytes = new byte[width * height];
         int bufferPos = yBuffer.position();
 
         if (rowStride == width) {
-            yBuffer.get(yBytes, 0, width * height);
+            yBuffer.get(out, 0, width * height);
         } else {
             for (int row = 0; row < height; row++) {
                 yBuffer.position(bufferPos + row * rowStride);
-                yBuffer.get(yBytes, row * width, width);
+                yBuffer.get(out, row * width, width);
             }
         }
-        return yBytes;
     }
 
     /**
-     * Rotates Y plane byte array to match display rotation degrees.
+     * Rotates Y plane byte array to match display rotation degrees into dest array.
      */
-    private byte[] rotateY(byte[] src, int width, int height, int rotation) {
-        if (rotation == 0) return src;
-        byte[] dest = new byte[width * height];
+    private void rotateY(byte[] src, byte[] dest, int width, int height, int rotation) {
+        if (rotation == 0) {
+            System.arraycopy(src, 0, dest, 0, width * height);
+            return;
+        }
         if (rotation == 90) {
             for (int y = 0; y < height; y++) {
                 for (int x = 0; x < width; x++) {
                     dest[x * height + (height - 1 - y)] = src[y * width + x];
                 }
             }
-            return dest;
         } else if (rotation == 180) {
             for (int y = 0; y < height; y++) {
                 for (int x = 0; x < width; x++) {
                     dest[(height - 1 - y) * width + (width - 1 - x)] = src[y * width + x];
                 }
             }
-            return dest;
         } else if (rotation == 270) {
             for (int y = 0; y < height; y++) {
                 for (int x = 0; x < width; x++) {
                     dest[(width - 1 - x) * height + y] = src[y * width + x];
                 }
             }
-            return dest;
         }
-        return src;
     }
 
     @Override
@@ -473,6 +521,7 @@ public class NativeQrActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        autoFocusHandler.removeCallbacksAndMessages(null);
         if (analysisExecutor != null) {
             analysisExecutor.shutdown();
         }

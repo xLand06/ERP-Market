@@ -97,6 +97,24 @@ export function AiChat() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isOpen]);
 
+    // Close on mobile hardware/gesture Back button
+    useEffect(() => {
+        let sub: any = null;
+        (async () => {
+            try {
+                const { App } = await import('@capacitor/app');
+                sub = await App.addListener('backButton', () => {
+                    if (isOpen) {
+                        setIsOpen(false);
+                    }
+                });
+            } catch {}
+        })();
+        return () => {
+            sub?.remove?.().catch?.(() => {});
+        };
+    }, [isOpen]);
+
     const loadSession = useCallback(async () => {
         try {
             const res = await api.get('/ai-chat/session');
@@ -216,20 +234,35 @@ export function AiChat() {
                 <>
                     {/* Mobile backdrop */}
                     <div
-                        className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 sm:hidden animate-fade-in"
+                        className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 sm:hidden animate-fade-in cursor-pointer"
                         onClick={() => setIsOpen(false)}
                         aria-hidden="true"
-                    />
+                    >
+                        <div className="pt-4 text-center">
+                            <span className="text-[11px] font-bold text-white/80 bg-black/40 px-3 py-1 rounded-full">
+                                Tocá arriba para cerrar
+                            </span>
+                        </div>
+                    </div>
 
-                    {/* Chat Panel: Fullscreen on mobile, floating card on desktop */}
+                    {/* Chat Panel: Slide-up sheet on mobile with header visible, floating card on desktop */}
                     <div
-                        className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-slate-900 overflow-hidden sm:inset-auto sm:bottom-24 sm:right-6 sm:w-[420px] sm:h-[600px] sm:max-h-[calc(100dvh-7rem)] sm:rounded-3xl sm:shadow-2xl sm:shadow-slate-950/30 sm:border sm:border-slate-200 sm:dark:border-slate-800 transition-all duration-200"
+                        className="fixed inset-x-0 bottom-0 top-14 sm:top-auto sm:inset-auto sm:bottom-24 sm:right-6 sm:w-[420px] sm:h-[600px] sm:max-h-[calc(100dvh-7rem)] z-50 flex flex-col bg-white dark:bg-slate-900 overflow-hidden rounded-t-[28px] sm:rounded-3xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-800 transition-all duration-200 animate-slide-up"
                         role="dialog"
                         aria-modal="true"
                         aria-label="Asistente de inteligencia artificial"
                     >
+                        {/* Pull handle on mobile */}
+                        <div
+                            onClick={() => setIsOpen(false)}
+                            className="sm:hidden pt-2.5 pb-1 flex justify-center cursor-pointer bg-slate-900 active:bg-slate-800"
+                            title="Deslizar o tocar para cerrar"
+                        >
+                            <div className="w-12 h-1.5 rounded-full bg-slate-600" />
+                        </div>
+
                         {/* Header */}
-                        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-4 sm:px-5 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-3 sm:py-4 flex items-center justify-between gap-3 shrink-0 border-b border-slate-800/80">
+                        <div className="bg-slate-900 px-4 sm:px-5 py-3 sm:py-4 flex items-center justify-between gap-3 shrink-0 border-b border-slate-800">
                             <div className="flex items-center gap-3 min-w-0">
                                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/25 shrink-0">
                                     <IconBot className="w-5 h-5" />
@@ -248,7 +281,7 @@ export function AiChat() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="flex items-center gap-1.5 shrink-0">
                                 {messages.length > 0 && (
                                     <button
                                         type="button"
@@ -263,11 +296,12 @@ export function AiChat() {
                                 <button
                                     type="button"
                                     onClick={() => setIsOpen(false)}
-                                    className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer active:scale-95"
+                                    className="h-9 px-3 flex items-center gap-1.5 text-xs font-bold text-white bg-white/20 hover:bg-white/30 active:bg-white/40 rounded-xl transition-all cursor-pointer active:scale-95"
                                     title="Cerrar chat"
                                     aria-label="Cerrar chat"
                                 >
-                                    <IconClose className="w-5 h-5" />
+                                    <IconClose className="w-4 h-4" />
+                                    <span className="sm:hidden font-semibold">Cerrar</span>
                                 </button>
                             </div>
                         </div>
