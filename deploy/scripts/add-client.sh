@@ -216,6 +216,9 @@ fi
 if [[ -n "${HOST_TLS_DIR:-}" ]]; then
     sed -i "s|./tls|${HOST_TLS_DIR}|g" "$CLIENT_DIR/docker-compose.yml"
     echo "tls volume fixed to: $HOST_TLS_DIR"
+    HOST_APK_DIR="$(dirname "$HOST_TLS_DIR")/apk"
+    sed -i "s|./apk|${HOST_APK_DIR}|g" "$CLIENT_DIR/docker-compose.yml"
+    echo "apk volume fixed to: $HOST_APK_DIR"
 fi
 
 # ── Deploy the stack ──────────────────────────────────────────────────────────

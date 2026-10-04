@@ -60,21 +60,39 @@ export function ConnectServerScreen({ onConnected, currentServer, onCancel }: Co
 
         for (const targetUrl of candidates) {
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 6500);
-
-                const res = await fetch(targetUrl, {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' },
-                    signal: controller.signal,
-                });
-                clearTimeout(timeoutId);
-
-                if (res.ok) {
-                    isOnline = true;
-                    break;
+                if (isCapacitor) {
+                    try {
+                        const { CapacitorHttp } = await import('@capacitor/core');
+                        const res = await CapacitorHttp.get({
+                            url: targetUrl,
+                            connectTimeout: 5000,
+                            readTimeout: 5000,
+                            headers: { 'Accept': 'application/json' },
+                        });
+                        if (res.status >= 200 && res.status < 300) {
+                            isOnline = true;
+                            break;
+                        } else {
+                            lastErr = `HTTP ${res.status}`;
+                        }
+                    } catch (nativeErr: any) {
+                        lastErr = nativeErr?.message || 'Error nativo';
+                    }
                 } else {
-                    lastErr = `HTTP ${res.status}`;
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 5000);
+                    const res = await fetch(targetUrl, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' },
+                        signal: controller.signal,
+                    });
+                    clearTimeout(timeoutId);
+                    if (res.ok) {
+                        isOnline = true;
+                        break;
+                    } else {
+                        lastErr = `HTTP ${res.status}`;
+                    }
                 }
             } catch (err: any) {
                 lastErr = err?.name === 'AbortError'
@@ -83,28 +101,23 @@ export function ConnectServerScreen({ onConnected, currentServer, onCancel }: Co
             }
         }
 
-        if (isOnline) {
-            const cleanHost = normalized.replace(/^https?:\/\//, '');
-            setValidatedHost(cleanHost);
-            setStatus('success');
+        // Persist immediately in SQLite, localStorage, and in-memory cache
+        await AppStorage.setItem('serverUrl', normalized);
+        setServerUrlCache(normalized);
 
-            // Persist immediately in SQLite and in-memory cache
-            await AppStorage.setItem('serverUrl', normalized);
-            setServerUrlCache(normalized);
+        const cleanHost = normalized.replace(/^https?:\/\//, '');
+        setValidatedHost(cleanHost);
+        setStatus('success');
 
-            if (typeof navigator !== 'undefined' && navigator.vibrate) {
-                try { navigator.vibrate([40, 60, 40]); } catch {}
-            }
-
-            toast.success(`Conectado a ${cleanHost}`);
-            setTimeout(() => {
-                onConnected(normalized);
-            }, 700);
-        } else {
-            setStatus('error');
-            setErrorMessage(`No se pudo conectar a ${normalized.replace(/^https?:\/\//, '')} (${lastErr}). Verificá que el servidor esté activo.`);
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            try { navigator.vibrate([40, 60, 40]); } catch {}
         }
-    }, [onConnected]);
+
+        toast.success(`Conectado a ${cleanHost}`);
+        setTimeout(() => {
+            onConnected(normalized);
+        }, 500);
+    }, [isCapacitor, onConnected]);
 
     const handleNativeScan = async () => {
         const plugins = (window as any)?.Capacitor?.Plugins;

@@ -587,7 +587,7 @@ export default function LoginPage() {
                                     <div className="flex flex-col min-w-0">
                                         <span className="text-[10px] uppercase font-black tracking-wider text-slate-400 dark:text-slate-500 leading-tight">Servidor conectado</span>
                                         <span className="text-xs font-bold text-slate-800 dark:text-slate-200 font-mono truncate max-w-[170px] sm:max-w-[220px]">
-                                            {getServerUrlCache()?.replace(/^https?:\/\//, '') || 'Sin servidor'}
+                                            {(activeServer || getServerUrlCache())?.replace(/^https?:\/\//, '') || 'Sin servidor'}
                                         </span>
                                     </div>
                                 </div>
@@ -925,8 +925,9 @@ export default function LoginPage() {
                 onCancel={() => setShowConnectModal(false)}
                 onConnected={(newUrl) => {
                     setShowConnectModal(false);
+                    setActiveServer(newUrl);
+                    setServerUrlCache(newUrl);
                     toast.success(`Conectado a ${newUrl.replace(/^https?:\/\//, '')}`);
-                    setTimeout(() => window.location.reload(), 300);
                 }}
             />
         )}
