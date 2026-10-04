@@ -186,6 +186,19 @@ fi
 # ── Idempotent resources (always) ────────────────────────────────────────────
 mkdir -p "$CLIENT_DIR/tls" "$CLIENT_DIR/apk"
 
+# Provision universal allmarket.apk and backward-compatible symlinks
+SOURCE_APK=""
+if [[ -f "$DEPLOY_DIR/allmarket.apk" ]]; then
+    SOURCE_APK="$DEPLOY_DIR/allmarket.apk"
+elif [[ -f "$CLIENTS_DIR/test/apk/allmarket.apk" ]]; then
+    SOURCE_APK="$CLIENTS_DIR/test/apk/allmarket.apk"
+fi
+
+if [[ -n "$SOURCE_APK" && -f "$SOURCE_APK" ]]; then
+    cp "$SOURCE_APK" "$CLIENT_DIR/apk/allmarket.apk"
+    ( cd "$CLIENT_DIR/apk" && ln -sf allmarket.apk allmarket-v1.2.apk && ln -sf allmarket.apk allmarket-v1.1.apk )
+fi
+
 # ── Shared network (idempotent; also safe when deploy/ was never started) ────
 if ! docker network inspect erp_proxy >/dev/null 2>&1; then
     echo "creating shared network erp_proxy"
