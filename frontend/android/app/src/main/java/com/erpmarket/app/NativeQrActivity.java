@@ -1,22 +1,35 @@
 package com.erpmarket.app;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.os.Bundle;
+import android.os.Vibrator;
 import android.util.Log;
+import android.util.Size;
+import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
+import androidx.camera.core.FocusMeteringAction;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageProxy;
+import androidx.camera.core.MeteringPoint;
+import androidx.camera.core.MeteringPointFactory;
 import androidx.camera.core.Preview;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
@@ -24,11 +37,15 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.zxing.BarcodeFormat;
 import com.google.zxing.BinaryBitmap;
 import com.google.zxing.DecodeHintType;
 import com.google.zxing.MultiFormatReader;
 import com.google.zxing.PlanarYUVLuminanceSource;
+import com.google.zxing.Result;
+import com.google.zxing.common.GlobalHistogramBinarizer;
 import com.google.zxing.common.HybridBinarizer;
+import com.google.zxing.qrcode.QRCodeReader;
 
 import java.nio.ByteBuffer;
 import java.util.Collections;
@@ -39,8 +56,8 @@ import java.util.concurrent.Executors;
 
 /**
  * CameraX + ZXing QR scanner.
- * JourneyApps CaptureActivity (old Camera API) paints black on Huawei HMS (P40 Pro).
- * CameraX uses Camera2/HAL paths that work without Google Mobile Services.
+ * Engineered for robustness across all Android vendors (Samsung, Huawei HMS, Xiaomi, Motorola).
+ * Fixes Camera2 Y-plane rowStride padding, sensor rotation, backlight binarization, and tap-to-focus.
  */
 public class NativeQrActivity extends AppCompatActivity {
     private static final String TAG = "NativeQr";
@@ -50,12 +67,21 @@ public class NativeQrActivity extends AppCompatActivity {
     private PreviewView previewView;
     private TextView hintView;
     private Button switchBtn;
+    private Button torchBtn;
+    private Button closeBtn;
+    private Camera camera;
     private ProcessCameraProvider cameraProvider;
     private ExecutorService analysisExecutor;
-    private final MultiFormatReader reader = new MultiFormatReader();
-    private int lensFacing = CameraSelector.LENS_FACING_BACK;
-    private boolean handled = false;
 
+    private final QRCodeReader qrCodeReader = new QRCodeReader();
+    private final MultiFormatReader multiFormatReader = new MultiFormatReader();
+    private final Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
+
+    private int lensFacing = CameraSelector.LENS_FACING_BACK;
+    private boolean isTorchOn = false;
+    private volatile boolean handled = false;
+
+    @SuppressLint("ClickableViewAccessibility")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -64,39 +90,139 @@ public class NativeQrActivity extends AppCompatActivity {
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF000000);
 
+        // 1. Camera Preview
         previewView = new PreviewView(this);
         previewView.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
         root.addView(previewView);
 
+        // 2. Viewfinder Overlay
+        View overlay = new View(this) {
+            private final Paint boxPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Paint dimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+            {
+                boxPaint.setColor(0xFF10B981); // Emerald green
+                boxPaint.setStyle(Paint.Style.STROKE);
+                boxPaint.setStrokeWidth(8f);
+                dimPaint.setColor(0x55000000);
+            }
+
+            @Override
+            protected void onDraw(Canvas canvas) {
+                super.onDraw(canvas);
+                int w = getWidth();
+                int h = getHeight();
+                int boxSize = (int) (Math.min(w, h) * 0.70f);
+                int left = (w - boxSize) / 2;
+                int top = (h - boxSize) / 2;
+                int right = left + boxSize;
+                int bottom = top + boxSize;
+
+                // Dim outer area
+                canvas.drawRect(0, 0, w, top, dimPaint);
+                canvas.drawRect(0, bottom, w, h, dimPaint);
+                canvas.drawRect(0, top, left, bottom, dimPaint);
+                canvas.drawRect(right, top, w, bottom, dimPaint);
+
+                // Viewfinder frame
+                RectF rect = new RectF(left, top, right, bottom);
+                canvas.drawRoundRect(rect, 32f, 32f, boxPaint);
+            }
+        };
+        root.addView(overlay, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+
+        // 3. Top Header Bar (Close + Hint)
+        LinearLayout topBar = new LinearLayout(this);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
+        topBar.setGravity(Gravity.CENTER_VERTICAL);
+        topBar.setPadding(24, 48, 24, 24);
+
+        closeBtn = new Button(this);
+        closeBtn.setText("✕");
+        closeBtn.setTextColor(0xFFFFFFFF);
+        closeBtn.setTextSize(18f);
+        closeBtn.setBackgroundColor(0x33000000);
+        closeBtn.setOnClickListener(v -> {
+            setResult(RESULT_CANCELED);
+            finish();
+        });
+        topBar.addView(closeBtn, new LinearLayout.LayoutParams(120, 120));
+
         hintView = new TextView(this);
-        hintView.setText("Escaneá el QR del panel ALLMARKET");
+        hintView.setText("Apuntá al código QR del panel");
         hintView.setTextColor(0xFFFFFFFF);
-        hintView.setTextSize(14f);
-        hintView.setPadding(32, 32, 32, 32);
-        FrameLayout.LayoutParams hintLp = new FrameLayout.LayoutParams(
+        hintView.setTextSize(15f);
+        hintView.setGravity(Gravity.CENTER);
+        hintView.setPadding(16, 0, 16, 0);
+        LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+        topBar.addView(hintView, hintLp);
+
+        FrameLayout.LayoutParams topBarLp = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT);
-        hintLp.gravity = android.view.Gravity.TOP;
-        root.addView(hintView, hintLp);
+        topBarLp.gravity = Gravity.TOP;
+        root.addView(topBar, topBarLp);
+
+        // 4. Bottom Controls Bar (Flashlight + Switch Camera)
+        LinearLayout bottomBar = new LinearLayout(this);
+        bottomBar.setOrientation(LinearLayout.HORIZONTAL);
+        bottomBar.setGravity(Gravity.CENTER);
+        bottomBar.setPadding(32, 24, 32, 64);
+
+        torchBtn = new Button(this);
+        torchBtn.setText("🔦 Luz");
+        torchBtn.setTextColor(0xFFFFFFFF);
+        torchBtn.setBackgroundColor(0x55000000);
+        torchBtn.setOnClickListener(v -> toggleTorch());
+        LinearLayout.LayoutParams torchLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        torchLp.setMargins(16, 0, 16, 0);
+        bottomBar.addView(torchBtn, torchLp);
 
         switchBtn = new Button(this);
-        switchBtn.setText("Cambiar cámara");
-        FrameLayout.LayoutParams btnLp = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT);
-        btnLp.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.CENTER_HORIZONTAL;
-        btnLp.bottomMargin = 48;
-        root.addView(switchBtn, btnLp);
+        switchBtn.setText("🔄 Cambiar cámara");
+        switchBtn.setTextColor(0xFFFFFFFF);
+        switchBtn.setBackgroundColor(0x55000000);
         switchBtn.setOnClickListener(v -> toggleCamera());
+        LinearLayout.LayoutParams switchLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        switchLp.setMargins(16, 0, 16, 0);
+        bottomBar.addView(switchBtn, switchLp);
+
+        FrameLayout.LayoutParams bottomBarLp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT);
+        bottomBarLp.gravity = Gravity.BOTTOM;
+        root.addView(bottomBar, bottomBarLp);
+
+        // 5. Tap-to-focus on preview
+        previewView.setOnTouchListener((v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_UP && camera != null) {
+                try {
+                    MeteringPointFactory factory = previewView.getMeteringPointFactory();
+                    MeteringPoint point = factory.createPoint(event.getX(), event.getY());
+                    FocusMeteringAction action = new FocusMeteringAction.Builder(
+                            point, FocusMeteringAction.FLAG_AF).build();
+                    camera.getCameraControl().startFocusAndMetering(action);
+                } catch (Exception ignored) {}
+            }
+            return true;
+        });
 
         setContentView(root);
 
-        Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
-        hints.put(DecodeHintType.POSSIBLE_FORMATS, Collections.singletonList(com.google.zxing.BarcodeFormat.QR_CODE));
+        // Configure ZXing hints
+        hints.put(DecodeHintType.POSSIBLE_FORMATS, Collections.singletonList(BarcodeFormat.QR_CODE));
         hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
-        reader.setHints(hints);
+        hints.put(DecodeHintType.CHARACTER_SET, "UTF-8");
+        multiFormatReader.setHints(hints);
 
         analysisExecutor = Executors.newSingleThreadExecutor();
 
@@ -109,13 +235,22 @@ public class NativeQrActivity extends AppCompatActivity {
         }
     }
 
+    private void toggleTorch() {
+        if (camera != null && camera.getCameraInfo().hasFlashUnit()) {
+            isTorchOn = !isTorchOn;
+            camera.getCameraControl().enableTorch(isTorchOn);
+            torchBtn.setText(isTorchOn ? "🔦 Apagar" : "🔦 Luz");
+        } else {
+            Toast.makeText(this, "Linterna no disponible", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void toggleCamera() {
         lensFacing = (lensFacing == CameraSelector.LENS_FACING_BACK)
                 ? CameraSelector.LENS_FACING_FRONT
                 : CameraSelector.LENS_FACING_BACK;
-        hintView.setText(lensFacing == CameraSelector.LENS_FACING_FRONT
-                ? "Cámara frontal activa"
-                : "Cámara trasera activa");
+        isTorchOn = false;
+        torchBtn.setText("🔦 Luz");
         if (cameraProvider != null) {
             cameraProvider.unbindAll();
             bindCamera();
@@ -142,8 +277,10 @@ public class NativeQrActivity extends AppCompatActivity {
         Preview preview = new Preview.Builder().build();
         preview.setSurfaceProvider(previewView.getSurfaceProvider());
 
+        // Target 720p for fast processing and optimal QR module density
         ImageAnalysis analysis = new ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setTargetResolution(new Size(1280, 720))
                 .build();
         analysis.setAnalyzer(analysisExecutor, this::analyzeFrame);
 
@@ -152,7 +289,7 @@ public class NativeQrActivity extends AppCompatActivity {
                 .build();
 
         try {
-            cameraProvider.bindToLifecycle(this, selector, preview, analysis);
+            camera = cameraProvider.bindToLifecycle(this, selector, preview, analysis);
         } catch (Exception e) {
             Log.e(TAG, "bind failed", e);
             Toast.makeText(this, "Error al vincular cámara", Toast.LENGTH_LONG).show();
@@ -164,27 +301,84 @@ public class NativeQrActivity extends AppCompatActivity {
             image.close();
             return;
         }
-        try {
-            ImageProxy.PlaneProxy yPlane = image.getPlanes()[0];
-            ByteBuffer buffer = yPlane.getBuffer();
-            byte[] bytes = new byte[buffer.remaining()];
-            buffer.get(bytes);
 
+        try {
+            int rotation = image.getImageInfo().getRotationDegrees();
             int width = image.getWidth();
             int height = image.getHeight();
-            // Crop center square for faster decode on tall preview streams
-            int crop = Math.min(width, height);
-            int x0 = (width - crop) / 2;
-            int y0 = (height - crop) / 2;
+
+            // 1. Extract clean continuous Y plane (compensating for Camera2 rowStride padding)
+            byte[] yData = toContinuousY(image);
+
+            // 2. Rotate pixels to match real display orientation
+            byte[] rotatedData = rotateY(yData, width, height, rotation);
+
+            int finalWidth = (rotation == 90 || rotation == 270) ? height : width;
+            int finalHeight = (rotation == 90 || rotation == 270) ? width : height;
 
             PlanarYUVLuminanceSource source = new PlanarYUVLuminanceSource(
-                    bytes, width, height, x0, y0, crop, crop, false);
-            BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
-            com.google.zxing.Result result = reader.decodeWithState(bitmap);
-            String text = result != null ? result.getText() : null;
-            if (text != null && !text.isEmpty()) {
+                    rotatedData, finalWidth, finalHeight, 0, 0, finalWidth, finalHeight, false
+            );
+
+            Result result = null;
+
+            // Strategy A: Dedicated QRCodeReader with HybridBinarizer on full frame
+            try {
+                BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
+                result = qrCodeReader.decode(bitmap, hints);
+            } catch (Exception ignored) {}
+
+            // Strategy B: GlobalHistogramBinarizer (superior for scanning LCD/LED screens with reflection)
+            if (result == null) {
+                try {
+                    BinaryBitmap bitmap = new BinaryBitmap(new GlobalHistogramBinarizer(source));
+                    result = qrCodeReader.decode(bitmap, hints);
+                } catch (Exception ignored) {}
+            }
+
+            // Strategy C: Inverted luminance (for dark mode or high contrast screens)
+            if (result == null) {
+                try {
+                    BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source.invert()));
+                    result = qrCodeReader.decode(bitmap, hints);
+                } catch (Exception ignored) {}
+            }
+
+            // Strategy D: Center-crop scan (reduces background clutter if user framed code in center)
+            if (result == null) {
+                try {
+                    int cropSize = (int) (Math.min(finalWidth, finalHeight) * 0.70f);
+                    int cropLeft = (finalWidth - cropSize) / 2;
+                    int cropTop = (finalHeight - cropSize) / 2;
+                    PlanarYUVLuminanceSource centerSource = new PlanarYUVLuminanceSource(
+                            rotatedData, finalWidth, finalHeight, cropLeft, cropTop, cropSize, cropSize, false
+                    );
+                    BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(centerSource));
+                    result = qrCodeReader.decode(bitmap, hints);
+                } catch (Exception ignored) {}
+            }
+
+            // Strategy E: MultiFormatReader fallback
+            if (result == null) {
+                try {
+                    BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
+                    result = multiFormatReader.decodeWithState(bitmap);
+                } catch (Exception ignored) {}
+            }
+
+            if (result != null && result.getText() != null && !result.getText().trim().isEmpty()) {
                 handled = true;
-                final String payload = text;
+                final String payload = result.getText().trim();
+                Log.i(TAG, "QR decode success: " + payload);
+
+                // Haptic feedback
+                try {
+                    Vibrator v = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+                    if (v != null) {
+                        v.vibrate(60);
+                    }
+                } catch (Exception ignored) {}
+
                 runOnUiThread(() -> {
                     Intent data = new Intent();
                     data.putExtra(EXTRA_TEXT, payload);
@@ -192,12 +386,68 @@ public class NativeQrActivity extends AppCompatActivity {
                     finish();
                 });
             }
-        } catch (Exception ignored) {
-            // no QR in this frame
+        } catch (Exception e) {
+            Log.e(TAG, "analyzeFrame error", e);
         } finally {
-            reader.reset();
+            qrCodeReader.reset();
+            multiFormatReader.reset();
             image.close();
         }
+    }
+
+    /**
+     * Extracts pure 8-bit Y plane data without rowStride padding.
+     */
+    private byte[] toContinuousY(ImageProxy image) {
+        ImageProxy.PlaneProxy yPlane = image.getPlanes()[0];
+        ByteBuffer yBuffer = yPlane.getBuffer();
+        int rowStride = yPlane.getRowStride();
+        int width = image.getWidth();
+        int height = image.getHeight();
+
+        byte[] yBytes = new byte[width * height];
+        int bufferPos = yBuffer.position();
+
+        if (rowStride == width) {
+            yBuffer.get(yBytes, 0, width * height);
+        } else {
+            for (int row = 0; row < height; row++) {
+                yBuffer.position(bufferPos + row * rowStride);
+                yBuffer.get(yBytes, row * width, width);
+            }
+        }
+        return yBytes;
+    }
+
+    /**
+     * Rotates Y plane byte array to match display rotation degrees.
+     */
+    private byte[] rotateY(byte[] src, int width, int height, int rotation) {
+        if (rotation == 0) return src;
+        byte[] dest = new byte[width * height];
+        if (rotation == 90) {
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    dest[x * height + (height - 1 - y)] = src[y * width + x];
+                }
+            }
+            return dest;
+        } else if (rotation == 180) {
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    dest[(height - 1 - y) * width + (width - 1 - x)] = src[y * width + x];
+                }
+            }
+            return dest;
+        } else if (rotation == 270) {
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    dest[(width - 1 - x) * height + y] = src[y * width + x];
+                }
+            }
+            return dest;
+        }
+        return src;
     }
 
     @Override
@@ -220,6 +470,7 @@ public class NativeQrActivity extends AppCompatActivity {
         if (analysisExecutor != null) {
             analysisExecutor.shutdown();
         }
-        reader.reset();
+        qrCodeReader.reset();
+        multiFormatReader.reset();
     }
 }
