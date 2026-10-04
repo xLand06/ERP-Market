@@ -38,7 +38,18 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     const [themePopoverOpen, setThemePopoverOpen] = useState(false);
     const [mobileQrOpen, setMobileQrOpen] = useState(false);
     const [mobileQrDataUrl, setMobileQrDataUrl] = useState('');
+    const [cycleIndex, setCycleIndex] = useState(0);
+    const [calcAmount, setCalcAmount] = useState('1');
     const navigate = useNavigate();
+
+    // Rotar automáticamente la moneda secundaria en móvil cada 4s
+    useEffect(() => {
+        if (ratePopoverOpen) return;
+        const interval = setInterval(() => {
+            setCycleIndex((prev) => (prev + 1) % 2);
+        }, 4000);
+        return () => clearInterval(interval);
+    }, [ratePopoverOpen]);
 
     useEffect(() => {
         if (mobileQrOpen && !mobileQrDataUrl && typeof window !== 'undefined') {
@@ -158,6 +169,8 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     };
 
     const others = CURRENCIES.filter(c => c !== base);
+    const activeMobileCur = others[cycleIndex % (others.length || 1)] || others[0];
+    const activeMobilePair = getPairInfo(base, activeMobileCur);
 
     const navigationShortcuts = [
         { key: 'V', label: t('nav.pos', 'PUNTO DE VENTA').toUpperCase(), icon: ShoppingCart },
@@ -168,8 +181,9 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     ];
 
     return (
-        <header className="pt-safe h-14 lg:h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-2 sm:px-3 lg:px-6 gap-2 sm:gap-3 transition-all duration-300 shadow-2xs relative z-30 min-w-0">
-            {/* Left – Sidebar Toggle */}
+        <header className="pt-safe bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 transition-all duration-300 shadow-2xs relative z-30 min-w-0">
+            <div className="h-14 lg:h-16 flex items-center justify-between px-2 sm:px-3 lg:px-6 gap-1.5 sm:gap-3 min-w-0 w-full">
+                {/* Left – Sidebar Toggle */}
             <div className="flex items-center gap-2 shrink-0">
                 <button
                     onClick={onToggleSidebar}
@@ -237,29 +251,162 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                 )}>
                     <button
                         onClick={() => setRatePopoverOpen(!ratePopoverOpen)}
-                        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-95 shadow-2xs cursor-pointer"
+                        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-95 shadow-2xs cursor-pointer min-w-0"
                         title="Ver tasas de cambio"
                         aria-label="Ver tasas de cambio"
                     >
                         <div className="w-5 h-5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
                             <ArrowLeftRight className="w-3 h-3" />
                         </div>
-                        <div className="flex items-center gap-1 text-[11px] font-bold tabular-nums">
-                            <span className="text-slate-900 dark:text-slate-100 font-extrabold truncate max-w-[110px] sm:max-w-none">
-                                {others[0] ? `${getPairInfo(base, others[0]).left} = ${getPairInfo(base, others[0]).short}` : base}
+                        <div className="flex items-center gap-1 text-[11px] font-bold tabular-nums min-w-0">
+                            <span className="text-slate-900 dark:text-slate-100 font-extrabold truncate max-w-[115px] sm:max-w-none">
+                                {activeMobilePair.left} = {activeMobilePair.short}
                             </span>
+                        </div>
+                        <div className="hidden xs:flex flex-col gap-0.5 shrink-0 px-0.5" title="Monedas alternando">
+                            <span className={cn("w-1 h-1 rounded-full transition-all duration-300", cycleIndex % 2 === 0 ? "bg-indigo-600 dark:bg-indigo-400 scale-125" : "bg-slate-300 dark:bg-slate-600")} />
+                            <span className={cn("w-1 h-1 rounded-full transition-all duration-300", cycleIndex % 2 === 1 ? "bg-indigo-600 dark:bg-indigo-400 scale-125" : "bg-slate-300 dark:bg-slate-600")} />
                         </div>
                         <ChevronDown className={cn("w-3 h-3 text-slate-400 transition-transform shrink-0", ratePopoverOpen && "rotate-180")} />
                     </button>
 
                     {ratePopoverOpen && (
                         <>
-                            {/* Backdrop móvil para cerrar al hacer tap fuera */}
+                            {/* Backdrop para cerrar al hacer tap fuera */}
                             <div 
-                                className="fixed inset-0 z-40 bg-slate-950/30 backdrop-blur-2xs sm:hidden"
+                                className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-2xs"
                                 onClick={() => setRatePopoverOpen(false)}
                             />
-                            <div className="fixed sm:absolute left-1/2 -translate-x-1/2 top-14 sm:top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-3.5 sm:p-4 z-50 animate-slide-up">
+
+                            {/* Modal Bottom Sheet en Móvil (< sm) */}
+                            <div className="fixed inset-x-0 bottom-0 z-50 p-4 sm:p-5 pb-safe bg-white dark:bg-slate-900 rounded-t-3xl border-t border-slate-200 dark:border-slate-800 shadow-2xl sm:hidden animate-slide-up max-h-[85vh] overflow-y-auto">
+                                <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mb-3" />
+                                
+                                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-3">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                            <ArrowLeftRight className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">Tasas de Cambio</h3>
+                                            <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">Cotización en tiempo real</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setRatePopoverOpen(false)}
+                                        className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 flex items-center justify-center cursor-pointer"
+                                        aria-label="Cerrar"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+
+                                {/* Selector de Moneda Base */}
+                                <div className="mb-3.5">
+                                    <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider mb-2 block">
+                                        Seleccionar Moneda Base
+                                    </label>
+                                    <div className="grid grid-cols-3 gap-2 bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-700/50">
+                                        {CURRENCIES.map(cur => {
+                                            const isSelected = base === cur;
+                                            const meta = cur === 'USD' ? { flag: '🇺🇸', name: 'Dólar' } : cur === 'COP' ? { flag: '🇨🇴', name: 'Pesos' } : { flag: '🇻🇪', name: 'Bolívares' };
+                                            return (
+                                                <button
+                                                    key={cur}
+                                                    type="button"
+                                                    onClick={() => setBase(cur)}
+                                                    className={cn(
+                                                        'flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-all cursor-pointer',
+                                                        isSelected
+                                                            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 scale-[1.02]'
+                                                            : 'text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-700/60'
+                                                    )}
+                                                >
+                                                    <span className="text-base leading-none mb-0.5">{meta.flag}</span>
+                                                    <span className="text-xs font-black">{cur}</span>
+                                                    <span className={cn('text-[10px] font-medium', isSelected ? 'text-indigo-100' : 'text-slate-400 dark:text-slate-500')}>
+                                                        {meta.name}
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Tarjetas de Conversión para las demás monedas */}
+                                <div className="space-y-2 mb-3.5">
+                                    <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider block">
+                                        Equivalencias para 1 {base}
+                                    </label>
+                                    {others.map((cur) => {
+                                        const pair = getPairInfo(base, cur);
+                                        const meta = cur === 'USD' ? { flag: '🇺🇸', name: 'Dólar Estadounidense' } : cur === 'COP' ? { flag: '🇨🇴', name: 'Peso Colombiano' } : { flag: '🇻🇪', name: 'Bolívar Venezolano' };
+                                        return (
+                                            <div key={cur} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-2xl">{meta.flag}</span>
+                                                    <div>
+                                                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{pair.left}</p>
+                                                        <p className="text-[11px] text-slate-400 dark:text-slate-500">{meta.name}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-sm font-black text-slate-900 dark:text-slate-100 tabular-nums">{pair.right}</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Conversor Rápido */}
+                                <div className="bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-2xl p-3 mb-3.5">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200">Conversor Rápido</span>
+                                        <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">En vivo</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 px-2 py-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">{base}</span>
+                                        <input
+                                            type="number"
+                                            value={calcAmount}
+                                            onChange={(e) => setCalcAmount(e.target.value)}
+                                            placeholder="1"
+                                            min="0"
+                                            step="any"
+                                            className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-sm font-bold text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-indigo-500 tabular-nums"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                        {others.map(cur => {
+                                            const parsed = parseFloat(calcAmount) || 1;
+                                            const valInUsd = toUSD(parsed, base);
+                                            const converted = fromUSD(valInUsd, cur);
+                                            const formatted = cur === 'COP' ? converted.toLocaleString('es-CO', { maximumFractionDigits: 0 }) : converted.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                            return (
+                                                <div key={cur} className="bg-white/80 dark:bg-slate-900/80 p-2 rounded-xl border border-indigo-100/50 dark:border-indigo-900/40">
+                                                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block">{cur}</span>
+                                                    <span className="font-black text-slate-900 dark:text-slate-100 tabular-nums">{SYMBOLS[cur]} {formatted}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="pt-1 flex items-center justify-between text-xs text-slate-400 dark:text-slate-500">
+                                    <span>Actualizado automáticamente</span>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => { setRatePopoverOpen(false); navigate('/finance'); }}
+                                        className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                                    >
+                                        Finanzas →
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Dropdown Popover en Tablet / Desktop (>= sm) */}
+                            <div className="hidden sm:block absolute left-1/2 -translate-x-1/2 top-full mt-2 w-80 max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-3.5 sm:p-4 z-50 animate-slide-up">
                                 <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800 mb-3">
                                     <div className="flex items-center gap-2">
                                         <div className="w-6 h-6 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
@@ -548,6 +695,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                         </div>
                     )}
                 </div>
+            </div>
             </div>
 
             {/* Monochromatic Minimalist Keyboard Shortcuts Dialog */}

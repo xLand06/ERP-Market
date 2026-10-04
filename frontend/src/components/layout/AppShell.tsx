@@ -102,7 +102,7 @@ export function AppShellLayout() {
 
             <aside
                 className={cn(
-                    'fixed left-0 top-0 h-dvh z-50 bg-slate-900 flex flex-col transition-all duration-300 ease-in-out shadow-2xl lg:shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)] border-r border-slate-800',
+                    'fixed left-0 top-0 h-dvh z-50 bg-slate-900 flex flex-col transition-all duration-300 ease-in-out shadow-2xl lg:shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)] border-r border-slate-800 pb-safe',
                     collapsed
                         ? '-translate-x-full lg:-translate-x-0 lg:w-20'
                         : 'translate-x-0 w-65'
@@ -132,7 +132,7 @@ export function AppShellLayout() {
                     <TopBar onToggleSidebar={() => setCollapsed(!collapsed)} collapsed={collapsed} />
                 </div>
 
-                <main className="flex-1 overflow-y-auto mt-14 lg:mt-16 p-2 sm:p-4 lg:p-6 xl:p-8 pb-28 lg:pb-6">
+                <main className="flex-1 overflow-y-auto mt-[calc(3.5rem+max(env(safe-area-inset-top),0px))] lg:mt-16 p-2 sm:p-4 lg:p-6 xl:p-8 pb-28 lg:pb-6">
                     {systemNotice && dismissedNotice !== systemNotice && (
                         <div className={cn(
                             "mb-4 px-4 py-3 rounded-xl border flex items-start justify-between gap-3 shadow-sm transition-all animate-in fade-in slide-in-from-top-2",

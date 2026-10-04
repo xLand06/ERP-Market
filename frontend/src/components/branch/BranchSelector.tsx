@@ -154,9 +154,9 @@ export function BranchSelector({ className, variant = 'topbar' }: BranchSelector
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 top-full mt-1.5 w-56 sm:w-64 bg-white border border-slate-200 rounded-2xl shadow-xl py-1.5 z-[100] animate-slide-up overflow-hidden">
-                    <div className="px-3 py-1.5 border-b border-slate-100 mb-1">
-                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Cambiar Sucursal</p>
+                <div className="absolute right-0 top-full mt-1.5 w-56 sm:w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl py-1.5 z-[100] animate-slide-up overflow-hidden">
+                    <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800 mb-1">
+                        <p className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">Cambiar Sucursal</p>
                     </div>
                     {options.map((option) => {
                         const isSelected = selectedBranch === option.id || (!selectedBranch && option.isAll) || (!isOwner && option.id === user.branchId);
@@ -166,14 +166,14 @@ export function BranchSelector({ className, variant = 'topbar' }: BranchSelector
                                 type="button"
                                 onClick={() => handleSelect(option)}
                                 className={cn(
-                                    'w-full flex items-center justify-between px-3 py-2 text-xs font-bold transition-colors text-left',
+                                    'w-full flex items-center justify-between px-3 py-2 text-xs font-bold transition-colors text-left cursor-pointer',
                                     isSelected
-                                        ? 'bg-emerald-50 text-emerald-700 font-black'
-                                        : 'text-slate-700 hover:bg-slate-50'
+                                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-black'
+                                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
                                 )}
                             >
                                 <span className="truncate">{option.name}</span>
-                                {isSelected && <Check className="w-4 h-4 text-emerald-600 shrink-0 ml-2" />}
+                                {isSelected && <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 ml-2" />}
                             </button>
                         );
                     })}
