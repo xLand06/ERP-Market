@@ -20,7 +20,6 @@ import './global.css';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import InitialSyncScreen from '@/components/loading/InitialSyncScreen';
-import ConnectScreen from '@/components/loading/ConnectScreen';
 import { AppStorage } from '@/services/app-storage';
 import { getServerUrlCache, normalizeServerUrl, setServerUrlCache } from '@/lib/server-url';
 import api from '@/lib/api';
@@ -237,15 +236,6 @@ export default function App() {
                 <div className="animate-spin w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full" />
             </div>
         );
-    }
-
-    // Thin client sin servidor: mostrar ConnectScreen
-    // Web normal → NUNCA (usa /api relativo del mismo origen)
-    // Electron → cuando no tiene serverUrl
-    // Capacitor APK test → serverUrl forzado a test.allcode.site, NUNCA ConnectScreen
-    const isElectron = !!(window as any).erpApi?.isElectron;
-    if (isElectron && !hasServerUrl) {
-        return <ConnectScreen />;
     }
 
     // Primer inicio en Electron: mostrar pantalla de sync
