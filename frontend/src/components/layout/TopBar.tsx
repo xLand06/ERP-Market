@@ -58,16 +58,28 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
         void i18n.changeLanguage(nextLang);
     };
 
-    // Notificaciones: badge real + panel desplegable
-    const [notifOpen, setNotifOpen] = useState(false);
+    // Dropdowns / popovers refs para cerrar al hacer clic afuera
     const notifRef = useRef<HTMLDivElement>(null);
+    const rateRef = useRef<HTMLDivElement>(null);
+    const themeRef = useRef<HTMLDivElement>(null);
+    const profileRef = useRef<HTMLDivElement>(null);
     const { items: notifications, dismiss: dismissNotification } = useNotifications();
 
-    // Cierra el panel al hacer clic fuera (mismo patrón que BranchSelector)
+    // Cierra todos los popovers al hacer clic fuera
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+            const target = event.target as Node;
+            if (notifRef.current && !notifRef.current.contains(target)) {
                 setNotifOpen(false);
+            }
+            if (rateRef.current && !rateRef.current.contains(target)) {
+                setRatePopoverOpen(false);
+            }
+            if (themeRef.current && !themeRef.current.contains(target)) {
+                setThemePopoverOpen(false);
+            }
+            if (profileRef.current && !profileRef.current.contains(target)) {
+                setProfileOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -86,50 +98,63 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     const getPairInfo = (from: Currency, to: Currency) => {
         if (from === 'USD') {
             const val = fromUSD(1, to);
-            const formatted = to === 'COP'
-                ? val.toLocaleString('es-CO', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
-                : val.toLocaleString('es-VE', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+            if (to === 'COP') {
+                const formatted = val.toLocaleString('es-CO', { maximumFractionDigits: 0 });
+                return {
+                    left: '1 USD',
+                    right: `$ ${formatted} COP`,
+                    short: `${formatted} COP`,
+                };
+            }
+            const formatted = val.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             return {
-                left: '$1 USD = ',
-                right: `${SYMBOLS[to]} ${formatted}`,
+                left: '1 USD',
+                right: `Bs. ${formatted} VES`,
+                short: `${formatted} Bs.`,
             };
+        }
+
+        if (from === 'COP') {
+            if (to === 'USD') {
+                const val = toUSD(1000, 'COP');
+                return {
+                    left: '1.000 COP',
+                    right: `$ ${val.toFixed(2)} USD`,
+                    short: `$ ${val.toFixed(2)} USD`,
+                };
+            } else {
+                const valVES = fromUSD(1, 'VES');
+                const valCOP = fromUSD(1, 'COP');
+                const vesPer1000Cop = valCOP > 0 ? (valVES / valCOP) * 1000 : 0;
+                const formatted = vesPer1000Cop.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                return {
+                    left: '1.000 COP',
+                    right: `Bs. ${formatted} VES`,
+                    short: `${formatted} Bs.`,
+                };
+            }
         }
 
         if (from === 'VES') {
             if (to === 'USD') {
                 const val = toUSD(1, 'VES');
                 return {
-                    left: 'Bs. 1 VES = ',
+                    left: '1 VES',
                     right: `$ ${val.toFixed(4)} USD`,
+                    short: `$ ${val.toFixed(4)} USD`,
                 };
             } else {
-                const val = fromUSD(toUSD(1, 'VES'), 'COP');
+                const valCOP = fromUSD(toUSD(1, 'VES'), 'COP');
+                const formatted = valCOP.toLocaleString('es-CO', { maximumFractionDigits: 0 });
                 return {
-                    left: 'Bs. 1 VES = ',
-                    right: `$ ${val.toLocaleString('es-CO', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} COP`,
+                    left: '1 VES',
+                    right: `$ ${formatted} COP`,
+                    short: `${formatted} COP`,
                 };
             }
         }
 
-        if (from === 'COP') {
-            if (to === 'USD') {
-                const val = fromUSD(1, 'COP');
-                return {
-                    left: '$1 USD = ',
-                    right: `$ ${val.toLocaleString('es-CO', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} COP`,
-                };
-            } else {
-                const valVES = fromUSD(1, 'VES');
-                const valCOP = fromUSD(1, 'COP');
-                const vesPer1000Cop = (valVES / valCOP) * 1000;
-                return {
-                    left: '$1,000 COP = ',
-                    right: `Bs. ${vesPer1000Cop.toFixed(2)} VES`,
-                };
-            }
-        }
-
-        return { left: '', right: '' };
+        return { left: '', right: '', short: '' };
     };
 
     const others = CURRENCIES.filter(c => c !== base);
@@ -143,45 +168,42 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     ];
 
     return (
-        <header className="pt-safe h-14 lg:h-16 bg-white border-b border-slate-200 flex items-center justify-between px-2 sm:px-3 lg:px-6 gap-2 sm:gap-3 transition-all duration-300 shadow-2xs relative z-[70] min-w-0">
+        <header className="pt-safe h-14 lg:h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-2 sm:px-3 lg:px-6 gap-2 sm:gap-3 transition-all duration-300 shadow-2xs relative z-30 min-w-0">
             {/* Left – Sidebar Toggle */}
             <div className="flex items-center gap-2 shrink-0">
                 <button
                     onClick={onToggleSidebar}
-                    className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all active:scale-95 flex items-center justify-center"
+                    className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:text-slate-100 transition-all active:scale-95 flex items-center justify-center cursor-pointer"
                     aria-label={collapsed ? 'Abrir menú' : 'Cerrar menú'}
                 >
                     <Menu className="w-5 h-5 lg:w-6 lg:h-6" />
                 </button>
             </div>
 
-            {/* Center – Exchange Rate Widget
-                When the sidebar is expanded on desktop the topbar loses ~180px,
-                so the full rates bar only fits at xl. On lg we fall back to the
-                compact trigger so the right side never overflows the navbar. */}
+            {/* Center – Exchange Rate Widget */}
             <div className="flex items-center justify-center min-w-0 flex-1">
-                {/* Desktop Full Rates Bar */}
+                {/* Desktop Full Rates Bar (>= xl or >= lg when collapsed) */}
                 <div className={cn(
-                    'hidden items-center gap-0 bg-slate-50 border border-slate-200/80 rounded-xl p-1 text-xs max-w-full',
+                    'hidden items-center gap-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl p-1 text-xs max-w-full shadow-2xs',
                     collapsed ? 'lg:flex' : 'xl:flex'
                 )}>
-                    <div className="flex items-center gap-1.5 px-2 text-slate-400">
-                        <ArrowLeftRight className="w-3.5 h-3.5 text-indigo-600" />
-                        <span className="font-semibold text-slate-600">Tasa</span>
+                    <div className="flex items-center gap-1.5 px-2 text-slate-500 dark:text-slate-400">
+                        <ArrowLeftRight className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                        <span className="font-bold text-slate-700 dark:text-slate-300">Tasa</span>
                     </div>
-                    <div className="w-px h-4 bg-slate-200 mx-1" />
+                    <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
 
                     {/* Currency tabs */}
-                    <div className="flex items-center bg-slate-200/50 p-0.5 rounded-lg">
+                    <div className="flex items-center bg-slate-200/60 dark:bg-slate-900/60 p-0.5 rounded-lg border border-slate-200/40 dark:border-slate-800">
                         {CURRENCIES.map(cur => (
                             <button
                                 key={cur}
                                 onClick={() => setBase(cur)}
                                 className={cn(
-                                    'px-2 py-0.5 rounded-md font-bold text-[11px] transition-all duration-150',
+                                    'px-2 py-0.5 rounded-md font-black text-[11px] transition-all duration-150 cursor-pointer',
                                     base === cur
-                                        ? 'bg-white shadow-sm text-indigo-600'
-                                        : 'text-slate-400 hover:text-slate-700'
+                                        ? 'bg-white dark:bg-slate-800 shadow-xs text-indigo-600 dark:text-indigo-400'
+                                        : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                                 )}
                             >
                                 {cur}
@@ -189,18 +211,18 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                         ))}
                     </div>
 
-                    <div className="w-px h-4 bg-slate-200 mx-1.5" />
+                    <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
 
                     {/* Rates display */}
-                    <div className="flex items-center min-w-0 overflow-hidden">
+                    <div className="flex items-center min-w-0 overflow-hidden pr-1">
                         {others.map((cur, i) => {
                             const pair = getPairInfo(base, cur);
                             return (
                                 <div key={cur} className="flex items-center min-w-0">
-                                    {i > 0 && <div className="w-px h-3.5 bg-slate-200 mx-2" />}
-                                    <span className="px-1.5 tabular-nums text-slate-600 text-xs font-medium truncate">
-                                        <span className="text-slate-400">{pair.left}</span>
-                                        <span className="font-extrabold text-slate-900">{pair.right}</span>
+                                    {i > 0 && <div className="w-px h-3.5 bg-slate-200 dark:bg-slate-700 mx-2" />}
+                                    <span className="px-1.5 tabular-nums text-xs truncate flex items-center gap-1">
+                                        <span className="text-slate-400 dark:text-slate-500 font-medium">{pair.left} =</span>
+                                        <span className="font-black text-slate-900 dark:text-slate-100">{pair.right}</span>
                                     </span>
                                 </div>
                             );
@@ -209,53 +231,84 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                 </div>
 
                 {/* Mobile / Tablet Compact Rate Trigger */}
-                <div className={cn(
+                <div ref={rateRef} className={cn(
                     'relative',
                     collapsed ? 'lg:hidden' : 'xl:hidden'
                 )}>
                     <button
                         onClick={() => setRatePopoverOpen(!ratePopoverOpen)}
-                        className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-1 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-all active:scale-95"
+                        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-95 shadow-2xs cursor-pointer"
                         title="Ver tasas de cambio"
+                        aria-label="Ver tasas de cambio"
                     >
-                        <ArrowLeftRight className="w-3.5 h-3.5 text-indigo-600" />
-                        <span className="font-bold text-xs">{base}</span>
-                        <ChevronDown className={cn("w-3 h-3 text-slate-400 transition-transform", ratePopoverOpen && "rotate-180")} />
+                        <div className="w-5 h-5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                            <ArrowLeftRight className="w-3 h-3" />
+                        </div>
+                        <div className="flex items-center gap-1 text-[11px] font-bold tabular-nums">
+                            <span className="text-slate-900 dark:text-slate-100 font-extrabold truncate max-w-[110px] sm:max-w-none">
+                                {others[0] ? `${getPairInfo(base, others[0]).left} = ${getPairInfo(base, others[0]).short}` : base}
+                            </span>
+                        </div>
+                        <ChevronDown className={cn("w-3 h-3 text-slate-400 transition-transform shrink-0", ratePopoverOpen && "rotate-180")} />
                     </button>
 
                     {ratePopoverOpen && (
-                        <div className="absolute right-0 sm:left-1/2 sm:-translate-x-1/2 top-full mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 animate-slide-up">
-                            <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2">
-                                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Moneda Base</span>
-                                <div className="flex bg-slate-100 p-0.5 rounded-lg">
-                                    {CURRENCIES.map(cur => (
-                                        <button
-                                            key={cur}
-                                            onClick={() => setBase(cur)}
-                                            className={cn(
-                                                'px-2 py-0.5 rounded-md text-[11px] font-bold transition-all',
-                                                base === cur
-                                                    ? 'bg-white shadow text-indigo-600'
-                                                    : 'text-slate-400 hover:text-slate-700'
-                                            )}
-                                        >
-                                            {cur}
-                                        </button>
-                                    ))}
+                        <>
+                            {/* Backdrop móvil para cerrar al hacer tap fuera */}
+                            <div 
+                                className="fixed inset-0 z-40 bg-slate-950/30 backdrop-blur-2xs sm:hidden"
+                                onClick={() => setRatePopoverOpen(false)}
+                            />
+                            <div className="fixed sm:absolute left-1/2 -translate-x-1/2 top-14 sm:top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-3.5 sm:p-4 z-50 animate-slide-up">
+                                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800 mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                            <ArrowLeftRight className="w-3.5 h-3.5" />
+                                        </div>
+                                        <span className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">Tasas de Cambio</span>
+                                    </div>
+                                    <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                                        {CURRENCIES.map(cur => (
+                                            <button
+                                                key={cur}
+                                                onClick={() => setBase(cur)}
+                                                className={cn(
+                                                    'px-2 py-1 rounded-md text-[11px] font-black transition-all cursor-pointer',
+                                                    base === cur
+                                                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                                                        : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                                                )}
+                                            >
+                                                {cur}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {others.map((cur) => {
+                                        const pair = getPairInfo(base, cur);
+                                        return (
+                                            <div key={cur} className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs">
+                                                <span className="text-slate-500 dark:text-slate-400 font-semibold">{pair.left} =</span>
+                                                <span className="text-slate-950 dark:text-slate-100 font-black tabular-nums">{pair.right}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500">
+                                    <span>Actualizado automáticamente</span>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => { setRatePopoverOpen(false); navigate('/finance'); }}
+                                        className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                                    >
+                                        Finanzas →
+                                    </button>
                                 </div>
                             </div>
-                            <div className="space-y-2">
-                                {others.map((cur) => {
-                                    const pair = getPairInfo(base, cur);
-                                    return (
-                                        <div key={cur} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold">
-                                            <span className="text-slate-500">{pair.left}</span>
-                                            <span className="text-slate-950 font-black">{pair.right}</span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
+                        </>
                     )}
                 </div>
             </div>
@@ -271,7 +324,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                     <BranchSelector />
                 </div>
 
-                <div className="relative shrink-0">
+                <div ref={themeRef} className="relative shrink-0">
                     <div className="flex items-center gap-0.5 sm:gap-1 bg-transparent sm:bg-slate-100/80 sm:dark:bg-slate-800/80 p-0 sm:p-1 rounded-xl sm:border sm:border-slate-200/50 sm:dark:border-slate-700/50 max-w-full">
                         {/* Mobile App Connect QR (Only for desktop/tablets) */}
                         <button
@@ -421,7 +474,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                     )}
                 </div>
 
-                <div className="relative shrink-0 min-w-0">
+                <div ref={profileRef} className="relative shrink-0 min-w-0">
                     <button
                         onClick={() => setProfileOpen(!profileOpen)}
                         className="flex items-center gap-1.5 p-0.5 sm:px-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 max-w-full cursor-pointer"
@@ -431,7 +484,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                             <User className="w-4 h-4 text-slate-700 dark:text-slate-200" />
                         </div>
                         <div className="hidden lg:block text-left min-w-0 max-w-[120px] xl:max-w-[160px]">
-                            <p className="text-xs font-bold text-slate-900 leading-none truncate">{user?.nombre || 'Usuario'}</p>
+                            <p className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-none truncate">{user?.nombre || 'Usuario'}</p>
                             <p className="text-[10px] text-slate-400 mt-0.5 font-medium uppercase tracking-tight italic truncate">{user?.role || 'Invitado'}</p>
                         </div>
                         <ChevronDown className="w-3 h-3 text-slate-400 hidden lg:block shrink-0" />
