@@ -135,14 +135,14 @@ export function BranchSelector({ className, variant = 'topbar' }: BranchSelector
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
                 className={cn(
-                    'flex items-center gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl transition-all max-w-full text-xs font-semibold',
-                    'bg-slate-100 hover:bg-slate-200/80 text-slate-800 border border-slate-200/80 shadow-2xs',
-                    isOpen && 'bg-slate-200 ring-2 ring-emerald-500/20'
+                    'flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl transition-all max-w-full text-xs font-semibold cursor-pointer',
+                    'bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 shadow-2xs',
+                    isOpen && 'bg-slate-200 dark:bg-slate-700 ring-2 ring-emerald-500/20'
                 )}
                 title={`Sucursal: ${currentOption?.name || 'Seleccionar'}`}
             >
-                <Store className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span className="text-xs font-bold text-slate-800 max-w-[70px] sm:max-w-[110px] lg:max-w-[130px] truncate">
+                <Store className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 max-w-[85px] sm:max-w-[110px] lg:max-w-[130px] truncate">
                     {currentOption?.name || 'Sucursal'}
                 </span>
                 <ChevronDown
