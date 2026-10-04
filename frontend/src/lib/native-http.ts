@@ -32,9 +32,20 @@ export interface NativeResult<T = any> {
     error?: string;
 }
 
-export async function nativeGet(path: string, timeoutMs = 8000): Promise<NativeResult> {
+export function resolveNativeUrl(path: string): string {
     const origin = requireServerOrigin();
-    const url = `${origin}${path.startsWith('/') ? path : `/${path}`}`;
+    if (/^https?:\/\//i.test(path)) {
+        return path;
+    }
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    const apiPath = cleanPath.startsWith('/api/') || cleanPath === '/api'
+        ? cleanPath
+        : `/api${cleanPath}`;
+    return `${origin}${apiPath}`;
+}
+
+export async function nativeGet(path: string, timeoutMs = 8000): Promise<NativeResult> {
+    const url = resolveNativeUrl(path);
     try {
         const { CapacitorHttp } = await import('@capacitor/core');
         const res = await CapacitorHttp.get({ url, connectTimeout: timeoutMs, readTimeout: timeoutMs });
@@ -46,8 +57,7 @@ export async function nativeGet(path: string, timeoutMs = 8000): Promise<NativeR
 }
 
 export async function nativePost(path: string, body: any, timeoutMs = 15000): Promise<NativeResult> {
-    const origin = requireServerOrigin();
-    const url = `${origin}${path.startsWith('/') ? path : `/${path}`}`;
+    const url = resolveNativeUrl(path);
     try {
         const { CapacitorHttp } = await import('@capacitor/core');
         const res = await CapacitorHttp.post({

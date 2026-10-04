@@ -105,7 +105,7 @@ export default function LoginPage() {
         if (!validate()) return;
         try {
             if (isNativeApp()) {
-                const res = await nativePost('/auth/login', {
+                const res = await nativePost('/api/auth/login', {
                     username: form.username,
                     password: form.password,
                     email: form.username,
@@ -120,6 +120,7 @@ export default function LoginPage() {
                 if (token && user) {
                     useAuthStore.getState().setAuth(token, user);
                     resetLoginAttempts();
+                    toast.success(`Bienvenido, ${user.nombre || user.username || 'Usuario'}!`);
                     window.location.reload();
                     return;
                 }
