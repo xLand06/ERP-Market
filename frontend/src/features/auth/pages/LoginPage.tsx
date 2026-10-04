@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
 import { normalizeServerUrl, setServerUrlCache, getServerUrlCache } from '@/lib/server-url';
 import { isOnline } from '@/lib/api';
+import { isNativeApp, nativePost } from '@/lib/native-http';
 const isCapacitor = typeof window !== 'undefined' && (
     !!(window as any).Capacitor?.isNativePlatform?.() ||
     (window as any).Capacitor?.platform === 'android' ||

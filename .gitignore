@@ -53,3 +53,4 @@ backend/prisma/test-auth.db*
 deploy/downloads/
 desktop/tsconfig.node.tsbuildinfo
 artifacts/
+*.apk

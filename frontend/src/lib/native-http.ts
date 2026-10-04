@@ -1,7 +1,7 @@
 // Direct CapacitorHttp — bypasses axios/fetch entirely on native.
 // WebView fetch + custom axios adapter are the usual sources of opaque "Network Error".
 
-import { getServerUrlCache, normalizeServerUrl } from './server-url';
+import { getServerUrlCache, normalizeServerUrl, TEST_SERVER_URL } from './server-url';
 
 export function isNativeApp(): boolean {
     try {
@@ -20,8 +20,7 @@ async function http(): Promise<any> {
 }
 
 export function requireServerOrigin(): string {
-    const s = getServerUrlCache();
-    if (!s) throw new Error('Sin servidor configurado — escaneá el QR del panel web');
+    const s = getServerUrlCache() || TEST_SERVER_URL;
     return s.replace(/\/+$/, '');
 }
 
