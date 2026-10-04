@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { isPathAllowed } from '@/lib/planConfig';
 import { useTranslation } from 'react-i18next';
+import { BranchSelector } from '@/components/branch/BranchSelector';
 
 interface NavItem {
     nameKey: string;
@@ -259,9 +260,14 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
             {/* Navigation */}
             <div className="px-2 lg:px-3 flex-1 overflow-y-auto override-scrollbar overflow-x-hidden pb-4">
                 {!collapsed ? (
-                    <div className="px-2 lg:px-3 mb-3 mt-2 text-[11px] font-black uppercase tracking-widest text-slate-500 whitespace-nowrap">
-                        {t('nav.main', 'Principal')}
-                    </div>
+                    <>
+                        <div className="px-1 mb-3">
+                            <BranchSelector variant="sidebar" />
+                        </div>
+                        <div className="px-2 lg:px-3 mb-2 text-[11px] font-black uppercase tracking-widest text-slate-500 whitespace-nowrap">
+                            {t('nav.main', 'Principal')}
+                        </div>
+                    </>
                 ) : (
                     <div className="w-full h-12 mb-3 flex items-center justify-center">
                         <button

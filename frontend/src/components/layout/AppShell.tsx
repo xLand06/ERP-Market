@@ -132,7 +132,7 @@ export function AppShellLayout() {
                     <TopBar onToggleSidebar={() => setCollapsed(!collapsed)} collapsed={collapsed} />
                 </div>
 
-                <main className="flex-1 overflow-y-auto mt-14 lg:mt-16 p-2 sm:p-4 lg:p-6 xl:p-8 pb-20 lg:pb-6">
+                <main className="flex-1 overflow-y-auto mt-14 lg:mt-16 p-2 sm:p-4 lg:p-6 xl:p-8 pb-28 lg:pb-6">
                     {systemNotice && dismissedNotice !== systemNotice && (
                         <div className={cn(
                             "mb-4 px-4 py-3 rounded-xl border flex items-start justify-between gap-3 shadow-sm transition-all animate-in fade-in slide-in-from-top-2",
@@ -174,11 +174,11 @@ export function AppShellLayout() {
                 </main>
 
                 {/* Mobile / Tablet Bottom Navigation Bar (visible < lg) */}
-                <nav aria-label="Navegación móvil" className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex items-center justify-around pt-1.5 px-1 pb-safe lg:hidden text-white shadow-2xl safe-area-bottom">
+                <nav aria-label="Navegación móvil" className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-xl border-t border-slate-800/80 flex items-center justify-around px-2 h-16 pb-safe lg:hidden text-white shadow-[0_-8px_30px_rgba(0,0,0,0.35)]">
                     {[
+                        { path: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
                         { path: '/pos', label: 'POS', icon: ShoppingCart },
                         { path: '/products', label: 'Productos', icon: Package },
-                        { path: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
                         { path: '/inventory', label: 'Inventario', icon: Warehouse },
                         { path: '/finance/cash-register', label: 'Cajas', icon: Banknote },
                     ].map((navItem) => {
@@ -189,12 +189,22 @@ export function AppShellLayout() {
                                 key={navItem.path}
                                 onClick={() => navigate(navItem.path)}
                                 className={cn(
-                                    "flex flex-col items-center justify-center gap-0.5 min-w-[52px] min-h-[48px] px-2 py-1.5 rounded-xl transition-all text-center",
-                                    isActive ? "text-emerald-400 font-extrabold bg-slate-800 scale-105" : "text-slate-400 hover:text-slate-200"
+                                    "flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl transition-all duration-200 select-none",
+                                    isActive ? "text-emerald-400" : "text-slate-400 hover:text-slate-200 active:scale-95"
                                 )}
                             >
-                                <Icon className="w-5 h-5 shrink-0" />
-                                <span className="text-[9px] font-bold leading-tight truncate max-w-[52px]">{navItem.label}</span>
+                                <div className={cn(
+                                    "p-1.5 rounded-xl transition-all duration-200 flex items-center justify-center",
+                                    isActive && "bg-emerald-500/15 text-emerald-400 shadow-sm shadow-emerald-500/20"
+                                )}>
+                                    <Icon className="w-5 h-5 shrink-0" />
+                                </div>
+                                <span className={cn(
+                                    "text-[10px] leading-tight truncate max-w-[56px] mt-0.5",
+                                    isActive ? "font-extrabold text-emerald-400" : "font-medium text-slate-400"
+                                )}>
+                                    {navItem.label}
+                                </span>
                             </button>
                         );
                     })}

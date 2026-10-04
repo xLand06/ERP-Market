@@ -14,7 +14,13 @@ interface BranchOption extends Branch {
     isAll?: boolean;
 }
 
-export function BranchSelector() {
+interface BranchSelectorProps {
+    className?: string;
+    variant?: 'topbar' | 'sidebar';
+}
+
+export function BranchSelector({ className, variant = 'topbar' }: BranchSelectorProps = {}) {
+    const isSidebar = variant === 'sidebar';
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -52,9 +58,12 @@ export function BranchSelector() {
 
     if (!isOwner && !user.branchId) {
         return (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg">
-                <Store className="w-4 h-4 text-amber-500" />
-                <span className="text-xs text-amber-700 font-medium">Sin sucursal asignada</span>
+            <div className={cn(
+                "flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs font-semibold",
+                isSidebar ? "bg-amber-500/10 text-amber-300 border border-amber-500/30" : "bg-amber-50 text-amber-700 border border-amber-200"
+            )}>
+                <Store className="w-4 h-4 text-amber-500 shrink-0" />
+                <span className="truncate">Sin sucursal</span>
             </div>
         );
     }
@@ -69,19 +78,72 @@ export function BranchSelector() {
         setIsOpen(false);
     };
 
+    if (isSidebar) {
+        return (
+            <div className={cn("relative w-full", className)} ref={dropdownRef}>
+                <button
+                    type="button"
+                    onClick={() => setIsOpen(!isOpen)}
+                    className={cn(
+                        'flex items-center justify-between gap-2.5 w-full px-3 py-2 rounded-xl transition-all duration-200',
+                        'bg-slate-800/90 hover:bg-slate-700/90 text-white border border-slate-700/70 shadow-sm',
+                        isOpen && 'bg-slate-700 ring-2 ring-emerald-500/40 border-emerald-500/50'
+                    )}
+                >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center text-emerald-400 shrink-0">
+                            <Store className="w-4 h-4" />
+                        </div>
+                        <div className="flex flex-col text-left min-w-0">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 leading-tight">Sucursal</span>
+                            <span className="text-xs font-bold text-white truncate max-w-[145px]">
+                                {currentOption?.name || 'Seleccionar'}
+                            </span>
+                        </div>
+                    </div>
+                    <ChevronDown className={cn('w-4 h-4 text-slate-400 transition-transform shrink-0', isOpen && 'rotate-180')} />
+                </button>
+
+                {isOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl py-1.5 z-[100] animate-slide-up overflow-hidden">
+                        {options.map((option) => {
+                            const isSelected = selectedBranch === option.id || (!selectedBranch && option.isAll) || (!isOwner && option.id === user.branchId);
+                            return (
+                                <button
+                                    key={option.id}
+                                    type="button"
+                                    onClick={() => handleSelect(option)}
+                                    className={cn(
+                                        'w-full flex items-center justify-between px-3 py-2.5 text-xs font-bold transition-colors text-left',
+                                        isSelected ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                                    )}
+                                >
+                                    <span className="truncate">{option.name}</span>
+                                    {isSelected && <Check className="w-4 h-4 text-emerald-400 shrink-0 ml-2" />}
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        );
+    }
+
     return (
-        <div className="relative" ref={dropdownRef}>
+        <div className={cn("relative", className)} ref={dropdownRef}>
             <button
+                type="button"
                 onClick={() => setIsOpen(!isOpen)}
                 className={cn(
-                    'flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors max-w-full',
-                    'hover:bg-slate-100 text-slate-700',
-                    isOpen && 'bg-slate-100'
+                    'flex items-center gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl transition-all max-w-full text-xs font-semibold',
+                    'bg-slate-100 hover:bg-slate-200/80 text-slate-800 border border-slate-200/80 shadow-2xs',
+                    isOpen && 'bg-slate-200 ring-2 ring-emerald-500/20'
                 )}
+                title={`Sucursal: ${currentOption?.name || 'Seleccionar'}`}
             >
-                <Store className="w-4 h-4 text-indigo-500 shrink-0" />
-                <span className="text-sm font-medium hidden sm:block max-w-[100px] lg:max-w-[120px] truncate">
-                    {currentOption?.name || 'Seleccionar'}
+                <Store className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span className="text-xs font-bold text-slate-800 max-w-[70px] sm:max-w-[110px] lg:max-w-[130px] truncate">
+                    {currentOption?.name || 'Sucursal'}
                 </span>
                 <ChevronDown
                     className={cn(
@@ -92,28 +154,29 @@ export function BranchSelector() {
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-lg py-1 z-50 animate-slide-up">
-                    {options.map((option) => (
-                        <button
-                            key={option.id}
-                            onClick={() => handleSelect(option)}
-                            className={cn(
-                                'w-full flex items-center justify-between px-3 py-2 text-sm transition-colors',
-                                selectedBranch === option.id ||
-                                (!selectedBranch && option.isAll) ||
-                                (!isOwner && option.id === user.branchId)
-                                    ? 'bg-indigo-50 text-indigo-700'
-                                    : 'text-slate-700 hover:bg-slate-50'
-                            )}
-                        >
-                            <span className="truncate">{option.name}</span>
-                            {(selectedBranch === option.id ||
-                                (!selectedBranch && option.isAll) ||
-                                (!isOwner && option.id === user.branchId)) && (
-                                <Check className="w-4 h-4 text-indigo-600" />
-                            )}
-                        </button>
-                    ))}
+                <div className="absolute right-0 top-full mt-1.5 w-56 sm:w-64 bg-white border border-slate-200 rounded-2xl shadow-xl py-1.5 z-[100] animate-slide-up overflow-hidden">
+                    <div className="px-3 py-1.5 border-b border-slate-100 mb-1">
+                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Cambiar Sucursal</p>
+                    </div>
+                    {options.map((option) => {
+                        const isSelected = selectedBranch === option.id || (!selectedBranch && option.isAll) || (!isOwner && option.id === user.branchId);
+                        return (
+                            <button
+                                key={option.id}
+                                type="button"
+                                onClick={() => handleSelect(option)}
+                                className={cn(
+                                    'w-full flex items-center justify-between px-3 py-2 text-xs font-bold transition-colors text-left',
+                                    isSelected
+                                        ? 'bg-emerald-50 text-emerald-700 font-black'
+                                        : 'text-slate-700 hover:bg-slate-50'
+                                )}
+                            >
+                                <span className="truncate">{option.name}</span>
+                                {isSelected && <Check className="w-4 h-4 text-emerald-600 shrink-0 ml-2" />}
+                            </button>
+                        );
+                    })}
                 </div>
             )}
         </div>

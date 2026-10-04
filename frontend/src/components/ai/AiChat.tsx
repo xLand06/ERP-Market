@@ -177,19 +177,19 @@ export function AiChat() {
             <button
                 type="button"
                 onClick={() => setIsOpen(prev => !prev)}
-                className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center transition-all duration-300 cursor-pointer ${
+                className={`fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] lg:bottom-6 right-4 lg:right-6 z-50 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl shadow-lg flex items-center justify-center transition-all duration-300 cursor-pointer ${
                     isOpen
                         ? 'bg-slate-800 text-white rotate-0'
                         : 'bg-gradient-to-br from-emerald-500 via-teal-500 to-emerald-600 text-white hover:scale-105 hover:shadow-xl hover:shadow-emerald-500/25'
                 }`}
                 title="Asistente IA"
             >
-                {isOpen ? <IconClose /> : <IconBot className="w-6 h-6" />}
+                {isOpen ? <IconClose /> : <IconBot className="w-5 h-5 sm:w-6 sm:h-6" />}
             </button>
 
             {!isOpen && messages.length === 0 && (
-                <div className="fixed bottom-[4.5rem] right-6 z-50 animate-bounce">
-                    <div className="bg-white rounded-2xl shadow-lg px-4 py-2.5 border border-slate-200 max-w-[220px]">
+                <div className="fixed bottom-[calc(8.25rem+env(safe-area-inset-bottom,0px))] lg:bottom-24 right-4 lg:right-6 z-50 animate-bounce">
+                    <div className="bg-white rounded-2xl shadow-lg px-3.5 py-2 border border-slate-200 max-w-[200px]">
                         <p className="text-xs text-slate-600 font-bold">¿Necesitás ayuda? 🤖</p>
                     </div>
                 </div>
@@ -197,7 +197,7 @@ export function AiChat() {
 
             {/* ── Chat Panel ──────────────────────────────────────────────── */}
             {isOpen && (
-                <div className="fixed bottom-24 right-6 z-50 w-[400px] max-w-[calc(100vw-3rem)] h-[540px] max-h-[calc(100dvh-8rem)] bg-white rounded-3xl shadow-2xl shadow-slate-900/20 border border-slate-200 flex flex-col overflow-hidden">
+                <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] lg:bottom-24 right-3 sm:right-6 z-50 w-[400px] max-w-[calc(100vw-1.5rem)] h-[540px] max-h-[calc(100dvh-6.5rem)] bg-white rounded-3xl shadow-2xl shadow-slate-900/20 border border-slate-200 flex flex-col overflow-hidden">
 
                     {/* Header */}
                     <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-5 py-4 flex items-center gap-3 shrink-0">
