@@ -50,7 +50,7 @@ function OrderDetailModal({ order, onClose }: { order: PurchaseOrder | null; onC
                 </DialogHeader>
 
                 {order && (
-                    <div className="px-6 pb-4 space-y-4">
+                    <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
                         {/* Resumen de montos */}
                         <div className="grid grid-cols-3 gap-3">
                             <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">

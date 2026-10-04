@@ -105,7 +105,7 @@ function SupplierPaymentModal({ order, onClose }: { order: PurchaseOrder | null;
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="px-6 pb-4 space-y-4">
+                <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
                     <div className="flex flex-col gap-1.5">
                         <label htmlFor="pay-amount" className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
                             Monto <span className="text-red-500 ml-0.5">*</span>

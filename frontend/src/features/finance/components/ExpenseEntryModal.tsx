@@ -101,7 +101,7 @@ export function ExpenseEntryModal({ open, onClose, onSave }: ExpenseEntryModalPr
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="px-6 py-4 space-y-4">
+                <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
                     {/* Type Toggle */}
                     <div className="flex rounded-xl border border-slate-200 overflow-hidden">
                         {(['income', 'expense'] as CashEntryType[]).map(t => (

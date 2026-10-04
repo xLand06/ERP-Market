@@ -291,9 +291,9 @@ export function UserFormModal({ open, onClose, user, branches, onSuccess }: User
                     </div>
                 ) : (
                 
-                <form onSubmit={handleSubmit} className="space-y-0">
+                <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
                     {/* Scrollable body with padding */}
-                    <div className="px-5 sm:px-6 py-5 space-y-5 overflow-y-auto flex-1 max-h-[calc(100dvh-14rem)]">
+                    <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
                     {/* ── 1. Información personal ─────────────────────────── */}
                     <div>
                         <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3">1 · Quién es</p>

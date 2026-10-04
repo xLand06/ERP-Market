@@ -65,7 +65,7 @@ export function SaleDetailModal({ sale, open, onClose }: SaleDetailModalProps) {
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="px-6 py-4 space-y-5">
+                <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-5">
                     {/* Meta info */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">

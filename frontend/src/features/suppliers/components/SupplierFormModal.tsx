@@ -124,7 +124,7 @@ export function SupplierFormModal({ open, onClose, onSuccess, initial, mode = 'c
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
+                <div className="px-4 sm:px-6 py-4 space-y-4 overflow-y-auto flex-1">
                     {/* Razón social + RIF */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Field label="Razón Social *" id="name" error={errors.name}>

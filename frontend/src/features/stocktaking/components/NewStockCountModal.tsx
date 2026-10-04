@@ -82,7 +82,7 @@ export function NewStockCountModal({ open, onClose }: NewStockCountModalProps) {
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5">
                     {/* Info */}
                     <div className="flex gap-3 p-3 bg-blue-50 border border-blue-100 rounded-xl text-blue-800 text-xs">
                         <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />

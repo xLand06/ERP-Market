@@ -47,7 +47,7 @@ export function RoleConfigModal({ open, onClose, employeeName, currentRole, onSa
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="px-6 py-4 space-y-2.5" role="radiogroup" aria-label="Roles disponibles">
+                <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-2.5" role="radiogroup" aria-label="Roles disponibles">
                     {ROLES.map(role => (
                         <button
                             key={role.key}

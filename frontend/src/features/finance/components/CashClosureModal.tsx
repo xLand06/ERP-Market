@@ -140,7 +140,7 @@ export function CashClosureModal({
                             </DialogDescription>
                         </DialogHeader>
 
-                <div className="px-4 sm:px-6 py-4 space-y-5">
+                <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-5">
                     {/* Summary Grid */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {[
