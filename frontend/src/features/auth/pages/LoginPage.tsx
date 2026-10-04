@@ -11,12 +11,13 @@ import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
 import { normalizeServerUrl, setServerUrlCache, getServerUrlCache } from '@/lib/server-url';
 import { isOnline } from '@/lib/api';
-import { collectConnectionDebug, formatDebugLines, type ConnectionDebug } from '@/lib/connection-debug';
-import { nativeGet, nativePost, isNativeApp, humanNetError, requireServerOrigin } from '@/lib/native-http';
-import { Bug, Play, ChevronDown, ChevronUp } from 'lucide-react';
-
-const isCapacitor = !!(window as any).Capacitor;
-export const APP_BUILD = '2026-10-03.2';
+const isCapacitor = typeof window !== 'undefined' && (
+    !!(window as any).Capacitor?.isNativePlatform?.() ||
+    (window as any).Capacitor?.platform === 'android' ||
+    (window as any).Capacitor?.platform === 'ios' ||
+    window.location.protocol === 'capacitor:'
+);
+export const APP_BUILD = '2026-10-03.3';
 const DESKTOP_WINDOWS_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Setup-Windows.exe';
 const DESKTOP_LINUX_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Linux.AppImage';
 
@@ -39,30 +40,8 @@ export default function LoginPage() {
 
     const [cloudOnline, setCloudOnline] = useState<boolean | null>(null);
     const [activeServer, setActiveServer] = useState<string | null>(null);
-    const [debugOpen, setDebugOpen] = useState(false);
-    const [debugRunning, setDebugRunning] = useState(false);
-    const [debugLines, setDebugLines] = useState<string[]>([]);
-    const [debugData, setDebugData] = useState<ConnectionDebug | null>(null);
-
-    const runDiagnostics = useCallback(async () => {
-        setDebugRunning(true);
-        try {
-            // refresh cache view + live health
-            setActiveServer(getServerUrlCache());
-            const data = await collectConnectionDebug();
-            setDebugData(data);
-            setDebugLines(formatDebugLines(data));
-        } catch (e: any) {
-            setDebugLines(['Error al diagnosticar:', String(e?.message || e)]);
-        } finally {
-            setDebugRunning(false);
-        }
-    }, []);
-
     useEffect(() => {
         setActiveServer(getServerUrlCache());
-        void runDiagnostics();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     const [syncing, setSyncing] = useState(false);
     const [lastSync, setLastSync] = useState<string | null>(null);
@@ -591,54 +570,6 @@ export default function LoginPage() {
                             </div>
                         )}
 
-                        {/* Connection diagnostics — collapsible */}
-                        <div className="mb-4 border border-slate-200 dark:border-[#30363D] rounded-xl overflow-hidden">
-                            <button
-                                type="button"
-                                onClick={() => { setDebugOpen(v => !v); if (!debugOpen) void runDiagnostics(); }}
-                                className="w-full flex items-center justify-between px-3 py-2.5 bg-slate-50 dark:bg-[#0D1117] text-left"
-                            >
-                                <span className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
-                                    <Bug className="w-3.5 h-3.5" />
-                                    Diagnosticar conexión
-                                    {!isCapacitor && (
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                                            WEB
-                                        </span>
-                                    )}
-                                    {isCapacitor && (
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
-                                            APK
-                                        </span>
-                                    )}
-                                    {debugData && (
-                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${debugData.healthOk ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300'}`}>
-                                            {debugData.healthOk ? 'OK' : 'FALLA'}
-                                        </span>
-                                    )}
-                                </span>
-                                {debugOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                            </button>
-                            {debugOpen && (
-                                <div className="px-3 py-3 bg-white dark:bg-[#161B22] border-t border-slate-200 dark:border-[#30363D]">
-                                    <div className="flex gap-2 mb-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => void runDiagnostics()}
-                                            disabled={debugRunning}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-bold hover:bg-teal-500 disabled:opacity-50"
-                                        >
-                                            {debugRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                                            Re-ejecutar
-                                        </button>
-                                    </div>
-                                    <pre className="text-[10px] leading-relaxed font-mono text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
-{debugLines.join('\n') || 'Ejecutá el diagnóstico...'}
-                                    </pre>
-                                </div>
-                            )}
-                        </div>
-
                         <form onSubmit={handleSubmit} className="space-y-5">
                             {/* Username */}
                             <div>
@@ -702,13 +633,6 @@ export default function LoginPage() {
                             {/* Attempts indicator */}
                             {rateState.attempts > 0 && !rateState.blocked && (
                                 <p className="text-center text-xs text-amber-600">{rateState.attempts}/5 intentos — {rateState.attempts >= 3 ? 'CAPTCHA activado' : 'CAPTCHA después de 3'}</p>
-                            )}
-
-                            {/* QR Scanner — APK only */}
-                            {isCapacitor && false && (
-                                <button type="button" onClick={openScanner} className="w-full h-12 rounded-xl border border-[#3a7d89]/30 dark:border-teal-500/40 bg-[#4ecdc4]/10 dark:bg-teal-500/15 text-[#3a7d89] dark:text-teal-300 font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#4ecdc4]/20 dark:hover:bg-teal-500/25 transition-all active:scale-95">
-                                    <Camera className="w-4 h-4" /> Escanear QR
-                                </button>
                             )}
                         </form>
                     </div>
@@ -793,35 +717,39 @@ export default function LoginPage() {
                         {activeServer ? `API: ${activeServer.replace(/^https?:\/\//, '')}/api` : 'Sin servidor — escaneá el QR'}
                     </p>
 
-                    {/* Connect buttons compact */}
-                    <div className="flex gap-2">
-                        <button onClick={connectDesktop} className="flex-1 h-11 rounded-xl bg-emerald-600 dark:bg-teal-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all">
-                            <Monitor className="w-3.5 h-3.5" /> Escritorio
-                        </button>
-                        <button onClick={() => setShowQr(!showQr)} className="flex-1 h-11 rounded-xl border border-slate-200 dark:border-[#30363D] text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all">
-                            <QrCode className="w-3.5 h-3.5" /> QR
-                        </button>
-                    </div>
+                    {!isCapacitor && (
+                        <>
+                            {/* Connect buttons compact */}
+                            <div className="flex gap-2">
+                                <button onClick={connectDesktop} className="flex-1 h-11 rounded-xl bg-emerald-600 dark:bg-teal-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+                                    <Monitor className="w-3.5 h-3.5" /> Escritorio
+                                </button>
+                                <button onClick={() => setShowQr(!showQr)} className="flex-1 h-11 rounded-xl border border-slate-200 dark:border-[#30363D] text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+                                    <QrCode className="w-3.5 h-3.5" /> QR
+                                </button>
+                            </div>
 
-                    {showQr && qrDataUrl && (
-                        <div className="flex flex-col items-center gap-2 p-4 bg-slate-50 dark:bg-[#0D1117] rounded-xl border border-slate-200 dark:border-[#30363D] animate-slideDown">
-                            <img src={qrDataUrl} alt="QR" className="w-36 h-36 rounded-xl" />
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 text-center">Escaneá con la APK</p>
-                        </div>
+                            {showQr && qrDataUrl && (
+                                <div className="flex flex-col items-center gap-2 p-4 bg-slate-50 dark:bg-[#0D1117] rounded-xl border border-slate-200 dark:border-[#30363D] animate-slideDown">
+                                    <img src={qrDataUrl} alt="QR" className="w-36 h-36 rounded-xl" />
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 text-center">Escaneá con la APK</p>
+                                </div>
+                            )}
+
+                            {/* Downloads */}
+                            <div className="bg-white dark:bg-[#161B22] rounded-2xl p-3 space-y-2 shadow-sm border border-slate-200/60 dark:border-[#30363D]">
+                                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Descargar app</p>
+                                {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/allmarket-v1.1.apk', label: 'Android APK v1.1', icon: Smartphone, color: 'text-[#3a7d89] dark:text-teal-400' }].map(d => (
+                                    <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')}
+                                        className="flex items-center gap-3 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-[#30363D] text-slate-700 dark:text-slate-200 hover:border-emerald-500/40 hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all active:scale-95">
+                                        <d.icon className={`w-5 h-5 ${d.color} shrink-0`} />
+                                        <span className="text-sm font-bold">{d.label}</span>
+                                        <Download className="w-4 h-4 text-slate-400 ml-auto" />
+                                    </a>
+                                ))}
+                            </div>
+                        </>
                     )}
-
-                    {/* Downloads */}
-                    <div className="bg-white dark:bg-[#161B22] rounded-2xl p-3 space-y-2 shadow-sm border border-slate-200/60 dark:border-[#30363D]">
-                        <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Descargar app</p>
-                        {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/allmarket-v1.1.apk', label: 'Android APK v1.1', icon: Smartphone, color: 'text-[#3a7d89] dark:text-teal-400' }].map(d => (
-                            <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')}
-                                className="flex items-center gap-3 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-[#30363D] text-slate-700 dark:text-slate-200 hover:border-emerald-500/40 hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all active:scale-95">
-                                <d.icon className={`w-5 h-5 ${d.color} shrink-0`} />
-                                <span className="text-sm font-bold">{d.label}</span>
-                                <Download className="w-4 h-4 text-slate-400 ml-auto" />
-                            </a>
-                        ))}
-                    </div>
 
                     <p className="text-center text-[10px] text-slate-400 dark:text-slate-500">ALL MARKET · ALLCODE</p>
                 </div>
