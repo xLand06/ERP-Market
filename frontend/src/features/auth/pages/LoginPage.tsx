@@ -14,6 +14,7 @@ import { normalizeServerUrl, setServerUrlCache, getServerUrlCache } from '@/lib/
 import { isOnline } from '@/lib/api';
 import { isNativeApp, nativePost } from '@/lib/native-http';
 import { ConnectServerScreen } from './ConnectServerScreen';
+import { useConfigStore } from '@/hooks/useConfigStore';
 const isCapacitor = typeof window !== 'undefined' && (
     !!(window as any).Capacitor?.isNativePlatform?.() ||
     (window as any).Capacitor?.platform === 'android' ||
@@ -387,11 +388,11 @@ export default function LoginPage() {
                 try { navigator.vibrate([40, 60, 40]); } catch {}
             }
             toast.success(`Conectado a ${cleanHost}`);
-            try { void fetchSettings(); } catch {}
+            try { void useConfigStore.getState().fetchSettings(); } catch {}
         } else {
             toast(`Servidor guardado (${cleanHost}), comprobación: ${result.detail || 'sin respuesta'}`, { icon: '⚠️' });
         }
-    }, [fetchSettings]);
+    }, []);
 
     const handleQrPayload = useCallback((raw: string) => {
         const normalized = normalizeServerUrl(raw);
