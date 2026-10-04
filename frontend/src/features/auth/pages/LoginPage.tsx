@@ -137,15 +137,13 @@ export default function LoginPage() {
                 const isNet = /network|failed to fetch|timeout|CAP_HTTP/i.test(err.message);
                 setGeneralError(
                     isNet
-                        ? `${err.message} — API: ${host}/api. Abrí Diagnosticar conexión.`
+                        ? `${err.message} — API: ${host}/api`
                         : err.message
                 );
-                if (isNet) setDebugOpen(true);
-                void runDiagnostics();
                 recordLoginAttempt(); setRateState(getLoginRateLimit()); setCaptchaKey(k => k + 1);
             }
         }
-    }, [form, validate, login, parseError, captchaValid, showCaptcha, runDiagnostics]);
+    }, [form, validate, login, parseError, captchaValid, showCaptcha]);
 
     const connectDesktop = () => { window.location.href = `allmarket://connect?server=${encodeURIComponent(window.location.origin)}`; };
 
