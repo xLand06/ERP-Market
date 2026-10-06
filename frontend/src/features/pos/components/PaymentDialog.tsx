@@ -592,13 +592,13 @@ export function PaymentDialog({
                 </div>
 
                 {/* Footer sticky — siempre visible en mobile */}
-                <div className="shrink-0 p-4 sm:p-5 bg-white border-t border-slate-200 flex gap-3">
+                <div className="shrink-0 p-3 sm:p-5 bg-white border-t border-slate-200 flex gap-2 sm:gap-3">
                     <Button
                         type="button"
                         variant="outline"
                         onClick={onClose}
                         disabled={isSubmitting}
-                        className="flex-1 h-14 rounded-2xl font-black text-slate-700 border-2 border-slate-300 text-xs sm:text-sm hover:bg-slate-200"
+                        className="px-3.5 sm:px-6 shrink-0 sm:flex-1 h-12 sm:h-14 rounded-2xl font-black text-slate-700 border-2 border-slate-300 text-xs sm:text-sm hover:bg-slate-200"
                     >
                         Cancelar
                     </Button>
@@ -607,7 +607,7 @@ export function PaymentDialog({
                         onClick={fiadoCanConfirm ? handleConfirm : undefined}
                         disabled={!fiadoCanConfirm || isSubmitting}
                         className={cn(
-                            'flex-[2] h-14 rounded-2xl font-black text-sm sm:text-base text-white transition-all shadow-lg flex items-center justify-center gap-2',
+                            'flex-1 sm:flex-[2] h-12 sm:h-14 rounded-2xl font-black text-xs sm:text-sm md:text-base text-white transition-all shadow-lg flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-6 min-w-0',
                             fiadoCanConfirm && !isSubmitting
                                 ? fiadoMode
                                     ? 'bg-amber-500 hover:bg-amber-600 active:scale-[0.99] shadow-amber-500/30 ring-2 ring-amber-500/30'
@@ -617,18 +617,21 @@ export function PaymentDialog({
                     >
                         {isSubmitting ? (
                             <>
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                                Procesando Venta...
+                                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin shrink-0" />
+                                <span className="truncate">Procesando Venta...</span>
                             </>
                         ) : fiadoMode ? (
                             <>
-                                <BookOpenCheck className="w-5 h-5" />
-                                Confirmar Fiado
+                                <BookOpenCheck className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                                <span className="truncate">Confirmar Fiado</span>
                             </>
                         ) : (
                             <>
-                                <Printer className="w-5 h-5" />
-                                Confirmar e Imprimir Factura
+                                <Printer className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                                <span className="truncate">
+                                    <span className="xs:hidden">Confirmar e Imprimir</span>
+                                    <span className="hidden xs:inline">Confirmar e Imprimir Factura</span>
+                                </span>
                             </>
                         )}
                     </Button>

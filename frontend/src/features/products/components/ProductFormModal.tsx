@@ -93,7 +93,7 @@ function PriceField({
             )}
             {/* COP — campo principal */}
             <div className="relative mb-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">COP</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded pointer-events-none">COP</span>
                 <input
                     id={id}
                     type="number"
@@ -106,7 +106,7 @@ function PriceField({
                             onChange(val === '' ? '' : Math.max(0, Math.round(Number(val))));
                         }
                     }}
-                    className={`w-full pl-10 sm:pl-14 pr-3 sm:pr-4 py-3 border rounded-xl focus:ring-2 outline-none text-sm font-bold tabular-nums ${colorClass}`}
+                    className={`w-full pl-16 pr-3 sm:pr-4 py-3 border rounded-xl focus:ring-2 outline-none text-sm font-bold tabular-nums ${colorClass}`}
                     required={required}
                     placeholder="0"
                 />
@@ -119,26 +119,26 @@ function PriceField({
             {/* USD y VES — campos secundarios de referencia/entrada */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="relative">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 bg-slate-50 px-1 rounded">USD</span>
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 bg-slate-50 px-1 rounded pointer-events-none">USD</span>
                     <input
                         type="number"
                         step="0.01"
                         min="0"
                         value={usdVal}
                         onChange={(e) => handleUsdChange(e.target.value)}
-                        className="w-full pl-10 pr-2 py-1.5 border border-slate-100 rounded-lg text-[11px] text-slate-500 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200 tabular-nums bg-slate-50"
+                        className="w-full pl-12 pr-2 py-1.5 border border-slate-100 rounded-lg text-[11px] text-slate-500 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200 tabular-nums bg-slate-50"
                         placeholder="0.00"
                     />
                 </div>
                 <div className="relative">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 bg-slate-50 px-1 rounded">VES</span>
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 bg-slate-50 px-1 rounded pointer-events-none">VES</span>
                     <input
                         type="number"
                         step="0.01"
                         min="0"
                         value={vesVal}
                         onChange={(e) => handleVesChange(e.target.value)}
-                        className="w-full pl-10 pr-2 py-1.5 border border-slate-100 rounded-lg text-[11px] text-slate-500 outline-none focus:border-amber-300 focus:ring-1 focus:ring-amber-200 tabular-nums bg-slate-50"
+                        className="w-full pl-12 pr-2 py-1.5 border border-slate-100 rounded-lg text-[11px] text-slate-500 outline-none focus:border-amber-300 focus:ring-1 focus:ring-amber-200 tabular-nums bg-slate-50"
                         placeholder="0.00"
                     />
                 </div>
