@@ -142,7 +142,7 @@ export function BranchSelector({ className, variant = 'topbar' }: BranchSelector
                 title={`Sucursal: ${currentOption?.name || 'Seleccionar'}`}
             >
                 <Store className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 max-w-[85px] sm:max-w-[110px] lg:max-w-[130px] truncate">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 max-w-[55px] xs:max-w-[80px] sm:max-w-[110px] lg:max-w-[130px] truncate">
                     {currentOption?.name || 'Sucursal'}
                 </span>
                 <ChevronDown

@@ -183,15 +183,15 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
 
     return (
         <header className="pt-safe bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 transition-all duration-300 shadow-2xs relative z-30 min-w-0">
-            <div className="h-14 lg:h-16 flex items-center justify-between px-2 sm:px-3 lg:px-6 gap-1.5 sm:gap-3 min-w-0 w-full">
+            <div className="h-13 sm:h-14 lg:h-16 flex items-center justify-between px-2 sm:px-3 lg:px-6 gap-1 sm:gap-2 lg:gap-3 min-w-0 w-full">
                 {/* Left – Sidebar Toggle */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center shrink-0">
                 <button
                     onClick={onToggleSidebar}
-                    className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:text-slate-100 transition-all active:scale-95 flex items-center justify-center cursor-pointer"
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl text-slate-700 dark:text-slate-200 bg-slate-100/80 dark:bg-slate-800/80 sm:bg-transparent hover:bg-slate-200 dark:hover:bg-slate-700 sm:hover:bg-slate-100 sm:dark:hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center cursor-pointer shrink-0"
                     aria-label={collapsed ? 'Abrir menú' : 'Cerrar menú'}
                 >
-                    <Menu className="w-5 h-5 lg:w-6 lg:h-6" />
+                    <Menu className="w-5 h-5" />
                 </button>
             </div>
 
@@ -247,26 +247,23 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
 
                 {/* Mobile / Tablet Compact Rate Trigger */}
                 <div ref={rateRef} className={cn(
-                    'relative',
+                    'relative max-w-full',
                     collapsed ? 'lg:hidden' : 'xl:hidden'
                 )}>
                     <button
                         onClick={() => setRatePopoverOpen(!ratePopoverOpen)}
-                        className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-95 shadow-2xs cursor-pointer min-w-0"
+                        className="flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 bg-slate-50 dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-95 shadow-2xs cursor-pointer min-w-0"
                         title="Ver tasas de cambio"
                         aria-label="Ver tasas de cambio"
                     >
-                        <div className="w-5 h-5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
-                            <ArrowLeftRight className="w-3 h-3" />
-                        </div>
+                        <ArrowLeftRight className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
                         <div className="flex items-center gap-1 text-[11px] font-bold tabular-nums min-w-0">
-                            <span className="text-slate-900 dark:text-slate-100 font-extrabold truncate max-w-[115px] sm:max-w-none">
-                                {activeMobilePair.left} = {activeMobilePair.short}
+                            <span className="hidden xs:inline text-slate-400 dark:text-slate-500 font-medium truncate">
+                                {activeMobilePair.left} =
                             </span>
-                        </div>
-                        <div className="hidden xs:flex flex-col gap-0.5 shrink-0 px-0.5" title="Monedas alternando">
-                            <span className={cn("w-1 h-1 rounded-full transition-all duration-300", cycleIndex % 2 === 0 ? "bg-indigo-600 dark:bg-indigo-400 scale-125" : "bg-slate-300 dark:bg-slate-600")} />
-                            <span className={cn("w-1 h-1 rounded-full transition-all duration-300", cycleIndex % 2 === 1 ? "bg-indigo-600 dark:bg-indigo-400 scale-125" : "bg-slate-300 dark:bg-slate-600")} />
+                            <span className="text-slate-900 dark:text-slate-100 font-black truncate max-w-[70px] xs:max-w-none">
+                                {activeMobilePair.short}
+                            </span>
                         </div>
                         <ChevronDown className={cn("w-3 h-3 text-slate-400 transition-transform shrink-0", ratePopoverOpen && "rotate-180")} />
                     </button>
@@ -464,11 +461,11 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
             {/* Right – BranchSelector + Shortcuts + Profile
                 Hidden secondary controls when the sidebar is open on lg so the
                 user block stays inside the navbar instead of overflowing right. */}
-            <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-3 shrink-0 min-w-0">
+            <div className="flex items-center gap-1 sm:gap-2 lg:gap-3 shrink-0 min-w-0">
                 <div className={cn('min-w-0', collapsed ? 'hidden sm:block' : 'hidden xl:block')}>
                     <CloudSyncWidget />
                 </div>
-                <div className="min-w-0 max-w-[34vw] sm:max-w-[180px] lg:max-w-[160px]">
+                <div className="min-w-0 max-w-[85px] xs:max-w-[110px] sm:max-w-[180px] lg:max-w-[160px]">
                     <BranchSelector />
                 </div>
 
