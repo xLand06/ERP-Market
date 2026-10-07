@@ -135,7 +135,7 @@ function BackupExportSection() {
     };
 
     return (
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm">
             <SectionHeader
                 icon={Archive}
                 title="Copias de Seguridad y Portabilidad (Takeout)"
@@ -152,12 +152,12 @@ function BackupExportSection() {
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
                 <button
                     id="btn-generate-backup"
                     onClick={handleExport}
                     disabled={exporting}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-all active:scale-95 shadow-sm shadow-indigo-200 disabled:opacity-60"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-all active:scale-95 shadow-sm shadow-indigo-200 disabled:opacity-60 min-h-[46px]"
                 >
                     <HardDrive className="w-4 h-4" />
                     {exporting ? 'Generando...' : 'Generar Nuevo Backup'}
@@ -165,7 +165,7 @@ function BackupExportSection() {
 
                 <label
                     htmlFor="restore-upload-input"
-                    className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-95 cursor-pointer shadow-sm"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-95 cursor-pointer shadow-sm min-h-[46px]"
                 >
                     <Upload className="w-4 h-4 text-slate-500" />
                     Subir y Restaurar Backup
@@ -224,15 +224,15 @@ function BackupExportSection() {
                 ) : (
                     <div className="space-y-2">
                         {backups.map(b => (
-                            <div key={b.filename} className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-slate-300 transition-all">
-                                <div>
-                                    <p className="text-sm font-bold text-slate-800 font-mono">{b.filename}</p>
+                            <div key={b.filename} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-slate-300 transition-all gap-3">
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-bold text-slate-800 font-mono truncate">{b.filename}</p>
                                     <p className="text-xs text-slate-400 mt-0.5">{fmtDate(b.createdAt)} · {fmt(b.sizeBytes)}</p>
                                 </div>
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap shrink-0">
                                     <button
                                         onClick={() => handleDownload(b.filename)}
-                                        className="touch-target flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-lg hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 transition-all"
+                                        className="touch-target flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-lg hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 transition-all min-h-[38px] flex-1 sm:flex-initial"
                                         title="Descargar backup"
                                     >
                                         <Download className="w-3.5 h-3.5" /> Descargar
@@ -258,7 +258,7 @@ function BackupExportSection() {
                                                 toast.error(err?.response?.data?.error || 'Error al restaurar', { id: toastId });
                                             }
                                         }}
-                                        className="touch-target flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-amber-600 text-xs font-bold rounded-lg hover:bg-amber-50 hover:border-amber-300 transition-all"
+                                        className="touch-target flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-amber-600 text-xs font-bold rounded-lg hover:bg-amber-50 hover:border-amber-300 transition-all min-h-[38px] flex-1 sm:flex-initial"
                                         title="Restaurar backup"
                                     >
                                         <RefreshCw className="w-3.5 h-3.5" /> Restaurar
@@ -269,7 +269,7 @@ function BackupExportSection() {
                                                 deleteMutation.mutate(b.filename);
                                             }
                                         }}
-                                        className="p-1.5 touch-target text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        className="p-2 touch-target text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors min-w-[38px] min-h-[38px] flex items-center justify-center"
                                         title="Eliminar backup"
                                     >
                                         <Trash2 className="w-3.5 h-3.5" />
@@ -340,7 +340,7 @@ function CloudPurgeSection() {
     };
 
     return (
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm">
             <SectionHeader
                 icon={Cloud}
                 title="Depuración Histórica y Optimización de Base de Datos"
@@ -402,9 +402,9 @@ function CloudPurgeSection() {
             </div>
 
             {/* Control de días */}
-            <div className="flex items-center gap-4 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-4">
                 <div className="flex-1 space-y-1.5">
-                    <label className="text-sm font-semibold text-slate-700">
+                    <label className="text-sm font-semibold text-slate-700 block">
                         Borrar registros con más de:
                     </label>
                     <div className="flex items-center gap-3">
@@ -419,12 +419,12 @@ function CloudPurgeSection() {
                                     setOlderThanDays(val);
                                 }
                             }}
-                            className="w-24 px-3 py-2 border border-slate-200 rounded-xl text-sm font-bold text-center focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all"
+                            className="w-24 px-3 py-2 border border-slate-200 rounded-xl text-sm font-bold text-center focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all min-h-[42px]"
                         />
                         <span className="text-sm font-semibold text-slate-600">días</span>
                         <button
                             onClick={() => { setShowStats(true); refetchStats(); }}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-200 transition-all"
+                            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-200 transition-all min-h-[42px]"
                         >
                             <RefreshCw className="w-3.5 h-3.5" /> Ver impacto
                         </button>
@@ -449,46 +449,48 @@ function CloudPurgeSection() {
                         <div className="p-4 text-center text-sm text-slate-400">Consultando registros históricos...</div>
                     ) : (
                         <>
-                            <table className="w-full text-sm">
-                            <thead className="bg-slate-50 border-y border-slate-100">
-                                <tr>
-                                    <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-500 uppercase">Tabla</th>
-                                    <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">A depurar</th>
-                                    <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Total en Base de Datos</th>
-                                    <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Más antiguo</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {(stats as any[])?.map(s => (
-                                    <tr key={s.table} className="hover:bg-slate-50">
-                                        <td className="px-4 py-2.5 font-mono text-slate-700">
-                                            {s.table === 'transactionItems' ? 'Detalle de Transacciones' :
-                                             s.table === 'transactions' ? 'Transacciones / Ventas' :
-                                             s.table === 'cashRegisters' ? 'Sesiones de Caja' :
-                                             s.table === 'auditLogs' ? 'Logs de Auditoría' : s.table}
-                                        </td>
-                                        <td className={`px-4 py-2.5 text-right font-bold ${s.count > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
-                                            {s.count.toLocaleString()}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-right font-semibold text-slate-500">
-                                            {s.totalCount?.toLocaleString() ?? '—'}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-right text-slate-400 text-xs">
-                                            {s.oldestRecord ? fmtDate(s.oldestRecord) : '—'}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        {totalToDelete === 0 && (stats?.some(s => (s as any).totalCount > 0)) && (
-                            <div className="p-3 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500 text-center italic">
-                                Nota: Hay registros en la base de datos, pero ninguno supera los {olderThanDays} días de antigüedad seleccionados.
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-slate-50 border-y border-slate-100">
+                                        <tr>
+                                            <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-500 uppercase">Tabla</th>
+                                            <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">A depurar</th>
+                                            <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Total en Base de Datos</th>
+                                            <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Más antiguo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {(stats as any[])?.map(s => (
+                                            <tr key={s.table} className="hover:bg-slate-50">
+                                                <td className="px-4 py-2.5 font-mono text-slate-700">
+                                                    {s.table === 'transactionItems' ? 'Detalle de Transacciones' :
+                                                     s.table === 'transactions' ? 'Transacciones / Ventas' :
+                                                     s.table === 'cashRegisters' ? 'Sesiones de Caja' :
+                                                     s.table === 'auditLogs' ? 'Logs de Auditoría' : s.table}
+                                                </td>
+                                                <td className={`px-4 py-2.5 text-right font-bold ${s.count > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+                                                    {s.count.toLocaleString()}
+                                                </td>
+                                                <td className="px-4 py-2.5 text-right font-semibold text-slate-500">
+                                                    {s.totalCount?.toLocaleString() ?? '—'}
+                                                </td>
+                                                <td className="px-4 py-2.5 text-right text-slate-400 text-xs">
+                                                    {s.oldestRecord ? fmtDate(s.oldestRecord) : '—'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
-                        )}
-                    </>
-                )}
-            </div>
-        )}
+                            {totalToDelete === 0 && (stats?.some(s => (s as any).totalCount > 0)) && (
+                                <div className="p-3 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500 text-center italic">
+                                    Nota: Hay registros en la base de datos, pero ninguno supera los {olderThanDays} días de antigüedad seleccionados.
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
 
             {/* Resultados de la última purga */}
             {purgeResults && (
@@ -512,7 +514,7 @@ function CloudPurgeSection() {
                 id="btn-purge-cloud"
                 onClick={handlePurge}
                 disabled={purging || olderThanDays < 7}
-                className="flex items-center gap-2 px-5 py-2.5 bg-amber-600 text-white text-sm font-bold rounded-xl hover:bg-amber-700 transition-all active:scale-95 shadow-sm shadow-amber-200 disabled:opacity-60"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 bg-amber-600 text-white text-sm font-bold rounded-xl hover:bg-amber-700 transition-all active:scale-95 shadow-sm shadow-amber-200 disabled:opacity-60 min-h-[46px]"
             >
                 {purging ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CloudOff className="w-4 h-4" />}
                 {purging ? 'Optimizando base de datos...' : `Depurar registros > ${olderThanDays} días`}

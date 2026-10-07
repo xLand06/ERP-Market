@@ -189,7 +189,7 @@ export default function SettingsPage() {
     };
 
     return (
-        <div className="flex flex-col gap-5 sm:gap-6 max-w-[1400px] mx-auto pb-12 px-1 sm:px-0">
+        <div className="flex flex-col gap-4 sm:gap-6 max-w-[1400px] mx-auto pb-12 px-3 sm:px-4 md:px-0">
             {/* Header with Title & Quick Info */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
@@ -262,13 +262,13 @@ export default function SettingsPage() {
             </div>
 
             {/* Desktop & Tablet Navigation Bar */}
-            <div className="relative bg-slate-100/70 p-1.5 rounded-2xl border border-slate-200/80 shadow-2xs">
+            <div className="hidden md:block relative bg-slate-100/70 p-1.5 rounded-2xl border border-slate-200/80 shadow-2xs">
                 {/* Horizontal scroll indicators */}
                 <button
                     type="button"
                     onClick={() => handleScroll('left')}
                     aria-label="Desplazar pestañas a la izquierda"
-                    className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 items-center justify-center rounded-lg bg-white/90 shadow-md text-slate-600 hover:text-slate-900 hover:bg-white backdrop-blur-xs transition-all border border-slate-200/60"
+                    className="flex absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 items-center justify-center rounded-lg bg-white/90 shadow-md text-slate-600 hover:text-slate-900 hover:bg-white backdrop-blur-xs transition-all border border-slate-200/60"
                 >
                     <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -323,7 +323,7 @@ export default function SettingsPage() {
                     type="button"
                     onClick={() => handleScroll('right')}
                     aria-label="Desplazar pestañas a la derecha"
-                    className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 items-center justify-center rounded-lg bg-white/90 shadow-md text-slate-600 hover:text-slate-900 hover:bg-white backdrop-blur-xs transition-all border border-slate-200/60"
+                    className="flex absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 items-center justify-center rounded-lg bg-white/90 shadow-md text-slate-600 hover:text-slate-900 hover:bg-white backdrop-blur-xs transition-all border border-slate-200/60"
                 >
                     <ChevronRight className="w-4 h-4" />
                 </button>

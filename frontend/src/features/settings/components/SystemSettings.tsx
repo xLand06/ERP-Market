@@ -227,7 +227,7 @@ export function SystemSettings() {
             </div>
 
             {/* LANGUAGE & REGION */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
                 <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
                     <div className="p-2 bg-violet-50 rounded-lg text-violet-600">
                         <Languages className="w-5 h-5" />
@@ -242,7 +242,7 @@ export function SystemSettings() {
                     </div>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {SUPPORTED_LANGUAGES.map((lang) => {
                         const isSel = currentLanguage === lang.code;
                         return (
@@ -251,7 +251,7 @@ export function SystemSettings() {
                                 type="button"
                                 onClick={() => i18n.changeLanguage(lang.code)}
                                 className={cn(
-                                    'flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border-2 transition-all font-bold text-sm',
+                                    'w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border-2 transition-all font-bold text-sm min-h-[48px]',
                                     isSel
                                         ? 'bg-violet-50 border-violet-600 text-violet-950 shadow-xs ring-2 ring-violet-600/20'
                                         : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
@@ -266,7 +266,7 @@ export function SystemSettings() {
                 </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm">
                 <div className="flex items-center gap-3 mb-6">
                     <div className="p-2 bg-indigo-50 rounded-lg">
                         <Settings2 className="w-5 h-5 text-indigo-600" />
@@ -647,7 +647,7 @@ export function SystemSettings() {
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-200 disabled:opacity-50 flex items-center gap-2"
+                        className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all active:scale-95 shadow-md shadow-indigo-200 disabled:opacity-50 flex items-center justify-center gap-2 min-h-[46px]"
                     >
                         <Save className="w-4 h-4" />
                         {saving ? 'Guardando...' : 'Guardar Cambios'}

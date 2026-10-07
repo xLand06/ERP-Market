@@ -249,13 +249,13 @@ function PrinterFormModal({
                 className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] w-[95vw] max-w-2xl max-h-[92vh] p-0 bg-slate-900 rounded-3xl border-2 border-slate-800 shadow-2xl overflow-hidden flex flex-col text-slate-950"
             >
                 {/* Header estilizado con pr-14 para evitar sobreposición con botón de cierre */}
-                <div className="px-6 py-5 bg-slate-950 text-white flex items-center justify-between border-b border-slate-800 shrink-0 pr-14">
-                    <div className="flex items-center gap-3.5">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
-                            <Printer className="w-6 h-6" />
+                <div className="px-4 py-4 sm:px-6 sm:py-5 bg-slate-950 text-white flex items-center justify-between border-b border-slate-800 shrink-0 pr-12 sm:pr-14">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                            <Printer className="w-5 h-5 sm:w-6 sm:h-6" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-black text-white tracking-tight leading-tight">
+                            <h2 className="text-lg sm:text-xl font-black text-white tracking-tight leading-tight">
                                 {printerToEdit ? 'Editar Impresora Térmica' : 'Vincular Nueva Impresora Térmica'}
                             </h2>
                             <p className="text-xs font-semibold text-slate-400 mt-0.5">
@@ -265,7 +265,7 @@ function PrinterFormModal({
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-5 bg-slate-100 overflow-y-auto flex-1 custom-scrollbar">
+                <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5 bg-slate-100 overflow-y-auto flex-1 custom-scrollbar">
                     
                     {/* 1. SELECCIONAR TIPO DE CONEXIÓN */}
                     <div className="space-y-2">
@@ -309,17 +309,17 @@ function PrinterFormModal({
 
                     {/* 2. VINCULACIÓN Y DETECCIÓN REAL DE HARDWARE */}
                     <div className="p-4 bg-white border-2 border-slate-300 rounded-2xl space-y-3 shadow-xs">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <span className="text-xs font-black text-slate-950 uppercase tracking-wide flex items-center gap-1.5">
                                 <Signal className="w-4 h-4 text-emerald-600" />
                                 2. Vinculación y Prueba de Hardware Real
                             </span>
                             {connectionVerified ? (
-                                <span className="text-[10px] font-black px-3 py-1 bg-emerald-100 text-emerald-900 rounded-full border border-emerald-400 flex items-center gap-1">
+                                <span className="text-[10px] font-black px-3 py-1 bg-emerald-100 text-emerald-900 rounded-full border border-emerald-400 flex items-center gap-1 self-start sm:self-auto">
                                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Conexión Verificada
                                 </span>
                             ) : (
-                                <span className="text-[10px] font-black px-3 py-1 bg-amber-100 text-amber-900 rounded-full border border-amber-400">
+                                <span className="text-[10px] font-black px-3 py-1 bg-amber-100 text-amber-900 rounded-full border border-amber-400 self-start sm:self-auto">
                                     Pendiente de Vincular
                                 </span>
                             )}
@@ -366,8 +366,8 @@ function PrinterFormModal({
                         )}
 
                         {connectionType === 'thermal_network' && (
-                            <div className="grid grid-cols-3 gap-3">
-                                <div className="col-span-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div className="sm:col-span-2">
                                     <label className="text-[11px] font-black text-slate-900 block mb-1">Dirección IP de Impresora</label>
                                     <Input
                                         type="text"
@@ -623,10 +623,10 @@ export function InvoiceSettings() {
             <div className="lg:col-span-7 space-y-6">
 
                 {/* SECCIÓN 1: GESTOR DE IMPRESORAS MULTI-DISPOSITIVO */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xs space-y-5">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="bg-white p-4 sm:p-6 rounded-3xl border border-slate-200 shadow-2xs space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold border border-emerald-100 shadow-2xs">
+                            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold border border-emerald-100 shadow-2xs shrink-0">
                                 <Printer className="w-5 h-5" />
                             </div>
                             <div>
@@ -636,7 +636,7 @@ export function InvoiceSettings() {
                         </div>
 
                         {/* Switch Activar/Desactivar Impresora Térmica */}
-                        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200">
+                        <div className="flex items-center justify-between sm:justify-start gap-2 bg-slate-50 p-2 sm:px-3 sm:py-2 rounded-2xl border border-slate-200 self-start sm:self-auto">
                             <span className="text-xs font-black text-slate-700">Térmica Activa</span>
                             <label className="relative inline-flex items-center cursor-pointer">
                                 <input
@@ -654,7 +654,7 @@ export function InvoiceSettings() {
                         <div className="space-y-4">
                             
                             {/* Header de la lista de impresoras */}
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                                 <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
                                     Impresoras Vinculadas ({printers.length})
                                 </span>
@@ -664,7 +664,7 @@ export function InvoiceSettings() {
                                         setEditingPrinter(null);
                                         setModalOpen(true);
                                     }}
-                                    className="h-9 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs gap-1.5"
+                                    className="w-full sm:w-auto h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs gap-1.5"
                                 >
                                     <Plus className="w-4 h-4" /> Vincular Nueva Impresora
                                 </Button>
@@ -738,7 +738,7 @@ export function InvoiceSettings() {
                                         </div>
 
                                         {/* Barra de Acciones de Impresora */}
-                                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2 border-t border-slate-100 text-xs gap-2.5">
                                             {!p.isPrimary ? (
                                                 <button
                                                     type="button"
@@ -746,7 +746,7 @@ export function InvoiceSettings() {
                                                         config.setPrimaryPrinter(p.id);
                                                         toast.success(`"${p.name}" es ahora la impresora principal`);
                                                     }}
-                                                    className="touch-target text-emerald-700 font-extrabold hover:underline flex items-center gap-1"
+                                                    className="touch-target text-emerald-700 font-extrabold hover:underline flex items-center gap-1 self-start sm:self-auto"
                                                 >
                                                     <Star className="w-3.5 h-3.5 text-emerald-600" /> Marcar como Principal
                                                 </button>
@@ -761,7 +761,7 @@ export function InvoiceSettings() {
                                                 variant="outline"
                                                 onClick={() => handleTestPrintPrinter(p)}
                                                 disabled={testingPrinterId === p.id}
-                                                className="text-[11px] font-bold border-slate-300 gap-1"
+                                                className="w-full sm:w-auto text-[11px] font-bold border-slate-300 gap-1 h-9"
                                             >
                                                 {testingPrinterId === p.id ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 text-emerald-600" />}
                                                 Probar Ticket Real
@@ -775,7 +775,7 @@ export function InvoiceSettings() {
                 </div>
 
                 {/* SECCIÓN 2: DATOS DEL NEGOCIO Y FISCALES */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xs space-y-4">
+                <div className="bg-white p-4 sm:p-6 rounded-3xl border border-slate-200 shadow-2xs space-y-4">
                     <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
                         <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold border border-indigo-100 shadow-2xs">
                             <Store className="w-5 h-5" />
@@ -858,7 +858,7 @@ export function InvoiceSettings() {
             <div className="lg:col-span-5 space-y-6">
                 
                 {/* ELEMENTOS VISIBLES EN TICKET */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xs space-y-4">
+                <div className="bg-white p-4 sm:p-6 rounded-3xl border border-slate-200 shadow-2xs space-y-4">
                     <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
                         <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold border border-purple-100 shadow-2xs">
                             <FileText className="w-5 h-5" />
@@ -906,7 +906,7 @@ export function InvoiceSettings() {
                 </div>
 
                 {/* VISTA PREVIA SIMULADA DE TICKET TÉRMICO REALISTA */}
-                <div className="bg-slate-900 p-5 rounded-3xl text-slate-100 space-y-3 shadow-xl">
+                <div className="bg-slate-900 p-4 sm:p-5 rounded-3xl text-slate-100 space-y-3 shadow-xl overflow-hidden">
                     <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                         <span className="text-xs font-black uppercase text-emerald-400 flex items-center gap-1.5">
                             <Printer className="w-4 h-4" /> Vista Previa Ticket Térmico Real

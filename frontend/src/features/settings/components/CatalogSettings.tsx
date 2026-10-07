@@ -172,15 +172,15 @@ export function CatalogSettings() {
                     <label htmlFor="catalog-slug" className="block text-xs font-bold text-slate-700 mb-1.5">
                         Slug del catálogo
                     </label>
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-400 font-semibold shrink-0">{catalogBaseUrl}/</span>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <span className="text-xs sm:text-sm text-slate-400 font-semibold shrink-0 select-none break-all">{catalogBaseUrl}/</span>
                         <input
                             id="catalog-slug"
                             type="text"
                             value={localSlug}
                             onChange={e => setLocalSlug(e.target.value.replace(/\s+/g, '-').toLowerCase())}
                             placeholder="mi-tienda"
-                            className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            className="flex-1 w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent min-h-[44px]"
                         />
                     </div>
                     <p className="text-xs text-slate-400 mt-1.5 font-medium">
@@ -190,14 +190,16 @@ export function CatalogSettings() {
 
                 {/* Link compartible + copiar */}
                 {shareLink ? (
-                    <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
-                        <Link2 className="w-4 h-4 text-slate-400 shrink-0" />
-                        <span className="flex-1 text-sm text-slate-600 font-medium truncate">{shareLink}</span>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:px-3.5 sm:py-2.5">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <Link2 className="w-4 h-4 text-slate-400 shrink-0" />
+                            <span className="text-xs sm:text-sm text-slate-600 font-medium truncate">{shareLink}</span>
+                        </div>
                         <button
                             type="button"
                             onClick={handleCopy}
                             className={cn(
-                                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0',
+                                'flex items-center justify-center gap-1.5 w-full sm:w-auto px-3.5 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0 min-h-[40px]',
                                 copied ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'
                             )}
                         >
@@ -213,7 +215,7 @@ export function CatalogSettings() {
             </div>
 
             {/* SECCIÓN REDES SOCIALES */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
                 <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
                     <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
                         <Link2 className="w-5 h-5" />
@@ -238,7 +240,7 @@ export function CatalogSettings() {
                                 value={socials[field.key]}
                                 onChange={e => setSocial(field.key, e.target.value)}
                                 placeholder={field.placeholder}
-                                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent min-h-[44px]"
                             />
                         </div>
                     ))}
@@ -246,12 +248,12 @@ export function CatalogSettings() {
             </div>
 
             {/* BOTÓN GUARDAR */}
-            <div className="flex justify-end">
+            <div className="flex justify-end pt-2">
                 <button
                     type="button"
                     onClick={handleSave}
                     disabled={saving}
-                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-xs min-h-[46px]"
                 >
                     <Save className="w-4 h-4" />
                     {saving ? 'Guardando...' : 'Guardar configuración'}

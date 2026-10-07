@@ -16,13 +16,13 @@ function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType
         cyan: 'bg-cyan-50 text-cyan-600',
     };
     return (
-        <div className="flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-all">
-            <div className={`p-3 rounded-lg ${colors[color]}`}>
-                <Icon className="w-5 h-5" />
+        <div className="flex items-center gap-2.5 sm:gap-4 p-3 sm:p-4 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-all">
+            <div className={`p-2.5 sm:p-3 rounded-xl shrink-0 ${colors[color]}`}>
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-                <p className="text-2xl font-black text-slate-900">{value.toLocaleString('es-CO')}</p>
-                <p className="text-xs font-medium text-slate-500">{label}</p>
+            <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-black text-slate-900 truncate">{value.toLocaleString('es-CO')}</p>
+                <p className="text-[11px] sm:text-xs font-medium text-slate-500 truncate">{label}</p>
             </div>
         </div>
     );
@@ -38,9 +38,9 @@ function SectionCard({ icon: Icon, title, description, children, color = 'indigo
         emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
     };
     return (
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-5">
-                <div className={`p-2 rounded-lg ${colors[color]}`}>
+                <div className={`p-2 rounded-xl shrink-0 ${colors[color]}`}>
                     <Icon className="w-5 h-5" />
                 </div>
                 <div>
@@ -87,7 +87,7 @@ export function MaintenanceTab({ onNavigateToBackup }: MaintenanceTabProps) {
                 {loadingStats ? (
                     <div className="py-8 text-center text-slate-400">Cargando estadísticas...</div>
                 ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-4">
                         <StatCard icon={Database} label="Sucursales" value={stats?.branchCount ?? 0} color="indigo" />
                         <StatCard icon={Package} label="Productos" value={stats?.productCount ?? 0} color="emerald" />
                         <StatCard icon={Receipt} label="Transacciones" value={stats?.transactionCount ?? 0} color="amber" />
@@ -100,7 +100,7 @@ export function MaintenanceTab({ onNavigateToBackup }: MaintenanceTabProps) {
 
             {/* Sección 2: Limpiar transacciones sincronizadas */}
             <SectionCard icon={Trash2} title="Optimización de Almacenamiento Local" description="Depuración de registros transaccionales temporales ya asegurados en la nube" color="amber">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <p className="text-sm text-slate-700 font-medium">Registros locales sincronizados</p>
                         <p className="text-xs text-slate-500 mt-1">Libera espacio local eliminando el histórico ya respaldado en el servidor principal</p>
@@ -108,7 +108,7 @@ export function MaintenanceTab({ onNavigateToBackup }: MaintenanceTabProps) {
                     <button
                         onClick={handleClearPending}
                         disabled={clearPending.isPending}
-                        className="px-4 py-2 bg-amber-600 text-white rounded-lg font-bold text-sm hover:bg-amber-700 transition-all disabled:opacity-50 flex items-center gap-2"
+                        className="w-full sm:w-auto px-5 py-2.5 bg-amber-600 text-white rounded-xl font-bold text-sm hover:bg-amber-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2 min-h-[44px]"
                     >
                         <Trash2 className="w-4 h-4" />
                         {clearPending.isPending ? 'Optimizando...' : 'Optimizar Ahora'}
@@ -121,9 +121,9 @@ export function MaintenanceTab({ onNavigateToBackup }: MaintenanceTabProps) {
                 <div className="space-y-4">
                     {/* Estado actual */}
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
-                                <div className={`w-3 h-3 rounded-full ${syncStatus?.isOnline ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                <div className={`w-3 h-3 rounded-full ${syncStatus?.isOnline ? 'bg-emerald-500' : 'bg-red-500'} shrink-0`} />
                                 <div>
                                     <p className="text-sm font-bold text-slate-800">
                                         {loadingSync ? 'Verificando...' : syncStatus?.isOnline ? 'Conectado al servidor' : 'Sin conexión central'}
@@ -132,7 +132,7 @@ export function MaintenanceTab({ onNavigateToBackup }: MaintenanceTabProps) {
                                 </div>
                             </div>
                             {syncStatus?.pendingCount !== undefined && (
-                                <span className="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-full">
+                                <span className="self-start sm:self-auto px-3 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-full">
                                     {syncStatus.pendingCount} pendientes
                                 </span>
                             )}
@@ -140,18 +140,18 @@ export function MaintenanceTab({ onNavigateToBackup }: MaintenanceTabProps) {
                     </div>
 
                     {/* Botones de acción */}
-                    <div className="flex flex-wrap gap-3">
+                    <div className="flex flex-col sm:flex-row gap-3">
                         <button
                             onClick={handleForceSync}
                             disabled={forceSync.isPending}
-                            className="flex-1 min-w-[200px] px-4 py-2.5 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="w-full sm:w-auto sm:flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2 min-h-[44px]"
                         >
                             <RefreshCw className={`w-4 h-4 ${forceSync.isPending ? 'animate-spin' : ''}`} />
                             {forceSync.isPending ? 'Sincronizando...' : 'Forzar Sincronización'}
                         </button>
                         <button
                             onClick={handleClearTokens}
-                            className="flex-1 min-w-[200px] px-4 py-2.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-bold text-sm hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
+                            className="w-full sm:w-auto sm:flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-200 transition-all flex items-center justify-center gap-2 min-h-[44px]"
                         >
                             <AlertTriangle className="w-4 h-4" />
                             Reiniciar Reconciliación
@@ -162,7 +162,7 @@ export function MaintenanceTab({ onNavigateToBackup }: MaintenanceTabProps) {
 
             {/* Sección 4: Link a Backup y Portabilidad */}
             <SectionCard icon={Cloud} title="Copias de Seguridad y Portabilidad (Takeout)" description="Descarga tu archivo de resguardo completo (.json.gz) o restaura información" color="blue">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <p className="text-sm text-slate-700 font-medium">Panel de Respaldos y Takeout</p>
                         <p className="text-xs text-slate-500 mt-1">Generar copias con compresión máxima, restaurar datos o purgar registros históricos</p>
@@ -175,7 +175,7 @@ export function MaintenanceTab({ onNavigateToBackup }: MaintenanceTabProps) {
                                 window.location.hash = 'settings/backup';
                             }
                         }}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer shadow-xs"
+                        className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs min-h-[44px]"
                     >
                         Gestionar Respaldos
                         <ArrowRight className="w-4 h-4" />

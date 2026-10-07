@@ -7,7 +7,6 @@ import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { useAuthStore } from '../features/auth/store/authStore';
 import toast from 'react-hot-toast';
 
-import { AppStorage } from '../services/app-storage';
 import { getServerUrlCache, setServerUrlCache, hydrateServerUrlFromStorage } from './server-url';
 
 // Sync-hydrate BEFORE any axios call (App useEffect order)
@@ -98,13 +97,27 @@ function createCapacitorAdapter() {
 
         const response = await http.request(options);
 
-        return {
+        const axiosResponse: AxiosResponse = {
             data: response.data,
             status: response.status,
             statusText: response.status >= 200 && response.status < 300 ? 'OK' : 'Error',
             headers: response.headers || {},
-            config,
+            config: config as any,
         };
+
+        const validateStatus = config.validateStatus || ((status: number) => status >= 200 && status < 300);
+        if (!validateStatus(response.status)) {
+            const error = new AxiosError(
+                `Request failed with status code ${response.status}`,
+                [AxiosError.ERR_BAD_REQUEST, AxiosError.ERR_BAD_RESPONSE][Math.floor(response.status / 100) - 4] || 'ERR_BAD_RESPONSE',
+                config as any,
+                options,
+                axiosResponse
+            );
+            return Promise.reject(error);
+        }
+
+        return axiosResponse;
     };
 }
 

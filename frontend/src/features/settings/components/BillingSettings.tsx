@@ -141,7 +141,11 @@ export function BillingSettings() {
         queryKey: ['billing-status'],
         queryFn: async () => {
             const res = await api.get('/billing/status');
-            return res.data;
+            const data = res?.data?.data || res?.data;
+            if (data?.error) {
+                throw new Error(data.error);
+            }
+            return data;
         },
         retry: 1,
     });
@@ -194,26 +198,39 @@ export function BillingSettings() {
         );
     }
 
-    if (error || !billing) {
+    if (error || !billing || !billing?.subscription) {
         return (
             <div className="text-center py-16">
                 <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-50 flex items-center justify-center mb-3">
                     <AlertTriangle className="w-7 h-7 text-amber-500" />
                 </div>
                 <p className="text-sm text-slate-600 font-semibold">No se pudo cargar la informacion de facturacion</p>
-                <p className="text-xs text-slate-400 mt-1">El servidor de facturacion no esta disponible</p>
+                <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                    {(error as any)?.response?.data?.error || (error as any)?.message || (billing as any)?.error || 'El servidor de facturacion no esta disponible'}
+                </p>
             </div>
         );
     }
 
-    const { subscription, recentPayments } = billing;
-    const price = (subscription.plan.priceCents / 100).toFixed(2);
+    const subscription = billing.subscription;
+    const recentPayments = Array.isArray(billing.recentPayments) ? billing.recentPayments : [];
+    const plan = subscription.plan || {
+        name: 'Plan Estándar',
+        priceCents: 0,
+        monthlyPriceCents: 0,
+        annualPriceCents: 0,
+        currency: 'USD',
+        maxUsers: 2,
+        maxBranches: 1,
+        maxProducts: 500,
+    };
+    const price = ((plan.priceCents || 0) / 100).toFixed(2);
     const originalPriceCents = subscription.billingCycle === 'ANNUAL'
-        ? subscription.plan.originalAnnualPriceCents
-        : subscription.plan.originalMonthlyPriceCents;
+        ? plan.originalAnnualPriceCents
+        : plan.originalMonthlyPriceCents;
     const originalPrice = originalPriceCents ? (originalPriceCents / 100).toFixed(2) : null;
     const isCurrent = subscription.paymentStatus === 'current';
-    const pendingPaymentItem = subscription.pendingPayment || recentPayments.find(p => p.status === 'PENDING') || null;
+    const pendingPaymentItem = subscription.pendingPayment || recentPayments.find(p => p?.status === 'PENDING') || null;
     const hasPending = Boolean(subscription.hasPendingPayment || pendingPaymentItem);
     const canMakePayment = subscription.canPay !== undefined ? subscription.canPay : (!isCurrent && !hasPending);
 
@@ -259,7 +276,7 @@ export function BillingSettings() {
             )}
 
             {/* Plan Card — Dark gradient */}
-            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white rounded-2xl p-6 space-y-5 shadow-xl">
+            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white rounded-2xl p-4 sm:p-6 space-y-5 shadow-xl">
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                     <div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -279,7 +296,7 @@ export function BillingSettings() {
                                 </span>
                             ) : null}
                         </div>
-                        <p className="text-3xl font-black mt-1 tracking-tight">{subscription.plan.name}</p>
+                        <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight">{plan.name}</p>
                     </div>
                     <div className={`self-start px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 ${
                         subscription.paymentStatus === 'current' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
@@ -331,19 +348,19 @@ export function BillingSettings() {
                     <div className="bg-white/5 rounded-lg p-2.5">
                         <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Usuarios</span>
                         <span className="text-sm font-black text-slate-100">
-                            {subscription.plan.maxUsers && subscription.plan.maxUsers >= 900 ? 'Ilimitados' : `${subscription.plan.maxUsers || 2} máx`}
+                            {plan.maxUsers && plan.maxUsers >= 900 ? 'Ilimitados' : `${plan.maxUsers || 2} máx`}
                         </span>
                     </div>
                     <div className="bg-white/5 rounded-lg p-2.5">
                         <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Sucursales</span>
                         <span className="text-sm font-black text-slate-100">
-                            {subscription.plan.maxBranches || 1} {Number(subscription.plan.maxBranches) === 1 ? 'sucursal' : 'sucursales'}
+                            {plan.maxBranches || 1} {Number(plan.maxBranches) === 1 ? 'sucursal' : 'sucursales'}
                         </span>
                     </div>
                     <div className="bg-white/5 rounded-lg p-2.5">
                         <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Productos</span>
                         <span className="text-sm font-black text-slate-100">
-                            {subscription.plan.maxProducts && subscription.plan.maxProducts >= 90000 ? 'Ilimitados' : `${subscription.plan.maxProducts || 500} máx`}
+                            {plan.maxProducts && plan.maxProducts >= 90000 ? 'Ilimitados' : `${plan.maxProducts || 500} máx`}
                         </span>
                     </div>
                 </div>
@@ -421,7 +438,7 @@ export function BillingSettings() {
                         <label className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 block">
                             Periodo a Renovar *
                         </label>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <button
                                 type="button"
                                 onClick={() => {
@@ -487,7 +504,7 @@ export function BillingSettings() {
                         <label className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 block">
                             Método de Pago *
                         </label>
-                        <div className="grid grid-cols-5 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
                             {PAYMENT_METHODS.map(m => (
                                 <button
                                     key={m.value}
@@ -594,7 +611,7 @@ export function BillingSettings() {
                         {recentPayments.map(payment => {
                             const statusInfo = STATUS_MAP[payment.status] || STATUS_MAP.PENDING;
                             return (
-                                <div key={payment.id} className="flex items-center justify-between px-5 py-3.5 gap-3 hover:bg-slate-50/50 transition-colors">
+                                <div key={payment.id} className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-5 py-3.5 gap-2.5 sm:gap-3 hover:bg-slate-50/50 transition-colors">
                                     <div className="flex items-center gap-3 min-w-0">
                                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${statusInfo.bg}`}>
                                             <span className={`w-2.5 h-2.5 rounded-full ${statusInfo.dot}`} />
@@ -603,12 +620,12 @@ export function BillingSettings() {
                                             <p className="text-sm font-bold text-slate-800 tabular-nums">
                                                 ${payment.amount.toFixed(2)} <span className="text-xs font-medium text-slate-400">{payment.currency}</span>
                                             </p>
-                                            <p className="text-[11px] text-slate-400">
+                                            <p className="text-[11px] text-slate-400 truncate">
                                                 {new Date(payment.createdAt).toLocaleDateString('es-VE', { day: 'numeric', month: 'short', year: 'numeric' })} · {PAYMENT_METHODS.find(m => m.value === payment.provider)?.label || payment.provider || 'N/A'}
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 shrink-0">
+                                    <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                                         {payment.paymentCode && (
                                             <button
                                                 onClick={() => copyCode(payment.paymentCode!)}
@@ -630,7 +647,7 @@ export function BillingSettings() {
             </div>
 
             {/* ── Soberanía y Portabilidad de Datos ────────────────────────── */}
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-4 shadow-sm">
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-start gap-3">
                         <div className="w-10 h-10 rounded-xl bg-indigo-100/80 border border-indigo-200/60 flex items-center justify-center shrink-0 mt-0.5">
@@ -648,13 +665,13 @@ export function BillingSettings() {
                             </p>
                         </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 shrink-0 w-full sm:w-auto">
                         <Button
                             variant="default"
                             size="sm"
                             onClick={handleDownloadTakeout}
                             disabled={exportingBackup}
-                            className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
+                            className="w-full sm:w-auto h-10 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
                         >
                             {exportingBackup ? (
                                 <>

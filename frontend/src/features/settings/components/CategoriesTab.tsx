@@ -75,63 +75,111 @@ export function CategoriesTab() {
 
     return (
         <div className="space-y-6">
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
-                <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-4 items-center justify-between">
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center sm:justify-between">
                     <div className="relative flex-1 w-full max-w-sm">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <Input
                             placeholder="Buscar grupos..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
-                            className="pl-9"
+                            className="pl-9 h-11 text-sm bg-slate-50/50"
                         />
                     </div>
-                    <Button onClick={() => { setEditingGroup(null); setShowGroupForm(true); }} size="lg" className="h-10 font-bold bg-slate-900">
+                    <Button onClick={() => { setEditingGroup(null); setShowGroupForm(true); }} size="lg" className="w-full sm:w-auto h-11 font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-xs">
                         <Plus className="w-4 h-4 mr-2" /> Nuevo Grupo
                     </Button>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full erp-table">
-                        <thead>
-                            <tr>
-                                <th>Grupo</th>
-                                <th className="hidden md:table-cell">Descripción</th>
-                                <th className="hidden md:table-cell">Subgrupos</th>
-                                <th className="text-center">Estado</th>
-                                <th className="w-32">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.map(group => {
-                                const groupSubGroups = subGroups.filter(sg => sg.groupId === group.id);
-                                return (
-                                    <tr key={group.id} className={cn("group/row", !group.isActive && "opacity-60 bg-slate-50/50")}>
-                                        <td>
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
-                                                    <Tag className="w-4 h-4" />
-                                                </div>
-                                                <span className="font-bold text-slate-900">
-                                                    {group.name}
-                                                    {!group.isActive && <span className="ml-2 text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded uppercase">Inactivo</span>}
+                {/* Mobile Cards View (< sm) */}
+                <div className="block sm:hidden divide-y divide-slate-100">
+                    {filtered.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 px-4 text-slate-400 gap-2">
+                            <Layers className="w-10 h-10 opacity-20" />
+                            <p className="font-medium text-sm">No se encontraron grupos registrados</p>
+                        </div>
+                    ) : (
+                        filtered.map(group => {
+                            const groupSubGroups = subGroups.filter(sg => sg.groupId === group.id);
+                            return (
+                                <div key={group.id} className={cn("p-4 space-y-3 transition-colors", !group.isActive && "opacity-60 bg-slate-50/60")}>
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+                                                <Tag className="w-4.5 h-4.5" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-slate-900 text-sm">{group.name}</h4>
+                                                <span className={cn(
+                                                    "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider mt-0.5",
+                                                    group.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                                                )}>
+                                                    {group.isActive ? 'Activo' : 'Inactivo'}
                                                 </span>
                                             </div>
-                                        </td>
-                                        <td className="hidden md:table-cell text-slate-500 text-sm">{group.description || '—'}</td>
-                                        <td className="hidden md:table-cell">
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {groupSubGroups.map(sg => (
-                                                    <div key={sg.id} className={cn(
-                                                        "flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border group/sg",
-                                                        sg.isActive
-                                                            ? "bg-slate-100 text-slate-700 border-slate-200"
-                                                            : "bg-slate-50 text-slate-400 border-slate-100"
-                                                    )}>
-                                                        <span>{sg.name}</span>
+                                        </div>
+
+                                        <div className="flex items-center gap-1">
+                                            <button 
+                                                onClick={() => { setEditingGroup(group); setShowGroupForm(true); }} 
+                                                className="w-9 h-9 flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-slate-200/60"
+                                                title="Editar Grupo"
+                                                aria-label="Editar grupo"
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
+                                            <button 
+                                                onClick={() => {
+                                                    const action = group.isActive ? 'desactivar' : 'activar';
+                                                    if (confirm(`¿Estás seguro de que deseas ${action} este grupo?`)) {
+                                                        toggleGroupMutation.mutate({ id: group.id, isActive: !group.isActive });
+                                                    }
+                                                }} 
+                                                className={cn(
+                                                    "w-9 h-9 flex items-center justify-center rounded-lg transition-colors border border-slate-200/60",
+                                                    group.isActive ? "text-slate-500 hover:text-red-500 hover:bg-red-50" : "text-slate-500 hover:text-emerald-600 hover:bg-emerald-50"
+                                                )}
+                                                title={group.isActive ? "Desactivar Grupo" : "Activar Grupo"}
+                                                aria-label={group.isActive ? "Desactivar grupo" : "Activar grupo"}
+                                            >
+                                                {group.isActive ? <Trash2 className="w-4 h-4" /> : <RefreshCw className="w-4 h-4" />}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {group.description && (
+                                        <p className="text-xs text-slate-500">{group.description}</p>
+                                    )}
+
+                                    {/* Subgrupos en Mobile */}
+                                    <div className="pt-2 border-t border-slate-100/80 space-y-2">
+                                        <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
+                                            <span>Subgrupos ({groupSubGroups.length})</span>
+                                            {group.isActive && (
+                                                <button 
+                                                    onClick={() => openSubGroupForm(group.id)}
+                                                    className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-xs font-bold transition-colors py-0.5 px-2 bg-indigo-50 rounded-lg"
+                                                >
+                                                    <Plus className="w-3 h-3" /> Añadir
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {groupSubGroups.map(sg => (
+                                                <div key={sg.id} className={cn(
+                                                    "flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-lg text-xs font-medium border",
+                                                    sg.isActive
+                                                        ? "bg-slate-100 text-slate-700 border-slate-200"
+                                                        : "bg-slate-50 text-slate-400 border-slate-100"
+                                                )}>
+                                                    <span>{sg.name}</span>
+                                                    <div className="flex items-center gap-0.5">
                                                         <button 
                                                             onClick={() => openSubGroupForm(group.id, sg)}
-                                                            className="p-0.5 hover:text-indigo-600 opacity-0 group-hover/sg:opacity-100 transition-opacity"
+                                                            className="p-1 hover:text-indigo-600 text-slate-400 transition-colors"
+                                                            title="Editar subgrupo"
+                                                            aria-label="Editar subgrupo"
                                                         >
                                                             <Edit2 className="w-3 h-3" />
                                                         </button>
@@ -143,12 +191,91 @@ export function CategoriesTab() {
                                                                 }
                                                             }}
                                                             className={cn(
-                                                                "p-0.5 transition-opacity opacity-0 group-hover/sg:opacity-100",
+                                                                "p-1 transition-colors text-slate-400",
                                                                 sg.isActive ? "hover:text-red-500" : "hover:text-emerald-600"
                                                             )}
+                                                            title={sg.isActive ? "Desactivar" : "Activar"}
+                                                            aria-label={sg.isActive ? "Desactivar subgrupo" : "Activar subgrupo"}
                                                         >
                                                             {sg.isActive ? <Trash2 className="w-3 h-3" /> : <RefreshCw className="w-3 h-3" />}
                                                         </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {groupSubGroups.length === 0 && (
+                                                <span className="text-[11px] text-slate-400 italic">Sin subgrupos</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+
+                {/* Tablet & Desktop Table (sm+) */}
+                <div className="hidden sm:block overflow-x-auto">
+                    <table className="w-full erp-table">
+                        <thead>
+                            <tr>
+                                <th>Grupo</th>
+                                <th className="hidden lg:table-cell">Descripción</th>
+                                <th>Subgrupos</th>
+                                <th className="text-center">Estado</th>
+                                <th className="w-32">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filtered.map(group => {
+                                const groupSubGroups = subGroups.filter(sg => sg.groupId === group.id);
+                                return (
+                                    <tr key={group.id} className={cn("group/row", !group.isActive && "opacity-60 bg-slate-50/50")}>
+                                        <td>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+                                                    <Tag className="w-4 h-4" />
+                                                </div>
+                                                <span className="font-bold text-slate-900">
+                                                    {group.name}
+                                                    {!group.isActive && <span className="ml-2 text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded uppercase">Inactivo</span>}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="hidden lg:table-cell text-slate-500 text-sm">{group.description || '—'}</td>
+                                        <td>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {groupSubGroups.map(sg => (
+                                                    <div key={sg.id} className={cn(
+                                                        "flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-lg text-xs font-medium border group/sg",
+                                                        sg.isActive
+                                                            ? "bg-slate-100 text-slate-700 border-slate-200"
+                                                            : "bg-slate-50 text-slate-400 border-slate-100"
+                                                    )}>
+                                                        <span>{sg.name}</span>
+                                                        <div className="flex items-center gap-0.5 opacity-70 group-hover/sg:opacity-100 transition-opacity">
+                                                            <button 
+                                                                onClick={() => openSubGroupForm(group.id, sg)}
+                                                                className="p-0.5 hover:text-indigo-600 transition-colors"
+                                                                title="Editar subgrupo"
+                                                            >
+                                                                <Edit2 className="w-3 h-3" />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const action = sg.isActive ? 'desactivar' : 'activar';
+                                                                    if (confirm(`¿Estás seguro de que deseas ${action} este subgrupo?`)) {
+                                                                        toggleSubGroupMutation.mutate({ id: sg.id, isActive: !sg.isActive });
+                                                                    }
+                                                                }}
+                                                                className={cn(
+                                                                    "p-0.5 transition-colors",
+                                                                    sg.isActive ? "hover:text-red-500" : "hover:text-emerald-600"
+                                                                )}
+                                                                title={sg.isActive ? "Desactivar" : "Activar"}
+                                                            >
+                                                                {sg.isActive ? <Trash2 className="w-3 h-3" /> : <RefreshCw className="w-3 h-3" />}
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 ))}
                                                 {group.isActive && (
