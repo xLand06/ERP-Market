@@ -77,18 +77,19 @@ if [[ -d "$CLIENT_DIR" ]]; then
     echo "client '$SLUG' already provisioned — re-verifying..."
 fi
 
+# ── Environment config (BASE_DOMAIN, CADDY_EMAIL, AI keys, ...) ──────────────
+if [[ -f "$DEPLOY_DIR/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$DEPLOY_DIR/.env"
+    set +a
+fi
+
 # ── Domain resolution ─────────────────────────────────────────────────────────
 if [[ -n "$DOMAIN_ARG" ]]; then
     [[ "$DOMAIN_ARG" =~ ^[a-zA-Z0-9.-]{4,253}$ ]] || fail "invalid domain: '$DOMAIN_ARG' (letters, digits, dots, hyphens only)"
     CLIENT_DOMAIN="$DOMAIN_ARG"
 else
-    # Optional operator config (BASE_DOMAIN, CADDY_EMAIL, ...)
-    if [[ -f "$DEPLOY_DIR/.env" ]]; then
-        set -a
-        # shellcheck disable=SC1091
-        source "$DEPLOY_DIR/.env"
-        set +a
-    fi
     if [[ -n "${BASE_DOMAIN:-}" ]]; then
         CLIENT_DOMAIN="$SLUG.$BASE_DOMAIN"
     else
@@ -169,6 +170,8 @@ ADMIN_USER=$ADMIN_USER
 TENANT_SLUG=$SLUG
 BILLING_SECRET=299799f89d311f1dd5748d1afa19f88cfcbd7c68df72484a
 MGMT_URL=http://89.167.46.144:3001
+OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+GROQ_API_KEY=${GROQ_API_KEY:-}
 EOF
     umask 022
 

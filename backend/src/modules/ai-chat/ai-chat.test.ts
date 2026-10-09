@@ -19,7 +19,14 @@ vi.mock('../../config/prisma', () => ({
     prismaCloud: {},
 }));
 
-import { validateSql, wantsExport } from './ai-chat.service';
+import { validateSql, wantsExport, isAiAvailable } from './ai-chat.service';
+
+describe('isAiAvailable', () => {
+    it('retorna true cuando hay una API key disponible', () => {
+        expect(isAiAvailable()).toBe(true);
+    });
+});
+
 
 describe('validateSql', () => {
     it('permite SELECT simple sobre tablas permitidas', () => {

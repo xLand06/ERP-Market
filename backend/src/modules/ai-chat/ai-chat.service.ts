@@ -7,33 +7,113 @@
 import Groq from 'groq-sdk';
 import { prisma } from '../../config/prisma';
 
-const groqApiKey = process.env.GROQ_API_KEY;
-const groq = groqApiKey ? new Groq({ apiKey: groqApiKey }) : null;
+const getOpenRouterKey = () => process.env.OPENROUTER_API_KEY;
+const getGroqKey = () => process.env.GROQ_API_KEY;
 
-// ─── Model rotation: prueba modelos en orden hasta que funcione ──────────────
-const MODELS = [
-    'openai/gpt-oss-20b',
-    'qwen/qwen3.8-27b',
-    'allam-2-7b',
+export const isAiAvailable = (): boolean => {
+    return Boolean(getOpenRouterKey() || getGroqKey());
+};
+
+// ─── Free models rotation en OpenRouter ───────────────────────────────────────
+const OPENROUTER_FREE_MODELS = [
+    'openrouter/free',
+    'nvidia/nemotron-3-ultra-550b-a55b:free',
+    'liquid/lfm-2.5-2.6b:free',
+    'nvidia/nemotron-3.5-lightning:free',
+    'google/gemma-4-31b-it:free',
+    'google/gemma-4-26b-a4b-it:free',
 ];
 
-async function callWithRotation(messages: any[], temperature: number, maxTokens: number): Promise<string> {
-    for (const model of MODELS) {
-        try {
-            const completion = await groq!.chat.completions.create({
+// ─── Groq fallback models (IDs válidos de Groq) ──────────────────────────────
+const GROQ_MODELS = [
+    'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant',
+];
+
+async function callOpenRouter(model: string, messages: any[], temperature: number, maxTokens: number): Promise<string> {
+    const apiKey = getOpenRouterKey();
+    if (!apiKey) throw new Error('OPENROUTER_API_KEY no configurada');
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+
+    try {
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'HTTP-Referer': 'https://erpmarket.com',
+                'X-Title': 'ERP-Market',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
                 model,
                 messages,
                 temperature,
                 max_tokens: maxTokens,
-            });
-            return completion.choices[0]?.message?.content || '';
-        } catch (error: any) {
-            console.error(`[ai-chat] Model ${model} failed:`, error.message?.slice(0, 100));
-            continue; // Try next model
+            }),
+            signal: controller.signal,
+        });
+
+        if (!res.ok) {
+            const errBody = await res.text().catch(() => '');
+            throw new Error(`OpenRouter HTTP ${res.status}: ${errBody.slice(0, 100)}`);
+        }
+
+        const data: any = await res.json();
+        const content = data?.choices?.[0]?.message?.content;
+        if (typeof content !== 'string' || !content.trim()) {
+            throw new Error('OpenRouter devolvió contenido vacío');
+        }
+        return content.trim();
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function callGroq(model: string, messages: any[], temperature: number, maxTokens: number): Promise<string> {
+    const apiKey = getGroqKey();
+    if (!apiKey) throw new Error('GROQ_API_KEY no configurada');
+    const groq = new Groq({ apiKey });
+    const completion = await groq.chat.completions.create({
+        model,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+    });
+    return completion.choices?.[0]?.message?.content || '';
+}
+
+async function callWithRotation(messages: any[], temperature: number, maxTokens: number): Promise<string> {
+    // 1. Priorizar OpenRouter con modelos gratuitos
+    if (getOpenRouterKey()) {
+        for (const model of OPENROUTER_FREE_MODELS) {
+            try {
+                const text = await callOpenRouter(model, messages, temperature, maxTokens);
+                if (text) return text;
+            } catch (error: any) {
+                console.warn(`[ai-chat] OpenRouter (${model}) falló:`, error.message?.slice(0, 100));
+                continue;
+            }
         }
     }
+
+    // 2. Fallback a Groq si está configurado
+    if (getGroqKey()) {
+        for (const model of GROQ_MODELS) {
+            try {
+                const text = await callGroq(model, messages, temperature, maxTokens);
+                if (text) return text;
+            } catch (error: any) {
+                console.warn(`[ai-chat] Groq (${model}) falló:`, error.message?.slice(0, 100));
+                continue;
+            }
+        }
+    }
+
     throw new Error('Todos los modelos de IA fallaron');
 }
+
 
 // ─── Rate limiting (30 req/min por usuario) ─────────────────────────────────
 const rateLimitMap = new Map<string, number[]>();
@@ -229,8 +309,8 @@ export const processAiQuestion = async (question: string, userId?: string): Prom
         return { answer: `Estás haciendo muchas preguntas. Esperá ${rl.retryAfter} segundos y probá de nuevo. ⏳` };
     }
 
-    if (!groq) {
-        return { answer: 'El asistente no está disponible temporalmente. Intentá más tarde.' };
+    if (!isAiAvailable()) {
+        return { answer: 'El asistente no está disponible temporalmente. No se ha configurado la API Key de IA.' };
     }
 
     try {
@@ -289,10 +369,10 @@ export const processAiQuestion = async (question: string, userId?: string): Prom
         return { answer, data };
     } catch (error: any) {
         console.error('[ai-chat] Error:', error.message);
-        if (error.message?.includes('GROQ_API_KEY')) {
-            return { answer: 'Servicio de IA no disponible temporalmente.' };
+        if (!isAiAvailable()) {
+            return { answer: 'Servicio de IA no disponible temporalmente. No hay API keys configuradas.' };
         }
-        return { answer: 'Hubo un error al procesar tu pregunta. Intentá de nuevo.' };
+        return { answer: 'Hubo un error al procesar tu pregunta con los modelos disponibles. Intentá de nuevo en unos momentos.' };
     }
 };
 
@@ -342,7 +422,7 @@ export function wantsExport(question: string): boolean {
 
 // ─── Análisis de archivos subidos ────────────────────────────────────────────
 export const analyzeUploadedFile = async (fileBuffer: Buffer, filename: string, question?: string): Promise<AiChatResponse> => {
-    if (!groq) return { answer: 'El asistente no está disponible.' };
+    if (!isAiAvailable()) return { answer: 'El asistente no está disponible.' };
     try {
         const XLSX = await import('xlsx');
         const ext = filename.toLowerCase().split('.').pop();
