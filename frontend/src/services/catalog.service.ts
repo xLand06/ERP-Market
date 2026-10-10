@@ -41,6 +41,9 @@ export interface PublicCatalog {
     taxId: string;
     socialLinks: SocialLinks;
     groups: CatalogGroup[];
+    mainCurrency?: string;
+    activeCurrencies?: string[];
+    exchangeRates?: Record<string, number>;
 }
 
 export const catalogApi = {

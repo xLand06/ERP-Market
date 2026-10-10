@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit2, PackageX, PackageCheck, AlertCircle, Download, PackageSearch, Percent } from 'lucide-react';
+import { Plus, Search, Edit2, PackageX, PackageCheck, AlertCircle, Download, PackageSearch, Percent, QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { DataTable, type Column } from '@/components/ui/table';
 import { cn, normalizeText } from '@/lib/utils';
 import { ProductFormModal } from '../components/ProductFormModal';
+import { ProductQrModal } from '../components/ProductQrModal';
 import type { Product, Category, Group } from '../types';
 import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
 import { useConfigStore } from '@/hooks/useConfigStore';
@@ -37,8 +38,10 @@ export default function ProductsPage() {
     const [limit, setLimit] = useState(25);
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [qrModalOpen, setQrModalOpen] = useState(false);
+    const [qrProduct, setQrProduct] = useState<Product | null>(null);
 
-    const { fmtCOP } = useConfigStore();
+    const { fmtCOP, catalogSlug } = useConfigStore();
     const user = useAuthStore(s => s.user);
     const isOwner = user?.role === 'OWNER';
 
@@ -233,6 +236,19 @@ export default function ProductsPage() {
             <Button
                 variant="ghost"
                 size="row-icon"
+                onClick={() => {
+                    setQrProduct(prod);
+                    setQrModalOpen(true);
+                }}
+                className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                aria-label={`Ver código QR de ${prod.name}`}
+                title="Ver código QR"
+            >
+                <QrCode className="w-4 h-4" />
+            </Button>
+            <Button
+                variant="ghost"
+                size="row-icon"
                 onClick={() => handleOpenEdit(prod)}
                 className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
                 aria-label={`Editar producto ${prod.name}`}
@@ -268,6 +284,16 @@ export default function ProductsPage() {
                 groups={groups}
                 subgroups={subgroups}
                 onSuccess={handleSuccess}
+            />
+
+            <ProductQrModal
+                open={qrModalOpen}
+                onClose={() => {
+                    setQrModalOpen(false);
+                    setQrProduct(null);
+                }}
+                product={qrProduct}
+                catalogSlug={catalogSlug}
             />
 
             <div className="flex flex-col gap-6 max-w-[1400px] mx-auto pb-8">

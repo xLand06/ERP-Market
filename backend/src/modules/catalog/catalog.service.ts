@@ -6,6 +6,7 @@
 
 import { prisma } from '../../config/prisma';
 import { getSettings } from '../settings/settings.service';
+import { getExchangeRates } from '../finance/finance.service';
 
 export interface CatalogPresentation {
     id: string;
@@ -42,6 +43,9 @@ export interface PublicCatalog {
     taxId: string;
     socialLinks: SocialLinks;
     groups: CatalogGroup[];
+    mainCurrency: string;
+    activeCurrencies: string[];
+    exchangeRates: Record<string, number>;
 }
 
 // Grupo sintético para productos sin subgrupo asignado
@@ -109,10 +113,22 @@ export const getPublicCatalog = async (slug: string): Promise<PublicCatalog | nu
         socialLinks = {};
     }
 
+    // Obtener tasas de cambio vigentes para conversión en catálogo
+    const dbRates = await getExchangeRates();
+    const exchangeRates: Record<string, number> = {};
+    for (const r of dbRates) {
+        exchangeRates[r.code] = Number(r.rate);
+    }
+
     return {
         businessName: settings.businessName,
         taxId: settings.taxId,
         socialLinks,
         groups,
+        mainCurrency: settings.mainCurrency || 'USD',
+        activeCurrencies: settings.activeCurrencies && settings.activeCurrencies.length > 0
+            ? settings.activeCurrencies
+            : ['USD', 'VES', 'COP'],
+        exchangeRates,
     };
 };
