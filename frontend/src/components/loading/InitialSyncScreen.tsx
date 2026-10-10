@@ -14,6 +14,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Loader2, CloudOff, CheckCircle2, Database, Cloud, ArrowRight, RefreshCw } from 'lucide-react';
 import api from '@/lib/api';
+import logoAllmarket from '@/assets/logo-allmarket.webp';
 
 type SyncStage = 'checking' | 'connecting' | 'syncing' | 'offline' | 'done' | 'error';
 
@@ -158,7 +159,7 @@ export default function InitialSyncScreen({ onComplete }: Props) {
             {/* Logo / Marca */}
             <div className="mb-8 text-center">
                 <div className="w-20 h-20 rounded-full overflow-hidden mx-auto mb-4 shadow-2xl shadow-emerald-500/20 bg-white ring-1 ring-white/20">
-                    <img src="/logo-allmarket.webp" alt="ALLMARKET" className="w-full h-full object-cover" draggable={false} />
+                    <img src={logoAllmarket} alt="ALLMARKET" className="w-full h-full object-cover" draggable={false} />
                 </div>
                 <h1 className="text-3xl font-bold text-white tracking-tight">
                     ALL<span className="text-emerald-400">MARKET</span>

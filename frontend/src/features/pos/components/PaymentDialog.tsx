@@ -81,13 +81,23 @@ function WeightItemRow({
 export function PaymentDialog({
     open,
     total,
-    cartItems,
+    cartItems = [],
     onUpdateQty,
     onClose,
     onConfirm,
     isSubmitting,
 }: PaymentDialogProps) {
-    const { rates, fmtCOP, fmtUSD, fmtVES, fromCOP, fromUSD, mainCurrency, activeCurrencies, convert, formatCurrency } = useConfigStore();
+    const config = useConfigStore();
+    const rates = config.rates || {};
+    const fromUSD = config.fromUSD || ((val: number, cur?: string) => cur === 'COP' ? val * (rates['COP'] || 3600) : cur === 'VES' ? val * (rates['VES'] || 5.5) : val);
+    const fromCOP = config.fromCOP || ((val: number, cur?: string) => cur === 'USD' ? val / (rates['COP'] || 3600) : val);
+    const fmtCOP = config.fmtCOP || ((v: number) => `$ ${v}`);
+    const fmtUSD = config.fmtUSD || ((v: number) => `$ ${v} USD`);
+    const fmtVES = config.fmtVES || ((v: number) => `Bs. ${v}`);
+    const mainCurrency = config.mainCurrency || 'USD';
+    const activeCurrencies = config.activeCurrencies || ['USD', 'COP', 'VES'];
+    const convert = config.convert || ((val: number) => val);
+    const formatCurrency = config.formatCurrency || ((val: number, code: string) => `${code} ${val}`);
     const active = activeCurrencies?.length ? activeCurrencies : ['USD', 'COP', 'VES'];
 
     const {

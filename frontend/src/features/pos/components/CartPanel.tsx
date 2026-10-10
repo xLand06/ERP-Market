@@ -50,7 +50,8 @@ const CartItemRow = React.memo(function CartItemRow({
     onUpdatePresentation: (productId: string, oldPresId: string | undefined, newPresId: string | 'base') => void;
     onRemoveItem: (productId: string, presentationId: string | undefined) => void;
 }) {
-    const { fmtUSD } = useConfigStore();
+    const config = useConfigStore();
+    const fmtUSD = config.fmtUSD || config.fmtMain || ((v: number) => `$ ${v}`);
     const { Icon, style } = getCartCategoryIcon(product?.category?.name, item.name);
 
     return (
@@ -130,7 +131,12 @@ export const CartPanel = React.memo(function CartPanel({
     onCheckout,
     isSubmitting,
 }: CartPanelProps) {
-    const { convert, formatCurrency, fmtMain, mainCurrency, activeCurrencies } = useConfigStore();
+    const config = useConfigStore();
+    const convert = config.convert || ((val: number) => val);
+    const formatCurrency = config.formatCurrency || ((val: number, code: string) => `${code} ${val}`);
+    const fmtMain = config.fmtMain || ((val: number) => `$ ${val}`);
+    const mainCurrency = config.mainCurrency || 'USD';
+    const activeCurrencies = config.activeCurrencies || ['USD', 'COP', 'VES'];
     const { t } = useTranslation();
 
     // Monedas NO principales (se muestran debajo del ticket como equivalencia)

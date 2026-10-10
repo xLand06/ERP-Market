@@ -64,6 +64,11 @@ export function useInventory(branchId: string) {
             if (db && data.length > 0) {
                 await db.saveStock(branchId, data);
             }
+            if (data.length > 0) {
+                try {
+                    localStorage.setItem(`inventory_cache_${branchId}`, JSON.stringify(data));
+                } catch {}
+            }
             
             return data
                 .filter((item: any) => item && item.product) // Seguridad ante registros corruptos
@@ -94,37 +99,77 @@ export function useInventory(branchId: string) {
     };
 
     const fetchFromLocal = async (): Promise<InventoryItem[]> => {
-        if (!db || !branchId || branchId === 'all') return [];
+        if (!branchId || branchId === 'all') return [];
         
-        try {
-            const data = await db.getStock(branchId);
-            return data.map((item: any) => ({
-                product: {
-                    id: item.productId,
-                    name: item.productName,
-                    barcode: item.barcode,
-                    price: item.productPrice ?? 0,
-                    cost: item.productCost ?? 0,
-                    baseUnit: item.baseUnit || 'UNIDAD',
-                    presentations: (item.productPresentations || []).map((p: any) => ({
-                        id: p.id,
-                        name: p.name,
-                        multiplier: Number(p.multiplier),
-                        price: Number(p.price),
-                        barcode: p.barcode
-                    })),
-                    subGroup: item.subGroupName || 'Varios',
-                    subGroupId: item.subGroupId,
-                    isActive: item.isActive ?? true,
-                },
-                stock: item.stock,
-                minStock: item.minStock || 0,
-                updatedAt: item.updatedAt,
-            }));
-        } catch (error) {
-            console.error('Error fetching from local:', error);
-            return [];
+        // 1. Electron SQLite local
+        if (db) {
+            try {
+                const data = await db.getStock(branchId);
+                if (data && data.length > 0) {
+                    return data.map((item: any) => ({
+                        product: {
+                            id: item.productId,
+                            name: item.productName,
+                            barcode: item.barcode,
+                            price: item.productPrice ?? 0,
+                            cost: item.productCost ?? 0,
+                            baseUnit: item.baseUnit || 'UNIDAD',
+                            presentations: (item.productPresentations || []).map((p: any) => ({
+                                id: p.id,
+                                name: p.name,
+                                multiplier: Number(p.multiplier),
+                                price: Number(p.price),
+                                barcode: p.barcode
+                            })),
+                            subGroup: item.subGroupName || 'Varios',
+                            subGroupId: item.subGroupId,
+                            isActive: item.isActive ?? true,
+                        },
+                        stock: item.stock,
+                        minStock: item.minStock || 0,
+                        updatedAt: item.updatedAt,
+                    }));
+                }
+            } catch (error) {
+                console.error('Error fetching from local db:', error);
+            }
         }
+
+        // 2. LocalStorage cache (Web y Capacitor)
+        try {
+            const raw = localStorage.getItem(`inventory_cache_${branchId}`);
+            if (raw) {
+                const data = JSON.parse(raw);
+                if (Array.isArray(data)) {
+                    return data
+                        .filter((item: any) => item && item.product)
+                        .map((item: any) => ({
+                            product: {
+                                id: item.product.id,
+                                name: item.product.name || 'Sin Nombre',
+                                barcode: item.product.barcode || '',
+                                barcodes: item.product.barcodes || [],
+                                price: Number(item.product.price || 0),
+                                cost: Number(item.product.cost || 0),
+                                baseUnit: item.product.baseUnit || 'UNIDAD',
+                                presentations: item.product.presentations || [],
+                                subGroup: typeof item.product.subGroup === 'object' 
+                                    ? (item.product.subGroup?.group?.name || item.product.subGroup?.name || 'Varios') 
+                                    : (item.product.subGroup || 'Varios'),
+                                subGroupId: item.product.subGroupId,
+                                isActive: true,
+                            },
+                            stock: Number(item.stock || 0),
+                            minStock: Number(item.minStock || 0),
+                            updatedAt: item.updatedAt,
+                        }));
+                }
+            }
+        } catch (e) {
+            console.error('[useInventory] Error reading localStorage inventory cache:', e);
+        }
+
+        return [];
     };
 
     const { data, isLoading, error, refetch } = useQuery({

@@ -38,6 +38,7 @@ export default defineConfig({
     // En prod: build genera out/renderer/ para electron-builder.
     renderer: {
         root: resolve(__dirname, '../frontend'),
+        base: './',
         build: {
             outDir: resolve(__dirname, 'out/renderer'),
             rollupOptions: {

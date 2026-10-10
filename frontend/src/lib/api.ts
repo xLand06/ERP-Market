@@ -259,11 +259,12 @@ api.interceptors.response.use(
             }
         }
 
-        // Toast de error — silenciar para endpoints del dashboard y reportes
+        // Toast de error — silenciar para endpoints del dashboard, reportes o endpoints con manejo offline propio
         const url = originalRequest.url || '';
         const data = error.response?.data as any;
+        const isOfflineCapable = !error.response && (url.includes('/pos/transactions') || url.includes('/cash-flow/current') || url.includes('/inventory/stock'));
 
-        if (!isSilent(url)) {
+        if (!isSilent(url) && !isOfflineCapable) {
             // Si hay detalles de validación, dejamos que el componente los maneje
             // para evitar doble toast (global + local)
             if (data?.details) {

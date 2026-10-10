@@ -26,6 +26,7 @@ import { useCart } from '../hooks/useCart';
 import { printThermalReceiptReal } from '@/lib/thermalPrinter';
 import { ThermalReceiptTicket } from '@/components/common/ThermalReceiptTicket';
 import toast from 'react-hot-toast';
+import { enqueueSale, countPending } from '@/lib/offline-queue';
 
 import type { Product, PaymentMethodType, Currency, CreateTransactionPayload } from '../types';
 
@@ -84,16 +85,36 @@ export default function POSPage() {
             if (!effectiveBranch) return null;
             try {
                 const res = await api.get(`/cash-flow/current/${effectiveBranch}`);
-                return res.data.data;
+                const regData = res.data?.data;
+                if (regData) {
+                    try {
+                        localStorage.setItem(`last_open_register_${effectiveBranch}`, JSON.stringify(regData));
+                    } catch {}
+                }
+                return regData;
             } catch (err: any) {
-                if (err.response?.status === 404) return null;
+                if (err.response?.status === 404) {
+                    try {
+                        localStorage.removeItem(`last_open_register_${effectiveBranch}`);
+                    } catch {}
+                    return null;
+                }
+                // Si la red falla o estamos offline, recuperar del cache local
+                try {
+                    const cached = localStorage.getItem(`last_open_register_${effectiveBranch}`);
+                    if (cached) return JSON.parse(cached);
+                } catch {}
+                // Si estamos sin conexión, proveer sesión offline para no bloquear la venta
+                if (!navigator.onLine) {
+                    return { id: `offline_register_${effectiveBranch}`, branchId: effectiveBranch, status: 'OPEN', isOffline: true };
+                }
                 throw err;
             }
         },
         enabled: !!effectiveBranch,
-        staleTime: 30_000,
-        gcTime: 5 * 60_000,
-        retry: 1,
+        staleTime: 60_000,
+        gcTime: 10 * 60_000,
+        retry: 0,
     });
 
     const usdRate = rates['USD'] || rates['COP'] || 3600;
@@ -101,6 +122,18 @@ export default function POSPage() {
 
     const openMutation = useMutation({
         mutationFn: async (openingAmount: number) => {
+            if (!navigator.onLine) {
+                const offlineReg = {
+                    id: `offline_register_${effectiveBranch}_${Date.now()}`,
+                    branchId: effectiveBranch,
+                    status: 'OPEN',
+                    openingAmount,
+                    openedAt: new Date().toISOString(),
+                    isOffline: true,
+                };
+                localStorage.setItem(`last_open_register_${effectiveBranch}`, JSON.stringify(offlineReg));
+                return offlineReg;
+            }
             await api.post('/cash-flow/open', { branchId: effectiveBranch, openingAmount });
         },
         onSuccess: () => {
@@ -230,8 +263,50 @@ export default function POSPage() {
                 ...(customerId ? { customerId } : {}),
             };
 
-            const res = await api.post('/pos/transactions', payload);
-            const invoiceNum = res.data?.data?.invoiceNumber || res.data?.invoiceNumber || 'FACT-000482';
+            let invoiceNum = '';
+            let isOfflineSale = false;
+
+            if (!navigator.onLine) {
+                isOfflineSale = true;
+                const saleId = await enqueueSale({
+                    ...payload,
+                    createdAt: new Date().toISOString(),
+                });
+                invoiceNum = `OFFLINE-${saleId.slice(0, 8).toUpperCase()}`;
+                const pendingCount = await countPending();
+                toast.success(
+                    `Venta guardada offline (${pendingCount} pendiente${pendingCount > 1 ? 's' : ''}). Se sincronizará al reconectar.`,
+                    { duration: 5000, icon: '📶' }
+                );
+            } else {
+                try {
+                    const res = await api.post('/pos/transactions', payload, { timeout: 8000 });
+                    invoiceNum = res.data?.data?.invoiceNumber || res.data?.invoiceNumber || `FAC-${Date.now().toString().slice(-6)}`;
+                } catch (err: any) {
+                    const isNetworkError = !err.response ||
+                        err.code === 'ECONNABORTED' ||
+                        err.message?.includes('Network Error') ||
+                        err.message?.includes('timeout') ||
+                        err.message?.includes('Failed to fetch') ||
+                        !navigator.onLine;
+
+                    if (isNetworkError) {
+                        isOfflineSale = true;
+                        const saleId = await enqueueSale({
+                            ...payload,
+                            createdAt: new Date().toISOString(),
+                        });
+                        invoiceNum = `OFFLINE-${saleId.slice(0, 8).toUpperCase()}`;
+                        const pendingCount = await countPending();
+                        toast.success(
+                            `Venta guardada offline (${pendingCount} pendiente${pendingCount > 1 ? 's' : ''}). Se sincronizará al reconectar.`,
+                            { duration: 5000, icon: '📶' }
+                        );
+                    } else {
+                        throw err;
+                    }
+                }
+            }
 
             const saleItems = cart.map(c => ({
                 name: c.name,
@@ -258,11 +333,15 @@ export default function POSPage() {
             const config = useConfigStore.getState();
             const primaryPrinter = config.printers.find(p => p.isPrimary) || config.printers[0] || null;
 
-            toast.success(customerId ? '¡Venta a crédito registrada!' : '¡Venta realizada con éxito!');
+            if (!isOfflineSale) {
+                toast.success(customerId ? '¡Venta a crédito registrada!' : '¡Venta realizada con éxito!');
+            }
             setPayOpen(false);
             clearCart();
-            refetch();
-            queryClient.invalidateQueries({ queryKey: ['openRegister'] });
+            if (navigator.onLine) {
+                refetch();
+                queryClient.invalidateQueries({ queryKey: ['openRegister'] });
+            }
 
             // Intentar imprimir el ticket térmico de forma asíncrona sin bloquear la venta realizada
             try {

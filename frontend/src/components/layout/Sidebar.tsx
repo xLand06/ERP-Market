@@ -17,6 +17,8 @@ import { cn } from '@/lib/utils';
 import { isPathAllowed } from '@/lib/planConfig';
 import { useTranslation } from 'react-i18next';
 import { BranchSelector } from '@/components/branch/BranchSelector';
+import logoAllmarket from '@/assets/logo-allmarket.webp';
+import isotipoWhite from '@/assets/isotipo-white.webp';
 
 interface NavItem {
     nameKey: string;
@@ -222,7 +224,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                     {collapsed ? (
                         <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 transition-all duration-300 shadow-md bg-white ring-1 ring-white/20">
                             <img
-                                src="/logo-allmarket.webp"
+                                src={logoAllmarket}
                                 alt="ALLMARKET"
                                 className="w-full h-full object-cover"
                                 draggable={false}
@@ -230,7 +232,7 @@ export function Sidebar({ collapsed = false, onCloseMobile, onToggleDesktop }: S
                         </div>
                     ) : (
                         <img
-                            src="/isotipo-white.webp"
+                            src={isotipoWhite}
                             alt="ALLMARKET"
                             className="h-9 lg:h-10 w-auto max-w-[160px] shrink-0 animate-in fade-in duration-300 delay-150"
                             draggable={false}

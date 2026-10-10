@@ -16,6 +16,7 @@ import { isNativeApp, nativePost } from '@/lib/native-http';
 import { ConnectServerScreen } from './ConnectServerScreen';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { scanNativeQr } from '@/services/qr-scanner';
+import logoAllmarket from '@/assets/logo-allmarket.webp';
 const isCapacitor = typeof window !== 'undefined' && (
     !!(window as any).Capacitor?.isNativePlatform?.() ||
     (window as any).Capacitor?.platform === 'android' ||
@@ -524,7 +525,7 @@ export default function LoginPage() {
                 <div className="hidden lg:flex flex-1 flex-col justify-center space-y-8 max-w-md">
                     <div className="animate-fadeInUp">
                         <div className="w-20 h-20 rounded-full overflow-hidden mb-6 shadow-2xl shadow-[#3a7d89]/30 dark:shadow-teal-500/20 bg-white dark:bg-[#161B22] ring-1 ring-slate-200 dark:ring-[#30363D]">
-                            <img src="/logo-allmarket.webp" alt="ALLMARKET" className="w-full h-full object-cover" draggable={false} />
+                            <img src={logoAllmarket} alt="ALLMARKET" className="w-full h-full object-cover" draggable={false} />
                         </div>
                         <h1 className="text-4xl xl:text-5xl font-black text-[#0f1c38] dark:text-white tracking-tight leading-tight">
                             ALL <span className="text-[#3a7d89] dark:text-teal-400">MARKET</span>
@@ -559,7 +560,7 @@ export default function LoginPage() {
                     {/* Mobile: minimal logo */}
                     <div className="lg:hidden text-center mb-6">
                         <div className="w-16 h-16 rounded-full overflow-hidden mx-auto mb-3 shadow-xl shadow-[#3a7d89]/30 dark:shadow-teal-500/20 bg-white dark:bg-[#161B22] ring-1 ring-slate-200 dark:ring-[#30363D]">
-                            <img src="/logo-allmarket.webp" alt="ALLMARKET" className="w-full h-full object-cover" draggable={false} />
+                            <img src={logoAllmarket} alt="ALLMARKET" className="w-full h-full object-cover" draggable={false} />
                         </div>
                         <h1 className="text-3xl font-black text-[#0f1c38] dark:text-white tracking-tight">
                             ALL <span className="text-[#3a7d89] dark:text-teal-400">MARKET</span>
