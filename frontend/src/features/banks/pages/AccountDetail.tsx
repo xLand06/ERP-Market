@@ -13,7 +13,7 @@ import { useBankAccounts, useAccountTransactions, useCreateBankTransaction } fro
 import type { BankTransaction } from '../types';
 
 // ─── Modal "Registrar Movimiento" ─────────────────────────────────────────────
-function TransactionModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function TransactionModal({ open, onClose, accountName, currentBalance }: { open: boolean; onClose: () => void; accountName?: string; currentBalance?: number }) {
     const { id } = useParams();
     const createTransaction = useCreateBankTransaction(id);
     const [type, setType] = useState<'income' | 'expense'>('income');
@@ -22,10 +22,17 @@ function TransactionModal({ open, onClose }: { open: boolean; onClose: () => voi
     const [reference, setReference] = useState('');
     const [error, setError] = useState('');
 
+    const quickConceptsIncome = ['Venta / Cobro de caja', 'Aporte de capital', 'Transferencia recibida', 'Ajuste de saldo'];
+    const quickConceptsExpense = ['Pago a proveedor', 'Retiro de efectivo', 'Comisión bancaria', 'Gasto operativo / Servicios'];
+
     const handleSave = () => {
         const value = parseFloat(amount);
         if (!value || value <= 0) {
             setError('Ingresa un monto mayor a 0');
+            return;
+        }
+        if (type === 'expense' && currentBalance !== undefined && value > currentBalance) {
+            setError(`Saldo insuficiente en la cuenta (Disponible: $${currentBalance.toLocaleString()})`);
             return;
         }
         setError('');
@@ -50,100 +57,165 @@ function TransactionModal({ open, onClose }: { open: boolean; onClose: () => voi
 
     return (
         <Dialog open={open} onOpenChange={open => !open && onClose()}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-                            <ReceiptText className="w-4 h-4 text-blue-600" />
+            <DialogContent className="w-[95vw] sm:max-w-xl max-h-[90vh] p-0 bg-slate-50 dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col">
+                {/* Header */}
+                <div className="pl-6 pr-14 py-4 bg-white dark:bg-slate-950 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-4 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className={cn(
+                            'w-10 h-10 rounded-2xl flex items-center justify-center shadow-2xs shrink-0 border',
+                            type === 'income'
+                                ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                                : 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800'
+                        )}>
+                            <ReceiptText className="w-5 h-5" />
                         </div>
-                        Registrar Movimiento
-                    </DialogTitle>
-                    <DialogDescription>
-                        Ingreso o egreso de la cuenta.
-                    </DialogDescription>
-                </DialogHeader>
+                        <div>
+                            <DialogHeader className="text-left p-0 space-y-0">
+                                <DialogTitle className="text-lg font-black text-slate-950 dark:text-slate-100 tracking-tight">
+                                    Registrar Movimiento Bancario
+                                </DialogTitle>
+                                <DialogDescription className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                                    {accountName ? `Cuenta: ${accountName}` : 'Ingreso o egreso directo'}
+                                </DialogDescription>
+                            </DialogHeader>
+                        </div>
+                    </div>
+                </div>
 
-                <div className="px-6 pb-4 space-y-4">
-                    <div className="grid grid-cols-2 gap-2">
+                <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
+                    {/* Selector Tipo: Ingreso / Egreso */}
+                    <div className="grid grid-cols-2 gap-3">
                         <button
                             type="button"
                             onClick={() => setType('income')}
                             className={cn(
-                                'h-10 rounded-xl border text-sm font-bold flex items-center justify-center gap-1.5 transition-colors',
+                                'h-12 rounded-2xl border-2 text-xs font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-2xs',
                                 type === 'income'
-                                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                                    : 'border-slate-200 text-slate-400 hover:border-emerald-200'
+                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-600/20'
+                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-emerald-300'
                             )}
                         >
-                            <ArrowUpRight className="w-4 h-4" /> Ingreso
+                            <ArrowUpRight className="w-4 h-4" /> Ingreso (Entrada)
                         </button>
                         <button
                             type="button"
                             onClick={() => setType('expense')}
                             className={cn(
-                                'h-10 rounded-xl border text-sm font-bold flex items-center justify-center gap-1.5 transition-colors',
+                                'h-12 rounded-2xl border-2 text-xs font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-2xs',
                                 type === 'expense'
-                                    ? 'bg-red-50 border-red-300 text-red-600'
-                                    : 'border-slate-200 text-slate-400 hover:border-red-200'
+                                    ? 'bg-red-600 text-white border-red-600 shadow-md ring-2 ring-red-600/20'
+                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-red-300'
                             )}
                         >
-                            <ArrowDownRight className="w-4 h-4" /> Egreso
+                            <ArrowDownRight className="w-4 h-4" /> Egreso (Salida)
                         </button>
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                        <label htmlFor="tx-amount" className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                            Monto <span className="text-red-500 ml-0.5">*</span>
-                        </label>
-                        <Input
-                            id="tx-amount"
-                            type="number"
-                            min="0.01"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={amount}
-                            onChange={e => setAmount(e.target.value)}
-                            className={cn('tabular-nums', error && 'border-red-400 focus-visible:ring-red-400')}
-                            aria-invalid={!!error}
-                        />
-                        {error && <p className="text-xs text-red-500 mt-0.5">{error}</p>}
+                    {/* Monto input */}
+                    <div className="space-y-1.5">
+                        <div className="flex justify-between items-center">
+                            <label htmlFor="tx-amount" className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider block">
+                                Monto <span className="text-red-500">*</span>
+                            </label>
+                            {currentBalance !== undefined && (
+                                <span className="text-[11px] font-bold text-slate-500">
+                                    Disponible: ${currentBalance.toLocaleString()}
+                                </span>
+                            )}
+                        </div>
+                        <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-slate-400">
+                                $
+                            </span>
+                            <Input
+                                id="tx-amount"
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={amount}
+                                onChange={e => setAmount(e.target.value)}
+                                className={cn(
+                                    'pl-9 h-13 rounded-2xl bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 font-black text-2xl tabular-nums',
+                                    error && 'border-red-500'
+                                )}
+                            />
+                        </div>
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                        <label htmlFor="tx-concept" className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                            Concepto
+                    {/* Sugerencias Rápidas de Concepto */}
+                    <div className="space-y-1.5">
+                        <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider block">
+                            Motivos frecuentes:
                         </label>
-                        <Input
-                            id="tx-concept"
-                            placeholder="ej. Venta del día, pago a proveedor..."
-                            value={concept}
-                            onChange={e => setConcept(e.target.value)}
-                        />
+                        <div className="flex flex-wrap gap-1.5">
+                            {(type === 'income' ? quickConceptsIncome : quickConceptsExpense).map((q, idx) => (
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => setConcept(q)}
+                                    className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 rounded-xl text-[11px] font-bold text-slate-700 dark:text-slate-300 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                                >
+                                    {q}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                        <label htmlFor="tx-reference" className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                            Referencia
-                        </label>
-                        <Input
-                            id="tx-reference"
-                            placeholder="Nº de comprobante (opcional)"
-                            value={reference}
-                            onChange={e => setReference(e.target.value)}
-                        />
+                    {/* Concepto y Referencia */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label htmlFor="tx-concept" className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider block">
+                                Detalle / Concepto
+                            </label>
+                            <Input
+                                id="tx-concept"
+                                placeholder="ej. Pago a distribuidora Polar..."
+                                value={concept}
+                                onChange={e => setConcept(e.target.value)}
+                                className="h-11 rounded-xl bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 font-bold text-sm"
+                            />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label htmlFor="tx-reference" className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider block">
+                                Referencia / Nº Comprobante
+                            </label>
+                            <Input
+                                id="tx-reference"
+                                placeholder="ej. REF-849201"
+                                value={reference}
+                                onChange={e => setReference(e.target.value)}
+                                className="h-11 rounded-xl bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 font-bold text-sm"
+                            />
+                        </div>
                     </div>
+
+                    {error && (
+                        <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl">
+                            <p className="text-xs font-bold text-red-600 dark:text-red-400">{error}</p>
+                        </div>
+                    )}
                 </div>
 
-                <DialogFooter className="border-t border-slate-100">
-                    <Button variant="outline" onClick={onClose}>Cancelar</Button>
+                {/* Footer */}
+                <div className="p-4 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3 shrink-0">
+                    <Button variant="outline" onClick={onClose} className="h-11 px-5 rounded-xl font-bold">
+                        Cancelar
+                    </Button>
                     <Button
                         onClick={handleSave}
                         disabled={createTransaction.isPending}
-                        className={cn('shadow-sm', type === 'expense' ? 'bg-red-600 hover:bg-red-700' : 'shadow-emerald-500/20')}
+                        className={cn(
+                            'h-11 px-6 rounded-xl font-black text-white shadow-md',
+                            type === 'income'
+                                ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                                : 'bg-red-600 hover:bg-red-700 shadow-red-600/20'
+                        )}
                     >
-                        {createTransaction.isPending ? 'Registrando...' : 'Registrar Movimiento'}
+                        {createTransaction.isPending ? 'Registrando...' : type === 'income' ? 'Registrar Ingreso' : 'Registrar Egreso'}
                     </Button>
-                </DialogFooter>
+                </div>
             </DialogContent>
         </Dialog>
     );
@@ -255,7 +327,12 @@ export default function AccountDetail() {
                 )}
             </div>
 
-            <TransactionModal open={modalOpen} onClose={() => setModalOpen(false)} />
+            <TransactionModal
+                open={modalOpen}
+                onClose={() => setModalOpen(false)}
+                accountName={account.name}
+                currentBalance={account.balance}
+            />
         </div>
     );
 }
