@@ -4,6 +4,7 @@
 
 import { Response } from 'express';
 import { AuthRequest } from '../../core/middlewares/auth.middleware';
+import { prisma } from '../../config/prisma';
 import * as aiChatService from './ai-chat.service';
 
 /**
@@ -13,8 +14,9 @@ import * as aiChatService from './ai-chat.service';
  */
 export const chat = async (req: AuthRequest, res: Response) => {
     try {
-        const { question } = req.body;
+        const { question, branchId: bodyBranchId } = req.body;
         const userId = req.user?.id || 'anonymous';
+        const branchId = bodyBranchId || req.user?.branchId || (req.headers['x-branch-id'] as string);
 
         if (!question || typeof question !== 'string' || question.trim().length === 0) {
             return res.status(400).json({ success: false, error: 'Escribí una pregunta.' });
@@ -25,7 +27,16 @@ export const chat = async (req: AuthRequest, res: Response) => {
             return res.status(400).json({ success: false, error: 'La pregunta es demasiado larga (máx. 500 caracteres).' });
         }
 
-        const result = await aiChatService.processAiQuestion(trimmed, userId);
+        // Obtener nombre de la sede si hay branchId
+        let branchName: string | undefined;
+        if (branchId) {
+            try {
+                const b = await prisma.branch.findUnique({ where: { id: branchId }, select: { name: true } });
+                if (b) branchName = b.name;
+            } catch {}
+        }
+
+        const result = await aiChatService.processAiQuestion(trimmed, userId, { branchId, branchName });
 
         // Guardar mensajes en la sesión
         try {
@@ -33,7 +44,13 @@ export const chat = async (req: AuthRequest, res: Response) => {
             const newMessages = [
                 ...existing,
                 { role: 'user' as const, content: trimmed, timestamp: new Date().toISOString() },
-                { role: 'assistant' as const, content: result.answer, exportData: result.exportData, timestamp: new Date().toISOString() },
+                {
+                    role: 'assistant' as const,
+                    content: result.answer,
+                    exportData: result.exportData,
+                    actions: result.actions,
+                    timestamp: new Date().toISOString()
+                },
             ];
             // Mantener solo últimos 50 mensajes
             const trimmed2 = newMessages.slice(-50);
@@ -48,6 +65,8 @@ export const chat = async (req: AuthRequest, res: Response) => {
                 answer: result.answer,
                 rows: result.data || null,
                 exportData: result.exportData || null,
+                actions: result.actions || null,
+                fromCache: Boolean(result.fromCache),
             },
         });
     } catch (error: any) {

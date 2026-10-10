@@ -4,6 +4,7 @@
 // =============================================================================
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import toast from 'react-hot-toast';
@@ -14,8 +15,22 @@ import {
     Users,
     BarChart3,
     TrendingUp,
+    Boxes,
+    ShoppingCart,
+    Landmark,
+    FileText,
+    Truck,
+    ShoppingBag,
+    ArrowRight,
+    Zap,
 } from 'lucide-react';
 import { AiChatChart } from './AiChatChart';
+
+interface ActionChip {
+    label: string;
+    path: string;
+    icon?: string;
+}
 
 interface Message {
     role: 'user' | 'assistant';
@@ -23,6 +38,8 @@ interface Message {
     sql?: string | null;
     rows?: any[] | null;
     exportData?: any[] | null;
+    actions?: ActionChip[] | null;
+    fromCache?: boolean;
     timestamp: Date;
 }
 
@@ -75,6 +92,7 @@ const QUICK_QUESTIONS = [
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 export function AiChat() {
+    const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
@@ -83,7 +101,7 @@ export function AiChat() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const { token } = useAuthStore();
+    const { token, selectedBranch, user } = useAuthStore();
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -129,7 +147,11 @@ export function AiChat() {
             const res = await api.get('/ai-chat/session');
             const data = res.data?.data;
             if (Array.isArray(data) && data.length > 0) {
-                setMessages(data.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) })));
+                setMessages(data.map((m: any) => ({
+                    ...m,
+                    timestamp: new Date(m.timestamp),
+                    actions: m.actions || null,
+                })));
             }
         } catch { /* silent */ }
     }, []);
@@ -153,7 +175,11 @@ export function AiChat() {
         setInput('');
         setLoading(true);
         try {
-            const res = await api.post('/ai-chat', { question: text.trim() });
+            const activeBranchId = selectedBranch || user?.branchId;
+            const res = await api.post('/ai-chat', {
+                question: text.trim(),
+                branchId: activeBranchId || undefined,
+            });
             const data = res.data?.data;
             setMessages(prev => [...prev, {
                 role: 'assistant',
@@ -161,6 +187,8 @@ export function AiChat() {
                 sql: data?.sql || null,
                 rows: data?.rows || null,
                 exportData: data?.exportData || null,
+                actions: data?.actions || null,
+                fromCache: Boolean(data?.fromCache),
                 timestamp: new Date(),
             }]);
         } catch (error: any) {
@@ -386,9 +414,42 @@ export function AiChat() {
                                             />
                                         )}
 
-                                        <p className={`text-[10px] mt-1.5 font-medium ${msg.role === 'user' ? 'text-white/70' : 'text-slate-400 dark:text-slate-500'}`}>
-                                            {msg.timestamp.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
-                                        </p>
+                                        {/* Chips de Acción / Deep Linking hacia módulos del ERP */}
+                                        {msg.actions && msg.actions.length > 0 && (
+                                            <div className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex flex-col gap-1.5">
+                                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                                    Acciones rápidas:
+                                                </span>
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    {msg.actions.map((act, aIdx) => (
+                                                        <button
+                                                            key={aIdx}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                navigate(act.path);
+                                                                if (window.innerWidth < 640) setIsOpen(false);
+                                                            }}
+                                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 dark:bg-slate-700/80 dark:hover:bg-emerald-950/40 text-slate-700 hover:text-emerald-700 dark:text-slate-200 dark:hover:text-emerald-400 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-600 transition-all cursor-pointer active:scale-95 group shadow-2xs"
+                                                        >
+                                                            {renderActionIcon(act.icon)}
+                                                            <span>{act.label}</span>
+                                                            <span className="text-[10px] text-slate-400 group-hover:translate-x-0.5 transition-transform">→</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="flex items-center justify-between mt-1.5 pt-0.5">
+                                            <p className={`text-[10px] font-medium ${msg.role === 'user' ? 'text-white/70' : 'text-slate-400 dark:text-slate-500'}`}>
+                                                {msg.timestamp.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                            {msg.fromCache && (
+                                                <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-md">
+                                                    <Zap className="w-2.5 h-2.5" /> Instantáneo (0ms)
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                                 );
@@ -475,4 +536,22 @@ function formatMarkdown(text: string): React.ReactNode {
             return <span key={`${i}-${j}`}>{ip}</span>;
         });
     });
+}
+
+function renderActionIcon(iconName?: string) {
+    const cls = 'w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0';
+    switch (iconName) {
+        case 'Package': return <Package className={cls} />;
+        case 'Boxes': return <Boxes className={cls} />;
+        case 'Users': return <Users className={cls} />;
+        case 'DollarSign': return <DollarSign className={cls} />;
+        case 'ShoppingCart': return <ShoppingCart className={cls} />;
+        case 'Landmark': return <Landmark className={cls} />;
+        case 'FileText': return <FileText className={cls} />;
+        case 'Truck': return <Truck className={cls} />;
+        case 'ShoppingBag': return <ShoppingBag className={cls} />;
+        case 'BarChart3': return <BarChart3 className={cls} />;
+        case 'TrendingUp': return <TrendingUp className={cls} />;
+        default: return <ArrowRight className={cls} />;
+    }
 }

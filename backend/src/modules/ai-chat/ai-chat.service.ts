@@ -297,23 +297,145 @@ export function validateSql(rawSql: string): SqlValidation {
     return { valid: true, sql };
 }
 
-// ─── Interfaz de respuesta ───────────────────────────────────────────────────
+// ─── Interfaz de respuesta y acciones ─────────────────────────────────────────
+export interface ActionChip {
+    label: string;
+    path: string;
+    icon?: string;
+}
+
+export interface BranchContext {
+    branchId?: string;
+    branchName?: string;
+}
+
 export interface AiChatResponse {
     answer: string;
     data?: any[];
     exportData?: any[];
+    actions?: ActionChip[];
+    fromCache?: boolean;
     error?: string;
 }
 
+// ─── Caché en memoria para consultas recurrentes (TTL: 3 min) ───────────────
+interface CacheEntry {
+    response: AiChatResponse;
+    timestamp: number;
+}
+const queryCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 3 * 60 * 1000;
+
+export function getCachedResponse(key: string): AiChatResponse | null {
+    const entry = queryCache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+        queryCache.delete(key);
+        return null;
+    }
+    return entry.response;
+}
+
+export function setCachedResponse(key: string, response: AiChatResponse): void {
+    if (queryCache.size > 200) {
+        const oldestKey = queryCache.keys().next().value;
+        if (oldestKey) queryCache.delete(oldestKey);
+    }
+    queryCache.set(key, { response, timestamp: Date.now() });
+}
+
+export function clearAiCache(): void {
+    queryCache.clear();
+}
+
+// ─── Detección de Chips de Acción / Deep Linking ─────────────────────────────
+export function detectActions(question: string, sql?: string | null, answer?: string): ActionChip[] {
+    const actions: ActionChip[] = [];
+    const text = `${question} ${sql || ''} ${answer || ''}`.toLowerCase();
+
+    // Clientes / Deudas / Cobros
+    if (/cliente|deud|cobro|moros|customer/i.test(text)) {
+        actions.push({ label: 'Ver Clientes', path: '/customers', icon: 'Users' });
+    }
+
+    // Inventario / Stock / Productos
+    if (/stock|inventar|agotad|bajo stock|reponer|merma/i.test(text)) {
+        actions.push({ label: 'Gestión de Inventario', path: '/inventory', icon: 'Package' });
+    }
+    if (/producto|art[ií]culo|precio|costo/i.test(text) && !actions.some(a => a.path === '/products')) {
+        actions.push({ label: 'Catálogo de Productos', path: '/products', icon: 'Boxes' });
+    }
+
+    // Ventas / POS / Caja
+    if (/caja|arqueo|cierre|apertura|cash_register/i.test(text)) {
+        actions.push({ label: 'Control de Caja', path: '/cash-registers', icon: 'DollarSign' });
+    }
+    if (/vender|venta|pos|factur|ticket|cobr/i.test(text) && !actions.some(a => a.path === '/pos')) {
+        actions.push({ label: 'Ir al POS', path: '/pos', icon: 'ShoppingCart' });
+    }
+
+    // Bancos / Finanzas
+    if (/banco|cuenta|transfer|saldo|bank/i.test(text)) {
+        actions.push({ label: 'Módulo de Bancos', path: '/banks', icon: 'Landmark' });
+    }
+    if (/finanza|ganancia|margen|flujo|ingreso|gasto/i.test(text) && !actions.some(a => a.path === '/finance')) {
+        actions.push({ label: 'Módulo de Finanzas', path: '/finance', icon: 'TrendingUp' });
+    }
+
+    // Cotizaciones
+    if (/cotiz|presupuesto|quote/i.test(text)) {
+        actions.push({ label: 'Cotizaciones', path: '/quotes', icon: 'FileText' });
+    }
+
+    // Proveedores / Compras
+    if (/proveedor|supplier/i.test(text)) {
+        actions.push({ label: 'Proveedores', path: '/suppliers', icon: 'Truck' });
+    }
+    if (/compra|orden de compra|purchase/i.test(text) && !actions.some(a => a.path === '/purchases')) {
+        actions.push({ label: 'Compras', path: '/purchases', icon: 'ShoppingBag' });
+    }
+
+    // Reportes
+    if (/reporte|resumen|estad[ií]stic/i.test(text) && !actions.some(a => a.path === '/reports')) {
+        actions.push({ label: 'Reportes Detallados', path: '/reports', icon: 'BarChart3' });
+    }
+
+    return actions.slice(0, 3);
+}
+
+function buildSystemPromptWithBranch(branch?: BranchContext): string {
+    let prompt = SYSTEM_PROMPT;
+    if (branch?.branchId) {
+        const bName = branch.branchName ? `"${branch.branchName}"` : 'activa';
+        prompt += `\n\nCONTEXTO DE SEDE ACTIVA:
+El usuario está operando en la sede ${bName} (branchId = '${branch.branchId}').
+A menos que la pregunta pida explícitamente "todas las sedes" o comparar entre sedes:
+- En transacciones de ventas ("transactions"), filtrá siempre por: t."branchId" = '${branch.branchId}'
+- En stock de inventario ("branch_inventory"), filtrá siempre por: branch_inventory."branchId" = '${branch.branchId}'`;
+    }
+    return prompt;
+}
+
 /**
- * Procesa una pregunta del usuario.
+ * Procesa una pregunta del usuario con soporte de branchContext y caché.
  */
-export const processAiQuestion = async (question: string, userId?: string): Promise<AiChatResponse> => {
+export const processAiQuestion = async (
+    question: string,
+    userId?: string,
+    branchContext?: BranchContext
+): Promise<AiChatResponse> => {
     // Rate limit
     const uid = userId || 'anonymous';
     const rl = checkRateLimit(uid);
     if (!rl.allowed) {
         return { answer: `Estás haciendo muchas preguntas. Esperá ${rl.retryAfter} segundos y probá de nuevo. ⏳` };
+    }
+
+    // Chequear caché en memoria (0 tokens, 0ms)
+    const cacheKey = `${uid}:${branchContext?.branchId || 'all'}:${question.trim().toLowerCase()}`;
+    const cached = getCachedResponse(cacheKey);
+    if (cached) {
+        return { ...cached, fromCache: true };
     }
 
     if (!isAiAvailable()) {
@@ -322,8 +444,9 @@ export const processAiQuestion = async (question: string, userId?: string): Prom
 
     try {
         // ── PASO 1: La IA decide si necesita SQL o solo guía ─────────────────
+        const systemPrompt = buildSystemPromptWithBranch(branchContext);
         const responseText = await callWithRotation([
-            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: question },
         ], 0.2, 1024);
 
@@ -337,9 +460,15 @@ export const processAiQuestion = async (question: string, userId?: string): Prom
             if (selectMatch) sql = selectMatch[1].trim().replace(/;$/, '');
         }
 
-        // Si no hay SQL, la IA está dando guía → devolver respuesta directa
+        // Si no hay SQL, la IA está dando guía → devolver respuesta directa con acciones
         if (!sql) {
-            return { answer: responseText };
+            const actions = detectActions(question, null, responseText);
+            const directResult: AiChatResponse = {
+                answer: responseText,
+                actions: actions.length > 0 ? actions : undefined,
+            };
+            setCachedResponse(cacheKey, directResult);
+            return directResult;
         }
 
         // ── PASO 2: Ejecutar SQL ────────────────────────────────────────────
@@ -362,19 +491,22 @@ export const processAiQuestion = async (question: string, userId?: string): Prom
             : [];
 
         // ── PASO 3: Formatear respuesta natural ──────────────────────────────
-        // max_tokens 1200: las respuestas analíticas (recomendaciones) son más largas
         const answer = (await callWithRotation([
             { role: 'system', content: buildFormatPrompt(question, data) },
             { role: 'user', content: 'Dame la respuesta.' },
         ], 0.3, 1200)).trim() || formatDataFallback(data);
 
-        // Adjuntar exportData y filas si la consulta devolvió datos
+        // Adjuntar exportData, filas y chips de acción
         const hasData = data.length > 0;
-        return {
+        const actions = detectActions(question, sql, answer);
+        const finalResult: AiChatResponse = {
             answer,
             data: hasData ? data : undefined,
             exportData: hasData ? data : undefined,
+            actions: actions.length > 0 ? actions : undefined,
         };
+        setCachedResponse(cacheKey, finalResult);
+        return finalResult;
     } catch (error: any) {
         console.error('[ai-chat] Error:', error.message);
         if (!isAiAvailable()) {
@@ -461,7 +593,7 @@ export const analyzeUploadedFile = async (fileBuffer: Buffer, filename: string, 
 };
 
 // ─── Persistencia de sesiones ────────────────────────────────────────────────
-export interface ChatMessage { role: 'user' | 'assistant'; content: string; exportData?: any[] | null; timestamp: string; }
+export interface ChatMessage { role: 'user' | 'assistant'; content: string; exportData?: any[] | null; actions?: ActionChip[] | null; timestamp: string; }
 
 export const saveChatSession = async (userId: string, messages: ChatMessage[]): Promise<void> => {
     try {
