@@ -44,6 +44,11 @@ export interface PublicCatalog {
     mainCurrency?: string;
     activeCurrencies?: string[];
     exchangeRates?: Record<string, number>;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    description?: string | null;
+    schedule?: string | null;
+    address?: string | null;
 }
 
 export const catalogApi = {

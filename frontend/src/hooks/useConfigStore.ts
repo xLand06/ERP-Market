@@ -81,6 +81,11 @@ export interface ConfigState {
     catalogSlug: string;    // slug público del catálogo ('' = sin catálogo)
     catalogActive: boolean; // flag maestro que habilita el catálogo público
     socialLinks: string;    // JSON string: { facebook?, instagram?, whatsapp? }
+    catalogLogo: string | null;
+    catalogBanner: string | null;
+    catalogDescription: string | null;
+    catalogSchedule: string | null;
+    catalogAddress: string | null;
 
     // Plan Comercial & Límites
     planTier: string;       // 'basic' | 'pro' | 'premium'
@@ -187,6 +192,11 @@ export const useConfigStore = create<ConfigState>()(
             catalogSlug: '',
             catalogActive: false,
             socialLinks: '{}',
+            catalogLogo: null,
+            catalogBanner: null,
+            catalogDescription: null,
+            catalogSchedule: null,
+            catalogAddress: null,
 
             planTier: 'basic',
             planConfig: '',

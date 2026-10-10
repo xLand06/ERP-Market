@@ -8,7 +8,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { 
     Loader2, PackageX, Search, Store, QrCode, Coins, X, 
-    Sparkles, ArrowRight, Layers, Tag, Check, Info
+    Sparkles, ArrowRight, Layers, Tag, Check, Info, Clock, MapPin
 } from 'lucide-react';
 import { catalogApi } from '@/services/catalog.service';
 import type { CatalogGroup, CatalogProduct, CatalogPresentation, SocialLinks } from '@/services/catalog.service';
@@ -466,25 +466,75 @@ export default function PublicCatalogPage() {
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col">
-            {/* Header del Negocio */}
-            <header className="bg-white border-b border-slate-200/90 shadow-2xs">
-                <div className="max-w-5xl mx-auto px-4 py-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100">
-                                <Store className="w-5 h-5" />
-                            </span>
-                            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                                {data.businessName}
-                            </h1>
-                        </div>
-                        {data.taxId && (
-                            <p className="text-xs text-slate-400 font-semibold mt-1 pl-1">
-                                RIF: {data.taxId}
-                            </p>
-                        )}
+            {/* Header del Negocio con Banner opcional */}
+            <header className="bg-white border-b border-slate-200/90 shadow-2xs overflow-hidden">
+                {data.bannerUrl && (
+                    <div className="w-full h-36 sm:h-52 bg-slate-100 overflow-hidden relative">
+                        <img
+                            src={data.bannerUrl}
+                            alt="Banner de la tienda"
+                            className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                     </div>
-                    {renderSocialLinks(data.socialLinks)}
+                )}
+
+                <div className="max-w-5xl mx-auto px-4 py-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex items-start sm:items-center gap-3.5">
+                            {data.logoUrl ? (
+                                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden flex items-center justify-center p-1 shrink-0 -mt-2 sm:-mt-0">
+                                    <img
+                                        src={data.logoUrl}
+                                        alt={data.businessName}
+                                        className="w-full h-full object-contain"
+                                    />
+                                </div>
+                            ) : (
+                                <span className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100 shrink-0">
+                                    <Store className="w-6 h-6" />
+                                </span>
+                            )}
+
+                            <div>
+                                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">
+                                    {data.businessName}
+                                </h1>
+                                {data.taxId && (
+                                    <span className="text-[11px] text-slate-400 font-semibold block mt-0.5">
+                                        RIF: {data.taxId}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {renderSocialLinks(data.socialLinks)}
+                    </div>
+
+                    {/* Descripción / Bio comercial */}
+                    {data.description && (
+                        <p className="text-xs sm:text-sm text-slate-600 mt-3 pt-3 border-t border-slate-100 max-w-2xl leading-relaxed">
+                            {data.description}
+                        </p>
+                    )}
+
+                    {/* Horarios y Dirección */}
+                    {(data.schedule || data.address) && (
+                        <div className="flex flex-wrap items-center gap-4 mt-3 pt-2 text-xs text-slate-500 font-medium">
+                            {data.schedule && (
+                                <div className="flex items-center gap-1.5">
+                                    <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                    <span>{data.schedule}</span>
+                                </div>
+                            )}
+                            {data.address && (
+                                <div className="flex items-center gap-1.5">
+                                    <MapPin className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                    <span>{data.address}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </header>
 

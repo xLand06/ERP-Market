@@ -119,4 +119,71 @@ router.post(
     }
 );
 
+/**
+ * POST /api/upload/catalog-image
+ * Sube logo o banner del catálogo → convierte a WebP optimizado → guarda en uploads/products/
+ * Solo plan PREMIUM.
+ */
+router.post(
+    '/catalog-image',
+    authMiddleware,
+    planGuard('premium'),
+    (req, res, next) => {
+        upload.single('image')(req, res, (err) => {
+            if (err instanceof multer.MulterError) {
+                if (err.code === 'LIMIT_FILE_SIZE') {
+                    return res.status(400).json({ success: false, error: 'La imagen no puede superar 5MB.' });
+                }
+                return res.status(400).json({ success: false, error: err.message });
+            }
+            if (err) {
+                return res.status(400).json({ success: false, error: err.message });
+            }
+            next();
+        });
+    },
+    async (req, res) => {
+        const tempFile = req.file?.path ?? '';
+        try {
+            if (!req.file) {
+                return res.status(400).json({ success: false, error: 'No se envió ninguna imagen.' });
+            }
+
+            const type = (req.query.type as string) || 'logo';
+            const outputFilename = `catalog-${type}-${crypto.randomBytes(8).toString('hex')}.webp`;
+            const outputPath = path.join(UPLOAD_DIR, outputFilename);
+
+            const resizeOptions = type === 'banner'
+                ? { width: 1400, height: 500, fit: 'inside' as const }
+                : { width: 500, height: 500, fit: 'inside' as const };
+
+            await sharp(tempFile)
+                .resize(resizeOptions.width, resizeOptions.height, {
+                    fit: resizeOptions.fit,
+                    withoutEnlargement: true,
+                })
+                .webp({ quality: 85 })
+                .toFile(outputPath);
+
+            if (tempFile) await fs.unlink(tempFile).catch(() => {});
+
+            const url = `/uploads/products/${outputFilename}`;
+            const stats = await fs.stat(outputPath);
+
+            res.json({
+                success: true,
+                url,
+                filename: outputFilename,
+                size: stats.size,
+                mimetype: 'image/webp',
+                format: 'webp',
+            });
+        } catch (error: any) {
+            console.error('[upload:catalog-image] Error:', error.message);
+            if (tempFile) await fs.unlink(tempFile).catch(() => {});
+            res.status(500).json({ success: false, error: 'Error al procesar imagen de catálogo.' });
+        }
+    }
+);
+
 export default router;

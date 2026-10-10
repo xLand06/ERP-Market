@@ -46,6 +46,11 @@ export interface SystemSettings {
     catalogSlug: string;    // slug público del catálogo ('' = sin catálogo)
     catalogActive: boolean; // flag maestro que habilita el catálogo público
     socialLinks: string;    // JSON string: { facebook?, instagram?, whatsapp? }
+    catalogLogo?: string | null;        // URL logo personalizado (Plan Premium)
+    catalogBanner?: string | null;      // URL banner/portada personalizada (Plan Premium)
+    catalogDescription?: string | null; // Descripción / Bio comercial del catálogo
+    catalogSchedule?: string | null;    // Horarios de atención (ej. Lun-Sáb 8am-8pm)
+    catalogAddress?: string | null;     // Dirección de atención / punto de retiro
 
     // Avisos y comunicados del sistema
     systemNotice?: string | null;
@@ -92,6 +97,11 @@ const DEFAULT_SETTINGS: SystemSettings = {
     catalogSlug: '',
     catalogActive: false,
     socialLinks: '{}',
+    catalogLogo: null,
+    catalogBanner: null,
+    catalogDescription: null,
+    catalogSchedule: null,
+    catalogAddress: null,
 
     systemNotice: null,
     noticeLevel: 'INFO',

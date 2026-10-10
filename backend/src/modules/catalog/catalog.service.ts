@@ -46,6 +46,11 @@ export interface PublicCatalog {
     mainCurrency: string;
     activeCurrencies: string[];
     exchangeRates: Record<string, number>;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    description?: string | null;
+    schedule?: string | null;
+    address?: string | null;
 }
 
 // Grupo sintético para productos sin subgrupo asignado
@@ -120,6 +125,9 @@ export const getPublicCatalog = async (slug: string): Promise<PublicCatalog | nu
         exchangeRates[r.code] = Number(r.rate);
     }
 
+    // En plan PREMIUM se habilitan logo, banner y datos completos de marca
+    const isPremium = (settings.planTier || '').toLowerCase() === 'premium';
+
     return {
         businessName: settings.businessName,
         taxId: settings.taxId,
@@ -130,5 +138,10 @@ export const getPublicCatalog = async (slug: string): Promise<PublicCatalog | nu
             ? settings.activeCurrencies
             : ['USD', 'VES', 'COP'],
         exchangeRates,
+        logoUrl: isPremium ? (settings.catalogLogo || null) : null,
+        bannerUrl: isPremium ? (settings.catalogBanner || null) : null,
+        description: isPremium ? (settings.catalogDescription || null) : null,
+        schedule: isPremium ? (settings.catalogSchedule || null) : null,
+        address: isPremium ? (settings.catalogAddress || settings.fiscalAddress || null) : null,
     };
 };
