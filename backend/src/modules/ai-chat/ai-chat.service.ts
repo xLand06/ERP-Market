@@ -163,27 +163,29 @@ WITH ventas_30 AS (
 SELECT p."name", g."name" AS category, v.revenue, v.units
 FROM ventas_30 v
 JOIN "products" p ON p."id" = v."productId"
-LEFT JOIN "groups" g ON g."id" = p."groupId"
+LEFT JOIN "sub_groups" sg ON sg."id" = p."subGroupId"
+LEFT JOIN "groups" g ON g."id" = sg."groupId"
 ORDER BY v.revenue DESC
-LIMIT 10
+LIMIT 10;
 \`\`\`
 
 REGLAS SQL:
 - SOLO SELECT.
-- IMPORTANTE NOMBRES Y STRINGS: Las tablas y nombres de columnas van entre comillas dobles: "name", "createdAt", "transaction_items", "products". Los literales de texto van SIEMPRE entre comillas simples: 'SALE', 'COMPLETED'. NUNCA uses comillas dobles para valores string.
+- IMPORTANTE NOMBRES Y STRINGS: Las tablas y nombres de columnas van entre comillas dobles: "name", "createdAt", "transaction_items", "products", "subGroupId". Los literales de texto van SIEMPRE entre comillas simples: 'SALE', 'COMPLETED'. NUNCA uses comillas dobles para valores string.
 - Ventas completadas: t."type"='SALE' AND t."status"='COMPLETED'
 - Fechas: "createdAt" >= NOW() - INTERVAL '7 days' (también '30 days', '90 days')
 - Stock: branch_inventory."stock", branch_inventory."minStock"
-- Categorías: groups."name" y sub_groups."name" a través de products."groupId" / products."subGroupId"
-- Bancos y saldos: "bank_accounts" (name, "bankName", "initialBalance", "isActive"), "bank_transactions" (type, amount, concept, "accountId")
+- Relación categorías: "products" tiene "subGroupId", NO tiene "groupId" directo. Para categoría join: products p LEFT JOIN "sub_groups" sg ON sg."id" = p."subGroupId" LEFT JOIN "groups" g ON g."id" = sg."groupId".
+- Bancos y saldos: "bank_accounts" (id, name, "bankName", "initialBalance", "isActive"), "bank_transactions" (id, type, amount, concept, "accountId")
 
 MÓDULOS: POS(/pos) · Productos(/products) · Inventario(/inventory) · Finanzas(/finance) · Clientes(/customers) · Proveedores(/suppliers) · Dashboard(/dashboard) · Reportes(/reports) · Bancos(/banks) · Cotizaciones(/quotes)
 
 SCHEMA:
 - "transactions": id, type (SALE | INVENTORY_IN | QUOTE), status (COMPLETED | CANCELLED | PENDING), total, "createdAt", "branchId", "customerId", currency
 - "transaction_items": id, quantity, "unitPrice", subtotal, "transactionId", "productId"
-- "products": id, name, price, cost, "groupId", "subGroupId"
-- "groups": id, name · "sub_groups": id, name, "groupId"
+- "products": id, name, price, cost, "subGroupId", "isActive"
+- "sub_groups": id, name, "groupId"
+- "groups": id, name
 - "branches": id, name · "branch_inventory": id, stock, "minStock", "productId", "branchId"
 - "customers": id, name, balance
 - "bank_accounts": id, name, "bankName", "initialBalance", "isActive"
