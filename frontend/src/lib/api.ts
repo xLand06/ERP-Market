@@ -173,7 +173,12 @@ api.interceptors.request.use((config) => {
         base = '/api';
     }
     if (config.url && !/^https?:\/\//.test(config.url)) {
-        config.url = base + config.url;
+        const cleanPath = config.url.startsWith('/') ? config.url : `/${config.url}`;
+        if (cleanPath.startsWith('/api/')) {
+            config.url = `${base.replace(/\/api$/, '')}${cleanPath}`;
+        } else {
+            config.url = `${base}${cleanPath}`;
+        }
     }
     return config;
 });

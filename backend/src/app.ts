@@ -53,6 +53,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.url.startsWith('/auth/') || req.url === '/auth') {
         req.url = `/api${req.url}`;
     }
+    // Prevent duplicated /api/api/* path prefix
+    if (req.url.startsWith('/api/api/')) {
+        req.url = req.url.replace(/^\/api\/api\//, '/api/');
+    }
     next();
 });
 

@@ -14,20 +14,21 @@ export const isAiAvailable = (): boolean => {
     return Boolean(getOpenRouterKey() || getGroqKey());
 };
 
-// ─── Free models rotation en OpenRouter ───────────────────────────────────────
-const OPENROUTER_FREE_MODELS = [
-    'openrouter/free',
-    'nvidia/nemotron-3-ultra-550b-a55b:free',
-    'liquid/lfm-2.5-2.6b:free',
-    'nvidia/nemotron-3.5-lightning:free',
-    'google/gemma-4-31b-it:free',
-    'google/gemma-4-26b-a4b-it:free',
+// ─── Groq models (Modelos activos y verificados de Groq) ──────────────────────
+const GROQ_MODELS = [
+    'openai/gpt-oss-120b',
+    'qwen/qwen3.8-27b',
+    'openai/gpt-oss-20b',
 ];
 
-// ─── Groq fallback models (IDs válidos de Groq) ──────────────────────────────
-const GROQ_MODELS = [
-    'llama-3.3-70b-versatile',
-    'llama-3.1-8b-instant',
+// ─── Free models rotation en OpenRouter ───────────────────────────────────────
+const OPENROUTER_FREE_MODELS = [
+    'google/gemma-4-31b-it:free',
+    'google/gemma-4-26b-a4b-it:free',
+    'nvidia/nemotron-3-super-120b-a12b:free',
+    'nvidia/nemotron-3-ultra-550b-a55b:free',
+    'nvidia/nemotron-3.5-lightning:free',
+    'openrouter/free',
 ];
 
 async function callOpenRouter(model: string, messages: any[], temperature: number, maxTokens: number): Promise<string> {
@@ -85,20 +86,7 @@ async function callGroq(model: string, messages: any[], temperature: number, max
 }
 
 async function callWithRotation(messages: any[], temperature: number, maxTokens: number): Promise<string> {
-    // 1. Priorizar OpenRouter con modelos gratuitos
-    if (getOpenRouterKey()) {
-        for (const model of OPENROUTER_FREE_MODELS) {
-            try {
-                const text = await callOpenRouter(model, messages, temperature, maxTokens);
-                if (text) return text;
-            } catch (error: any) {
-                console.warn(`[ai-chat] OpenRouter (${model}) falló:`, error.message?.slice(0, 100));
-                continue;
-            }
-        }
-    }
-
-    // 2. Fallback a Groq si está configurado
+    // 1. Priorizar Groq (ultrarrápido y confiable con modelos disponibles)
     if (getGroqKey()) {
         for (const model of GROQ_MODELS) {
             try {
@@ -106,6 +94,19 @@ async function callWithRotation(messages: any[], temperature: number, maxTokens:
                 if (text) return text;
             } catch (error: any) {
                 console.warn(`[ai-chat] Groq (${model}) falló:`, error.message?.slice(0, 100));
+                continue;
+            }
+        }
+    }
+
+    // 2. Fallback a OpenRouter
+    if (getOpenRouterKey()) {
+        for (const model of OPENROUTER_FREE_MODELS) {
+            try {
+                const text = await callOpenRouter(model, messages, temperature, maxTokens);
+                if (text) return text;
+            } catch (error: any) {
+                console.warn(`[ai-chat] OpenRouter (${model}) falló:`, error.message?.slice(0, 100));
                 continue;
             }
         }
@@ -168,21 +169,25 @@ LIMIT 10
 \`\`\`
 
 REGLAS SQL:
-- SOLO SELECT. Columnas camelCase entre comillas dobles: "name", "createdAt"
-- Ventas completadas: "type"='SALE' AND "status"='COMPLETED'
+- SOLO SELECT.
+- IMPORTANTE NOMBRES Y STRINGS: Las tablas y nombres de columnas van entre comillas dobles: "name", "createdAt", "transaction_items", "products". Los literales de texto van SIEMPRE entre comillas simples: 'SALE', 'COMPLETED'. NUNCA uses comillas dobles para valores string.
+- Ventas completadas: t."type"='SALE' AND t."status"='COMPLETED'
 - Fechas: "createdAt" >= NOW() - INTERVAL '7 days' (también '30 days', '90 days')
 - Stock: branch_inventory."stock", branch_inventory."minStock"
 - Categorías: groups."name" y sub_groups."name" a través de products."groupId" / products."subGroupId"
+- Bancos y saldos: "bank_accounts" (name, "bankName", "initialBalance", "isActive"), "bank_transactions" (type, amount, concept, "accountId")
 
 MÓDULOS: POS(/pos) · Productos(/products) · Inventario(/inventory) · Finanzas(/finance) · Clientes(/customers) · Proveedores(/suppliers) · Dashboard(/dashboard) · Reportes(/reports) · Bancos(/banks) · Cotizaciones(/quotes)
 
 SCHEMA:
-- "transactions": id, type (SALE | INVENTORY_IN | QUOTE), status (COMPLETED | CANCELLED | PENDING), total, createdAt, branchId, customerId, currency
-- "transaction_items": id, quantity, unitPrice, subtotal, transactionId, productId
-- "products": id, name, price, cost, groupId, subGroupId
-- "groups": id, name · "sub_groups": id, name, groupId
-- "branches": id, name · "branch_inventory": id, stock, minStock, productId, branchId
-- "customers": id, name, balance`;
+- "transactions": id, type (SALE | INVENTORY_IN | QUOTE), status (COMPLETED | CANCELLED | PENDING), total, "createdAt", "branchId", "customerId", currency
+- "transaction_items": id, quantity, "unitPrice", subtotal, "transactionId", "productId"
+- "products": id, name, price, cost, "groupId", "subGroupId"
+- "groups": id, name · "sub_groups": id, name, "groupId"
+- "branches": id, name · "branch_inventory": id, stock, "minStock", "productId", "branchId"
+- "customers": id, name, balance
+- "bank_accounts": id, name, "bankName", "initialBalance", "isActive"
+- "bank_transactions": id, type, amount, concept, "accountId"`;
 
 // ─── Seguridad: validar SQL ─────────────────────────────────────────────────
 
