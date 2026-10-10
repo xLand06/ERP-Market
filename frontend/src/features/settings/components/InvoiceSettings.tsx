@@ -245,8 +245,7 @@ function PrinterFormModal({
             <DialogContent
                 onPointerDownOutside={(e) => e.preventDefault()}
                 onInteractOutside={(e) => e.preventDefault()}
-                onEscapeKeyDown={(e) => e.preventDefault()}
-                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] w-[95vw] max-w-2xl max-h-[92vh] p-0 bg-slate-900 rounded-3xl border-2 border-slate-800 shadow-2xl overflow-hidden flex flex-col text-slate-950"
+                className="w-[95vw] max-w-2xl max-h-[92vh] p-0 bg-slate-900 rounded-3xl border-2 border-slate-800 shadow-2xl overflow-hidden flex flex-col text-slate-950"
             >
                 {/* Header estilizado con pr-14 para evitar sobreposición con botón de cierre */}
                 <div className="px-4 py-4 sm:px-6 sm:py-5 bg-slate-950 text-white flex items-center justify-between border-b border-slate-800 shrink-0 pr-12 sm:pr-14">

@@ -15,7 +15,7 @@ const DialogOverlay = React.forwardRef<
     <DialogPrimitive.Overlay
         ref={ref}
         className={cn(
-            'fixed inset-0 z-[70] bg-slate-950/60 backdrop-blur-md p-2 sm:p-6 flex items-center justify-center',
+            'fixed inset-0 z-[70] bg-slate-950/60 backdrop-blur-sm',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             className
@@ -31,27 +31,27 @@ const DialogContent = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
     <DialogPortal>
         <DialogOverlay />
-        <DialogPrimitive.Content
-            ref={ref}
-            className={cn(
-                'fixed left-[50%] top-[50%] z-[70] translate-x-[-50%] translate-y-[-50%]',
-                'w-[calc(100vw-1.5rem)] sm:w-full max-w-lg max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3.5rem)] rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-0 shadow-2xl border border-slate-200/90 dark:border-slate-800 flex flex-col overflow-hidden my-auto safe-area-bottom',
-                'data-[state=open]:animate-in data-[state=closed]:animate-out',
-                'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
-                'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
-                'data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]',
-                'data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]',
-                className
-            )}
-            onEscapeKeyDown={(e) => e.preventDefault()}
-            onPointerDownOutside={(e) => e.preventDefault()}
-            {...props}
-        >
-            {children}
-            <DialogPrimitive.Close className="absolute right-3 top-3 sm:right-4 sm:top-4 rounded-xl p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 z-10 min-w-[44px] min-h-[44px] flex items-center justify-center">
-                <X className="h-4 w-4" />
-            </DialogPrimitive.Close>
-        </DialogPrimitive.Content>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-6 pointer-events-none overflow-y-auto">
+            <DialogPrimitive.Content
+                ref={ref}
+                className={cn(
+                    'relative pointer-events-auto z-[70] transform-gpu backface-hidden [transform:translateZ(0)]',
+                    'w-[calc(100vw-1.5rem)] sm:w-full max-w-lg max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3.5rem)] rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-0 shadow-2xl border border-slate-200/90 dark:border-slate-800 flex flex-col overflow-hidden my-auto safe-area-bottom',
+                    'data-[state=open]:animate-in data-[state=closed]:animate-out',
+                    'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+                    'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+                    className
+                )}
+                onEscapeKeyDown={(e) => e.preventDefault()}
+                onPointerDownOutside={(e) => e.preventDefault()}
+                {...props}
+            >
+                {children}
+                <DialogPrimitive.Close className="absolute right-3 top-3 sm:right-4 sm:top-4 rounded-xl p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 z-10 min-w-[44px] min-h-[44px] flex items-center justify-center">
+                    <X className="h-4 w-4" />
+                </DialogPrimitive.Close>
+            </DialogPrimitive.Content>
+        </div>
     </DialogPortal>
 ));
 DialogContent.displayName = DialogPrimitive.Content.displayName;
