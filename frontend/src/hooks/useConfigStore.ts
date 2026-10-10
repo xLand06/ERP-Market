@@ -85,6 +85,8 @@ export interface ConfigState {
     // Plan Comercial & Límites
     planTier: string;       // 'basic' | 'pro' | 'premium'
     planConfig: string;     // JSON string: { maxUsers, maxBranches, maxProducts }
+    isSettingsLoading: boolean;
+    settingsLoaded: boolean;
 
     // Avisos Administrativos
     systemNotice: string | null;
@@ -188,6 +190,8 @@ export const useConfigStore = create<ConfigState>()(
 
             planTier: 'basic',
             planConfig: '',
+            isSettingsLoading: false,
+            settingsLoaded: false,
 
             systemNotice: null,
             noticeLevel: 'INFO',
@@ -299,6 +303,8 @@ export const useConfigStore = create<ConfigState>()(
             setPurgeLogRetention: (days) => set({ purgeLogRetentionDays: days }),
 
             fetchSettings: async () => {
+                if (get().isSettingsLoading) return;
+                set({ isSettingsLoading: true });
                 try {
                     const currentTheme = get().activeTheme;
                     const res = await api.get('/settings');
@@ -322,14 +328,19 @@ export const useConfigStore = create<ConfigState>()(
                             })(),
                             systemNotice: res.data.data.systemNotice !== undefined ? res.data.data.systemNotice : null,
                             noticeLevel: (res.data.data.noticeLevel as any) || 'INFO',
+                            settingsLoaded: true,
+                            isSettingsLoading: false,
                         });
                         if (typeof document !== 'undefined') {
                             document.documentElement.setAttribute('data-theme', themeToApply);
                             document.documentElement.className = themeToApply === 'dark' ? 'theme-dark dark' : `theme-${themeToApply}`;
                         }
+                    } else {
+                        set({ isSettingsLoading: false });
                     }
                 } catch (error) {
                     console.error('Error fetching settings:', error);
+                    set({ isSettingsLoading: false });
                 }
             },
 

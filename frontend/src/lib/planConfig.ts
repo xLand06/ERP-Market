@@ -41,8 +41,19 @@ export const normalizePlanType = (raw?: string | null): PlanType => {
 
 export const getEffectivePlan = (): PlanType => {
     try {
-        const storeTier = useConfigStore.getState().planTier;
-        if (storeTier) return normalizePlanType(storeTier);
+        const state = useConfigStore.getState();
+        // Si las configuraciones ya cargaron desde el backend, usamos el plan del backend
+        if (state.settingsLoaded && state.planTier) {
+            return normalizePlanType(state.planTier);
+        }
+        // Si hay un ACTIVE_PLAN configurado por env diferente a BASICO, respetarlo
+        if (ACTIVE_PLAN !== 'BASICO') {
+            return ACTIVE_PLAN;
+        }
+        // Si ya hay un planTier persistido o configurado
+        if (state.planTier) {
+            return normalizePlanType(state.planTier);
+        }
     } catch {
         // Fallback si zustand aún no montó
     }
@@ -175,24 +186,38 @@ export const ROLE_CONFIG: Record<RoleType, RoleConfig> = {
             '/cash-registers',
             '/cash-register',
             '/merma',
-            '/settings'
+            '/settings',
+            '/quotes',
+            '/customers'
         ]
     }
 };
 
-export const isPathAllowed = (path: string, userRole?: RoleType, planType?: PlanType): boolean => {
-    if (!userRole) return false;
-    
+export interface PathAccessResult {
+    allowed: boolean;
+    reason?: 'ROLE_FORBIDDEN' | 'PLAN_REQUIRED';
+}
+
+export const checkPathAccess = (path: string, userRole?: RoleType, planType?: PlanType): PathAccessResult => {
+    if (!userRole) return { allowed: false, reason: 'ROLE_FORBIDDEN' };
+
     const roleConfig = ROLE_CONFIG[userRole];
-    if (!roleConfig) return false;
-    
+    if (!roleConfig) return { allowed: false, reason: 'ROLE_FORBIDDEN' };
+
     const isRoleAllowed = roleConfig.allowedPaths.some(p => path.startsWith(p));
-    if (!isRoleAllowed) return false;
+    if (!isRoleAllowed) return { allowed: false, reason: 'ROLE_FORBIDDEN' };
 
     // Verificar además contra el plan activo dinámico
     const effectivePlan = planType ?? getEffectivePlan();
     const planConfig = PLANS[effectivePlan];
-    if (!planConfig) return true;
+    if (!planConfig) return { allowed: true };
 
-    return planConfig.allowedPaths.some(p => path.startsWith(p));
+    const isPlanAllowed = planConfig.allowedPaths.some(p => path.startsWith(p));
+    if (!isPlanAllowed) return { allowed: false, reason: 'PLAN_REQUIRED' };
+
+    return { allowed: true };
+};
+
+export const isPathAllowed = (path: string, userRole?: RoleType, planType?: PlanType): boolean => {
+    return checkPathAccess(path, userRole, planType).allowed;
 };
