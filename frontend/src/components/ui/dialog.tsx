@@ -31,12 +31,12 @@ const DialogContent = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
     <DialogPortal>
         <DialogOverlay />
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-1.5 sm:p-4 md:p-6 pointer-events-none overflow-y-auto">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-0 sm:p-4 md:p-6 pointer-events-none">
             <DialogPrimitive.Content
                 ref={ref}
                 className={cn(
                     'relative pointer-events-auto z-[70] transform-gpu backface-hidden [transform:translateZ(0)]',
-                    'w-[calc(100vw-1rem)] sm:w-full max-w-lg max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2.5rem)] rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-0 shadow-2xl border border-slate-200/90 dark:border-slate-800 flex flex-col overflow-hidden my-auto safe-area-bottom',
+                    'w-full sm:w-full max-w-lg h-[100dvh] sm:h-auto max-h-[100dvh] sm:max-h-[calc(100dvh-2.5rem)] rounded-none sm:rounded-3xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-0 shadow-2xl border-0 sm:border border-slate-200/90 dark:border-slate-800 flex flex-col overflow-hidden',
                     'data-[state=open]:animate-in data-[state=closed]:animate-out',
                     'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
                     'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',

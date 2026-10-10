@@ -257,7 +257,7 @@ export function PaymentDialog({
             <DialogContent
                 onPointerDownOutside={(e) => e.preventDefault()}
                 onInteractOutside={(e) => e.preventDefault()}
-                className="w-[96vw] max-w-4xl h-[92dvh] max-h-[92dvh] p-0 bg-slate-50 rounded-2xl sm:rounded-3xl border border-slate-300 shadow-2xl flex flex-col overflow-hidden"
+                className="w-full sm:w-[96vw] max-w-4xl h-[100dvh] sm:h-[92dvh] max-h-[100dvh] sm:max-h-[92dvh] p-0 bg-slate-50 rounded-none sm:rounded-3xl border-0 sm:border border-slate-300 shadow-2xl flex flex-col overflow-hidden"
             >
                 {/* Header Elegante con suficiente espacio a la derecha (pr-14) para evitar solapamientos */}
                 <div className="pl-4 sm:pl-6 pr-12 sm:pr-14 py-3 sm:py-4 bg-white border-b border-slate-200/80 flex items-center justify-between gap-3 shrink-0">
@@ -639,7 +639,7 @@ export function PaymentDialog({
                 </div>
 
                 {/* Footer sticky — siempre visible en mobile */}
-                <div className="shrink-0 p-3 sm:p-5 bg-white border-t border-slate-200 flex gap-2 sm:gap-3">
+                <div className="shrink-0 p-3 sm:p-5 pb-safe sm:pb-5 bg-white border-t border-slate-200 flex gap-2 sm:gap-3 z-20">
                     <Button
                         type="button"
                         variant="outline"
