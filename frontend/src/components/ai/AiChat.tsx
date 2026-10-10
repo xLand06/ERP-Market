@@ -15,6 +15,7 @@ import {
     BarChart3,
     TrendingUp,
 } from 'lucide-react';
+import { AiChatChart } from './AiChatChart';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -195,16 +196,24 @@ export function AiChat() {
         }
     };
 
-    const downloadFile = async (data: any[], format: 'csv' | 'excel') => {
+    const downloadFile = async (data: any[], format: 'csv' | 'excel' | 'pdf') => {
         try {
             const res = await api.post('/ai-chat/export', { data, format, filename: 'reporte_erp' }, { responseType: 'blob' });
-            const blob = new Blob([res.data]);
+            const mime =
+                format === 'pdf'
+                    ? 'application/pdf'
+                    : format === 'excel'
+                    ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    : 'text/csv';
+            const blob = new Blob([res.data], { type: mime });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = format === 'excel' ? 'reporte_erp.xlsx' : 'reporte_erp.csv';
+            const ext = format === 'excel' ? 'xlsx' : format === 'pdf' ? 'pdf' : 'csv';
+            a.download = `reporte_erp_${new Date().toISOString().slice(0, 10)}.${ext}`;
             document.body.appendChild(a); a.click(); document.body.removeChild(a);
             URL.revokeObjectURL(url);
+            toast.success(`Descargando ${format.toUpperCase()}...`);
         } catch { toast.error('Error al descargar'); }
     };
 
@@ -350,9 +359,17 @@ export function AiChat() {
                                 </div>
                             )}
 
-                            {messages.map((msg, idx) => (
+                            {messages.map((msg, idx) => {
+                                const hasData = (msg.rows && msg.rows.length > 0) || (msg.exportData && msg.exportData.length > 0);
+                                const dataset = (msg.rows && msg.rows.length > 0) ? msg.rows : msg.exportData;
+
+                                return (
                                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[88%] sm:max-w-[80%] ${
+                                    <div className={`${
+                                        hasData
+                                            ? 'w-full max-w-[96%] sm:max-w-[92%]'
+                                            : 'max-w-[88%] sm:max-w-[80%]'
+                                    } ${
                                         msg.role === 'user'
                                             ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-2xl rounded-br-xs shadow-sm shadow-emerald-500/20'
                                             : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-2xl rounded-bl-xs shadow-sm border border-slate-200/80 dark:border-slate-700/60'
@@ -361,27 +378,12 @@ export function AiChat() {
                                             {formatMarkdown(msg.content)}
                                         </p>
 
-                                        {/* Export buttons */}
-                                        {msg.exportData && msg.exportData.length > 0 && (
-                                            <div className="flex flex-wrap items-center gap-2 mt-2.5 pt-2.5 border-t border-slate-200/60 dark:border-slate-700/60">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => downloadFile(msg.exportData!, 'csv')}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-[11px] font-bold rounded-xl border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer active:scale-95"
-                                                >
-                                                    <IconDownload /> CSV
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => downloadFile(msg.exportData!, 'excel')}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 text-[11px] font-bold rounded-xl border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition-colors cursor-pointer active:scale-95"
-                                                >
-                                                    <IconDownload /> Excel
-                                                </button>
-                                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-                                                    {msg.exportData.length} registros
-                                                </span>
-                                            </div>
+                                        {/* Visualización interactiva (Gráfico / Tabla) y exportación profesional (Excel / PDF / CSV) */}
+                                        {dataset && dataset.length > 0 && (
+                                            <AiChatChart
+                                                data={dataset}
+                                                onDownload={(format) => downloadFile(dataset, format)}
+                                            />
                                         )}
 
                                         <p className={`text-[10px] mt-1.5 font-medium ${msg.role === 'user' ? 'text-white/70' : 'text-slate-400 dark:text-slate-500'}`}>
@@ -389,7 +391,8 @@ export function AiChat() {
                                         </p>
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
 
                             {(loading || uploading) && (
                                 <div className="flex justify-start">

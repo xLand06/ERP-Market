@@ -141,9 +141,9 @@ function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number
 const SYSTEM_PROMPT = `Sos el asistente de ALL MARKET para gerentes de tiendas en Venezuela.
 
 FLUJO:
-1. Datos/análisis → SIEMPRE generá un SQL SELECT dentro de \`\`\`sql ... \`\`\`
-2. Acciones / cómo usar el sistema → guialo al módulo correcto (POS, Productos, Inventario, etc.), sin SQL
-3. Exportación → SOLO si el usuario lo pidió explícitamente (exportar, csv, excel, descargar). Entonces empezá la respuesta con "EXPORT_DATA" seguido de una tabla markdown. NUNCA lo hagas en respuestas de datos normales.
+1. Consultas de datos, métricas, ventas, gráficos, reportes o exportación → SIEMPRE generá un SQL SELECT dentro de ```sql ... ``` para consultar la base de datos real.
+2. NUNCA generes tablas markdown manuales ni des instrucciones de cómo armar gráficos en Excel. El sistema del ERP se encarga automáticamente de renderizar el gráfico interactivo y generar los archivos Excel y PDF a partir de los datos que devuelvas en el SQL.
+3. Respuestas de guía sobre el uso del ERP (sin datos) → indicá directamente el módulo correspondiente (POS, Productos, Inventario, etc.) sin SQL.
 4. NUNCA digas "Todavía no hay registros" sin haber ejecutado un query. Solo repetí esa frase si el SQL realmente devolvió 0 filas.
 5. FORMATO: Español profesional y conciso. NUNCA uses emojis ni emoticones en ninguna respuesta.
 
@@ -368,12 +368,13 @@ export const processAiQuestion = async (question: string, userId?: string): Prom
             { role: 'user', content: 'Dame la respuesta.' },
         ], 0.3, 1200)).trim() || formatDataFallback(data);
 
-        // Detectar si el usuario pidió exportar explícitamente
-        if (wantsExport(question) && data.length > 0) {
-            return { answer: `📊 **Archivo listo para descargar** — ${data.length} registros.`, data, exportData: data };
-        }
-
-        return { answer, data };
+        // Adjuntar exportData y filas si la consulta devolvió datos
+        const hasData = data.length > 0;
+        return {
+            answer,
+            data: hasData ? data : undefined,
+            exportData: hasData ? data : undefined,
+        };
     } catch (error: any) {
         console.error('[ai-chat] Error:', error.message);
         if (!isAiAvailable()) {
@@ -391,7 +392,7 @@ function isAdvisoryQuestion(question: string): boolean {
 
 function buildFormatPrompt(question: string, data: any[]): string {
     const dataBlock = data.length > 0
-        ? JSON.stringify(data.slice(0, 10))
+        ? JSON.stringify(data.slice(0, 15))
         : 'La consulta no devolvió registros.';
 
     if (isAdvisoryQuestion(question)) {
@@ -399,16 +400,16 @@ function buildFormatPrompt(question: string, data: any[]): string {
 Datos: ${dataBlock}
 
 Estructura obligatoria:
-1. Qué muestran los datos — con números concretos ($).
+1. Qué muestran los datos — con números concretos ($ o Bs).
 2. Tendencias o hallazgos.
 3. Entre 3 y 5 recomendaciones ACCIONABLES para vender más.
 
-Reglas: español natural de dueño de tienda, sin emojis ni emoticones, sin SQL, sin tecnicismos, moneda $, máximo ~200 palabras. NO menciones CSV, Excel ni exportación.`;
+Reglas: español natural de dueño de tienda, sin emojis ni emoticones, sin SQL, sin tecnicismos, moneda $, máximo ~150 palabras. NO generes tablas markdown, gráficos en texto ni instrucciones de cómo usar Excel o PDF; la interfaz ya muestra el gráfico interactivo y los botones de descarga correspondientes.`;
     }
 
     return `Respondé al dueño del negocio: "${question}"
 Datos: ${dataBlock}
-Reglas: español natural, sin emojis ni emoticones, sin SQL, sin tecnicismos. Si la consulta no devolvió registros, decí "No encontré registros para esa consulta". Moneda: $. Breve. NO menciones CSV, Excel ni exportación salvo que el usuario lo haya pedido explícitamente.`;
+Reglas: español natural, sin emojis ni emoticones, sin SQL, sin tecnicismos. Si la consulta no devolvió registros, decí "No encontré registros para esa consulta". Moneda: $. Breve (máximo ~80 palabras). NO generes tablas markdown, gráficos en texto ni instrucciones de cómo usar Excel o PDF; la interfaz ya muestra el gráfico interactivo y los botones de descarga correspondientes.`;
 }
 
 function formatDataFallback(data: any[]): string {
@@ -420,11 +421,9 @@ function formatDataFallback(data: any[]): string {
     return data.slice(0, 5).map(r => Object.entries(r).map(([k, v]) => `**${k}**: ${v}`).join(' · ')).join('\n');
 }
 
-// ─── Intención de exportación ────────────────────────────────────────────────
-// "reporte" se eliminó a propósito: es demasiado amplio y matchea preguntas
-// de negocio comunes que no quieren descargar nada.
+// ─── Intención de exportación o gráficos ─────────────────────────────────────
 export function wantsExport(question: string): boolean {
-    return /export|csv|excel|archivo|descargar/i.test(question);
+    return /export|csv|excel|archivo|descargar|grafic|gr[áa]fic|pdf|reporte|tabla/i.test(question);
 }
 
 // ─── Análisis de archivos subidos ────────────────────────────────────────────

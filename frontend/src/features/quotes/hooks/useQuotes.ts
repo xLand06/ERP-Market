@@ -14,6 +14,27 @@ export function useQuotes(branchId?: string) {
 }
 
 /**
+ * Crea una cotización
+ */
+export function useCreateQuote() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (payload: Parameters<typeof quotesApi.createQuote>[0]) => {
+            return quotesApi.createQuote(payload);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['quotes'] });
+            toast.success('Cotización guardada exitosamente');
+        },
+        onError: (error: unknown) => {
+            const err = error as { response?: { data?: { error?: string } } };
+            toast.error(err?.response?.data?.error || 'Error al guardar la cotización');
+        },
+    });
+}
+
+/**
  * Convierte una cotización en venta.
  * Al convertir: toast de éxito + refresh de la lista de cotizaciones y transacciones.
  */
@@ -21,12 +42,13 @@ export function useConvertQuote() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, branchId }: { id: string; branchId?: string }) => {
-            return quotesApi.convertQuote(id, branchId ? { branchId } : undefined);
+        mutationFn: async ({ id, payload }: { id: string; payload?: Parameters<typeof quotesApi.convertQuote>[1] }) => {
+            return quotesApi.convertQuote(id, payload);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['quotes'] });
             queryClient.invalidateQueries({ queryKey: ['transactions'] });
+            queryClient.invalidateQueries({ queryKey: ['inventory'] });
             toast.success('Cotización convertida a venta correctamente');
         },
         onError: (error: unknown) => {

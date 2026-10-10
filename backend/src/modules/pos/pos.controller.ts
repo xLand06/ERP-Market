@@ -245,6 +245,8 @@ export const convertQuote = async (req: AuthRequest, res: Response): Promise<voi
         const sale = await posService.convertQuoteToSale(id, {
             userId: req.user!.id,
             branchId: body.branchId as string | undefined,
+            customerId: body.customerId as string | undefined,
+            paymentMethods: body.paymentMethods,
         });
 
         await logAudit({

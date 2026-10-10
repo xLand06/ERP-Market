@@ -595,6 +595,9 @@ export interface CreateQuoteInput {
     branchId: string;
     userId: string;
     items: TransactionItemInput[];
+    customerId?: string;
+    customerName?: string;
+    validityDays?: number;
     notes?: string;
     currency?: string;
 }
@@ -602,6 +605,8 @@ export interface CreateQuoteInput {
 export interface ConvertQuoteInput {
     userId: string;
     branchId?: string;
+    customerId?: string;
+    paymentMethods?: PaymentMethodInput[];
 }
 
 /**
@@ -629,7 +634,7 @@ const serializeMetadata = (metadata: Record<string, any>): string =>
  * Valida sucursal activa + que los productos existan y estén activos.
  */
 export const createQuote = async (input: CreateQuoteInput): Promise<any> => {
-    const { branchId, userId, items, notes, currency = 'COP' } = input;
+    const { branchId, userId, items, customerId, customerName, validityDays = 7, notes, currency = 'COP' } = input;
 
     // 1. Validar que la sucursal existe y está activa
     const branch = await prisma.branch.findUnique({
@@ -654,6 +659,8 @@ export const createQuote = async (input: CreateQuoteInput): Promise<any> => {
     // Total en la moneda de referencia de los ítems
     const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
+    const validUntil = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000).toISOString();
+
     return prisma.$transaction(async (tx) => {
         const txRecord = await tx.transaction.create({
             data: {
@@ -663,13 +670,19 @@ export const createQuote = async (input: CreateQuoteInput): Promise<any> => {
                 notes,
                 userId,
                 branchId,
+                customerId: customerId || null,
                 cashRegisterId: null,
                 currency: currency || 'COP',
                 exchangeRate: null,
                 invoiceNumber: null,
                 // Sin métodos de pago ni descuento de stock
                 paymentMethods: null as any,
-                metadata: serializeMetadata({ type: 'quote' }),
+                metadata: serializeMetadata({
+                    type: 'quote',
+                    customerName: customerName || null,
+                    validUntil,
+                    validityDays,
+                }),
                 items: {
                     create: items.map((item) => ({
                         productId: item.productId,
@@ -681,7 +694,10 @@ export const createQuote = async (input: CreateQuoteInput): Promise<any> => {
                     })),
                 },
             },
-            include: { items: { include: { product: { select: { name: true, barcode: true } } } } },
+            include: {
+                items: { include: { product: { select: { name: true, barcode: true } } } },
+                customer: { select: { id: true, name: true, phone: true, cedula: true } },
+            },
         });
 
         return txRecord;
@@ -702,16 +718,26 @@ export const getQuotes = async (filters: { branchId?: string; page?: number; lim
             items: { include: { product: { select: { id: true, name: true, barcode: true, baseUnit: true } } } },
             user: { select: { id: true, nombre: true, username: true } },
             branch: { select: { id: true, name: true } },
+            customer: { select: { id: true, name: true, phone: true, cedula: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
     });
 
-    // Normalizar metadata + exponer flag de conversión para el frontend
+    // Normalizar metadata + exponer flag de conversión y vencimiento para el frontend
     return rows.map((q: any) => {
         const metadata = parseTransactionMetadata(q.metadata);
-        return { ...q, metadata, alreadyConverted: Boolean(metadata.quoteConvertedTo) };
+        const validUntil = metadata.validUntil ? new Date(metadata.validUntil) : null;
+        const isExpired = validUntil ? validUntil.getTime() < Date.now() : false;
+        return {
+            ...q,
+            metadata,
+            customerName: metadata.customerName || q.customer?.name || null,
+            validUntil: metadata.validUntil || null,
+            isExpired,
+            alreadyConverted: Boolean(metadata.quoteConvertedTo),
+        };
     });
 };
 
@@ -725,12 +751,22 @@ export const getQuoteById = async (id: string): Promise<any> => {
             items: { include: { product: true, presentation: true } },
             user: { select: { id: true, nombre: true, username: true } },
             branch: { select: { id: true, name: true } },
+            customer: { select: { id: true, name: true, phone: true, cedula: true } },
         },
     });
     if (!quote) return null;
 
     const metadata = parseTransactionMetadata((quote as any).metadata);
-    return { ...quote, metadata, alreadyConverted: Boolean(metadata.quoteConvertedTo) };
+    const validUntil = metadata.validUntil ? new Date(metadata.validUntil) : null;
+    const isExpired = validUntil ? validUntil.getTime() < Date.now() : false;
+    return {
+        ...quote,
+        metadata,
+        customerName: metadata.customerName || quote.customer?.name || null,
+        validUntil: metadata.validUntil || null,
+        isExpired,
+        alreadyConverted: Boolean(metadata.quoteConvertedTo),
+    };
 };
 
 /**
@@ -760,6 +796,8 @@ export const convertQuoteToSale = async (quoteId: string, input: ConvertQuoteInp
         type: TransactionType.SALE,
         branchId: input.branchId || quote.branchId,
         userId: input.userId,
+        customerId: input.customerId || quote.customerId || undefined,
+        paymentMethods: input.paymentMethods,
         items: quote.items.map((item) => ({
             productId: item.productId,
             presentationId: item.presentationId || undefined,

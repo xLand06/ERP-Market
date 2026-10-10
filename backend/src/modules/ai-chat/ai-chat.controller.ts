@@ -85,35 +85,35 @@ export const uploadFile = async (req: AuthRequest, res: Response) => {
     }
 };
 
+import * as aiChatExport from './ai-chat.export';
+
 /**
  * POST /api/ai-chat/export
- * Body: { data: any[], format: 'csv' | 'excel', filename?: string }
- * Descarga un archivo CSV o Excel con los datos.
+ * Body: { data: any[], format: 'csv' | 'excel' | 'pdf', filename?: string, title?: string }
+ * Descarga un archivo CSV, Excel profesional o PDF formateado.
  */
 export const exportData = async (req: AuthRequest, res: Response) => {
     try {
-        const { data, format = 'csv', filename } = req.body;
+        const { data, format = 'csv', filename, title } = req.body;
 
         if (!data || !Array.isArray(data) || data.length === 0) {
             return res.status(400).json({ success: false, error: 'No hay datos para exportar.' });
         }
 
-        const safeName = (filename || 'export').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
+        const safeName = (filename || 'reporte_erp').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
         const timestamp = new Date().toISOString().slice(0, 10);
+        const reportTitle = typeof title === 'string' && title.trim() ? title.trim() : 'Reporte de Gestión';
 
         if (format === 'excel') {
-            const XLSX = await import('xlsx');
-            const wb = XLSX.utils.book_new();
-            const ws = XLSX.utils.json_to_sheet(data);
-            const colWidths = Object.keys(data[0]).map(key => ({
-                wch: Math.min(Math.max(key.length, ...data.map(row => String(row[key] ?? '').length)) + 2, 40),
-            }));
-            ws['!cols'] = colWidths;
-            XLSX.utils.book_append_sheet(wb, ws, 'Datos');
-            const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+            const buffer = await aiChatExport.generateExcelReport(data, reportTitle);
             res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
             res.setHeader('Content-Disposition', `attachment; filename="${safeName}_${timestamp}.xlsx"`);
-            res.send(Buffer.from(buf));
+            res.send(buffer);
+        } else if (format === 'pdf') {
+            const buffer = await aiChatExport.generatePdfReport(data, reportTitle);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${safeName}_${timestamp}.pdf"`);
+            res.send(buffer);
         } else {
             const headers = Object.keys(data[0]);
             const csvRows = [

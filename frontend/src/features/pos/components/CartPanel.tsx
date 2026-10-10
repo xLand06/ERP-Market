@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-    Package, X, CreditCard, DollarSign,
+    Package, X, CreditCard, DollarSign, FileText,
     Coffee, Croissant, CupSoda, Wine, Beef, Apple, Sparkles, Cookie, ShoppingBag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,7 @@ interface CartPanelProps {
     onRemoveItem: (productId: string, presentationId: string | undefined) => void;
     onClearCart: () => void;
     onCheckout: () => void;
+    onQuote?: () => void;
     isSubmitting: boolean;
 }
 
@@ -129,6 +130,7 @@ export const CartPanel = React.memo(function CartPanel({
     onRemoveItem,
     onClearCart,
     onCheckout,
+    onQuote,
     isSubmitting,
 }: CartPanelProps) {
     const config = useConfigStore();
@@ -219,8 +221,26 @@ export const CartPanel = React.memo(function CartPanel({
                 )}
             </div>
 
-            {/* Checkout action button */}
-            <div className="p-4 bg-white border-t border-slate-100">
+            {/* Checkout action buttons */}
+            <div className="p-4 bg-white border-t border-slate-100 flex flex-col gap-2">
+                {isSaleMode && onQuote && (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={items.length === 0 || isSubmitting}
+                        onClick={onQuote}
+                        className="w-full h-10 border-amber-300 text-amber-800 bg-amber-50/50 hover:bg-amber-100/70 hover:text-amber-900 font-bold rounded-xl flex items-center justify-between px-4 transition-all"
+                    >
+                        <span className="flex items-center gap-2 text-xs">
+                            <FileText className="w-4 h-4 text-amber-600" /> Guardar como Cotización
+                        </span>
+                        <kbd className="bg-amber-200/60 text-amber-900 text-[10px] px-2 py-0.5 rounded font-bold font-mono">
+                            F4
+                        </kbd>
+                    </Button>
+                )}
+
                 <Button
                     size="lg"
                     className={cn(

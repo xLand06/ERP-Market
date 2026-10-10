@@ -92,6 +92,9 @@ export const createQuoteSchema = z.object({
     type: z.literal('QUOTE').optional(),
     branchId: z.string().min(1, 'ID de sede es requerido'),
     items: z.array(transactionItemSchema).min(1, 'Debe incluir al menos un producto'),
+    customerId: z.string().min(1, 'ID de cliente inválido').optional(),
+    customerName: z.string().max(150).optional(),
+    validityDays: z.number().int().positive().optional().default(7),
     notes: z.string().max(500, 'Las notas son muy largas').optional().or(z.literal('')),
     currency: z.enum(['COP', 'USD', 'VES']).optional(),
 });
@@ -102,6 +105,8 @@ export const createQuoteSchema = z.object({
  */
 export const convertQuoteSchema = z.object({
     branchId: z.string().min(1, 'ID de sede es requerido').optional(),
+    customerId: z.string().min(1, 'ID de cliente inválido').optional(),
+    paymentMethods: z.array(paymentMethodSchema).optional(),
 }).default({});
 
 /**

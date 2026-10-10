@@ -18,11 +18,13 @@ import { useInventory } from '@/hooks/useInventory';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useAutoOpenRegister } from '@/hooks/useAutoOpenRegister';
 import { StockEntryModal } from '../../inventory/components/StockEntryModal';
+import { SaveQuoteModal } from '../components/SaveQuoteModal';
 import { ProductSearch } from '../components/ProductSearch';
 import { CartPanel } from '../components/CartPanel';
 import { PaymentDialog } from '../components/PaymentDialog';
 import { TransactionSummary } from '../components/TransactionSummary';
 import { useCart } from '../hooks/useCart';
+import { useCreateQuote } from '@/features/quotes/hooks/useQuotes';
 import { printThermalReceiptReal } from '@/lib/thermalPrinter';
 import { ThermalReceiptTicket } from '@/components/common/ThermalReceiptTicket';
 import toast from 'react-hot-toast';
@@ -34,9 +36,11 @@ import type { Product, PaymentMethodType, Currency, CreateTransactionPayload } f
 export default function POSPage() {
     const [isSaleMode, setIsSaleMode] = useState(true);
     const [payOpen, setPayOpen] = useState(false);
+    const [quoteOpen, setQuoteOpen] = useState(false);
     const [activeProductForPres, setActiveProductForPres] = useState<Product | null>(null);
     const [stockEntryOpen, setStockEntryOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const createQuoteMutation = useCreateQuote();
     const [mobileTab, setMobileTab] = useState<'catalog' | 'cart'>('catalog');
     const [summary, setSummary] = useState<{
         visible: boolean;
@@ -229,11 +233,15 @@ export default function POSPage() {
     useEffect(() => {
         const h = (e: KeyboardEvent) => {
             if (e.key === 'F2') { e.preventDefault(); searchRef.current?.focus(); }
+            if (e.key === 'F4') {
+                e.preventDefault();
+                if (cart.length > 0 && isSaleMode) setQuoteOpen(true);
+            }
             if (e.ctrlKey && e.key === 'Enter' && cart.length > 0) setPayOpen(true);
         };
         window.addEventListener('keydown', h);
         return () => window.removeEventListener('keydown', h);
-    }, [cart]);
+    }, [cart, isSaleMode]);
 
     // ── Handle Payment Confirm ───────────────────────────────────────
     const handlePayment = async (paymentMethods: Array<{
@@ -378,6 +386,40 @@ export default function POSPage() {
             }
         } catch (error: any) {
             toast.error(error.response?.data?.error || 'Error al procesar la venta en la sucursal');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleSaveQuote = async (payload: {
+        customerName: string;
+        customerId?: string;
+        validityDays: number;
+        notes: string;
+    }) => {
+        if (!effectiveBranch) { toast.error('Seleccioná una sucursal'); return; }
+        if (cart.length === 0) { toast.error('El carrito está vacío'); return; }
+
+        setIsSubmitting(true);
+        try {
+            await createQuoteMutation.mutateAsync({
+                branchId: effectiveBranch,
+                items: cart.map(item => ({
+                    productId: item.id,
+                    presentationId: item.presentationId,
+                    quantity: item.qty,
+                    unitPrice: item.currentPrice,
+                })),
+                customerId: payload.customerId,
+                customerName: payload.customerName,
+                validityDays: payload.validityDays,
+                notes: payload.notes,
+                currency: 'COP',
+            });
+            setQuoteOpen(false);
+            clearCart();
+        } catch (err: any) {
+            console.error('Error al guardar cotización:', err);
         } finally {
             setIsSubmitting(false);
         }
@@ -634,6 +676,7 @@ export default function POSPage() {
                     onRemoveItem={removeFromCart}
                     onClearCart={clearCart}
                     onCheckout={() => isSaleMode ? setPayOpen(true) : handleStockEntry()}
+                    onQuote={() => setQuoteOpen(true)}
                     isSubmitting={isSubmitting}
                 />
             </div>
@@ -670,6 +713,18 @@ export default function POSPage() {
                     onUpdateQty={updateCartItemQty}
                     onClose={() => setPayOpen(false)}
                     onConfirm={handlePayment}
+                    isSubmitting={isSubmitting}
+                />
+            )}
+
+            {/* Save Quote Modal (F4) */}
+            {isSaleMode && (
+                <SaveQuoteModal
+                    open={quoteOpen}
+                    onClose={() => setQuoteOpen(false)}
+                    cart={cart}
+                    total={totals.total}
+                    onConfirm={handleSaveQuote}
                     isSubmitting={isSubmitting}
                 />
             )}
