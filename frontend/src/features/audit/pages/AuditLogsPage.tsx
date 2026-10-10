@@ -322,10 +322,7 @@ const AuditLogsPage: React.FC = () => {
 
     const handleSelectLog = (log: AuditLog) => {
         setSelectedLog(log);
-        // En pantallas móviles (< lg), abrir modal de detalle
-        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-            setDetailModalOpen(true);
-        }
+        setDetailModalOpen(true);
     };
 
     const activeFilterCount = [
@@ -644,11 +641,11 @@ const AuditLogsPage: React.FC = () => {
                             <table className="w-full">
                                 <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-100">
                                     <tr>
-                                        <th className="px-5 py-3.5 text-left font-bold">Evento</th>
+                                        <th className="px-5 py-3.5 text-left font-bold">Evento y Acción Realizada</th>
                                         <th className="px-5 py-3.5 text-left font-bold">Módulo</th>
                                         <th className="px-5 py-3.5 text-left font-bold">Usuario</th>
                                         <th className="px-5 py-3.5 text-left font-bold">Fecha</th>
-                                        <th className="px-5 py-3.5 text-center font-bold">Info</th>
+                                        <th className="px-5 py-3.5 text-center font-bold">Detalle</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -672,21 +669,27 @@ const AuditLogsPage: React.FC = () => {
                                                 onClick={() => handleSelectLog(log)}
                                                 className={`hover:bg-slate-50/80 cursor-pointer transition-colors group ${selectedLog?.id === log.id ? 'bg-indigo-50/60' : ''}`}
                                             >
-                                                <td className="px-5 py-3.5">
+                                                <td className="px-5 py-3.5 max-w-md">
                                                     <div className="text-xs sm:text-sm font-bold text-slate-900">
                                                         {ACTION_DICTIONARY[log.action] || log.action}
                                                     </div>
-                                                    <div className="text-[10px] text-slate-400 mt-0.5 max-w-[220px] truncate">
-                                                        {getDisplayName(log.user)} ejecutó esta acción
-                                                    </div>
+                                                    {log.descripcion ? (
+                                                        <p className="text-xs text-slate-600 line-clamp-2 mt-1 leading-relaxed font-normal">
+                                                            {log.descripcion}
+                                                        </p>
+                                                    ) : (
+                                                        <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                                                            {getDisplayName(log.user)} ejecutó esta acción
+                                                        </div>
+                                                    )}
                                                 </td>
-                                                <td className="px-5 py-3.5">
+                                                <td className="px-5 py-3.5 whitespace-nowrap">
                                                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${MODULE_COLORS[log.module] || 'bg-slate-100 text-slate-600'}`}>
                                                         {MODULE_ICONS[log.module]}
                                                         {log.module}
                                                     </span>
                                                 </td>
-                                                <td className="px-5 py-3.5">
+                                                <td className="px-5 py-3.5 whitespace-nowrap">
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-bold uppercase shrink-0">
                                                             {log.user ? (log.user.nombre?.charAt(0) || log.user.username?.charAt(0) || 'U') : 'S'}
@@ -699,11 +702,21 @@ const AuditLogsPage: React.FC = () => {
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="px-5 py-3.5 text-xs text-slate-500 font-mono">
+                                                <td className="px-5 py-3.5 text-xs text-slate-500 font-mono whitespace-nowrap">
                                                     {format(new Date(log.createdAt), "dd MMM, HH:mm:ss", { locale: es })}
                                                 </td>
-                                                <td className="px-5 py-3.5 text-center">
-                                                    <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors mx-auto" />
+                                                <td className="px-5 py-3.5 text-center whitespace-nowrap">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleSelectLog(log);
+                                                        }}
+                                                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                                                    >
+                                                        <span>Ver más</span>
+                                                        <ExternalLink className="w-3.5 h-3.5" />
+                                                    </button>
                                                 </td>
                                             </tr>
                                         ))
@@ -736,25 +749,23 @@ const AuditLogsPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* 📱 Modal / Drawer de Detalle para Móviles (< lg) */}
+            {/* 🔍 Modal de Detalle Emergente (se abre de inmediato al hacer clic en cualquier evento) */}
             {selectedLog && (
-                <div className="lg:hidden">
-                    <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
-                        <DialogContent className="max-w-lg p-4 sm:p-5 max-h-[85vh] overflow-y-auto custom-scrollbar">
-                            <DialogHeader className="pb-3 border-b border-slate-100">
-                                <DialogTitle className="text-base font-bold text-slate-900">
-                                    Detalle del Evento
-                                </DialogTitle>
-                                <DialogDescription className="text-xs text-slate-500">
-                                    Información de auditoría y cambios realizados
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="pt-2">
-                                {renderLogDetailContent(selectedLog)}
-                            </div>
-                        </DialogContent>
-                    </Dialog>
-                </div>
+                <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
+                    <DialogContent className="max-w-xl p-4 sm:p-6 max-h-[88vh] overflow-y-auto custom-scrollbar">
+                        <DialogHeader className="pb-3 border-b border-slate-100">
+                            <DialogTitle className="text-base sm:text-lg font-bold text-slate-900">
+                                Detalle del Evento
+                            </DialogTitle>
+                            <DialogDescription className="text-xs text-slate-500">
+                                Información de auditoría, trazabilidad y cambios realizados
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="pt-2">
+                            {renderLogDetailContent(selectedLog)}
+                        </div>
+                    </DialogContent>
+                </Dialog>
             )}
 
             {/* Paginación Responsiva */}
