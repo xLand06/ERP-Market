@@ -100,7 +100,7 @@ export function SaveQuoteModal({
             <DialogContent
                 onPointerDownOutside={(e) => e.preventDefault()}
                 onInteractOutside={(e) => e.preventDefault()}
-                className="w-[95vw] max-w-4xl max-h-[90vh] p-0 bg-slate-50 rounded-3xl border border-slate-300 shadow-2xl overflow-hidden flex flex-col"
+                className="w-[96vw] max-w-4xl h-[92dvh] max-h-[92dvh] p-0 bg-slate-50 rounded-2xl sm:rounded-3xl border border-slate-300 shadow-2xl overflow-hidden flex flex-col"
             >
                 {/* Header Elegante y consistente con el POS */}
                 <div className="pl-6 pr-14 py-4 bg-white border-b border-slate-200/80 flex items-center justify-between gap-4 shrink-0">

@@ -135,6 +135,8 @@ export function PaymentDialog({
     const [customerSearch, setCustomerSearch] = useState('');
     const [creatingCustomer, setCreatingCustomer] = useState(false);
     const [newCustomerName, setNewCustomerName] = useState('');
+    const [newCustomerCedula, setNewCustomerCedula] = useState('');
+    const [newCustomerPhone, setNewCustomerPhone] = useState('');
     const queryClient = useQueryClient();
 
     // Cerrar el modo fiado y limpiar el cliente al cerrar el diálogo
@@ -144,6 +146,8 @@ export function PaymentDialog({
             setCustomer(null);
             setCustomerSearch('');
             setNewCustomerName('');
+            setNewCustomerCedula('');
+            setNewCustomerPhone('');
         }
     }, [open]);
 
@@ -161,14 +165,25 @@ export function PaymentDialog({
 
     const handleQuickCreateCustomer = async () => {
         const name = newCustomerName.trim();
-        if (!name) return;
+        const cedula = newCustomerCedula.trim();
+        const phone = newCustomerPhone.trim();
+        if (!name) {
+            toast.error('El nombre del cliente es obligatorio');
+            return;
+        }
         setCreatingCustomer(true);
         try {
-            const created = await customersApi.createCustomer({ name });
+            const created = await customersApi.createCustomer({
+                name,
+                cedula: cedula || undefined,
+                phone: phone || undefined,
+            });
             setCustomer(created);
             setNewCustomerName('');
+            setNewCustomerCedula('');
+            setNewCustomerPhone('');
             queryClient.invalidateQueries({ queryKey: ['customers'] });
-            toast.success(`Cliente "${created.name}" creado`);
+            toast.success(`Cliente "${created.name}" registrado`);
         } catch (err: any) {
             toast.error(err?.response?.data?.error || 'Error al crear el cliente');
         } finally {
@@ -242,28 +257,28 @@ export function PaymentDialog({
             <DialogContent
                 onPointerDownOutside={(e) => e.preventDefault()}
                 onInteractOutside={(e) => e.preventDefault()}
-                className="w-[95vw] max-w-4xl max-h-[90vh] p-0 bg-slate-50 rounded-3xl border border-slate-300 shadow-2xl overflow-hidden flex flex-col"
+                className="w-[96vw] max-w-4xl h-[92dvh] max-h-[92dvh] p-0 bg-slate-50 rounded-2xl sm:rounded-3xl border border-slate-300 shadow-2xl flex flex-col overflow-hidden"
             >
                 {/* Header Elegante con suficiente espacio a la derecha (pr-14) para evitar solapamientos */}
-                <div className="pl-6 pr-14 py-4 bg-white border-b border-slate-200/80 flex items-center justify-between gap-4 shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700 shadow-2xs shrink-0">
-                            <CreditCard className="w-5 h-5" />
+                <div className="pl-4 sm:pl-6 pr-12 sm:pr-14 py-3 sm:py-4 bg-white border-b border-slate-200/80 flex items-center justify-between gap-3 shrink-0">
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700 shadow-2xs shrink-0">
+                            <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                             <DialogHeader className="text-left p-0 space-y-0">
-                                <DialogTitle className="text-lg font-black text-slate-950 tracking-tight">
+                                <DialogTitle className="text-base sm:text-lg font-black text-slate-950 tracking-tight truncate">
                                     Procesar Pago POS
                                 </DialogTitle>
-                                <DialogDescription className="text-xs font-bold text-slate-600">
-                                    Selecciona los métodos de pago o divide la cuenta
+                                <DialogDescription className="text-[11px] sm:text-xs font-semibold text-slate-500 truncate">
+                                    Selecciona métodos de pago o divide la cuenta
                                 </DialogDescription>
                             </DialogHeader>
                         </div>
                     </div>
 
-                    <span className="text-xs font-black px-3.5 py-1 bg-indigo-100 text-indigo-900 rounded-full border border-indigo-300 shrink-0">
-                        Moneda Base: {mainCurrency}
+                    <span className="text-[11px] sm:text-xs font-black px-2.5 sm:px-3.5 py-1 bg-indigo-100 text-indigo-900 rounded-full border border-indigo-300 shrink-0">
+                        Base: {mainCurrency}
                     </span>
                 </div>
 
@@ -425,25 +440,48 @@ export function PaymentDialog({
                                             </div>
 
                                             {/* Crear cliente rápido */}
-                                            <div className="flex gap-1.5">
+                                            <div className="p-3 bg-white rounded-xl border border-amber-300 shadow-2xs space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[11px] font-black text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                                                        <UserPlus className="w-3.5 h-3.5 text-amber-600" />
+                                                        Nuevo Cliente Fiado
+                                                    </span>
+                                                </div>
                                                 <Input
-                                                    placeholder="Nombre del nuevo cliente..."
+                                                    placeholder="Nombre y Apellido *"
                                                     value={newCustomerName}
                                                     onChange={e => setNewCustomerName(e.target.value)}
-                                                    className="h-9 text-xs rounded-lg"
+                                                    className="h-8 text-xs rounded-lg border-slate-200"
                                                 />
+                                                <div className="grid grid-cols-2 gap-1.5">
+                                                    <Input
+                                                        placeholder="Cédula / RIF (ej. V-12345678)"
+                                                        value={newCustomerCedula}
+                                                        onChange={e => setNewCustomerCedula(e.target.value)}
+                                                        className="h-8 text-xs rounded-lg border-slate-200 font-mono"
+                                                    />
+                                                    <Input
+                                                        placeholder="Teléfono (Opcional)"
+                                                        value={newCustomerPhone}
+                                                        onChange={e => setNewCustomerPhone(e.target.value)}
+                                                        className="h-8 text-xs rounded-lg border-slate-200 font-mono"
+                                                    />
+                                                </div>
                                                 <Button
                                                     type="button"
-                                                    variant="outline"
                                                     size="sm"
                                                     onClick={handleQuickCreateCustomer}
                                                     disabled={creatingCustomer || !newCustomerName.trim()}
-                                                    className="h-11 shrink-0 border-amber-400 text-amber-900 hover:bg-amber-100 font-black text-[11px] rounded-lg"
+                                                    className="w-full h-8 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-lg shadow-2xs cursor-pointer flex items-center justify-center gap-1.5"
                                                 >
-                                                    {creatingCustomer
-                                                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                        : <UserPlus className="w-3.5 h-3.5" />}
-                                                    <span className="hidden sm:inline">Crear</span>
+                                                    {creatingCustomer ? (
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    ) : (
+                                                        <>
+                                                            <UserPlus className="w-3.5 h-3.5" />
+                                                            <span>Crear y Seleccionar Cliente</span>
+                                                        </>
+                                                    )}
                                                 </Button>
                                             </div>
                                         </>
