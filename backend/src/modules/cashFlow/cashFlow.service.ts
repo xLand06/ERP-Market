@@ -48,11 +48,16 @@ export const closeCashRegister = async (
     notes?: string,
     /** Si se pasa, se usa este valor como expectedAmount en lugar de calcularlo internamente.
      *  Útil para cierres automáticos donde no hay conteo físico y el expected ES el closing. */
-    expectedOverride?: number
+    expectedOverride?: number,
+    bankDepositOptions?: {
+        bankAccountId?: string;
+        depositAmount?: number;
+    }
 ) => {
     const cashRegister = await prisma.cashRegister.findUnique({
         where: { id: cashRegisterId },
         include: {
+            branch: { select: { name: true } },
             transactions: {
                 where: { type: 'SALE', status: 'COMPLETED' },
                 select: { total: true },
@@ -70,7 +75,7 @@ export const closeCashRegister = async (
     const expectedAmount = expectedOverride ?? (Number(cashRegister.openingAmount) + salesTotal);
     const difference = closingAmount - expectedAmount;
 
-    return prisma.cashRegister.update({
+    const updated = await prisma.cashRegister.update({
         where: { id: cashRegisterId },
         data: {
             status: 'CLOSED',
@@ -81,6 +86,23 @@ export const closeCashRegister = async (
             ...(notes && { notes }),
         },
     });
+
+    if (bankDepositOptions?.bankAccountId) {
+        const depositAmount = bankDepositOptions.depositAmount ?? closingAmount;
+        if (depositAmount > 0) {
+            await prisma.bankTransaction.create({
+                data: {
+                    accountId: bankDepositOptions.bankAccountId,
+                    type: 'income',
+                    amount: depositAmount,
+                    concept: `Depósito por Cierre de Caja (${cashRegister.branch?.name || 'Sede'})`,
+                    reference: `CAJA-${cashRegisterId.slice(-6).toUpperCase()}`,
+                },
+            });
+        }
+    }
+
+    return updated;
 };
 
 export const getCurrentOpenRegister = (branchId: string) =>
@@ -205,6 +227,8 @@ export interface ReportZExecutePayload {
     physicalCounts?: DrawerCountPayload;
     closingAmount: number;
     notes?: string;
+    bankAccountId?: string;
+    depositAmount?: number;
 }
 
 export const getReportX = async (registerId: string) => {
@@ -380,6 +404,21 @@ export const executeReportZ = async (registerId: string, payload: ReportZExecute
             ...(payload.notes ? { notes: payload.notes } : {}),
         },
     });
+
+    if (payload.bankAccountId) {
+        const depositAmount = payload.depositAmount ?? closingAmount;
+        if (depositAmount > 0) {
+            await prisma.bankTransaction.create({
+                data: {
+                    accountId: payload.bankAccountId,
+                    type: 'income',
+                    amount: depositAmount,
+                    concept: `Depósito por Cierre Reporte Z (${reportX.branch?.name || 'Sede'})`,
+                    reference: `Z-${registerId.slice(-6).toUpperCase()}`,
+                },
+            });
+        }
+    }
 
     return {
         ...reportX,

@@ -21,6 +21,8 @@ export const openCashRegisterSchema = z.object({
 export const closeCashRegisterSchema = z.object({
     closingAmount: z.preprocess((val) => Number(val), z.number().min(0, 'El monto de cierre no puede ser negativo').max(9999999.99)),
     notes: z.string().max(500).optional().or(z.literal('')),
+    bankAccountId: z.string().optional().or(z.literal('')),
+    depositAmount: z.preprocess((val) => (val === '' || val === null || val === undefined) ? undefined : Number(val), z.number().positive('El monto a depositar debe ser mayor a 0').optional()),
 });
 
 /**
@@ -50,6 +52,8 @@ export const executeReportZSchema = z.object({
     physicalCounts: drawerCountSchema,
     closingAmount: z.preprocess((val) => Number(val), z.number().min(0, 'El monto de cierre no puede ser negativo').max(99999999.99)),
     notes: z.string().max(500).optional().or(z.literal('')),
+    bankAccountId: z.string().optional().or(z.literal('')),
+    depositAmount: z.preprocess((val) => (val === '' || val === null || val === undefined) ? undefined : Number(val), z.number().positive('El monto a depositar debe ser mayor a 0').optional()),
 });
 
 /**

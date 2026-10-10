@@ -181,8 +181,8 @@ export default function CashRegisterPage() {
     });
 
     const closeMutation = useMutation({
-        mutationFn: async ({ closingAmount, notes }: { closingAmount: number, notes?: string }) => {
-            await api.patch(`/cash-flow/${openRegister.id}/close`, { closingAmount, notes });
+        mutationFn: async ({ closingAmount, notes, bankAccountId, depositAmount }: { closingAmount: number, notes?: string, bankAccountId?: string, depositAmount?: number }) => {
+            await api.patch(`/cash-flow/${openRegister.id}/close`, { closingAmount, notes, bankAccountId, depositAmount });
         },
         onSuccess: () => {
             toast.success('Caja cerrada correctamente');

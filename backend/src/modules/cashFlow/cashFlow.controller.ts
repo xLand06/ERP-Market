@@ -46,9 +46,15 @@ export const openRegister = async (req: AuthRequest, res: Response): Promise<voi
 export const closeRegister = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const { id } = validatedData(req, 'params');
-        const { closingAmount, notes } = validatedData(req, 'body');
+        const { closingAmount, notes, bankAccountId, depositAmount } = validatedData(req, 'body');
         
-        const register = await cashFlowService.closeCashRegister(id, closingAmount, notes);
+        const register = await cashFlowService.closeCashRegister(
+            id,
+            closingAmount,
+            notes,
+            undefined,
+            bankAccountId ? { bankAccountId, depositAmount } : undefined
+        );
         
         await logAudit({
             action: 'CASH_CLOSE',
@@ -59,6 +65,8 @@ export const closeRegister = async (req: AuthRequest, res: Response): Promise<vo
                 montoCierre: closingAmount,
                 diferencia: Number(register.difference),
                 moneda: 'COP',
+                bankAccountId: bankAccountId || null,
+                depositAmount: depositAmount || null,
             },
             userId: req.user!.id,
             ipAddress: extractIp(req),
@@ -170,6 +178,8 @@ export const executeReportZ = async (req: AuthRequest, res: Response): Promise<v
                 diferencia: reportZ.difference,
                 varianceType: reportZ.varianceType,
                 ventasTotales: reportZ.salesTotal,
+                bankAccountId: body.bankAccountId || null,
+                depositAmount: body.depositAmount || null,
             },
             userId: req.user!.id,
             ipAddress: extractIp(req),

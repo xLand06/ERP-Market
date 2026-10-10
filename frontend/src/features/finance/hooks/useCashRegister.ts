@@ -30,17 +30,21 @@ export interface ExecuteReportZParams {
     };
     closingAmount: number;
     notes?: string;
+    bankAccountId?: string;
+    depositAmount?: number;
 }
 
 export function useExecuteReportZ() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ registerId, physicalCounts, closingAmount, notes }: ExecuteReportZParams) => {
+        mutationFn: async ({ registerId, physicalCounts, closingAmount, notes, bankAccountId, depositAmount }: ExecuteReportZParams) => {
             const res = await api.post(`/cash-flow/registers/${registerId}/report-z`, {
                 physicalCounts,
                 closingAmount,
                 notes,
+                bankAccountId,
+                depositAmount,
             });
             return res.data.data as ReportAuditData;
         },

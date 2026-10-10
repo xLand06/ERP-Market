@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Lock } from 'lucide-react';
+import { AlertTriangle, Lock, Landmark } from 'lucide-react';
 import {
     Dialog, DialogContent, DialogHeader,
     DialogTitle, DialogDescription, DialogFooter,
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useConfigStore, ThermalPrinterConfig } from '@/hooks/useConfigStore';
 import { useExecuteReportZ } from '../hooks/useCashRegister';
+import { useBankAccounts } from '@/features/banks/hooks/useBanks';
 import { printReportZTicket, ReportAuditData } from '@/lib/thermalPrinter';
 import { ThermalAuditTicket } from '@/components/common/ThermalAuditTicket';
 import toast from 'react-hot-toast';
@@ -32,6 +33,7 @@ export const ReportZModal: React.FC<ReportZModalProps> = ({
 }) => {
     const { fmtCOP, rates, printers, paperWidth, openCashDrawer, printerType } = useConfigStore();
     const executeReportZMutation = useExecuteReportZ();
+    const { data: bankAccounts = [] } = useBankAccounts();
 
     const [countedCop, setCountedCop] = useState('');
     const [countedUsd, setCountedUsd] = useState('');
@@ -39,6 +41,11 @@ export const ReportZModal: React.FC<ReportZModalProps> = ({
     const [notes, setNotes] = useState('');
     const [error, setError] = useState('');
     const [step, setStep] = useState<'count' | 'confirm'>('count');
+
+    // Integración Bancos / Bóveda
+    const [depositToBank, setDepositToBank] = useState(false);
+    const [selectedAccountId, setSelectedAccountId] = useState('');
+    const [customDepositAmount, setCustomDepositAmount] = useState('');
 
     const usdRate = rates['USD'] || 3600;
     const vesRate = rates['VES'] || 5.5;
@@ -72,6 +79,10 @@ export const ReportZModal: React.FC<ReportZModalProps> = ({
             setError('Ingresa montos contados válidos.');
             return;
         }
+        if (depositToBank && !selectedAccountId) {
+            setError('Selecciona la cuenta bancaria o bóveda receptora.');
+            return;
+        }
         setError('');
         setStep('confirm');
     };
@@ -83,6 +94,10 @@ export const ReportZModal: React.FC<ReportZModalProps> = ({
         }
 
         try {
+            const depositAmt = depositToBank
+                ? (customDepositAmount ? parseFloat(customDepositAmount) || totalCountedCop : totalCountedCop)
+                : undefined;
+
             const resultData = await executeReportZMutation.mutateAsync({
                 registerId,
                 physicalCounts: {
@@ -94,6 +109,8 @@ export const ReportZModal: React.FC<ReportZModalProps> = ({
                 },
                 closingAmount: totalCountedCop,
                 notes,
+                bankAccountId: depositToBank ? selectedAccountId : undefined,
+                depositAmount: depositAmt,
             });
 
             // Auto-trigger thermal print ticket
@@ -103,7 +120,6 @@ export const ReportZModal: React.FC<ReportZModalProps> = ({
             } catch (err: any) {
                 console.warn('Error al imprimir ticket Z:', err);
             }
-
 
             if (onCloseSuccess) {
                 onCloseSuccess(resultData);
@@ -121,6 +137,9 @@ export const ReportZModal: React.FC<ReportZModalProps> = ({
         setNotes('');
         setError('');
         setStep('count');
+        setDepositToBank(false);
+        setSelectedAccountId('');
+        setCustomDepositAmount('');
         onClose();
     };
 
@@ -382,6 +401,79 @@ export const ReportZModal: React.FC<ReportZModalProps> = ({
                                                     ? `Sobrante detectado de +${fmtCOP(difference)} en caja.`
                                                     : 'Caja totalmente cuadrada (exacta).'}
                                         </p>
+                                    </div>
+                                )}
+
+                                {/* Integración Banco / Bóveda */}
+                                {bankAccounts && bankAccounts.length > 0 && (
+                                    <div className="rounded-2xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/30 p-4 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                                    <Landmark className="w-4 h-4" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100">¿Depositar en Banco o Bóveda?</p>
+                                                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Transfiere la recaudación directamente a tesorería</p>
+                                                </div>
+                                            </div>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={depositToBank}
+                                                    onChange={(e) => {
+                                                        setDepositToBank(e.target.checked);
+                                                        if (e.target.checked && !selectedAccountId && bankAccounts.length > 0) {
+                                                            setSelectedAccountId(bankAccounts[0].id);
+                                                        }
+                                                    }}
+                                                    className="sr-only peer"
+                                                />
+                                                <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                                            </label>
+                                        </div>
+
+                                        {depositToBank && (
+                                            <div className="pt-2 border-t border-indigo-100 dark:border-indigo-900/60 space-y-3">
+                                                <div>
+                                                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block mb-1">
+                                                        Cuenta o Bóveda Destino <span className="text-red-500">*</span>
+                                                    </label>
+                                                    <select
+                                                        value={selectedAccountId}
+                                                        onChange={(e) => setSelectedAccountId(e.target.value)}
+                                                        className="w-full h-9 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
+                                                    >
+                                                        {bankAccounts.filter(a => a.isActive).map((acc) => (
+                                                            <option key={acc.id} value={acc.id}>
+                                                                {acc.name} {acc.bankName ? `(${acc.bankName})` : ''} — Saldo: {fmtCOP(acc.balance)}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block mb-1">
+                                                        Monto a Depositar (COP)
+                                                    </label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">$</span>
+                                                        <Input
+                                                            type="number"
+                                                            min="0"
+                                                            step="1"
+                                                            placeholder={totalCountedCop ? String(totalCountedCop) : '0'}
+                                                            value={customDepositAmount}
+                                                            onChange={(e) => setCustomDepositAmount(e.target.value)}
+                                                            className="h-9 text-xs font-bold tabular-nums pl-7 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200"
+                                                        />
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                                                        Si lo dejas vacío, se depositará el total contado: <span className="font-bold text-slate-700 dark:text-slate-300">{fmtCOP(totalCountedCop)}</span>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
