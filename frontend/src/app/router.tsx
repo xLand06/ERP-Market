@@ -76,6 +76,12 @@ export const router = createRouter([
         element: wrap(PublicCatalogPage),
         errorElement: <RouteErrorBoundary />
     },
+    // Soporte directo para URL limpia de catálogo /:slug (ej: https://allmarket.allcode.site/test)
+    {
+        path: '/:slug',
+        element: wrap(PublicCatalogPage),
+        errorElement: <RouteErrorBoundary />
+    },
     {
         path: '/',
         element: <PrivateRoute><PlanGuard><AppShellLayout /></PlanGuard></PrivateRoute>,
