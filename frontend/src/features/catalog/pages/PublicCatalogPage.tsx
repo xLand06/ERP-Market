@@ -9,7 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { 
     Loader2, PackageX, Search, Store, QrCode, Coins, X, 
     Sparkles, ArrowRight, Layers, Tag, Check, Info, Clock, MapPin,
-    Sun, Moon, ShoppingBag, Eye, Share2, PhoneCall
+    ShoppingBag, Eye, Share2, PhoneCall
 } from 'lucide-react';
 import { catalogApi } from '@/services/catalog.service';
 import type { CatalogGroup, CatalogProduct, CatalogPresentation, SocialLinks } from '@/services/catalog.service';
@@ -162,11 +162,6 @@ function ProductDetailModal({ open, onClose, product, currency, baseCurrency, ra
                         </div>
                     )}
                     
-                    <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow border border-white/10">
-                        <Tag className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>{product.barcode ? `Cód: ${product.barcode}` : 'Disponible'}</span>
-                    </div>
-
                     <button
                         type="button"
                         onClick={handleShare}
@@ -344,19 +339,13 @@ function ProductCard({
                 )}
 
                 {/* Badges superiores */}
-                <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
-                    {product.barcode ? (
-                        <span className="bg-slate-950/75 backdrop-blur text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg border border-white/10 shadow-sm">
-                            {product.barcode}
-                        </span>
-                    ) : <span />}
-
-                    {hasPresentations && (
+                {hasPresentations && (
+                    <div className="absolute top-2.5 right-2.5 flex items-center pointer-events-none">
                         <span className="bg-indigo-600/90 backdrop-blur text-white text-[10px] font-bold px-2 py-0.5 rounded-lg shadow-sm">
                             {product.presentations.length} var.
                         </span>
-                    )}
-                </div>
+                    </div>
+                )}
 
                 {/* Botón flotante para ver detalle al pasar el mouse */}
                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -443,14 +432,8 @@ export default function PublicCatalogPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const queryParamQ = searchParams.get('q') || '';
 
-    // Manejo exclusivo de Modo Claro / Oscuro para el catálogo
-    const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
-        const saved = localStorage.getItem('catalog_theme_mode');
-        if (saved === 'dark' || saved === 'light') return saved;
-        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    });
-
-    const isDark = themeMode === 'dark';
+    // El catálogo público opera permanentemente en Modo Claro para máxima legibilidad comercial
+    const isDark = false;
 
     // Aislar la página de los estilos agresivos globales `html.theme-dark` del ERP
     useEffect(() => {
@@ -458,8 +441,11 @@ export default function PublicCatalogPage() {
         const prevClasses = root.className;
         const prevDataTheme = root.getAttribute('data-theme');
 
-        root.className = isDark ? 'catalog-view dark' : 'catalog-view';
-        root.setAttribute('data-theme', isDark ? 'catalog-dark' : 'catalog-light');
+        root.className = 'catalog-view';
+        root.setAttribute('data-theme', 'catalog-light');
+
+        // Limpiar cualquier preferencia oscura previa guardada
+        localStorage.removeItem('catalog_theme_mode');
 
         return () => {
             root.className = prevClasses;
@@ -469,13 +455,7 @@ export default function PublicCatalogPage() {
                 root.removeAttribute('data-theme');
             }
         };
-    }, [isDark]);
-
-    const toggleTheme = () => {
-        const nextMode = themeMode === 'light' ? 'dark' : 'light';
-        setThemeMode(nextMode);
-        localStorage.setItem('catalog_theme_mode', nextMode);
-    };
+    }, []);
 
     const [search, setSearch] = useState(queryParamQ);
     const [selectedCurrency, setSelectedCurrency] = useState<string>('USD');
@@ -838,33 +818,8 @@ export default function PublicCatalogPage() {
                         </Button>
                     </div>
 
-                    {/* Controles de Vista: Tema y Selector de Moneda */}
+                    {/* Controles de Vista: Selector de Moneda */}
                     <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                        {/* Selector de Modo Claro / Oscuro */}
-                        <button
-                            type="button"
-                            onClick={toggleTheme}
-                            aria-label={`Cambiar a modo ${isDark ? 'claro' : 'oscuro'}`}
-                            title={`Modo ${isDark ? 'Claro' : 'Oscuro'}`}
-                            className={`p-2 sm:px-3 rounded-2xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
-                                isDark 
-                                    ? 'bg-slate-800/80 border-slate-700 text-amber-300 hover:bg-slate-750' 
-                                    : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
-                            }`}
-                        >
-                            {isDark ? (
-                                <>
-                                    <Sun className="w-4 h-4 text-amber-400" />
-                                    <span className="hidden md:inline text-[11px]">Claro</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Moon className="w-4 h-4 text-indigo-600" />
-                                    <span className="hidden md:inline text-[11px]">Oscuro</span>
-                                </>
-                            )}
-                        </button>
-
                         {/* Selector de Moneda */}
                         <div className={`flex items-center gap-1 p-1 rounded-2xl border ${
                             isDark 
