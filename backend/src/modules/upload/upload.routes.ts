@@ -62,7 +62,7 @@ const upload = multer({
 router.post(
     '/product-image',
     authMiddleware,
-    planGuard('premium'),
+    planGuard('pro'),
     (req, res, next) => {
         upload.single('image')(req, res, (err) => {
             if (err instanceof multer.MulterError) {
@@ -127,7 +127,7 @@ router.post(
 router.post(
     '/catalog-image',
     authMiddleware,
-    planGuard('premium'),
+    planGuard('pro'),
     (req, res, next) => {
         upload.single('image')(req, res, (err) => {
             if (err instanceof multer.MulterError) {

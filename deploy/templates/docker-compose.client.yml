@@ -131,6 +131,7 @@ services:
     # después de compilar el APK con build-apk.sh + gradle.
     volumes:
       - ./apk:/app/public/apk:ro
+      - ./uploads:/app/uploads
 
 networks:
   default:
