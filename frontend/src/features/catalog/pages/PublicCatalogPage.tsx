@@ -9,13 +9,14 @@ import { useQuery } from '@tanstack/react-query';
 import { 
     Loader2, PackageX, Search, Store, QrCode, Coins, X, 
     Sparkles, ArrowRight, Layers, Tag, Check, Info, Clock, MapPin,
-    Sun, Moon
+    Sun, Moon, ShoppingBag, Eye, Share2, PhoneCall
 } from 'lucide-react';
 import { catalogApi } from '@/services/catalog.service';
 import type { CatalogGroup, CatalogProduct, CatalogPresentation, SocialLinks } from '@/services/catalog.service';
 import { CameraBarcodeScannerModal } from '@/components/scanner/CameraBarcodeScannerModal';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import toast from 'react-hot-toast';
 
 // ─── Conversión y Formato de Precios ──────────────────────────────────────────
 const convertCatalogPrice = (
@@ -95,9 +96,10 @@ interface ProductDetailModalProps {
     baseCurrency: string;
     rates: Record<string, number>;
     isDark: boolean;
+    whatsappNumber?: string;
 }
 
-function ProductDetailModal({ open, onClose, product, currency, baseCurrency, rates, isDark }: ProductDetailModalProps) {
+function ProductDetailModal({ open, onClose, product, currency, baseCurrency, rates, isDark, whatsappNumber }: ProductDetailModalProps) {
     const [selectedPresId, setSelectedPresId] = useState<string | null>(null);
     const [imgError, setImgError] = useState(false);
 
@@ -112,21 +114,41 @@ function ProductDetailModal({ open, onClose, product, currency, baseCurrency, ra
     const finalPrice = convertCatalogPrice(rawPrice, baseCurrency, currency, rates);
     const showImage = !!product.imageUrl && !imgError;
 
+    const handleShare = () => {
+        if (navigator.share) {
+            navigator.share({
+                title: product.name,
+                text: `Mira ${product.name} en el catálogo: ${formatCurrencyPrice(finalPrice, currency)}`,
+                url: window.location.href,
+            }).catch(() => {});
+        } else {
+            navigator.clipboard.writeText(window.location.href);
+            toast.success('Enlace copiado al portapapeles');
+        }
+    };
+
+    const handleWhatsAppConsult = () => {
+        if (!whatsappNumber) return;
+        const phone = whatsappNumber.replace(/\D/g, '');
+        const message = `¡Hola! Me interesa este producto de su catálogo:%0A*${product.name}*%0A${activePresentation ? `Presentación: ${activePresentation.name}%0A` : ''}Precio: ${formatCurrencyPrice(finalPrice, currency)}`;
+        window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
+    };
+
     return (
         <Dialog open={open} onOpenChange={o => !o && onClose()}>
-            <DialogContent className={`max-w-lg p-0 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] transition-colors ${
+            <DialogContent className={`max-w-lg p-0 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] transition-colors border ${
                 isDark 
                     ? 'bg-slate-900 border-slate-800 text-slate-100' 
                     : 'bg-white border-slate-200 text-slate-900'
             }`}>
-                <div className={`relative aspect-video sm:aspect-4/3 flex items-center justify-center overflow-hidden shrink-0 ${
+                <div className={`relative aspect-video sm:aspect-4/3 flex items-center justify-center overflow-hidden shrink-0 group ${
                     isDark ? 'bg-slate-950' : 'bg-slate-100'
                 }`}>
                     {showImage ? (
                         <img
                             src={product.imageUrl!}
                             alt={product.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                             onError={() => setImgError(true)}
                         />
                     ) : (
@@ -139,19 +161,32 @@ function ProductDetailModal({ open, onClose, product, currency, baseCurrency, ra
                             </span>
                         </div>
                     )}
-                    <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow">
+                    
+                    <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow border border-white/10">
                         <Tag className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>{product.barcode ? `Cód: ${product.barcode}` : 'ID Producto'}</span>
+                        <span>{product.barcode ? `Cód: ${product.barcode}` : 'Disponible'}</span>
                     </div>
+
+                    <button
+                        type="button"
+                        onClick={handleShare}
+                        aria-label="Compartir producto"
+                        className="absolute bottom-3 right-3 bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 p-2 rounded-full shadow-md backdrop-blur hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                        title="Compartir enlace"
+                    >
+                        <Share2 className="w-4 h-4" />
+                    </button>
                 </div>
 
                 <div className="p-5 sm:p-6 flex flex-col gap-4 overflow-y-auto">
                     <div>
-                        <h2 className={`text-xl sm:text-2xl font-black leading-snug tracking-tight ${
-                            isDark ? 'text-white' : 'text-slate-900'
-                        }`}>
-                            {product.name}
-                        </h2>
+                        <div className="flex items-start justify-between gap-2">
+                            <h2 className={`text-xl sm:text-2xl font-black leading-snug tracking-tight ${
+                                isDark ? 'text-white' : 'text-slate-900'
+                            }`}>
+                                {product.name}
+                            </h2>
+                        </div>
                         {product.description ? (
                             <p className={`text-sm mt-2 leading-relaxed whitespace-pre-line ${
                                 isDark ? 'text-slate-300' : 'text-slate-600'
@@ -162,7 +197,7 @@ function ProductDetailModal({ open, onClose, product, currency, baseCurrency, ra
                             <p className={`text-xs italic mt-1 ${
                                 isDark ? 'text-slate-500' : 'text-slate-400'
                             }`}>
-                                Sin descripción detallada
+                                Sin descripción adicional
                             </p>
                         )}
                     </div>
@@ -193,7 +228,7 @@ function ProductDetailModal({ open, onClose, product, currency, baseCurrency, ra
                                                 isSelected
                                                     ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
                                                     : isDark
-                                                        ? 'bg-slate-800 border-slate-700 text-slate-200 hover:border-indigo-400 hover:bg-slate-750'
+                                                        ? 'bg-slate-800/80 border-slate-700 text-slate-200 hover:border-indigo-400 hover:bg-slate-750'
                                                         : 'bg-white border-slate-200 text-slate-800 hover:border-indigo-300'
                                             }`}
                                         >
@@ -217,19 +252,32 @@ function ProductDetailModal({ open, onClose, product, currency, baseCurrency, ra
                         </div>
                     )}
 
-                    {/* Precio Principal */}
-                    <div className="p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white rounded-2xl flex items-center justify-between shadow-lg mt-auto border border-slate-800">
-                        <div>
-                            <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">
-                                Precio {activePresentation ? `(${activePresentation.name})` : ''}
+                    {/* Precio y Botón de Consulta WhatsApp */}
+                    <div className="space-y-3 mt-auto pt-2">
+                        <div className="p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white rounded-2xl flex items-center justify-between shadow-lg border border-slate-800">
+                            <div>
+                                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                                    Precio {activePresentation ? `(${activePresentation.name})` : ''}
+                                </span>
+                                <p className="text-2xl sm:text-3xl font-black text-emerald-400 tabular-nums">
+                                    {formatCurrencyPrice(finalPrice, currency)}
+                                </p>
+                            </div>
+                            <span className="text-xs font-black px-3 py-1.5 bg-white/10 text-white rounded-xl border border-white/10">
+                                {currency}
                             </span>
-                            <p className="text-2xl sm:text-3xl font-black text-emerald-400 tabular-nums">
-                                {formatCurrencyPrice(finalPrice, currency)}
-                            </p>
                         </div>
-                        <span className="text-xs font-black px-3 py-1.5 bg-white/10 text-white rounded-xl border border-white/10">
-                            {currency}
-                        </span>
+
+                        {whatsappNumber && (
+                            <button
+                                type="button"
+                                onClick={handleWhatsAppConsult}
+                                className="w-full py-3 px-4 bg-[#25D366] hover:bg-[#20ba59] active:scale-[0.99] text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer text-sm"
+                            >
+                                <WhatsAppIcon className="w-5 h-5" />
+                                <span>Consultar o Pedir por WhatsApp</span>
+                            </button>
+                        )}
                     </div>
                 </div>
             </DialogContent>
@@ -268,77 +316,81 @@ function ProductCard({
     return (
         <div 
             onClick={onSelect}
-            className={`group rounded-2xl border shadow-xs hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col cursor-pointer active:scale-[0.99] ${
+            className={`catalog-card-glow group rounded-3xl border overflow-hidden flex flex-col cursor-pointer active:scale-[0.98] ${
                 isDark 
-                    ? 'bg-slate-900 border-slate-800/90 hover:border-indigo-500/60 hover:bg-slate-850' 
-                    : 'bg-white border-slate-200/90 hover:border-indigo-300'
+                    ? 'bg-slate-900/90 border-slate-800/80 hover:border-indigo-500/50' 
+                    : 'bg-white border-slate-200/80 hover:border-indigo-300'
             }`}
         >
+            {/* Imagen del Producto */}
             <div className={`aspect-square flex items-center justify-center overflow-hidden relative ${
-                isDark ? 'bg-slate-950' : 'bg-slate-100'
+                isDark ? 'bg-slate-950' : 'bg-slate-100/80'
             }`}>
                 {showImage ? (
                     <img
                         src={product.imageUrl!}
                         alt={product.name}
                         loading="lazy"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500"
                         onError={() => setImgError(true)}
                     />
                 ) : (
-                    <div className={`w-full h-full flex items-center justify-center ${
+                    <div className={`w-full h-full flex flex-col items-center justify-center gap-1 ${
                         isDark ? 'text-slate-700' : 'text-slate-300'
                     }`}>
-                        <Store className="w-10 h-10 group-hover:text-indigo-400 transition-colors" />
+                        <Store className="w-10 h-10 group-hover:text-indigo-400 group-hover:scale-110 transition-all" />
+                        <span className="text-[10px] font-semibold opacity-60">Sin foto</span>
                     </div>
                 )}
-                {product.barcode && (
-                    <span className="absolute bottom-2 left-2 bg-slate-950/80 backdrop-blur text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border border-white/10">
-                        {product.barcode}
-                    </span>
-                )}
-            </div>
 
-            <div className="p-3.5 flex flex-col gap-1.5 flex-1">
-                <h3 className={`text-sm font-bold leading-snug line-clamp-2 transition-colors ${
-                    isDark 
-                        ? 'text-slate-100 group-hover:text-indigo-400' 
-                        : 'text-slate-900 group-hover:text-indigo-600'
-                }`}>
-                    {product.name}
-                </h3>
+                {/* Badges superiores */}
+                <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
+                    {product.barcode ? (
+                        <span className="bg-slate-950/75 backdrop-blur text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg border border-white/10 shadow-sm">
+                            {product.barcode}
+                        </span>
+                    ) : <span />}
 
-                {product.description ? (
-                    <p className={`text-xs line-clamp-2 leading-relaxed ${
-                        isDark ? 'text-slate-400' : 'text-slate-500'
-                    }`}>
-                        {product.description}
-                    </p>
-                ) : null}
-
-                <div className="mt-auto pt-2 flex items-baseline justify-between gap-1">
-                    <div>
-                        <p className={`text-base font-black tabular-nums ${
-                            isDark ? 'text-emerald-400' : 'text-slate-950'
-                        }`}>
-                            {formatCurrencyPrice(convertedPrice, currency)}
-                        </p>
-                        {hasPresentations && (
-                            <span className="text-[10px] font-bold text-indigo-400">
-                                {product.presentations.length} presentaciones
-                            </span>
-                        )}
-                    </div>
-                    <span className={`text-[10px] font-black uppercase ${
-                        isDark ? 'text-slate-500' : 'text-slate-400'
-                    }`}>
-                        {currency}
-                    </span>
+                    {hasPresentations && (
+                        <span className="bg-indigo-600/90 backdrop-blur text-white text-[10px] font-bold px-2 py-0.5 rounded-lg shadow-sm">
+                            {product.presentations.length} var.
+                        </span>
+                    )}
                 </div>
 
+                {/* Botón flotante para ver detalle al pasar el mouse */}
+                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <span className="bg-white/95 dark:bg-slate-900/95 text-slate-800 dark:text-slate-100 text-xs font-bold py-1.5 px-3 rounded-full shadow-lg flex items-center gap-1.5 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+                        <Eye className="w-3.5 h-3.5 text-indigo-500" />
+                        Ver detalles
+                    </span>
+                </div>
+            </div>
+
+            {/* Contenido de la Tarjeta */}
+            <div className="p-3.5 sm:p-4 flex flex-col gap-2 flex-1">
+                <div>
+                    <h3 className={`text-sm sm:text-base font-extrabold leading-snug line-clamp-2 transition-colors ${
+                        isDark 
+                            ? 'text-slate-100 group-hover:text-indigo-400' 
+                            : 'text-slate-900 group-hover:text-indigo-600'
+                    }`}>
+                        {product.name}
+                    </h3>
+
+                    {product.description ? (
+                        <p className={`text-xs line-clamp-2 mt-1 leading-relaxed ${
+                            isDark ? 'text-slate-400' : 'text-slate-500'
+                        }`}>
+                            {product.description}
+                        </p>
+                    ) : null}
+                </div>
+
+                {/* Presentaciones en píldoras */}
                 {hasPresentations ? (
                     <div 
-                        className={`flex flex-wrap gap-1 pt-1.5 border-t ${
+                        className={`flex flex-wrap gap-1 pt-1.5 mt-auto border-t ${
                             isDark ? 'border-slate-800' : 'border-slate-100'
                         }`}
                         onClick={e => e.stopPropagation()}
@@ -350,7 +402,7 @@ function ProductCard({
                                     key={pres.id}
                                     type="button"
                                     onClick={() => setSelectedPresId(pres.id)}
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
+                                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
                                         isSelected
                                             ? 'bg-indigo-600 text-white shadow-2xs'
                                             : isDark
@@ -364,6 +416,22 @@ function ProductCard({
                         })}
                     </div>
                 ) : null}
+
+                {/* Precios */}
+                <div className="pt-2 flex items-baseline justify-between gap-1 border-t border-dashed border-slate-200 dark:border-slate-800">
+                    <div>
+                        <p className={`text-base sm:text-lg font-black tabular-nums tracking-tight ${
+                            isDark ? 'text-emerald-400' : 'text-slate-950'
+                        }`}>
+                            {formatCurrencyPrice(convertedPrice, currency)}
+                        </p>
+                    </div>
+                    <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${
+                        isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                        {currency}
+                    </span>
+                </div>
             </div>
         </div>
     );
@@ -390,12 +458,10 @@ export default function PublicCatalogPage() {
         const prevClasses = root.className;
         const prevDataTheme = root.getAttribute('data-theme');
 
-        // Configurar clase y atributo temporal específico para el catálogo
         root.className = isDark ? 'catalog-view dark' : 'catalog-view';
         root.setAttribute('data-theme', isDark ? 'catalog-dark' : 'catalog-light');
 
         return () => {
-            // Restaurar estado global al salir de la página de catálogo
             root.className = prevClasses;
             if (prevDataTheme) {
                 root.setAttribute('data-theme', prevDataTheme);
@@ -413,6 +479,7 @@ export default function PublicCatalogPage() {
 
     const [search, setSearch] = useState(queryParamQ);
     const [selectedCurrency, setSelectedCurrency] = useState<string>('USD');
+    const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [scannerOpen, setScannerOpen] = useState(false);
     const [detailProduct, setDetailProduct] = useState<CatalogProduct | null>(null);
 
@@ -455,13 +522,25 @@ export default function PublicCatalogPage() {
         }
     }, [data, queryParamQ]);
 
-    // Filtro por término o código escaneado
+    // Conteo total de productos
+    const totalProductsCount = useMemo(() => {
+        if (!data) return 0;
+        return data.groups.reduce((acc, g) => acc + g.products.length, 0);
+    }, [data]);
+
+    // Filtro por término y categoría seleccionada
     const filteredGroups = useMemo<CatalogGroup[]>(() => {
         if (!data) return [];
         const term = search.trim().toLowerCase();
-        if (!term) return data.groups;
+        
+        let groups = data.groups;
+        if (selectedCategory !== 'all') {
+            groups = groups.filter(g => g.id === selectedCategory);
+        }
 
-        return data.groups
+        if (!term) return groups;
+
+        return groups
             .map(group => ({
                 ...group,
                 products: group.products.filter(p =>
@@ -475,7 +554,7 @@ export default function PublicCatalogPage() {
                 ),
             }))
             .filter(group => group.products.length > 0);
-    }, [data, search]);
+    }, [data, search, selectedCategory]);
 
     // Manejar escaneo desde cámara QR / Barras
     const handleScan = (scannedCode: string) => {
@@ -483,7 +562,6 @@ export default function PublicCatalogPage() {
         const code = scannedCode.trim();
         setSearch(code);
 
-        // Buscar si coincide directamente con algún producto
         if (data) {
             const normalized = code.toLowerCase();
             for (const g of data.groups) {
@@ -523,7 +601,7 @@ export default function PublicCatalogPage() {
                         target="_blank"
                         rel="noopener noreferrer"
                         aria-label={link.label}
-                        className={`${link.color} text-white p-2.5 rounded-full shadow-sm hover:opacity-90 transition-opacity`}
+                        className={`${link.color} text-white p-2.5 rounded-full shadow-md hover:scale-110 active:scale-95 transition-all`}
                     >
                         {link.icon}
                     </a>
@@ -543,9 +621,9 @@ export default function PublicCatalogPage() {
                     }`}>
                         <PackageX className="w-8 h-8" />
                     </div>
-                    <h1 className="text-lg font-black mb-1">Catálogo no encontrado</h1>
+                    <h1 className="text-lg font-black mb-1">Catálogo no disponible</h1>
                     <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Verifica el enlace o contacta directamente al negocio para recibir el catálogo actualizado.
+                        Verifica el enlace o contacta directamente al negocio.
                     </p>
                 </div>
             </div>
@@ -557,7 +635,10 @@ export default function PublicCatalogPage() {
             <div className={`min-h-screen flex items-center justify-center ${
                 isDark ? 'bg-slate-950' : 'bg-slate-50'
             }`}>
-                <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
+                    <span className="text-xs font-bold text-slate-400">Cargando catálogo...</span>
+                </div>
             </div>
         );
     }
@@ -566,29 +647,35 @@ export default function PublicCatalogPage() {
 
     return (
         <div className={`catalog-root min-h-screen flex flex-col transition-colors duration-200 ${
-            isDark ? 'catalog-mode-dark bg-slate-950 text-slate-100' : 'catalog-mode-light bg-slate-50 text-slate-900'
+            isDark ? 'catalog-mode-dark bg-slate-950 text-slate-100' : 'catalog-mode-light bg-slate-50/70 text-slate-900'
         }`}>
-            {/* Header del Negocio con Banner opcional */}
-            <header className={`border-b shadow-2xs overflow-hidden transition-colors ${
-                isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/90'
+            {/* ─── Hero Header Premium ─── */}
+            <header className={`border-b shadow-xs overflow-hidden transition-colors ${
+                isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200/90'
             }`}>
-                {data.bannerUrl && (
-                    <div className="w-full h-36 sm:h-52 bg-slate-800 overflow-hidden relative">
+                {/* Banner */}
+                {data.bannerUrl ? (
+                    <div className="w-full h-40 sm:h-60 bg-slate-800 overflow-hidden relative">
                         <img
                             src={data.bannerUrl}
                             alt="Banner de la tienda"
                             className="w-full h-full object-cover"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                    </div>
+                ) : (
+                    <div className="w-full h-20 sm:h-28 bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-950 relative overflow-hidden">
+                        <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#818cf8_1px,transparent_1px)] [background-size:16px_16px]" />
                     </div>
                 )}
 
-                <div className="max-w-5xl mx-auto px-4 py-5">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div className="flex items-start sm:items-center gap-3.5">
+                <div className="max-w-5xl mx-auto px-4 pb-6">
+                    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-10 sm:-mt-14 relative z-10">
+                        {/* Logo + Información principal */}
+                        <div className="flex items-end gap-4">
                             {data.logoUrl ? (
-                                <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl border shadow-sm overflow-hidden flex items-center justify-center p-1 shrink-0 -mt-2 sm:-mt-0 ${
-                                    isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+                                <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-3xl border-4 shadow-xl overflow-hidden flex items-center justify-center p-1.5 shrink-0 ${
+                                    isDark ? 'bg-slate-900 border-slate-900' : 'bg-white border-white'
                                 }`}>
                                     <img
                                         src={data.logoUrl}
@@ -597,57 +684,71 @@ export default function PublicCatalogPage() {
                                     />
                                 </div>
                             ) : (
-                                <span className={`p-3 rounded-2xl border shrink-0 ${
+                                <span className={`w-20 h-20 sm:w-24 sm:h-24 rounded-3xl border-4 shadow-xl flex items-center justify-center shrink-0 ${
                                     isDark 
-                                        ? 'bg-indigo-950/60 text-indigo-400 border-indigo-900' 
-                                        : 'bg-indigo-50 text-indigo-600 border-indigo-100'
+                                        ? 'bg-indigo-950 border-slate-900 text-indigo-400' 
+                                        : 'bg-indigo-600 border-white text-white'
                                 }`}>
-                                    <Store className="w-6 h-6" />
+                                    <Store className="w-10 h-10" />
                                 </span>
                             )}
 
-                            <div>
-                                <h1 className={`text-xl sm:text-2xl font-black tracking-tight leading-tight ${
-                                    isDark ? 'text-white' : 'text-slate-900'
-                                }`}>
-                                    {data.businessName}
-                                </h1>
-                                {data.taxId && (
-                                    <span className={`text-[11px] font-semibold block mt-0.5 ${
-                                        isDark ? 'text-slate-400' : 'text-slate-400'
+                            <div className="pb-1">
+                                <div className="flex items-center gap-2">
+                                    <h1 className={`text-xl sm:text-3xl font-black tracking-tight leading-tight ${
+                                        isDark ? 'text-white' : 'text-slate-900'
                                     }`}>
-                                        RIF: {data.taxId}
+                                        {data.businessName}
+                                    </h1>
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                        <Sparkles className="w-3 h-3" /> Catálogo Oficial
                                     </span>
-                                )}
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-3 mt-1">
+                                    {data.taxId && (
+                                        <span className="text-xs text-slate-400 font-semibold">
+                                            RIF: {data.taxId}
+                                        </span>
+                                    )}
+                                    <span className="text-xs font-bold text-indigo-500">
+                                        • {totalProductsCount} productos activos
+                                    </span>
+                                </div>
                             </div>
                         </div>
 
-                        {renderSocialLinks(data.socialLinks)}
+                        {/* Redes Sociales */}
+                        <div className="self-start sm:self-end pb-1">
+                            {renderSocialLinks(data.socialLinks)}
+                        </div>
                     </div>
 
-                    {/* Descripción / Bio comercial */}
+                    {/* Descripción Comercial */}
                     {data.description && (
-                        <p className={`text-xs sm:text-sm mt-3 pt-3 border-t max-w-2xl leading-relaxed ${
+                        <p className={`text-xs sm:text-sm mt-4 pt-3 border-t max-w-2xl leading-relaxed ${
                             isDark ? 'border-slate-800 text-slate-300' : 'border-slate-100 text-slate-600'
                         }`}>
                             {data.description}
                         </p>
                     )}
 
-                    {/* Horarios y Dirección */}
+                    {/* Horarios y Dirección con Badges limpios */}
                     {(data.schedule || data.address) && (
-                        <div className={`flex flex-wrap items-center gap-4 mt-3 pt-2 text-xs font-medium ${
-                            isDark ? 'text-slate-400' : 'text-slate-500'
-                        }`}>
+                        <div className="flex flex-wrap items-center gap-3 mt-3 pt-1 text-xs">
                             {data.schedule && (
-                                <div className="flex items-center gap-1.5">
-                                    <Clock className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${
+                                    isDark ? 'bg-slate-800/60 border-slate-700/60 text-slate-300' : 'bg-slate-100/80 border-slate-200 text-slate-600'
+                                }`}>
+                                    <Clock className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                                     <span>{data.schedule}</span>
                                 </div>
                             )}
                             {data.address && (
-                                <div className="flex items-center gap-1.5">
-                                    <MapPin className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${
+                                    isDark ? 'bg-slate-800/60 border-slate-700/60 text-slate-300' : 'bg-slate-100/80 border-slate-200 text-slate-600'
+                                }`}>
+                                    <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                                     <span>{data.address}</span>
                                 </div>
                             )}
@@ -656,10 +757,10 @@ export default function PublicCatalogPage() {
                 </div>
             </header>
 
-            {/* Barra de Filtro, Modo Claro/Oscuro, Selector de Moneda y Escáner QR */}
-            <div className={`sticky top-0 z-20 backdrop-blur-md border-b shadow-2xs transition-colors ${
+            {/* ─── Barra Flotante Sticky: Buscador + QR + Moneda + Tema ─── */}
+            <div className={`sticky top-0 z-30 backdrop-blur-xl border-b shadow-sm transition-colors ${
                 isDark 
-                    ? 'bg-slate-900/90 border-slate-800' 
+                    ? 'bg-slate-900/90 border-slate-800/90' 
                     : 'bg-white/90 border-slate-200/90'
             }`}>
                 <div className="max-w-5xl mx-auto px-4 py-3 flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
@@ -673,10 +774,10 @@ export default function PublicCatalogPage() {
                                 type="text"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
-                                placeholder="Buscar por producto, código o presentación..."
-                                className={`w-full pl-10 pr-9 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                                placeholder="Buscar productos, marcas o códigos..."
+                                className={`w-full pl-10 pr-9 py-2.5 rounded-2xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
                                     isDark 
-                                        ? 'border-slate-700 bg-slate-950 text-slate-100 placeholder:text-slate-500 focus:bg-slate-900' 
+                                        ? 'border-slate-800 bg-slate-950 text-slate-100 placeholder:text-slate-500 focus:bg-slate-900' 
                                         : 'border-slate-200 bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:bg-white'
                                 }`}
                             />
@@ -684,7 +785,7 @@ export default function PublicCatalogPage() {
                                 <button
                                     type="button"
                                     onClick={() => setSearch('')}
-                                    className={`absolute right-2.5 top-1/2 -translate-y-1/2 p-1 ${
+                                    className={`absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-full ${
                                         isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'
                                     }`}
                                 >
@@ -693,28 +794,29 @@ export default function PublicCatalogPage() {
                             )}
                         </div>
 
-                        {/* Botón de Escanear QR con Cámara */}
+                        {/* Botón de Escaneo con Cámara */}
                         <Button
                             type="button"
                             onClick={() => setScannerOpen(true)}
-                            className="h-10 px-3 sm:px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl flex items-center gap-2 shrink-0 shadow-sm transition-all cursor-pointer"
+                            className="h-10 px-3.5 sm:px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl flex items-center gap-2 shrink-0 shadow-md hover:shadow-indigo-500/20 transition-all cursor-pointer"
                             title="Escanear código QR o barras"
                         >
                             <QrCode className="w-4 h-4" />
-                            <span className="hidden sm:inline text-xs">Escanear QR</span>
+                            <span className="hidden sm:inline text-xs">Escanear</span>
                         </Button>
                     </div>
 
+                    {/* Controles de Vista: Tema y Selector de Moneda */}
                     <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                        {/* Selector de Modo Claro / Oscuro dedicado al Catálogo */}
+                        {/* Selector de Modo Claro / Oscuro */}
                         <button
                             type="button"
                             onClick={toggleTheme}
                             aria-label={`Cambiar a modo ${isDark ? 'claro' : 'oscuro'}`}
                             title={`Modo ${isDark ? 'Claro' : 'Oscuro'}`}
-                            className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
+                            className={`p-2 sm:px-3 rounded-2xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
                                 isDark 
-                                    ? 'bg-slate-800 border-slate-700 text-amber-300 hover:bg-slate-750' 
+                                    ? 'bg-slate-800/80 border-slate-700 text-amber-300 hover:bg-slate-750' 
                                     : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
                             }`}
                         >
@@ -732,7 +834,7 @@ export default function PublicCatalogPage() {
                         </button>
 
                         {/* Selector de Moneda */}
-                        <div className={`flex items-center gap-1 p-1 rounded-xl border ${
+                        <div className={`flex items-center gap-1 p-1 rounded-2xl border ${
                             isDark 
                                 ? 'bg-slate-950 border-slate-800' 
                                 : 'bg-slate-100 border-slate-200/80'
@@ -740,7 +842,7 @@ export default function PublicCatalogPage() {
                             <span className={`text-[11px] font-bold pl-2 pr-1 hidden xs:inline flex items-center gap-1 ${
                                 isDark ? 'text-slate-400' : 'text-slate-500'
                             }`}>
-                                <Coins className="w-3.5 h-3.5" /> Moneda:
+                                <Coins className="w-3.5 h-3.5 text-indigo-400" /> Moneda:
                             </span>
                             {activeCurrencies.map(curr => {
                                 const isCurrSelected = selectedCurrency === curr;
@@ -749,11 +851,11 @@ export default function PublicCatalogPage() {
                                         key={curr}
                                         type="button"
                                         onClick={() => setSelectedCurrency(curr)}
-                                        className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                                        className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                                             isCurrSelected
                                                 ? isDark
-                                                    ? 'bg-indigo-600 text-white shadow-sm'
-                                                    : 'bg-white text-indigo-700 shadow-2xs ring-1 ring-slate-200'
+                                                    ? 'bg-indigo-600 text-white shadow-md'
+                                                    : 'bg-white text-indigo-700 shadow-xs ring-1 ring-slate-200'
                                                 : isDark
                                                     ? 'text-slate-400 hover:text-white hover:bg-slate-800'
                                                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -766,64 +868,110 @@ export default function PublicCatalogPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* ─── Píldoras de Categorías Horizontales ─── */}
+                {data.groups.length > 1 && (
+                    <div className="max-w-5xl mx-auto px-4 pb-2.5 overflow-x-auto no-scrollbar flex items-center gap-1.5">
+                        <button
+                            type="button"
+                            onClick={() => setSelectedCategory('all')}
+                            className={`px-3 py-1 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                                selectedCategory === 'all'
+                                    ? isDark
+                                        ? 'bg-indigo-600 text-white shadow-sm'
+                                        : 'bg-slate-900 text-white shadow-xs'
+                                    : isDark
+                                        ? 'bg-slate-800/80 text-slate-300 hover:bg-slate-800'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            Todas ({totalProductsCount})
+                        </button>
+                        {data.groups.map(group => {
+                            const isCatSelected = selectedCategory === group.id;
+                            return (
+                                <button
+                                    key={group.id}
+                                    type="button"
+                                    onClick={() => setSelectedCategory(group.id)}
+                                    className={`px-3 py-1 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                                        isCatSelected
+                                            ? isDark
+                                                ? 'bg-indigo-600 text-white shadow-sm'
+                                                : 'bg-slate-900 text-white shadow-xs'
+                                            : isDark
+                                                ? 'bg-slate-800/80 text-slate-300 hover:bg-slate-800'
+                                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    {group.name} ({group.products.length})
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
-            {/* Listado de Productos */}
-            <main className="max-w-5xl mx-auto px-4 py-6 pb-20 flex-1 w-full">
+            {/* ─── Listado Principal de Productos ─── */}
+            <main className="max-w-5xl mx-auto px-4 py-8 pb-24 flex-1 w-full">
                 {isEmpty ? (
                     <div className={`text-center py-20 rounded-3xl border p-8 ${
                         isDark 
-                            ? 'bg-slate-900 border-slate-800' 
+                            ? 'bg-slate-900/80 border-slate-800' 
                             : 'bg-white border-slate-200'
                     }`}>
-                        <PackageX className={`w-12 h-12 mx-auto mb-3 ${
-                            isDark ? 'text-slate-600' : 'text-slate-300'
-                        }`} />
-                        <h3 className={`text-base font-bold mb-1 ${
+                        <div className={`w-16 h-16 rounded-3xl flex items-center justify-center mx-auto mb-4 ${
+                            isDark ? 'bg-slate-800 text-slate-600' : 'bg-slate-100 text-slate-300'
+                        }`}>
+                            <PackageX className="w-8 h-8" />
+                        </div>
+                        <h3 className={`text-lg font-bold mb-1 ${
                             isDark ? 'text-white' : 'text-slate-800'
                         }`}>
-                            {search ? 'Sin coincidencias' : 'Catálogo sin productos'}
+                            {search ? 'Sin coincidencias' : 'No hay productos en esta sección'}
                         </h3>
                         <p className={`text-xs max-w-sm mx-auto ${
                             isDark ? 'text-slate-400' : 'text-slate-500'
                         }`}>
                             {search 
-                                ? `No encontramos productos para "${search}". Intenta con otro término o escanea el código nuevamente.`
-                                : 'No hay productos activos disponibles en este momento.'}
+                                ? `No encontramos productos para "${search}". Intenta con otra palabra clave.`
+                                : 'Pronto se añadirán nuevos artículos.'}
                         </p>
-                        {search && (
+                        {(search || selectedCategory !== 'all') && (
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => setSearch('')}
-                                className={`mt-4 rounded-xl text-xs font-bold cursor-pointer ${
+                                onClick={() => { setSearch(''); setSelectedCategory('all'); }}
+                                className={`mt-5 rounded-2xl text-xs font-bold cursor-pointer ${
                                     isDark ? 'border-slate-700 text-slate-200 hover:bg-slate-800' : ''
                                 }`}
                             >
-                                Limpiar búsqueda
+                                Restablecer filtros
                             </Button>
                         )}
                     </div>
                 ) : (
-                    <div className="space-y-10">
+                    <div className="space-y-12">
                         {filteredGroups.map(group => (
-                            <section key={group.id} aria-label={group.name} className="space-y-3">
-                                <div className={`flex items-center justify-between border-b pb-2 ${
+                            <section key={group.id} aria-label={group.name} className="space-y-4">
+                                <div className={`flex items-center justify-between border-b pb-3 ${
                                     isDark ? 'border-slate-800' : 'border-slate-200'
                                 }`}>
-                                    <h2 className={`text-sm font-black uppercase tracking-wider flex items-center gap-2 ${
-                                        isDark ? 'text-slate-200' : 'text-slate-700'
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-sm" />
+                                        <h2 className={`text-base sm:text-lg font-black tracking-tight ${
+                                            isDark ? 'text-slate-100' : 'text-slate-900'
+                                        }`}>
+                                            {group.name}
+                                        </h2>
+                                    </div>
+                                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                                        isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'
                                     }`}>
-                                        <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                                        {group.name}
-                                    </h2>
-                                    <span className={`text-xs font-bold ${
-                                        isDark ? 'text-slate-500' : 'text-slate-400'
-                                    }`}>
-                                        {group.products.length} {group.products.length === 1 ? 'producto' : 'productos'}
+                                        {group.products.length} {group.products.length === 1 ? 'artículo' : 'artículos'}
                                     </span>
                                 </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
                                     {group.products.map(product => (
                                         <ProductCard
                                             key={product.id}
@@ -851,6 +999,7 @@ export default function PublicCatalogPage() {
                 baseCurrency={baseCurrency}
                 rates={rates}
                 isDark={isDark}
+                whatsappNumber={data.socialLinks?.whatsapp}
             />
 
             {/* Escáner de Código de Barras / QR con la Cámara */}
@@ -860,22 +1009,22 @@ export default function PublicCatalogPage() {
                 onScan={handleScan}
             />
 
-            {/* Footer */}
-            <footer className={`border-t py-6 transition-colors ${
+            {/* Footer Elegante */}
+            <footer className={`border-t py-8 transition-colors ${
                 isDark 
-                    ? 'border-slate-800 bg-slate-900/60' 
-                    : 'border-slate-200 bg-white'
+                    ? 'border-slate-800/80 bg-slate-950' 
+                    : 'border-slate-200/80 bg-white'
             }`}>
-                <div className="max-w-5xl mx-auto px-4 text-center space-y-1">
-                    <p className={`text-xs font-bold ${
-                        isDark ? 'text-slate-300' : 'text-slate-600'
+                <div className="max-w-5xl mx-auto px-4 text-center space-y-2">
+                    <p className={`text-sm font-black tracking-tight ${
+                        isDark ? 'text-slate-200' : 'text-slate-800'
                     }`}>
-                        {data.businessName} — Catálogo Digital
+                        {data.businessName}
                     </p>
-                    <p className={`text-[11px] ${
+                    <p className={`text-xs ${
                         isDark ? 'text-slate-500' : 'text-slate-400'
                     }`}>
-                        Precios sujetos a disponibilidad y cambio sin previo aviso.
+                        Catálogo digital actualizado en tiempo real • Precios sujetos a disponibilidad
                     </p>
                 </div>
             </footer>
