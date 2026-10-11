@@ -769,3 +769,68 @@
   -webkit-backdrop-filter: blur(40px);
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
+
+/* ─── Public Catalog Dedicated Theming & Isolation ───────────────────────────── */
+/* Prevent html.theme-dark global wildcards from clobbering the public catalog */
+html.theme-dark .catalog-root {
+  background-color: transparent !important;
+}
+html.theme-dark .catalog-root.catalog-mode-light,
+html.theme-dark .catalog-root.catalog-mode-light header,
+html.theme-dark .catalog-root.catalog-mode-light main,
+html.theme-dark .catalog-root.catalog-mode-light footer {
+  background-color: #F8FAFC !important;
+  color: #0F172A !important;
+}
+html.theme-dark .catalog-root.catalog-mode-light .bg-white {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: #E2E8F0 !important;
+}
+html.theme-dark .catalog-root.catalog-mode-light .bg-slate-50 {
+  background-color: #F8FAFC !important;
+}
+html.theme-dark .catalog-root.catalog-mode-light .bg-slate-100 {
+  background-color: #F1F5F9 !important;
+}
+html.theme-dark .catalog-root.catalog-mode-light [class*="text-slate-9"] {
+  color: #0F172A !important;
+}
+html.theme-dark .catalog-root.catalog-mode-light [class*="text-slate-8"] {
+  color: #1E293B !important;
+}
+html.theme-dark .catalog-root.catalog-mode-light [class*="text-slate-7"] {
+  color: #334155 !important;
+}
+html.theme-dark .catalog-root.catalog-mode-light [class*="text-slate-6"] {
+  color: #475569 !important;
+}
+html.theme-dark .catalog-root.catalog-mode-light [class*="text-slate-5"] {
+  color: #64748B !important;
+}
+html.theme-dark .catalog-root.catalog-mode-light [class*="text-slate-4"] {
+  color: #94A3B8 !important;
+}
+html.theme-dark .catalog-root.catalog-mode-light [class*="border-slate-"] {
+  border-color: #E2E8F0 !important;
+}
+
+/* Catalog Dedicated Dark Mode styling */
+.catalog-root.catalog-mode-dark {
+  background-color: #090D16 !important;
+  color: #F1F5F9 !important;
+}
+.catalog-root.catalog-mode-dark .bg-white {
+  background-color: #0F172A !important;
+  color: #F1F5F9 !important;
+  border-color: #1E293B !important;
+}
+.catalog-root.catalog-mode-dark .bg-slate-50 {
+  background-color: #090D16 !important;
+  color: #F1F5F9 !important;
+}
+.catalog-root.catalog-mode-dark .bg-slate-100 {
+  background-color: #1E293B !important;
+  color: #F1F5F9 !important;
+}
+

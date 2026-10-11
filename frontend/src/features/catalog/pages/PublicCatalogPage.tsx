@@ -8,12 +8,13 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { 
     Loader2, PackageX, Search, Store, QrCode, Coins, X, 
-    Sparkles, ArrowRight, Layers, Tag, Check, Info, Clock, MapPin
+    Sparkles, ArrowRight, Layers, Tag, Check, Info, Clock, MapPin,
+    Sun, Moon
 } from 'lucide-react';
 import { catalogApi } from '@/services/catalog.service';
 import type { CatalogGroup, CatalogProduct, CatalogPresentation, SocialLinks } from '@/services/catalog.service';
 import { CameraBarcodeScannerModal } from '@/components/scanner/CameraBarcodeScannerModal';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
 // ─── Conversión y Formato de Precios ──────────────────────────────────────────
@@ -93,9 +94,10 @@ interface ProductDetailModalProps {
     currency: string;
     baseCurrency: string;
     rates: Record<string, number>;
+    isDark: boolean;
 }
 
-function ProductDetailModal({ open, onClose, product, currency, baseCurrency, rates }: ProductDetailModalProps) {
+function ProductDetailModal({ open, onClose, product, currency, baseCurrency, rates, isDark }: ProductDetailModalProps) {
     const [selectedPresId, setSelectedPresId] = useState<string | null>(null);
     const [imgError, setImgError] = useState(false);
 
@@ -112,8 +114,14 @@ function ProductDetailModal({ open, onClose, product, currency, baseCurrency, ra
 
     return (
         <Dialog open={open} onOpenChange={o => !o && onClose()}>
-            <DialogContent className="max-w-lg p-0 bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[92dvh]">
-                <div className="relative aspect-video sm:aspect-4/3 bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
+            <DialogContent className={`max-w-lg p-0 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] transition-colors ${
+                isDark 
+                    ? 'bg-slate-900 border-slate-800 text-slate-100' 
+                    : 'bg-white border-slate-200 text-slate-900'
+            }`}>
+                <div className={`relative aspect-video sm:aspect-4/3 flex items-center justify-center overflow-hidden shrink-0 ${
+                    isDark ? 'bg-slate-950' : 'bg-slate-100'
+                }`}>
                     {showImage ? (
                         <img
                             src={product.imageUrl!}
@@ -122,12 +130,16 @@ function ProductDetailModal({ open, onClose, product, currency, baseCurrency, ra
                             onError={() => setImgError(true)}
                         />
                     ) : (
-                        <div className="flex flex-col items-center justify-center text-slate-300 gap-2">
+                        <div className={`flex flex-col items-center justify-center gap-2 ${
+                            isDark ? 'text-slate-600' : 'text-slate-300'
+                        }`}>
                             <Store className="w-16 h-16" />
-                            <span className="text-xs font-semibold text-slate-400">Sin imagen disponible</span>
+                            <span className={`text-xs font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                Sin imagen disponible
+                            </span>
                         </div>
                     )}
-                    <div className="absolute top-3 left-3 bg-slate-900/80 backdrop-blur text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow">
+                    <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow">
                         <Tag className="w-3.5 h-3.5 text-indigo-400" />
                         <span>{product.barcode ? `Cód: ${product.barcode}` : 'ID Producto'}</span>
                     </div>
@@ -135,23 +147,37 @@ function ProductDetailModal({ open, onClose, product, currency, baseCurrency, ra
 
                 <div className="p-5 sm:p-6 flex flex-col gap-4 overflow-y-auto">
                     <div>
-                        <h2 className="text-xl sm:text-2xl font-black text-slate-900 leading-snug tracking-tight">
+                        <h2 className={`text-xl sm:text-2xl font-black leading-snug tracking-tight ${
+                            isDark ? 'text-white' : 'text-slate-900'
+                        }`}>
                             {product.name}
                         </h2>
                         {product.description ? (
-                            <p className="text-sm text-slate-600 mt-2 leading-relaxed whitespace-pre-line">
+                            <p className={`text-sm mt-2 leading-relaxed whitespace-pre-line ${
+                                isDark ? 'text-slate-300' : 'text-slate-600'
+                            }`}>
                                 {product.description}
                             </p>
                         ) : (
-                            <p className="text-xs text-slate-400 italic mt-1">Sin descripción detallada</p>
+                            <p className={`text-xs italic mt-1 ${
+                                isDark ? 'text-slate-500' : 'text-slate-400'
+                            }`}>
+                                Sin descripción detallada
+                            </p>
                         )}
                     </div>
 
                     {/* Presentaciones */}
                     {hasPresentations && (
-                        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2.5">
-                            <span className="text-xs font-black uppercase text-slate-600 tracking-wider flex items-center gap-1.5">
-                                <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                        <div className={`rounded-2xl p-4 space-y-2.5 border ${
+                            isDark 
+                                ? 'bg-slate-950/60 border-slate-800' 
+                                : 'bg-slate-50 border-slate-200/80'
+                        }`}>
+                            <span className={`text-xs font-black uppercase tracking-wider flex items-center gap-1.5 ${
+                                isDark ? 'text-slate-400' : 'text-slate-600'
+                            }`}>
+                                <Layers className="w-3.5 h-3.5 text-indigo-400" />
                                 Presentaciones Disponibles:
                             </span>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -166,12 +192,18 @@ function ProductDetailModal({ open, onClose, product, currency, baseCurrency, ra
                                             className={`p-3 rounded-xl border text-left transition-all flex items-center justify-between gap-2 cursor-pointer ${
                                                 isSelected
                                                     ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
-                                                    : 'bg-white border-slate-200 text-slate-800 hover:border-indigo-300'
+                                                    : isDark
+                                                        ? 'bg-slate-800 border-slate-700 text-slate-200 hover:border-indigo-400 hover:bg-slate-750'
+                                                        : 'bg-white border-slate-200 text-slate-800 hover:border-indigo-300'
                                             }`}
                                         >
                                             <div className="min-w-0">
                                                 <p className="text-xs font-bold truncate">{pres.name}</p>
-                                                <p className={`text-[11px] ${isSelected ? 'text-indigo-100' : 'text-slate-500'}`}>
+                                                <p className={`text-[11px] ${
+                                                    isSelected 
+                                                        ? 'text-indigo-100' 
+                                                        : isDark ? 'text-slate-400' : 'text-slate-500'
+                                                }`}>
                                                     x{pres.multiplier} unid.
                                                 </p>
                                             </div>
@@ -186,7 +218,7 @@ function ProductDetailModal({ open, onClose, product, currency, baseCurrency, ra
                     )}
 
                     {/* Precio Principal */}
-                    <div className="p-4 bg-gradient-to-br from-slate-950 to-slate-900 text-white rounded-2xl flex items-center justify-between shadow-lg mt-auto">
+                    <div className="p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white rounded-2xl flex items-center justify-between shadow-lg mt-auto border border-slate-800">
                         <div>
                             <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">
                                 Precio {activePresentation ? `(${activePresentation.name})` : ''}
@@ -211,12 +243,14 @@ function ProductCard({
     currency,
     baseCurrency,
     rates,
+    isDark,
     onSelect,
 }: {
     product: CatalogProduct;
     currency: string;
     baseCurrency: string;
     rates: Record<string, number>;
+    isDark: boolean;
     onSelect: () => void;
 }) {
     const [selectedPresId, setSelectedPresId] = useState<string | null>(null);
@@ -234,9 +268,15 @@ function ProductCard({
     return (
         <div 
             onClick={onSelect}
-            className="group bg-white rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all duration-200 overflow-hidden flex flex-col cursor-pointer active:scale-[0.99]"
+            className={`group rounded-2xl border shadow-xs hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col cursor-pointer active:scale-[0.99] ${
+                isDark 
+                    ? 'bg-slate-900 border-slate-800/90 hover:border-indigo-500/60 hover:bg-slate-850' 
+                    : 'bg-white border-slate-200/90 hover:border-indigo-300'
+            }`}
         >
-            <div className="aspect-square bg-slate-100 flex items-center justify-center overflow-hidden relative">
+            <div className={`aspect-square flex items-center justify-center overflow-hidden relative ${
+                isDark ? 'bg-slate-950' : 'bg-slate-100'
+            }`}>
                 {showImage ? (
                     <img
                         src={product.imageUrl!}
@@ -246,45 +286,61 @@ function ProductCard({
                         onError={() => setImgError(true)}
                     />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-300">
+                    <div className={`w-full h-full flex items-center justify-center ${
+                        isDark ? 'text-slate-700' : 'text-slate-300'
+                    }`}>
                         <Store className="w-10 h-10 group-hover:text-indigo-400 transition-colors" />
                     </div>
                 )}
                 {product.barcode && (
-                    <span className="absolute bottom-2 left-2 bg-slate-950/70 backdrop-blur text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded-md">
+                    <span className="absolute bottom-2 left-2 bg-slate-950/80 backdrop-blur text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border border-white/10">
                         {product.barcode}
                     </span>
                 )}
             </div>
 
             <div className="p-3.5 flex flex-col gap-1.5 flex-1">
-                <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-2 group-hover:text-indigo-600 transition-colors">
+                <h3 className={`text-sm font-bold leading-snug line-clamp-2 transition-colors ${
+                    isDark 
+                        ? 'text-slate-100 group-hover:text-indigo-400' 
+                        : 'text-slate-900 group-hover:text-indigo-600'
+                }`}>
                     {product.name}
                 </h3>
 
                 {product.description ? (
-                    <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{product.description}</p>
+                    <p className={`text-xs line-clamp-2 leading-relaxed ${
+                        isDark ? 'text-slate-400' : 'text-slate-500'
+                    }`}>
+                        {product.description}
+                    </p>
                 ) : null}
 
                 <div className="mt-auto pt-2 flex items-baseline justify-between gap-1">
                     <div>
-                        <p className="text-base font-black text-slate-950 tabular-nums">
+                        <p className={`text-base font-black tabular-nums ${
+                            isDark ? 'text-emerald-400' : 'text-slate-950'
+                        }`}>
                             {formatCurrencyPrice(convertedPrice, currency)}
                         </p>
                         {hasPresentations && (
-                            <span className="text-[10px] font-bold text-indigo-600">
+                            <span className="text-[10px] font-bold text-indigo-400">
                                 {product.presentations.length} presentaciones
                             </span>
                         )}
                     </div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase">
+                    <span className={`text-[10px] font-black uppercase ${
+                        isDark ? 'text-slate-500' : 'text-slate-400'
+                    }`}>
                         {currency}
                     </span>
                 </div>
 
                 {hasPresentations ? (
                     <div 
-                        className="flex flex-wrap gap-1 pt-1.5 border-t border-slate-100"
+                        className={`flex flex-wrap gap-1 pt-1.5 border-t ${
+                            isDark ? 'border-slate-800' : 'border-slate-100'
+                        }`}
                         onClick={e => e.stopPropagation()}
                     >
                         {product.presentations.map(pres => {
@@ -297,7 +353,9 @@ function ProductCard({
                                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
                                         isSelected
                                             ? 'bg-indigo-600 text-white shadow-2xs'
-                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                            : isDark
+                                                ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                     }`}
                                 >
                                     {pres.name}
@@ -316,6 +374,42 @@ export default function PublicCatalogPage() {
     const { slug } = useParams<{ slug: string }>();
     const [searchParams, setSearchParams] = useSearchParams();
     const queryParamQ = searchParams.get('q') || '';
+
+    // Manejo exclusivo de Modo Claro / Oscuro para el catálogo
+    const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
+        const saved = localStorage.getItem('catalog_theme_mode');
+        if (saved === 'dark' || saved === 'light') return saved;
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    });
+
+    const isDark = themeMode === 'dark';
+
+    // Aislar la página de los estilos agresivos globales `html.theme-dark` del ERP
+    useEffect(() => {
+        const root = document.documentElement;
+        const prevClasses = root.className;
+        const prevDataTheme = root.getAttribute('data-theme');
+
+        // Configurar clase y atributo temporal específico para el catálogo
+        root.className = isDark ? 'catalog-view dark' : 'catalog-view';
+        root.setAttribute('data-theme', isDark ? 'catalog-dark' : 'catalog-light');
+
+        return () => {
+            // Restaurar estado global al salir de la página de catálogo
+            root.className = prevClasses;
+            if (prevDataTheme) {
+                root.setAttribute('data-theme', prevDataTheme);
+            } else {
+                root.removeAttribute('data-theme');
+            }
+        };
+    }, [isDark]);
+
+    const toggleTheme = () => {
+        const nextMode = themeMode === 'light' ? 'dark' : 'light';
+        setThemeMode(nextMode);
+        localStorage.setItem('catalog_theme_mode', nextMode);
+    };
 
     const [search, setSearch] = useState(queryParamQ);
     const [selectedCurrency, setSelectedCurrency] = useState<string>('USD');
@@ -440,13 +534,17 @@ export default function PublicCatalogPage() {
 
     if (isError) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+            <div className={`min-h-screen flex items-center justify-center p-6 ${
+                isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
+            }`}>
                 <div className="text-center max-w-sm">
-                    <div className="mx-auto w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-4">
+                    <div className={`mx-auto w-16 h-16 rounded-2xl flex items-center justify-center mb-4 ${
+                        isDark ? 'bg-slate-900 text-slate-500' : 'bg-slate-100 text-slate-400'
+                    }`}>
                         <PackageX className="w-8 h-8" />
                     </div>
-                    <h1 className="text-lg font-black text-slate-900 mb-1">Catálogo no encontrado</h1>
-                    <p className="text-sm text-slate-500">
+                    <h1 className="text-lg font-black mb-1">Catálogo no encontrado</h1>
+                    <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                         Verifica el enlace o contacta directamente al negocio para recibir el catálogo actualizado.
                     </p>
                 </div>
@@ -456,8 +554,10 @@ export default function PublicCatalogPage() {
 
     if (isPending || !data) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+            <div className={`min-h-screen flex items-center justify-center ${
+                isDark ? 'bg-slate-950' : 'bg-slate-50'
+            }`}>
+                <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
             </div>
         );
     }
@@ -465,17 +565,21 @@ export default function PublicCatalogPage() {
     const isEmpty = filteredGroups.length === 0;
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col">
+        <div className={`catalog-root min-h-screen flex flex-col transition-colors duration-200 ${
+            isDark ? 'catalog-mode-dark bg-slate-950 text-slate-100' : 'catalog-mode-light bg-slate-50 text-slate-900'
+        }`}>
             {/* Header del Negocio con Banner opcional */}
-            <header className="bg-white border-b border-slate-200/90 shadow-2xs overflow-hidden">
+            <header className={`border-b shadow-2xs overflow-hidden transition-colors ${
+                isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/90'
+            }`}>
                 {data.bannerUrl && (
-                    <div className="w-full h-36 sm:h-52 bg-slate-100 overflow-hidden relative">
+                    <div className="w-full h-36 sm:h-52 bg-slate-800 overflow-hidden relative">
                         <img
                             src={data.bannerUrl}
                             alt="Banner de la tienda"
                             className="w-full h-full object-cover"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                     </div>
                 )}
 
@@ -483,7 +587,9 @@ export default function PublicCatalogPage() {
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div className="flex items-start sm:items-center gap-3.5">
                             {data.logoUrl ? (
-                                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden flex items-center justify-center p-1 shrink-0 -mt-2 sm:-mt-0">
+                                <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl border shadow-sm overflow-hidden flex items-center justify-center p-1 shrink-0 -mt-2 sm:-mt-0 ${
+                                    isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+                                }`}>
                                     <img
                                         src={data.logoUrl}
                                         alt={data.businessName}
@@ -491,17 +597,25 @@ export default function PublicCatalogPage() {
                                     />
                                 </div>
                             ) : (
-                                <span className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100 shrink-0">
+                                <span className={`p-3 rounded-2xl border shrink-0 ${
+                                    isDark 
+                                        ? 'bg-indigo-950/60 text-indigo-400 border-indigo-900' 
+                                        : 'bg-indigo-50 text-indigo-600 border-indigo-100'
+                                }`}>
                                     <Store className="w-6 h-6" />
                                 </span>
                             )}
 
                             <div>
-                                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">
+                                <h1 className={`text-xl sm:text-2xl font-black tracking-tight leading-tight ${
+                                    isDark ? 'text-white' : 'text-slate-900'
+                                }`}>
                                     {data.businessName}
                                 </h1>
                                 {data.taxId && (
-                                    <span className="text-[11px] text-slate-400 font-semibold block mt-0.5">
+                                    <span className={`text-[11px] font-semibold block mt-0.5 ${
+                                        isDark ? 'text-slate-400' : 'text-slate-400'
+                                    }`}>
                                         RIF: {data.taxId}
                                     </span>
                                 )}
@@ -513,23 +627,27 @@ export default function PublicCatalogPage() {
 
                     {/* Descripción / Bio comercial */}
                     {data.description && (
-                        <p className="text-xs sm:text-sm text-slate-600 mt-3 pt-3 border-t border-slate-100 max-w-2xl leading-relaxed">
+                        <p className={`text-xs sm:text-sm mt-3 pt-3 border-t max-w-2xl leading-relaxed ${
+                            isDark ? 'border-slate-800 text-slate-300' : 'border-slate-100 text-slate-600'
+                        }`}>
                             {data.description}
                         </p>
                     )}
 
                     {/* Horarios y Dirección */}
                     {(data.schedule || data.address) && (
-                        <div className="flex flex-wrap items-center gap-4 mt-3 pt-2 text-xs text-slate-500 font-medium">
+                        <div className={`flex flex-wrap items-center gap-4 mt-3 pt-2 text-xs font-medium ${
+                            isDark ? 'text-slate-400' : 'text-slate-500'
+                        }`}>
                             {data.schedule && (
                                 <div className="flex items-center gap-1.5">
-                                    <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                    <Clock className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                                     <span>{data.schedule}</span>
                                 </div>
                             )}
                             {data.address && (
                                 <div className="flex items-center gap-1.5">
-                                    <MapPin className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                    <MapPin className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                                     <span>{data.address}</span>
                                 </div>
                             )}
@@ -538,25 +656,37 @@ export default function PublicCatalogPage() {
                 </div>
             </header>
 
-            {/* Barra de Filtro, Selector de Moneda y Escáner QR */}
-            <div className="sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
+            {/* Barra de Filtro, Modo Claro/Oscuro, Selector de Moneda y Escáner QR */}
+            <div className={`sticky top-0 z-20 backdrop-blur-md border-b shadow-2xs transition-colors ${
+                isDark 
+                    ? 'bg-slate-900/90 border-slate-800' 
+                    : 'bg-white/90 border-slate-200/90'
+            }`}>
                 <div className="max-w-5xl mx-auto px-4 py-3 flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
                     {/* Input de Búsqueda + Botón de Escáner QR */}
                     <div className="flex items-center gap-2 flex-1">
                         <div className="relative flex-1">
-                            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                            <Search className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${
+                                isDark ? 'text-slate-500' : 'text-slate-400'
+                            }`} />
                             <input
                                 type="text"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
                                 placeholder="Buscar por producto, código o presentación..."
-                                className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                className={`w-full pl-10 pr-9 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+                                    isDark 
+                                        ? 'border-slate-700 bg-slate-950 text-slate-100 placeholder:text-slate-500 focus:bg-slate-900' 
+                                        : 'border-slate-200 bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:bg-white'
+                                }`}
                             />
                             {search && (
                                 <button
                                     type="button"
                                     onClick={() => setSearch('')}
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                                    className={`absolute right-2.5 top-1/2 -translate-y-1/2 p-1 ${
+                                        isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'
+                                    }`}
                                 >
                                     <X className="w-3.5 h-3.5" />
                                 </button>
@@ -567,7 +697,7 @@ export default function PublicCatalogPage() {
                         <Button
                             type="button"
                             onClick={() => setScannerOpen(true)}
-                            className="h-10 px-3 sm:px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl flex items-center gap-2 shrink-0 shadow-sm transition-all"
+                            className="h-10 px-3 sm:px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl flex items-center gap-2 shrink-0 shadow-sm transition-all cursor-pointer"
                             title="Escanear código QR o barras"
                         >
                             <QrCode className="w-4 h-4" />
@@ -575,28 +705,65 @@ export default function PublicCatalogPage() {
                         </Button>
                     </div>
 
-                    {/* Selector de Moneda */}
-                    <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0 bg-slate-100 p-1 rounded-xl border border-slate-200/80">
-                        <span className="text-[11px] font-bold text-slate-500 pl-2 pr-1 hidden xs:inline flex items-center gap-1">
-                            <Coins className="w-3.5 h-3.5" /> Moneda:
-                        </span>
-                        {activeCurrencies.map(curr => {
-                            const isCurrSelected = selectedCurrency === curr;
-                            return (
-                                <button
-                                    key={curr}
-                                    type="button"
-                                    onClick={() => setSelectedCurrency(curr)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                                        isCurrSelected
-                                            ? 'bg-white text-indigo-700 shadow-2xs ring-1 ring-slate-200'
-                                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                                    }`}
-                                >
-                                    {curr}
-                                </button>
-                            );
-                        })}
+                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                        {/* Selector de Modo Claro / Oscuro dedicado al Catálogo */}
+                        <button
+                            type="button"
+                            onClick={toggleTheme}
+                            aria-label={`Cambiar a modo ${isDark ? 'claro' : 'oscuro'}`}
+                            title={`Modo ${isDark ? 'Claro' : 'Oscuro'}`}
+                            className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
+                                isDark 
+                                    ? 'bg-slate-800 border-slate-700 text-amber-300 hover:bg-slate-750' 
+                                    : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                            }`}
+                        >
+                            {isDark ? (
+                                <>
+                                    <Sun className="w-4 h-4 text-amber-400" />
+                                    <span className="hidden md:inline text-[11px]">Claro</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Moon className="w-4 h-4 text-indigo-600" />
+                                    <span className="hidden md:inline text-[11px]">Oscuro</span>
+                                </>
+                            )}
+                        </button>
+
+                        {/* Selector de Moneda */}
+                        <div className={`flex items-center gap-1 p-1 rounded-xl border ${
+                            isDark 
+                                ? 'bg-slate-950 border-slate-800' 
+                                : 'bg-slate-100 border-slate-200/80'
+                        }`}>
+                            <span className={`text-[11px] font-bold pl-2 pr-1 hidden xs:inline flex items-center gap-1 ${
+                                isDark ? 'text-slate-400' : 'text-slate-500'
+                            }`}>
+                                <Coins className="w-3.5 h-3.5" /> Moneda:
+                            </span>
+                            {activeCurrencies.map(curr => {
+                                const isCurrSelected = selectedCurrency === curr;
+                                return (
+                                    <button
+                                        key={curr}
+                                        type="button"
+                                        onClick={() => setSelectedCurrency(curr)}
+                                        className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                                            isCurrSelected
+                                                ? isDark
+                                                    ? 'bg-indigo-600 text-white shadow-sm'
+                                                    : 'bg-white text-indigo-700 shadow-2xs ring-1 ring-slate-200'
+                                                : isDark
+                                                    ? 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                                        }`}
+                                    >
+                                        {curr}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -604,12 +771,22 @@ export default function PublicCatalogPage() {
             {/* Listado de Productos */}
             <main className="max-w-5xl mx-auto px-4 py-6 pb-20 flex-1 w-full">
                 {isEmpty ? (
-                    <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 p-8">
-                        <PackageX className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                        <h3 className="text-base font-bold text-slate-800 mb-1">
+                    <div className={`text-center py-20 rounded-3xl border p-8 ${
+                        isDark 
+                            ? 'bg-slate-900 border-slate-800' 
+                            : 'bg-white border-slate-200'
+                    }`}>
+                        <PackageX className={`w-12 h-12 mx-auto mb-3 ${
+                            isDark ? 'text-slate-600' : 'text-slate-300'
+                        }`} />
+                        <h3 className={`text-base font-bold mb-1 ${
+                            isDark ? 'text-white' : 'text-slate-800'
+                        }`}>
                             {search ? 'Sin coincidencias' : 'Catálogo sin productos'}
                         </h3>
-                        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                        <p className={`text-xs max-w-sm mx-auto ${
+                            isDark ? 'text-slate-400' : 'text-slate-500'
+                        }`}>
                             {search 
                                 ? `No encontramos productos para "${search}". Intenta con otro término o escanea el código nuevamente.`
                                 : 'No hay productos activos disponibles en este momento.'}
@@ -619,7 +796,9 @@ export default function PublicCatalogPage() {
                                 type="button"
                                 variant="outline"
                                 onClick={() => setSearch('')}
-                                className="mt-4 rounded-xl text-xs font-bold"
+                                className={`mt-4 rounded-xl text-xs font-bold cursor-pointer ${
+                                    isDark ? 'border-slate-700 text-slate-200 hover:bg-slate-800' : ''
+                                }`}
                             >
                                 Limpiar búsqueda
                             </Button>
@@ -629,12 +808,18 @@ export default function PublicCatalogPage() {
                     <div className="space-y-10">
                         {filteredGroups.map(group => (
                             <section key={group.id} aria-label={group.name} className="space-y-3">
-                                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                                    <h2 className="text-sm font-black uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                                <div className={`flex items-center justify-between border-b pb-2 ${
+                                    isDark ? 'border-slate-800' : 'border-slate-200'
+                                }`}>
+                                    <h2 className={`text-sm font-black uppercase tracking-wider flex items-center gap-2 ${
+                                        isDark ? 'text-slate-200' : 'text-slate-700'
+                                    }`}>
+                                        <span className="w-2 h-2 rounded-full bg-indigo-500" />
                                         {group.name}
                                     </h2>
-                                    <span className="text-xs font-bold text-slate-400">
+                                    <span className={`text-xs font-bold ${
+                                        isDark ? 'text-slate-500' : 'text-slate-400'
+                                    }`}>
                                         {group.products.length} {group.products.length === 1 ? 'producto' : 'productos'}
                                     </span>
                                 </div>
@@ -646,6 +831,7 @@ export default function PublicCatalogPage() {
                                             currency={selectedCurrency}
                                             baseCurrency={baseCurrency}
                                             rates={rates}
+                                            isDark={isDark}
                                             onSelect={() => setDetailProduct(product)}
                                         />
                                     ))}
@@ -664,6 +850,7 @@ export default function PublicCatalogPage() {
                 currency={selectedCurrency}
                 baseCurrency={baseCurrency}
                 rates={rates}
+                isDark={isDark}
             />
 
             {/* Escáner de Código de Barras / QR con la Cámara */}
@@ -674,12 +861,20 @@ export default function PublicCatalogPage() {
             />
 
             {/* Footer */}
-            <footer className="border-t border-slate-200 bg-white py-6">
+            <footer className={`border-t py-6 transition-colors ${
+                isDark 
+                    ? 'border-slate-800 bg-slate-900/60' 
+                    : 'border-slate-200 bg-white'
+            }`}>
                 <div className="max-w-5xl mx-auto px-4 text-center space-y-1">
-                    <p className="text-xs font-bold text-slate-600">
+                    <p className={`text-xs font-bold ${
+                        isDark ? 'text-slate-300' : 'text-slate-600'
+                    }`}>
                         {data.businessName} — Catálogo Digital
                     </p>
-                    <p className="text-[11px] text-slate-400">
+                    <p className={`text-[11px] ${
+                        isDark ? 'text-slate-500' : 'text-slate-400'
+                    }`}>
                         Precios sujetos a disponibilidad y cambio sin previo aviso.
                     </p>
                 </div>
