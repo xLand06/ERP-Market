@@ -697,29 +697,39 @@ export default function PublicCatalogPage() {
                             )}
 
                             {/* Nombre, Badge de Catálogo, RIF y Productos */}
-                            <div className="flex flex-col items-center sm:items-start gap-1.5 pb-1">
+                            <div className="flex flex-col items-center sm:items-start gap-2 pb-1">
                                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
                                     <h1 className={`text-2xl sm:text-3xl font-black tracking-tight leading-tight ${
-                                        isDark ? 'text-white' : 'text-slate-900'
+                                        isDark ? 'text-white' : 'text-slate-950'
                                     }`}>
                                         {data.businessName}
                                     </h1>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/25 shrink-0">
-                                        <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-extrabold border shrink-0 ${
+                                        isDark 
+                                            ? 'bg-emerald-950/70 text-emerald-300 border-emerald-700/60' 
+                                            : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                    }`}>
+                                        <Sparkles className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                                         Catálogo Oficial
                                     </span>
                                 </div>
 
                                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-xs">
                                     {data.taxId && (
-                                        <span className={`font-semibold px-2 py-0.5 rounded-md ${
-                                            isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
+                                        <span className={`font-bold px-2.5 py-1 rounded-lg border ${
+                                            isDark 
+                                                ? 'bg-slate-800/90 text-slate-100 border-slate-700' 
+                                                : 'bg-slate-100 text-slate-800 border-slate-200'
                                         }`}>
                                             RIF: {data.taxId}
                                         </span>
                                     )}
-                                    <span className="font-bold text-indigo-500 flex items-center gap-1">
-                                        <ShoppingBag className="w-3.5 h-3.5" />
+                                    <span className={`font-black flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${
+                                        isDark 
+                                            ? 'bg-indigo-950/60 text-indigo-300 border border-indigo-800/50' 
+                                            : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                    }`}>
+                                        <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
                                         {totalProductsCount} {totalProductsCount === 1 ? 'producto activo' : 'productos activos'}
                                     </span>
                                 </div>
@@ -735,26 +745,30 @@ export default function PublicCatalogPage() {
                     {/* Descripción Comercial */}
                     {data.description && (
                         <p className={`text-xs sm:text-sm mt-4 pt-3 border-t max-w-3xl leading-relaxed text-center sm:text-left ${
-                            isDark ? 'border-slate-800 text-slate-300' : 'border-slate-100 text-slate-600'
+                            isDark ? 'border-slate-800 text-slate-200' : 'border-slate-200 text-slate-700'
                         }`}>
                             {data.description}
                         </p>
                     )}
 
-                    {/* Horarios y Dirección con Badges limpios y centrados en móvil */}
+                    {/* Horarios y Dirección con Badges limpios y legibles */}
                     {(data.schedule || data.address) && (
                         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 mt-3 pt-1 text-xs">
                             {data.schedule && (
-                                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${
-                                    isDark ? 'bg-slate-800/60 border-slate-700/60 text-slate-300' : 'bg-slate-100/80 border-slate-200 text-slate-600'
+                                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-semibold ${
+                                    isDark 
+                                        ? 'bg-slate-800/80 border-slate-700 text-slate-100' 
+                                        : 'bg-slate-100 border-slate-200 text-slate-800'
                                 }`}>
                                     <Clock className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                                     <span>{data.schedule}</span>
                                 </div>
                             )}
                             {data.address && (
-                                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${
-                                    isDark ? 'bg-slate-800/60 border-slate-700/60 text-slate-300' : 'bg-slate-100/80 border-slate-200 text-slate-600'
+                                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-semibold ${
+                                    isDark 
+                                        ? 'bg-slate-800/80 border-slate-700 text-slate-100' 
+                                        : 'bg-slate-100 border-slate-200 text-slate-800'
                                 }`}>
                                     <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                                     <span>{data.address}</span>

@@ -818,21 +818,79 @@ html.theme-dark .catalog-root.catalog-mode-light [class*="border-slate-"] {
 /* Catalog Dedicated Dark Mode styling */
 .catalog-root.catalog-mode-dark {
   background-color: #090D16 !important;
-  color: #F1F5F9 !important;
+  color: #F8FAFC !important;
+}
+.catalog-root.catalog-mode-dark header {
+  background-color: #0F172A !important;
+  color: #F8FAFC !important;
+  border-color: #1E293B !important;
 }
 .catalog-root.catalog-mode-dark .bg-white {
   background-color: #0F172A !important;
-  color: #F1F5F9 !important;
+  color: #F8FAFC !important;
   border-color: #1E293B !important;
 }
 .catalog-root.catalog-mode-dark .bg-slate-50 {
   background-color: #090D16 !important;
-  color: #F1F5F9 !important;
+  color: #F8FAFC !important;
 }
 .catalog-root.catalog-mode-dark .bg-slate-100 {
   background-color: #1E293B !important;
-  color: #F1F5F9 !important;
+  color: #F8FAFC !important;
 }
+/* Ensure dark mode high contrast for titles, badges and meta text */
+.catalog-root.catalog-mode-dark h1,
+.catalog-root.catalog-mode-dark h2,
+.catalog-root.catalog-mode-dark h3 {
+  color: #FFFFFF !important;
+}
+.catalog-root.catalog-mode-dark [class*="text-slate-9"] {
+  color: #F8FAFC !important;
+}
+.catalog-root.catalog-mode-dark [class*="text-slate-8"] {
+  color: #E2E8F0 !important;
+}
+.catalog-root.catalog-mode-dark [class*="text-slate-7"],
+.catalog-root.catalog-mode-dark [class*="text-slate-6"] {
+  color: #CBD5E1 !important;
+}
+.catalog-root.catalog-mode-dark [class*="text-slate-5"],
+.catalog-root.catalog-mode-dark [class*="text-slate-4"] {
+  color: #94A3B8 !important;
+}
+
+/* Catalog Dedicated Light Mode styling - High Contrast against light backgrounds */
+.catalog-root.catalog-mode-light {
+  background-color: #F8FAFC !important;
+  color: #0F172A !important;
+}
+.catalog-root.catalog-mode-light header {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: #E2E8F0 !important;
+}
+.catalog-root.catalog-mode-light h1,
+.catalog-root.catalog-mode-light h2,
+.catalog-root.catalog-mode-light h3 {
+  color: #0F172A !important;
+}
+.catalog-root.catalog-mode-light [class*="text-slate-9"] {
+  color: #0F172A !important;
+}
+.catalog-root.catalog-mode-light [class*="text-slate-8"] {
+  color: #1E293B !important;
+}
+.catalog-root.catalog-mode-light [class*="text-slate-7"],
+.catalog-root.catalog-mode-light [class*="text-slate-6"] {
+  color: #334155 !important;
+}
+.catalog-root.catalog-mode-light [class*="text-slate-5"] {
+  color: #475569 !important;
+}
+.catalog-root.catalog-mode-light [class*="text-slate-4"] {
+  color: #64748B !important;
+}
+
 
 /* Catalog Modern Visual Effects */
 .catalog-card-glow {
