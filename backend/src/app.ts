@@ -90,11 +90,14 @@ app.use(cors({
         // Origenes de Capacitor (WebView Android: https://localhost, iOS: capacitor://localhost)
         const isCapacitorOrigin = /^(https?|capacitor|ionic):\/\/localhost(:\d+)?$/i.test(origin);
 
-        if (allowedUrls.includes(origin) || allowedUrls.includes('*') || isLocalDevelopment || isLocalNetwork || isCapacitorOrigin) {
+        // Orígenes oficiales del ecosistema AllMarket / AllCode
+        const isAllCodeDomain = /^https:\/\/[a-z0-9-]+\.allcode\.site$/i.test(origin) || origin === 'https://allcode.site' || origin === 'https://allmarket.allcode.site';
+
+        if (allowedUrls.includes(origin) || allowedUrls.includes('*') || isLocalDevelopment || isLocalNetwork || isCapacitorOrigin || isAllCodeDomain) {
             callback(null, true);
         } else {
             console.warn(`[CORS] Blocked origin: ${origin}`);
-            callback(new Error(`CORS not allowed for origin: ${origin}`));
+            callback(null, false);
         }
     },
     credentials: true,
