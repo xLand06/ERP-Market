@@ -450,6 +450,15 @@ export default function PublicCatalogPage() {
         root.className = isDark ? 'catalog-view dark' : 'catalog-view';
         root.setAttribute('data-theme', isDark ? 'catalog-dark' : 'catalog-light');
 
+        // Desregistrar cualquier Service Worker residual que intercepte peticiones de la tienda/catálogo
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+                for (const registration of registrations) {
+                    registration.unregister();
+                }
+            }).catch(() => {});
+        }
+
         return () => {
             root.className = prevClasses;
             if (prevDataTheme) {
