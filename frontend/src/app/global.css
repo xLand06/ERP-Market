@@ -815,27 +815,27 @@ html.theme-dark .catalog-root.catalog-mode-light [class*="border-slate-"] {
   border-color: #E2E8F0 !important;
 }
 
-/* Catalog Dedicated Dark Mode styling */
+/* Catalog Dedicated Dark Mode styling (OLED Slate Cinema Theme) */
 .catalog-root.catalog-mode-dark {
-  background-color: #090D16 !important;
+  background-color: #030712 !important;
   color: #F8FAFC !important;
 }
 .catalog-root.catalog-mode-dark header {
-  background-color: #0F172A !important;
+  background-color: #090D1A !important;
   color: #F8FAFC !important;
-  border-color: #1E293B !important;
+  border-color: #1F2937 !important;
 }
 .catalog-root.catalog-mode-dark .bg-white {
-  background-color: #0F172A !important;
+  background-color: #0E1322 !important;
   color: #F8FAFC !important;
-  border-color: #1E293B !important;
+  border-color: #1F2937 !important;
 }
 .catalog-root.catalog-mode-dark .bg-slate-50 {
-  background-color: #090D16 !important;
+  background-color: #030712 !important;
   color: #F8FAFC !important;
 }
 .catalog-root.catalog-mode-dark .bg-slate-100 {
-  background-color: #1E293B !important;
+  background-color: #161D2F !important;
   color: #F8FAFC !important;
 }
 /* Ensure dark mode high contrast for titles, badges and meta text */
@@ -848,13 +848,15 @@ html.theme-dark .catalog-root.catalog-mode-light [class*="border-slate-"] {
   color: #F8FAFC !important;
 }
 .catalog-root.catalog-mode-dark [class*="text-slate-8"] {
-  color: #E2E8F0 !important;
+  color: #F1F5F9 !important;
 }
 .catalog-root.catalog-mode-dark [class*="text-slate-7"],
 .catalog-root.catalog-mode-dark [class*="text-slate-6"] {
+  color: #E2E8F0 !important;
+}
+.catalog-root.catalog-mode-dark [class*="text-slate-5"] {
   color: #CBD5E1 !important;
 }
-.catalog-root.catalog-mode-dark [class*="text-slate-5"],
 .catalog-root.catalog-mode-dark [class*="text-slate-4"] {
   color: #94A3B8 !important;
 }
@@ -891,7 +893,6 @@ html.theme-dark .catalog-root.catalog-mode-light [class*="border-slate-"] {
   color: #64748B !important;
 }
 
-
 /* Catalog Modern Visual Effects */
 .catalog-card-glow {
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
@@ -903,7 +904,8 @@ html.theme-dark .catalog-root.catalog-mode-light [class*="border-slate-"] {
   box-shadow: 0 16px 32px -8px rgba(79, 70, 229, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.05);
 }
 .catalog-mode-dark .catalog-card-glow:hover {
-  box-shadow: 0 16px 36px -8px rgba(99, 102, 241, 0.25), 0 4px 14px -2px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 16px 36px -8px rgba(99, 102, 241, 0.35), 0 0 20px 0 rgba(99, 102, 241, 0.15);
+  border-color: rgba(129, 140, 248, 0.6) !important;
 }
 
 

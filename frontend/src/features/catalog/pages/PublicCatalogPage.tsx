@@ -9,7 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { 
     Loader2, PackageX, Search, Store, QrCode, Coins, X, 
     Sparkles, ArrowRight, Layers, Tag, Check, Info, Clock, MapPin,
-    ShoppingBag, Eye, Share2, PhoneCall
+    ShoppingBag, Eye, Share2, PhoneCall, Sun, Moon
 } from 'lucide-react';
 import { catalogApi } from '@/services/catalog.service';
 import type { CatalogGroup, CatalogProduct, CatalogPresentation, SocialLinks } from '@/services/catalog.service';
@@ -432,8 +432,14 @@ export default function PublicCatalogPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const queryParamQ = searchParams.get('q') || '';
 
-    // El catálogo público opera permanentemente en Modo Claro para máxima legibilidad comercial
-    const isDark = false;
+    // Manejo refinado de Modo Claro / Oscuro para el catálogo
+    const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
+        const saved = localStorage.getItem('catalog_theme_mode');
+        if (saved === 'dark' || saved === 'light') return saved;
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    });
+
+    const isDark = themeMode === 'dark';
 
     // Aislar la página de los estilos agresivos globales `html.theme-dark` del ERP
     useEffect(() => {
@@ -441,11 +447,8 @@ export default function PublicCatalogPage() {
         const prevClasses = root.className;
         const prevDataTheme = root.getAttribute('data-theme');
 
-        root.className = 'catalog-view';
-        root.setAttribute('data-theme', 'catalog-light');
-
-        // Limpiar cualquier preferencia oscura previa guardada
-        localStorage.removeItem('catalog_theme_mode');
+        root.className = isDark ? 'catalog-view dark' : 'catalog-view';
+        root.setAttribute('data-theme', isDark ? 'catalog-dark' : 'catalog-light');
 
         return () => {
             root.className = prevClasses;
@@ -455,7 +458,13 @@ export default function PublicCatalogPage() {
                 root.removeAttribute('data-theme');
             }
         };
-    }, []);
+    }, [isDark]);
+
+    const toggleTheme = () => {
+        const nextMode = themeMode === 'light' ? 'dark' : 'light';
+        setThemeMode(nextMode);
+        localStorage.setItem('catalog_theme_mode', nextMode);
+    };
 
     const [search, setSearch] = useState(queryParamQ);
     const [selectedCurrency, setSelectedCurrency] = useState<string>('USD');
@@ -818,12 +827,37 @@ export default function PublicCatalogPage() {
                         </Button>
                     </div>
 
-                    {/* Controles de Vista: Selector de Moneda */}
+                    {/* Controles de Vista: Tema y Selector de Moneda */}
                     <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                        {/* Selector de Modo Claro / Oscuro Premium */}
+                        <button
+                            type="button"
+                            onClick={toggleTheme}
+                            aria-label={`Cambiar a modo ${isDark ? 'claro' : 'oscuro'}`}
+                            title={`Modo ${isDark ? 'Claro' : 'Oscuro'}`}
+                            className={`p-2 sm:px-3 rounded-2xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
+                                isDark 
+                                    ? 'bg-slate-800/90 border-slate-700/80 text-amber-300 hover:bg-slate-750 hover:border-amber-400/40 shadow-xs' 
+                                    : 'bg-slate-100 border-slate-200/90 text-slate-700 hover:bg-slate-200 shadow-2xs'
+                            }`}
+                        >
+                            {isDark ? (
+                                <>
+                                    <Sun className="w-4 h-4 text-amber-400 animate-spin-slow" />
+                                    <span className="hidden md:inline text-[11px] font-extrabold text-amber-200">Claro</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Moon className="w-4 h-4 text-indigo-600" />
+                                    <span className="hidden md:inline text-[11px] font-extrabold text-slate-700">Oscuro</span>
+                                </>
+                            )}
+                        </button>
+
                         {/* Selector de Moneda */}
                         <div className={`flex items-center gap-1 p-1 rounded-2xl border ${
                             isDark 
-                                ? 'bg-slate-950 border-slate-800' 
+                                ? 'bg-slate-900/90 border-slate-800' 
                                 : 'bg-slate-100 border-slate-200/80'
                         }`}>
                             <span className={`text-[11px] font-bold pl-2 pr-1 hidden xs:inline flex items-center gap-1 ${
