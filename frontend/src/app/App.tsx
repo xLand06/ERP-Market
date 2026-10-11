@@ -52,10 +52,34 @@ export default function App() {
         }
     }, []);
 
-    // Fetch settings ONLY after serverUrl is known on native — otherwise
-    // axios hits /api on capacitor://localhost and the user sees Network Error.
+    // Fetch settings ONLY after serverUrl is known on native and NOT on public catalog/terms routes
+    // otherwise axios hits /api/settings on public domains (e.g. allmarket.allcode.site/:slug) and throws 404.
     useEffect(() => {
         if (!serverUrlReady) return;
+        const path = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
+        const isPublicPath = path.startsWith('/catalogo') || path.startsWith('/terms') || (
+            !path.startsWith('/dashboard') &&
+            !path.startsWith('/inventory') &&
+            !path.startsWith('/pos') &&
+            !path.startsWith('/finance') &&
+            !path.startsWith('/cash-register') &&
+            !path.startsWith('/products') &&
+            !path.startsWith('/suppliers') &&
+            !path.startsWith('/users') &&
+            !path.startsWith('/reports') &&
+            !path.startsWith('/purchases') &&
+            !path.startsWith('/audit') &&
+            !path.startsWith('/settings') &&
+            !path.startsWith('/merma') &&
+            !path.startsWith('/quotes') &&
+            !path.startsWith('/customers') &&
+            !path.startsWith('/banks') &&
+            !path.startsWith('/login') &&
+            path !== '/'
+        );
+        // Do not fetch ERP settings when visiting public catalog or terms
+        if (isPublicPath) return;
+
         const isNative = !!(window as any).Capacitor?.isNativePlatform?.()
             || window.location.protocol === 'capacitor:'
             || window.location.hostname === 'localhost';
