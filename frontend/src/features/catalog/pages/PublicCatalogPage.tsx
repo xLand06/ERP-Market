@@ -664,40 +664,50 @@ export default function PublicCatalogPage() {
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
                     </div>
                 ) : (
-                    <div className="w-full h-24 sm:h-36 md:h-44 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 relative overflow-hidden">
-                        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#818cf8_1px,transparent_1px)] [background-size:20px_20px]" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                    <div className={`w-full h-24 sm:h-36 md:h-44 relative overflow-hidden transition-colors ${
+                        isDark 
+                            ? 'bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900' 
+                            : 'bg-gradient-to-r from-slate-200 via-indigo-50 to-slate-200 border-b border-slate-200/80'
+                    }`}>
+                        <div className={`absolute inset-0 opacity-20 ${
+                            isDark 
+                                ? 'bg-[radial-gradient(#818cf8_1px,transparent_1px)]' 
+                                : 'bg-[radial-gradient(#6366f1_1px,transparent_1px)]'
+                        } [background-size:20px_20px]`} />
+                        {isDark && <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />}
                     </div>
                 )}
 
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-6">
                     {/* Contenedor principal de Identidad del Negocio */}
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 -mt-12 sm:-mt-16 relative z-10">
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 relative z-10">
                         {/* Logo + Textos con jerarquía clara y limpia */}
                         <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 text-center sm:text-left">
-                            {/* Logo */}
-                            {data.logoUrl ? (
-                                <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-3xl border-4 shadow-xl overflow-hidden flex items-center justify-center p-2 shrink-0 ${
-                                    isDark ? 'bg-slate-900 border-slate-900 shadow-black/50' : 'bg-white border-white shadow-slate-200'
-                                }`}>
-                                    <img
-                                        src={data.logoUrl}
-                                        alt={data.businessName}
-                                        className="w-full h-full object-contain"
-                                    />
-                                </div>
-                            ) : (
-                                <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-3xl border-4 shadow-xl flex items-center justify-center shrink-0 ${
-                                    isDark 
-                                        ? 'bg-indigo-950 border-slate-900 text-indigo-400 shadow-black/50' 
-                                        : 'bg-indigo-600 border-white text-white shadow-slate-200'
-                                }`}>
-                                    <Store className="w-12 h-12" />
-                                </div>
-                            )}
+                            {/* Logo flotante sobre el banner */}
+                            <div className="-mt-12 sm:-mt-16 shrink-0 relative z-20">
+                                {data.logoUrl ? (
+                                    <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-3xl border-4 shadow-xl overflow-hidden flex items-center justify-center p-2 ${
+                                        isDark ? 'bg-slate-900 border-slate-900 shadow-black/50' : 'bg-white border-white shadow-slate-200'
+                                    }`}>
+                                        <img
+                                            src={data.logoUrl}
+                                            alt={data.businessName}
+                                            className="w-full h-full object-contain"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-3xl border-4 shadow-xl flex items-center justify-center ${
+                                        isDark 
+                                            ? 'bg-indigo-950 border-slate-900 text-indigo-400 shadow-black/50' 
+                                            : 'bg-indigo-600 border-white text-white shadow-slate-200'
+                                    }`}>
+                                        <Store className="w-12 h-12" />
+                                    </div>
+                                )}
+                            </div>
 
-                            {/* Nombre, Badge de Catálogo, RIF y Productos */}
-                            <div className="flex flex-col items-center sm:items-start gap-2 pb-1">
+                            {/* Nombre, Badge de Catálogo, RIF y Productos (permanece 100% sobre el fondo del header) */}
+                            <div className="flex flex-col items-center sm:items-start gap-2 pt-2 sm:pt-3 pb-1">
                                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
                                     <h1 className={`text-2xl sm:text-3xl font-black tracking-tight leading-tight ${
                                         isDark ? 'text-white' : 'text-slate-950'
@@ -737,7 +747,7 @@ export default function PublicCatalogPage() {
                         </div>
 
                         {/* Redes Sociales */}
-                        <div className="flex justify-center sm:justify-end pb-1 shrink-0">
+                        <div className="flex justify-center sm:justify-end pt-2 sm:pt-0 pb-1 shrink-0">
                             {renderSocialLinks(data.socialLinks)}
                         </div>
                     </div>
