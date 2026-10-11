@@ -1017,23 +1017,48 @@ export default function PublicCatalogPage() {
                 onScan={handleScan}
             />
 
-            {/* Footer Elegante */}
-            <footer className={`border-t py-8 transition-colors ${
+            {/* Footer Elegante con Redes Sociales y Marca */}
+            <footer className={`border-t py-10 transition-colors ${
                 isDark 
                     ? 'border-slate-800/80 bg-slate-950' 
                     : 'border-slate-200/80 bg-white'
             }`}>
-                <div className="max-w-5xl mx-auto px-4 text-center space-y-2">
-                    <p className={`text-sm font-black tracking-tight ${
-                        isDark ? 'text-slate-200' : 'text-slate-800'
-                    }`}>
-                        {data.businessName}
-                    </p>
-                    <p className={`text-xs ${
-                        isDark ? 'text-slate-500' : 'text-slate-400'
-                    }`}>
-                        Catálogo digital actualizado en tiempo real • Precios sujetos a disponibilidad
-                    </p>
+                <div className="max-w-5xl mx-auto px-4 flex flex-col items-center text-center gap-4">
+                    {/* Redes Sociales en el Footer */}
+                    {renderSocialLinks(data.socialLinks) && (
+                        <div className="flex flex-col items-center gap-2">
+                            <span className={`text-[11px] font-bold uppercase tracking-wider ${
+                                isDark ? 'text-slate-500' : 'text-slate-400'
+                            }`}>
+                                Conecta con nosotros
+                            </span>
+                            <div className="flex items-center justify-center">
+                                {renderSocialLinks(data.socialLinks)}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="space-y-1 pt-1">
+                        <p className={`text-base font-black tracking-tight ${
+                            isDark ? 'text-slate-200' : 'text-slate-900'
+                        }`}>
+                            {data.businessName}
+                        </p>
+                        <p className={`text-xs max-w-md mx-auto ${
+                            isDark ? 'text-slate-500' : 'text-slate-400'
+                        }`}>
+                            Catálogo digital en tiempo real • Precios y disponibilidad sujetos a cambio sin previo aviso.
+                        </p>
+                    </div>
+
+                    {data.address && (
+                        <div className={`text-xs flex items-center gap-1.5 ${
+                            isDark ? 'text-slate-400' : 'text-slate-500'
+                        }`}>
+                            <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                            <span>{data.address}</span>
+                        </div>
+                    )}
                 </div>
             </footer>
         </div>
