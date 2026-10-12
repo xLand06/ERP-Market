@@ -169,6 +169,19 @@ ORDER BY v.revenue DESC
 LIMIT 10;
 \`\`\`
 
+Ejemplo de SQL para "resumen semanal" / tendencia de los últimos 7 días (UNA sola sentencia):
+\`\`\`sql
+SELECT DATE_TRUNC('day', t."createdAt") AS dia,
+       SUM(t."total") AS ventas,
+       COUNT(*) AS tickets
+FROM "transactions" t
+WHERE t."type"='SALE' AND t."status"='COMPLETED'
+  AND t."createdAt" >= NOW() - INTERVAL '7 days'
+GROUP BY 1
+ORDER BY 1;
+\`\`\`
+IMPORTANTE: Para preguntas semanales generá UNA sola sentencia SQL (podés combinar métricas con agregados o UNION), NUNCA varias sentencias separadas por punto y coma.
+
 REGLAS SQL:
 - SOLO SELECT.
 - IMPORTANTE NOMBRES Y STRINGS: Las tablas y nombres de columnas van entre comillas dobles: "name", "createdAt", "transaction_items", "products", "subGroupId". Los literales de texto van SIEMPRE entre comillas simples: 'SALE', 'COMPLETED'. NUNCA uses comillas dobles para valores string.
@@ -238,25 +251,107 @@ function extractTables(sql: string): { ctes: string[]; tables: string[] } {
         ctes.push(cteMatch[1].toLowerCase());
     }
 
+    // FROM/JOIN DENTRO de funciones (EXTRACT(WEEK FROM col), TRIM(... FROM col),
+    // SUBSTRING(col FROM n)) no son tablas: sin este filtro el escáner confunde
+    // alias."columna" con una tabla y rechazaba "Resumen semanal"
+    // (EXTRACT(WEEK FROM t."createdAt") → "Tabla no permitida: createdat").
+    // Solo se eliminan llamadas sin paréntesis anidados; el caso anidado
+    // (p. ej. EXTRACT(... FROM DATE_TRUNC(...))) lo cubre el chequeo de
+    // funciones seguras de abajo.
+    const scanSql = sql.replace(/\b(EXTRACT|SUBSTRING|SUBSTR|TRIM|date_part)\s*\([^()]*\)/gi, ' ');
+
+    // Funciones de retorno de conjunto seguras (solo lectura, sin acceso a
+    // tablas) que aparecen válidamente en posición FROM. Cualquier otra
+    // identificador seguido de "(" se trata como tabla y cae en el allowlist,
+    // así que funciones de sistema (p. ej. pg_ls_dir) siguen rechazadas.
+    const SAFE_FUNCTION_SRF = new Set(['generate_series', 'unnest', 'date_trunc', 'date_part']);
+
     const re = /\b(?:FROM|JOIN)\s+(?:"?([a-zA-Z_][a-zA-Z0-9_]*)"?\s*\.\s*)?"?([a-zA-Z_][a-zA-Z0-9_]*)"?/gi;
     let match: RegExpExecArray | null;
-    while ((match = re.exec(sql)) !== null) {
+    while ((match = re.exec(scanSql)) !== null) {
         // match[1] = esquema (opcional), match[2] = tabla
-        tables.push((match[2] || '').toLowerCase());
+        const name = (match[2] || '').toLowerCase();
+        // FROM generate_series(...) → función segura, no una tabla
+        const after = scanSql.slice(match.index + match[0].length);
+        if (after.startsWith('(') && SAFE_FUNCTION_SRF.has(name)) continue;
+        tables.push(name);
     }
     return { ctes, tables };
 }
 
+/**
+ * Limpia comentarios SQL (-- y bloque) respetando literales de string, quita
+ * los ';' finales y detecta si queda algún ';' FUERA de strings
+ * (multi-statement real). Un ';' dentro de 'a;b' o escondido en un comentario
+ * no es inyección multi-statement.
+ */
+function normalizeSqlForValidation(rawSql: string): { clean: string; hasInternalSemi: boolean } {
+    let clean = '';
+    let inString = false;
+    for (let i = 0; i < rawSql.length; i++) {
+        const ch = rawSql[i];
+        if (inString) {
+            clean += ch;
+            if (ch === "'") {
+                if (rawSql[i + 1] === "'") { // escape '' dentro del literal
+                    clean += rawSql[i + 1];
+                    i++;
+                } else {
+                    inString = false;
+                }
+            }
+            continue;
+        }
+        if (ch === "'") {
+            inString = true;
+            clean += ch;
+            continue;
+        }
+        if (ch === '-' && rawSql[i + 1] === '-') { // comentario de línea
+            while (i < rawSql.length && rawSql[i] !== '\n') i++;
+            clean += '\n';
+            continue;
+        }
+        if (ch === '/' && rawSql[i + 1] === '*') { // comentario de bloque
+            i += 2;
+            while (i < rawSql.length && !(rawSql[i] === '*' && rawSql[i + 1] === '/')) i++;
+            i++; // saltar el '*' de cierre
+            clean += ' ';
+            continue;
+        }
+        clean += ch;
+    }
+
+    const trimmed = clean.trim().replace(/;+\s*$/, '');
+
+    // ¿Quedan ';' fuera de strings? → multi-statement real
+    let hasInternalSemi = false;
+    let inStr = false;
+    for (let j = 0; j < trimmed.length; j++) {
+        const c = trimmed[j];
+        if (inStr) {
+            if (c === "'") {
+                if (trimmed[j + 1] === "'") j++;
+                else inStr = false;
+            }
+            continue;
+        }
+        if (c === "'") inStr = true;
+        else if (c === ';') { hasInternalSemi = true; break; }
+    }
+
+    return { clean: trimmed, hasInternalSemi };
+}
+
 export function validateSql(rawSql: string): SqlValidation {
     // Las consultas del asistente son siempre de UNA sola sentencia. Cualquier
-    // ';' interno habilita inyección multi-statement (el chequeo clásico de
-    // ';' + palabra perdía "; DROP" con espacio). Se tolera solo el ';' final.
-    const singleStatement = rawSql.trim().replace(/;+$/, '');
-    if (singleStatement.includes(';')) {
+    // ';' real (fuera de strings y comentarios) habilita inyección multi-statement.
+    const { clean, hasInternalSemi } = normalizeSqlForValidation(rawSql);
+    if (hasInternalSemi) {
         return { valid: false, error: 'Operación no permitida.' };
     }
 
-    let sql = singleStatement;
+    let sql = clean;
     const normalized = sql.trim().toUpperCase();
     const forbidden = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'TRUNCATE', 'CREATE', 'GRANT', 'REVOKE', 'EXEC'];
     for (const kw of forbidden) {
@@ -474,6 +569,9 @@ export const processAiQuestion = async (
         // ── PASO 2: Ejecutar SQL ────────────────────────────────────────────
         const validation = validateSql(sql);
         if (!validation.valid) {
+            // Log del motivo real: sin esto un rechazo del validador era
+            // indistinguible en producción (solo devolvía el mensaje genérico).
+            console.warn(`[ai-chat] SQL rechazado por validación (${validation.error}): ${sql.slice(0, 300)}`);
             return { answer: 'No puedo ejecutar esa consulta. Probá reformulando la pregunta.' };
         }
         // validation.sql puede incluir un LIMIT auto-agregado (HIGH #8)

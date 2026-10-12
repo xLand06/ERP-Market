@@ -103,6 +103,74 @@ describe('validateSql', () => {
         expect(result.valid).toBe(false);
         expect(result.error).toBe('Acceso denegado a columnas sensibles.');
     });
+
+    // ── Regresiones: "Resumen semanal" (falsos positivos del validador) ──────
+
+    it('permite EXTRACT(WEEK FROM alias."col") — no es una tabla (regresión Resumen semanal)', () => {
+        const sql = `SELECT EXTRACT(WEEK FROM t."createdAt") AS semana, SUM(t."total") AS ventas
+FROM "transactions" t
+WHERE t."type"='SALE' AND t."status"='COMPLETED'
+GROUP BY 1`;
+        const result = validateSql(sql);
+        expect(result.valid).toBe(true);
+        expect(result.error).toBeUndefined();
+    });
+
+    it('permite EXTRACT(EPOCH FROM (expresión)) con paréntesis anidado', () => {
+        const sql = `SELECT EXTRACT(EPOCH FROM (NOW() - t."createdAt")) AS age, t."id"
+FROM "transactions" t
+WHERE t."type"='SALE'
+LIMIT 5`;
+        expect(validateSql(sql).valid).toBe(true);
+    });
+
+    it('permite TRIM(... FROM col) y SUBSTRING(col FROM n) sin confundirlos con tablas', () => {
+        const sql = `SELECT TRIM(BOTH ' ' FROM b."name") AS sede, SUBSTRING(t."id"::text FROM 1 FOR 8) AS ticket
+FROM "transactions" t
+JOIN "branches" b ON b."id" = t."branchId"
+LIMIT 10`;
+        expect(validateSql(sql).valid).toBe(true);
+    });
+
+    it('permite comentarios de línea inicial antes del SELECT (regresión)', () => {
+        const sql = `-- Resumen de ventas de la última semana
+SELECT SUM(t."total") AS ventas FROM "transactions" t WHERE t."createdAt" >= NOW() - INTERVAL '7 days'`;
+        const result = validateSql(sql);
+        expect(result.valid).toBe(true);
+        expect(result.sql).toContain('SELECT');
+    });
+
+    it('ignora ";" dentro de comentarios pero rechaza multi-statement real', () => {
+        const ok = validateSql(`-- nota; DROP TABLE products;\nSELECT id FROM products`);
+        expect(ok.valid).toBe(true);
+
+        const bad = validateSql('SELECT id FROM products; DELETE FROM products');
+        expect(bad.valid).toBe(false);
+        expect(bad.error).toBe('Operación no permitida.');
+    });
+
+    it('permite ";" dentro de literales de string (no es multi-statement)', () => {
+        const result = validateSql(`SELECT id FROM products WHERE name = 'a;b'`);
+        expect(result.valid).toBe(true);
+    });
+
+    it('permite generate_series para completar días faltantes en tendencias', () => {
+        const sql = `SELECT gs.dia, COALESCE(SUM(t."total"), 0) AS ventas
+FROM generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, INTERVAL '1 day') AS gs(dia)
+LEFT JOIN "transactions" t ON CAST(t."createdAt" AS date) = gs.dia AND t."type"='SALE'
+GROUP BY gs.dia ORDER BY gs.dia`;
+        expect(validateSql(sql).valid).toBe(true);
+    });
+
+    it('sigue rechazando tablas alucinadas fuera del allowlist', () => {
+        expect(validateSql('SELECT * FROM "sales"').valid).toBe(false);
+    });
+
+    it('sigue rechazando FROM a tablas del sistema incluso tras quitar comentarios', () => {
+        const result = validateSql(`-- comentario válido\nSELECT * FROM pg_authid`);
+        expect(result.valid).toBe(false);
+        expect(result.error).toBe('Acceso denegado a tablas del sistema.');
+    });
 });
 
 describe('wantsExport', () => {
