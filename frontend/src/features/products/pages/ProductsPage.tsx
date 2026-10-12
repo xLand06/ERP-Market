@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit2, PackageX, PackageCheck, AlertCircle, Download, PackageSearch, Percent, QrCode } from 'lucide-react';
+import { Plus, Search, Edit2, PackageX, PackageCheck, AlertCircle, Download, PackageSearch, Percent, QrCode, Printer, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +40,8 @@ export default function ProductsPage() {
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [qrModalOpen, setQrModalOpen] = useState(false);
     const [qrProduct, setQrProduct] = useState<Product | null>(null);
+    const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+    const [batchProducts, setBatchProducts] = useState<Product[] | null>(null);
 
     const { fmtCOP, catalogSlug } = useConfigStore();
     const user = useAuthStore(s => s.user);
@@ -98,6 +100,49 @@ export default function ProductsPage() {
         refetch();
     };
 
+    const isAllSelected = products.length > 0 && products.every(p => selectedProductIds.has(p.id));
+    const isSomeSelected = products.some(p => selectedProductIds.has(p.id));
+
+    const handleToggleSelectAll = () => {
+        setSelectedProductIds(prev => {
+            const next = new Set(prev);
+            if (isAllSelected) {
+                products.forEach(p => next.delete(p.id));
+            } else {
+                products.forEach(p => next.add(p.id));
+            }
+            return next;
+        });
+    };
+
+    const handleToggleSelect = (id: string) => {
+        setSelectedProductIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const handleClearSelection = () => {
+        setSelectedProductIds(new Set());
+    };
+
+    const handlePrintSelected = () => {
+        const selected = products.filter(p => selectedProductIds.has(p.id));
+        if (selected.length === 0) return;
+        setBatchProducts(selected);
+        setQrProduct(null);
+        setQrModalOpen(true);
+    };
+
+    const handlePrintAllVisible = () => {
+        if (products.length === 0) return;
+        setBatchProducts(products);
+        setQrProduct(null);
+        setQrModalOpen(true);
+    };
+
     useEffect(() => {
         setFilterCategory('all');
     }, [filterGroup]);
@@ -107,6 +152,37 @@ export default function ProductsPage() {
     }, [search, filterGroup, filterCategory, filterStatus]);
 
     const columns: Column<Product>[] = [
+        {
+            key: 'select',
+            header: (
+                <div className="flex items-center justify-center">
+                    <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        ref={el => {
+                            if (el) el.indeterminate = !isAllSelected && isSomeSelected;
+                        }}
+                        onChange={handleToggleSelectAll}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                        aria-label="Seleccionar todos los productos visibles"
+                    />
+                </div>
+            ),
+            cell: prod => (
+                <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                    <input
+                        type="checkbox"
+                        checked={selectedProductIds.has(prod.id)}
+                        onChange={() => handleToggleSelect(prod.id)}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                        aria-label={`Seleccionar ${prod.name}`}
+                    />
+                </div>
+            ),
+            headerClassName: 'w-10 text-center',
+            className: 'w-10 text-center pr-0',
+            showCard: true,
+        },
         {
             key: 'icon',
             header: '',
@@ -291,8 +367,10 @@ export default function ProductsPage() {
                 onClose={() => {
                     setQrModalOpen(false);
                     setQrProduct(null);
+                    setBatchProducts(null);
                 }}
                 product={qrProduct}
+                productsList={batchProducts || undefined}
                 catalogSlug={catalogSlug}
             />
 
@@ -307,6 +385,29 @@ export default function ProductsPage() {
                         </p>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2.5">
+                        {selectedProductIds.size > 0 ? (
+                            <Button
+                                onClick={handlePrintSelected}
+                                variant="outline"
+                                size="lg"
+                                className="h-10 font-bold text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100"
+                            >
+                                <Printer className="w-4.5 h-4.5 mr-2 text-indigo-600" />
+                                Imprimir Selección ({selectedProductIds.size})
+                            </Button>
+                        ) : (
+                            <Button
+                                onClick={handlePrintAllVisible}
+                                disabled={products.length === 0}
+                                variant="outline"
+                                size="lg"
+                                className="h-10 font-bold text-slate-700 hover:bg-slate-50"
+                                title="Imprimir etiquetas de todos los productos visibles del grupo o filtro actual"
+                            >
+                                <Printer className="w-4.5 h-4.5 mr-2 text-slate-500" />
+                                Imprimir Etiquetas ({products.length})
+                            </Button>
+                        )}
                         <Button onClick={() => handleExportExcel()} variant="outline" size="lg" className="h-10 font-bold text-slate-700">
                             <Download className="w-4.5 h-4.5 mr-2" /> Exportar Excel
                         </Button>
@@ -382,6 +483,37 @@ export default function ProductsPage() {
                     <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-4 flex items-center gap-3">
                         <AlertCircle className="w-5 h-5" />
                         <p className="text-sm font-medium">Error al cargar el catálogo de productos. Verifica tu conexión offline/local.</p>
+                    </div>
+                )}
+
+                {selectedProductIds.size > 0 && (
+                    <div className="bg-indigo-50/90 border border-indigo-200 rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-semibold text-indigo-950 shadow-xs">
+                        <div className="flex items-center gap-2.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse"></span>
+                            <span>
+                                <strong>{selectedProductIds.size}</strong> producto{selectedProductIds.size > 1 ? 's' : ''} seleccionado{selectedProductIds.size > 1 ? 's' : ''} para imprimir
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={handlePrintSelected}
+                                className="h-8 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl gap-1.5 shadow-xs"
+                            >
+                                <Printer className="w-3.5 h-3.5" />
+                                Imprimir Etiquetas ({selectedProductIds.size})
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleClearSelection}
+                                className="h-8 text-indigo-700 hover:bg-indigo-100 text-xs font-bold rounded-xl"
+                            >
+                                Deseleccionar
+                            </Button>
+                        </div>
                     </div>
                 )}
 

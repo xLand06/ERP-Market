@@ -508,11 +508,13 @@ export default function PublicCatalogPage() {
         const normalized = queryParamQ.trim().toLowerCase();
         for (const g of data.groups) {
             for (const p of g.products) {
-                if (
-                    p.barcode?.toLowerCase() === normalized ||
-                    p.id.toLowerCase() === normalized ||
-                    p.presentations.some(pr => pr.barcode?.toLowerCase() === normalized)
-                ) {
+                const hasBarcodeMatch = p.barcode?.toLowerCase() === normalized ||
+                    ((p as any).barcodes && (p as any).barcodes.some((b: string) => b.toLowerCase() === normalized));
+                const hasPresentationMatch = p.presentations?.some(pr => pr.barcode?.toLowerCase() === normalized);
+                const hasIdMatch = p.id.toLowerCase() === normalized;
+                const hasExactNameMatch = p.name.trim().toLowerCase() === normalized;
+
+                if (hasBarcodeMatch || hasPresentationMatch || hasIdMatch || hasExactNameMatch) {
                     setDetailProduct(p);
                     return;
                 }

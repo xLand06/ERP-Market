@@ -21,6 +21,7 @@ export interface CatalogProduct {
     name: string;
     price: number;
     barcode: string | null;
+    barcodes?: string[];
     imageUrl: string | null;
     description: string | null;
     presentations: CatalogPresentation[];
@@ -75,6 +76,7 @@ export const getPublicCatalog = async (slug: string): Promise<PublicCatalog | nu
         include: {
             subGroup: { include: { group: true } },
             presentations: true,
+            barcodes: true,
         },
         orderBy: { name: 'asc' },
     });
@@ -90,11 +92,17 @@ export const getPublicCatalog = async (slug: string): Promise<PublicCatalog | nu
             groupsMap.set(groupId, { id: groupId, name: groupName, products: [] });
         }
 
+        const allCodes = Array.from(new Set([
+            ...(p.barcode ? [p.barcode] : []),
+            ...((p.barcodes || []).map(b => b.code)),
+        ]));
+
         groupsMap.get(groupId)!.products.push({
             id: p.id,
             name: p.name,
             price: Number(p.price),
-            barcode: p.barcode ?? null,
+            barcode: p.barcode ?? (allCodes[0] || null),
+            barcodes: allCodes,
             imageUrl: p.imageUrl ?? null,
             description: p.description ?? null,
             presentations: p.presentations.map(pres => ({
