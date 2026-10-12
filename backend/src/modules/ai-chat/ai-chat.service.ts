@@ -450,6 +450,187 @@ export function validateSql(rawSql: string): SqlValidation {
     return { valid: true, sql };
 }
 
+// ─── Normalización y Aprendizaje de Consultas (Zero-Token Router) ───────────
+
+/**
+ * Normaliza una pregunta quitando acentos, puntuación innecesaria y espacios redundantes
+ * para maximizar coincidencias semánticas sin gastar tokens.
+ */
+export function normalizeQuestion(text: string): string {
+    return text
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // quitar acentos
+        .replace(/[¿?¡!.,;:_()'"-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+export interface QueryRouteMatch {
+    type: string;
+    sql: string;
+    isAdvisory: boolean;
+}
+
+/**
+ * Enrutador determinístico de consultas frecuentes.
+ * Resuelve las intenciones más comunes del negocio con 0 tokens de LLM para la generación del SQL.
+ */
+export function routeCommonQuestion(question: string, branchId?: string): QueryRouteMatch | null {
+    const norm = normalizeQuestion(question);
+    const branchFilterTx = branchId ? ` AND t."branchId" = '${branchId}'` : '';
+    const branchFilterBi = branchId ? ` AND bi."branchId" = '${branchId}'` : '';
+
+    // 1. Recomendación de compras y reabastecimiento
+    if (
+        /que (deberia |debo |puedo )?comprar/.test(norm) ||
+        /que comprar.*vender/.test(norm) ||
+        /reabastecer|surtir|surtido/.test(norm) ||
+        (/comprar/.test(norm) && /mas/.test(norm) && /producto/.test(norm))
+    ) {
+        return {
+            type: 'REPLENISHMENT',
+            isAdvisory: true,
+            sql: `SELECT p."name",
+       COALESCE(SUM(ti."quantity"), 0) AS unidades_vendidas,
+       COALESCE(SUM(ti."subtotal"), 0) AS ingresos_totales,
+       COALESCE(bi."stock", 0) AS stock_actual,
+       COALESCE(bi."minStock", 0) AS stock_minimo,
+       CASE
+         WHEN COALESCE(bi."stock", 0) <= COALESCE(bi."minStock", 0) THEN 'CRITICO: Comprar urgente'
+         WHEN COALESCE(bi."stock", 0) < COALESCE(SUM(ti."quantity"), 0) * 0.5 THEN 'REABASTECER: Alta rotacion y stock bajo'
+         ELSE 'STOCK SUFICIENTE'
+       END AS prioridad_compra
+FROM "products" p
+LEFT JOIN "transaction_items" ti ON ti."productId" = p."id"
+LEFT JOIN "transactions" t ON t."id" = ti."transactionId" AND t."type"='SALE' AND t."status"='COMPLETED'${branchFilterTx}
+LEFT JOIN "branch_inventory" bi ON bi."productId" = p."id"${branchFilterBi}
+WHERE p."isActive" = true
+GROUP BY p."id", p."name", bi."stock", bi."minStock"
+ORDER BY unidades_vendidas DESC, stock_actual ASC
+LIMIT 10;`,
+        };
+    }
+
+    // 2. Productos más vendidos
+    if (
+        /mas vendidos|mas se vende|top ventas|top productos|mejores productos/.test(norm)
+    ) {
+        return {
+            type: 'TOP_SELLING',
+            isAdvisory: false,
+            sql: `SELECT p."name",
+       COALESCE(SUM(ti."quantity"), 0) AS unidades_vendidas,
+       COALESCE(SUM(ti."subtotal"), 0) AS total_generado
+FROM "products" p
+JOIN "transaction_items" ti ON ti."productId" = p."id"
+JOIN "transactions" t ON t."id" = ti."transactionId" AND t."type"='SALE' AND t."status"='COMPLETED'${branchFilterTx}
+WHERE p."isActive" = true
+GROUP BY p."id", p."name"
+ORDER BY unidades_vendidas DESC
+LIMIT 10;`,
+        };
+    }
+
+    // 3. Stock bajo / productos por agotarse
+    if (
+        /stock bajo|bajo stock|por agotarse|se estan agotando|inventario bajo|falta mercancia/.test(norm)
+    ) {
+        return {
+            type: 'LOW_STOCK',
+            isAdvisory: false,
+            sql: `SELECT p."name",
+       COALESCE(bi."stock", 0) AS stock_actual,
+       COALESCE(bi."minStock", 0) AS stock_minimo,
+       (COALESCE(bi."minStock", 0) - COALESCE(bi."stock", 0)) AS deficit
+FROM "products" p
+JOIN "branch_inventory" bi ON bi."productId" = p."id"${branchFilterBi}
+WHERE p."isActive" = true AND COALESCE(bi."stock", 0) <= COALESCE(bi."minStock", 0)
+ORDER BY deficit DESC, stock_actual ASC
+LIMIT 15;`,
+        };
+    }
+
+    // 4. Ventas de hoy
+    if (
+        /ventas? (de )?hoy|cuanto vendi hoy|como van las ventas hoy|ingresos (de )?hoy/.test(norm)
+    ) {
+        return {
+            type: 'SALES_TODAY',
+            isAdvisory: false,
+            sql: `SELECT COUNT(*) AS total_tickets,
+       COALESCE(SUM(t."total"), 0) AS ingresos_totales,
+       COALESCE(AVG(t."total"), 0) AS ticket_promedio
+FROM "transactions" t
+WHERE t."type"='SALE' AND t."status"='COMPLETED'${branchFilterTx}
+  AND t."createdAt" >= CURRENT_DATE;`,
+        };
+    }
+
+    // 5. Resumen semanal / ventas de los últimos 7 días
+    if (
+        /ventas? (de la|esta) semana|resumen semanal|ultimos 7 dias|como fue la semana/.test(norm)
+    ) {
+        return {
+            type: 'WEEKLY_SALES',
+            isAdvisory: false,
+            sql: `SELECT DATE_TRUNC('day', t."createdAt") AS dia,
+       SUM(t."total") AS ventas,
+       COUNT(*) AS tickets
+FROM "transactions" t
+WHERE t."type"='SALE' AND t."status"='COMPLETED'${branchFilterTx}
+  AND t."createdAt" >= NOW() - INTERVAL '7 days'
+GROUP BY 1
+ORDER BY 1;`,
+        };
+    }
+
+    return null;
+}
+
+// ─── Memoria persistente de consultas aprendidas (System Settings) ───────────
+const LEARNED_QUERIES_KEY = 'ai_learned_query_knowledge';
+let learnedKnowledgeCache: Record<string, string> | null = null;
+
+async function getLearnedKnowledge(): Promise<Record<string, string>> {
+    if (learnedKnowledgeCache) return learnedKnowledgeCache;
+    try {
+        const rows = await prisma.$queryRawUnsafe<{ value: string }[]>(
+            `SELECT "value" FROM "system_settings" WHERE "key" = $1 LIMIT 1`,
+            LEARNED_QUERIES_KEY
+        );
+        if (rows.length > 0 && rows[0].value) {
+            learnedKnowledgeCache = JSON.parse(rows[0].value);
+            return learnedKnowledgeCache || {};
+        }
+    } catch {}
+    learnedKnowledgeCache = {};
+    return learnedKnowledgeCache;
+}
+
+async function saveLearnedKnowledge(normQuestion: string, validatedSql: string): Promise<void> {
+    try {
+        const knowledge = await getLearnedKnowledge();
+        if (Object.keys(knowledge).length > 150) {
+            // Limitar a las 150 consultas más comunes
+            const keys = Object.keys(knowledge);
+            delete knowledge[keys[0]];
+        }
+        knowledge[normQuestion] = validatedSql;
+        learnedKnowledgeCache = knowledge;
+
+        const val = JSON.stringify(knowledge);
+        await prisma.$executeRawUnsafe(
+            `INSERT INTO "system_settings" ("id", "key", "value", "createdAt", "updatedAt")
+             VALUES ($1, $2, $3, NOW(), NOW())
+             ON CONFLICT ("key") DO UPDATE SET "value" = $3, "updatedAt" = NOW()`,
+            LEARNED_QUERIES_KEY,
+            LEARNED_QUERIES_KEY,
+            val
+        );
+    } catch {}
+}
+
 // ─── Interfaz de respuesta y acciones ─────────────────────────────────────────
 export interface ActionChip {
     label: string;
@@ -471,7 +652,7 @@ export interface AiChatResponse {
     error?: string;
 }
 
-// ─── Caché en memoria para consultas recurrentes (TTL: 3 min) ───────────────
+// ─── Caché en memoria para respuestas terminadas (TTL: 3 min) ───────────────
 interface CacheEntry {
     response: AiChatResponse;
     timestamp: number;
@@ -499,6 +680,7 @@ export function setCachedResponse(key: string, response: AiChatResponse): void {
 
 export function clearAiCache(): void {
     queryCache.clear();
+    learnedKnowledgeCache = null;
 }
 
 // ─── Detección de Chips de Acción / Deep Linking ─────────────────────────────
@@ -570,70 +752,94 @@ A menos que la pregunta pida explícitamente "todas las sedes" o comparar entre 
 }
 
 /**
- * Procesa una pregunta del usuario con soporte de branchContext y caché.
+ * Procesa una pregunta del usuario con soporte de aprendizaje continuo, enrutador sin tokens y lenguaje natural.
  */
 export const processAiQuestion = async (
     question: string,
     userId?: string,
     branchContext?: BranchContext
 ): Promise<AiChatResponse> => {
-    // Rate limit
+    // Control de frecuencia amigable
     const uid = userId || 'anonymous';
     const rl = checkRateLimit(uid);
     if (!rl.allowed) {
-        return { answer: `Estás haciendo muchas preguntas. Esperá ${rl.retryAfter} segundos y probá de nuevo. ⏳` };
+        return { answer: `Dame un momentito, estamos procesando varias preguntas a la vez. Esperá ${rl.retryAfter} segundos y te respondo con gusto.` };
     }
 
-    // Chequear caché en memoria (0 tokens, 0ms)
-    const cacheKey = `${uid}:${branchContext?.branchId || 'all'}:${question.trim().toLowerCase()}`;
+    const normQ = normalizeQuestion(question);
+
+    // Chequear respuesta lista en memoria (0 tokens, 0ms)
+    const cacheKey = `${uid}:${branchContext?.branchId || 'all'}:${normQ}`;
     const cached = getCachedResponse(cacheKey);
     if (cached) {
         return { ...cached, fromCache: true };
     }
 
-    if (!isAiAvailable()) {
-        return { answer: 'El asistente no está disponible temporalmente. No se ha configurado la API Key de IA.' };
+    let sql: string | null = null;
+    let isAdvisory = isAdvisoryQuestion(question);
+
+    // ── PASO 0: Enrutador Determinístico Frecuente (0 Tokens consumidos para SQL) ──
+    const commonRoute = routeCommonQuestion(question, branchContext?.branchId);
+    if (commonRoute) {
+        sql = commonRoute.sql;
+        if (commonRoute.isAdvisory) isAdvisory = true;
+    }
+
+    // ── PASO 0.1: Buscar en memoria de consultas aprendidas previamente ──
+    if (!sql) {
+        const learned = await getLearnedKnowledge();
+        if (learned[normQ]) {
+            sql = learned[normQ];
+        }
+    }
+
+    // Si aún no tenemos SQL y no hay claves configuradas, avisar amigablemente
+    if (!sql && !isAiAvailable()) {
+        return { answer: 'En este momento no puedo conectarme con el servicio de análisis inteligente. Por favor verificá más tarde.' };
     }
 
     try {
-        // ── PASO 1: La IA decide si necesita SQL o solo guía ─────────────────
-        const systemPrompt = buildSystemPromptWithBranch(branchContext);
-        const responseText = await callWithRotation([
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: question },
-        ], 0.2, 1024);
-
-        // Extraer SQL si la IA generó uno
-        const sqlMatch = responseText.match(/```sql\s*([\s\S]*?)```/i)
-            || responseText.match(/```\s*([\s\S]*?)```/i);
-        let sql = sqlMatch ? sqlMatch[1].trim() : null;
-
+        // ── PASO 1: Si no estaba aprendida ni enrutada, consultar a la IA ───
         if (!sql) {
-            const selectMatch = responseText.match(/((?:SELECT|WITH)\s[\s\S]*?);?\s*$/i);
-            if (selectMatch) sql = selectMatch[1].trim().replace(/;$/, '');
+            const systemPrompt = buildSystemPromptWithBranch(branchContext);
+            const responseText = await callWithRotation([
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: question },
+            ], 0.2, 1024);
+
+            // Extraer SQL generado por el modelo
+            const sqlMatch = responseText.match(/```sql\s*([\s\S]*?)```/i)
+                || responseText.match(/```\s*([\s\S]*?)```/i);
+            sql = sqlMatch ? sqlMatch[1].trim() : null;
+
+            if (!sql) {
+                const selectMatch = responseText.match(/((?:SELECT|WITH)\s[\s\S]*?);?\s*$/i);
+                if (selectMatch) sql = selectMatch[1].trim().replace(/;$/, '');
+            }
+
+            // Si el modelo dio una orientación directa sin SQL (ej: cómo usar el sistema)
+            if (!sql) {
+                const actions = detectActions(question, null, responseText);
+                const directResult: AiChatResponse = {
+                    answer: responseText,
+                    actions: actions.length > 0 ? actions : undefined,
+                };
+                setCachedResponse(cacheKey, directResult);
+                return directResult;
+            }
         }
 
-        // Si no hay SQL, la IA está dando guía → devolver respuesta directa con acciones
-        if (!sql) {
-            const actions = detectActions(question, null, responseText);
-            const directResult: AiChatResponse = {
-                answer: responseText,
-                actions: actions.length > 0 ? actions : undefined,
-            };
-            setCachedResponse(cacheKey, directResult);
-            return directResult;
-        }
-
-        // ── PASO 2: Ejecutar SQL ────────────────────────────────────────────
+        // ── PASO 2: Validar y ejecutar la consulta de datos ──────────────────
         const validation = validateSql(sql);
         if (!validation.valid) {
-            // Log del motivo real: sin esto un rechazo del validador era
-            // indistinguible en producción (solo devolvía el mensaje genérico).
-            console.warn(`[ai-chat] SQL rechazado por validación (${validation.error}): ${sql.slice(0, 300)}`);
-            return { answer: 'No puedo ejecutar esa consulta. Probá reformulando la pregunta.' };
+            console.warn(`[ai-chat] SQL no válido (${validation.error}): ${sql.slice(0, 300)}`);
+            return {
+                answer: 'No pude encontrar la información exacta con esa frase. ¿Podrías preguntármelo de otra manera para buscarlo mejor?',
+                actions: detectActions(question),
+            };
         }
-        let safeSql = validation.sql || sql;
 
+        let safeSql = validation.sql || sql;
         let rawResult = await prisma.$queryRawUnsafe(safeSql);
         let data = Array.isArray(rawResult)
             ? rawResult.map((row: any) => {
@@ -645,9 +851,9 @@ export const processAiQuestion = async (
             })
             : [];
 
-        // Fallback: si es una consulta analítica/asesora y devolvió 0 filas debido a un filtro estricto de fecha,
-        // relajar el intervalo para no dejar al usuario sin datos ni recomendaciones.
-        if (data.length === 0 && isAdvisoryQuestion(question) && /INTERVAL\s+'\d+\s*days?'/i.test(safeSql)) {
+        // Fallback: si es una consulta analítica y devolvió 0 filas por un filtro rígido de fecha,
+        // relajar el intervalo para no dejar al dueño de tienda sin información
+        if (data.length === 0 && isAdvisory && /INTERVAL\s+'\d+\s*days?'/i.test(safeSql)) {
             const relaxedSql = safeSql.replace(/AND\s+t\."createdAt"\s*>=\s*NOW\(\)\s*-\s*INTERVAL\s+'\d+\s*days?'/gi, '')
                                       .replace(/WHERE\s+t\."createdAt"\s*>=\s*NOW\(\)\s*-\s*INTERVAL\s+'\d+\s*days?'\s*AND/gi, 'WHERE')
                                       .replace(/WHERE\s+t\."createdAt"\s*>=\s*NOW\(\)\s*-\s*INTERVAL\s+'\d+\s*days?'/gi, '');
@@ -668,13 +874,26 @@ export const processAiQuestion = async (
             }
         }
 
-        // ── PASO 3: Formatear respuesta natural ──────────────────────────────
-        const answer = (await callWithRotation([
-            { role: 'system', content: buildFormatPrompt(question, data) },
-            { role: 'user', content: 'Dame la respuesta.' },
-        ], 0.3, 1200)).trim() || formatDataFallback(data);
+        // Si la consulta fue exitosa y arrojó datos, aprenderla en segundo plano para consultas futuras
+        if (data.length > 0 && !commonRoute) {
+            saveLearnedKnowledge(normQ, safeSql).catch(() => {});
+        }
 
-        // Adjuntar exportData, filas y chips de acción
+        // ── PASO 3: Redactar la respuesta en lenguaje natural claro ──────────
+        let answer = '';
+        if (isAiAvailable()) {
+            try {
+                answer = (await callWithRotation([
+                    { role: 'system', content: buildFormatPrompt(question, data) },
+                    { role: 'user', content: 'Dame la respuesta clara para el dueño.' },
+                ], 0.3, 1200)).trim();
+            } catch {}
+        }
+
+        if (!answer) {
+            answer = formatDataFallback(data);
+        }
+
         const hasData = data.length > 0;
         const actions = detectActions(question, sql, answer);
         const finalResult: AiChatResponse = {
@@ -686,11 +905,11 @@ export const processAiQuestion = async (
         setCachedResponse(cacheKey, finalResult);
         return finalResult;
     } catch (error: any) {
-        console.error('[ai-chat] Error:', error.message);
-        if (!isAiAvailable()) {
-            return { answer: 'Servicio de IA no disponible temporalmente. No hay API keys configuradas.' };
-        }
-        return { answer: 'Hubo un error al procesar tu pregunta con los modelos disponibles. Intentá de nuevo en unos momentos.' };
+        console.error('[ai-chat] Error general:', error.message);
+        return {
+            answer: 'Hubo un inconveniente momentáneo al revisar los registros. Por favor probá de nuevo en unos instantes o consultá directamente el módulo del sistema.',
+            actions: detectActions(question),
+        };
     }
 };
 

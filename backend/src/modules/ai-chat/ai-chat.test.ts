@@ -19,7 +19,7 @@ vi.mock('../../config/prisma', () => ({
     prismaCloud: {},
 }));
 
-import { validateSql, wantsExport, isAiAvailable, isAdvisoryQuestion, quoteCamelCaseCols } from './ai-chat.service';
+import { validateSql, wantsExport, isAiAvailable, isAdvisoryQuestion, quoteCamelCaseCols, normalizeQuestion, routeCommonQuestion } from './ai-chat.service';
 
 describe('isAiAvailable', () => {
     it('retorna true cuando hay una API key disponible', () => {
@@ -197,4 +197,39 @@ describe('isAdvisoryQuestion', () => {
         expect(isAdvisoryQuestion('surtir productos con inventario bajo')).toBe(true);
     });
 });
+
+describe('routeCommonQuestion (Zero-Token router)', () => {
+    it('normaliza texto con acentos y mayúsculas correctamente', () => {
+        expect(normalizeQuestion('¿Qué productos debería comprar para vender?')).toBe('que productos deberia comprar para vender');
+    });
+
+    it('enruta consultas de compra a la plantilla REPLENISHMENT con 0 tokens de SQL', () => {
+        const match = routeCommonQuestion('hazme un análisis de qué producto debería comprar más para vender');
+        expect(match).not.toBeNull();
+        expect(match?.type).toBe('REPLENISHMENT');
+        expect(match?.sql).toContain('prioridad_compra');
+    });
+
+    it('enruta productos más vendidos a TOP_SELLING con 0 tokens', () => {
+        const match = routeCommonQuestion('cuáles son los más vendidos');
+        expect(match).not.toBeNull();
+        expect(match?.type).toBe('TOP_SELLING');
+        expect(match?.sql).toContain('ORDER BY unidades_vendidas DESC');
+    });
+
+    it('enruta productos con stock bajo a LOW_STOCK con 0 tokens', () => {
+        const match = routeCommonQuestion('qué productos tienen stock bajo');
+        expect(match).not.toBeNull();
+        expect(match?.type).toBe('LOW_STOCK');
+        expect(match?.sql).toContain('deficit DESC');
+    });
+
+    it('enruta ventas de hoy a SALES_TODAY con 0 tokens', () => {
+        const match = routeCommonQuestion('cuánto vendí hoy');
+        expect(match).not.toBeNull();
+        expect(match?.type).toBe('SALES_TODAY');
+        expect(match?.sql).toContain('CURRENT_DATE');
+    });
+});
+
 
