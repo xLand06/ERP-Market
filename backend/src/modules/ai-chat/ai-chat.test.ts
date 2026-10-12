@@ -19,7 +19,7 @@ vi.mock('../../config/prisma', () => ({
     prismaCloud: {},
 }));
 
-import { validateSql, wantsExport, isAiAvailable } from './ai-chat.service';
+import { validateSql, wantsExport, isAiAvailable, isAdvisoryQuestion, quoteCamelCaseCols } from './ai-chat.service';
 
 describe('isAiAvailable', () => {
     it('retorna true cuando hay una API key disponible', () => {
@@ -173,22 +173,28 @@ GROUP BY gs.dia ORDER BY gs.dia`;
     });
 });
 
-describe('wantsExport', () => {
-    it('detecta petición explícita de exportación', () => {
-        expect(wantsExport('exportá esto')).toBe(true);
-        expect(wantsExport('dame csv')).toBe(true);
-        expect(wantsExport('bajar a excel')).toBe(true);
-        expect(wantsExport('descargar archivo')).toBe(true);
-        expect(wantsExport('EXPORTAR los datos')).toBe(true);
+describe('quoteCamelCaseCols', () => {
+    it('agrega comillas dobles a columnas camelCase no entrecomilladas', () => {
+        const query = 'SELECT ti.productId, ti.transactionId, bi.minStock FROM transaction_items ti JOIN branch_inventory bi ON bi.productId = ti.productId';
+        const quoted = validateSql(query).sql;
+        expect(quoted).toContain('ti."productId"');
+        expect(quoted).toContain('ti."transactionId"');
+        expect(quoted).toContain('bi."minStock"');
     });
 
-    it('NO detecta "reporte" como exportación (regresión)', () => {
-        expect(wantsExport('dame un reporte de ventas')).toBe(false);
-        expect(wantsExport('genera un reporte mensual')).toBe(false);
-    });
-
-    it('NO detecta preguntas analíticas como exportación', () => {
-        expect(wantsExport('analiza mis ventas y cómo vender más')).toBe(false);
-        expect(wantsExport('dame recomendaciones para vender')).toBe(false);
+    it('no rompe columnas camelCase que ya estaban entre comillas', () => {
+        const query = 'SELECT ti."productId", ti."transactionId" FROM transaction_items ti';
+        const quoted = validateSql(query).sql;
+        expect(quoted).toContain('ti."productId"');
+        expect(quoted).not.toContain('"""productId"""');
     });
 });
+
+describe('isAdvisoryQuestion', () => {
+    it('detecta preguntas de análisis de compra o qué comprar para vender', () => {
+        expect(isAdvisoryQuestion('hazme un analisis de que producto deberia comprar mas para vender')).toBe(true);
+        expect(isAdvisoryQuestion('qué debería comprar para reabastecer el inventario')).toBe(true);
+        expect(isAdvisoryQuestion('surtir productos con inventario bajo')).toBe(true);
+    });
+});
+

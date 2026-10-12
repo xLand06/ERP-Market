@@ -147,8 +147,35 @@ FLUJO:
 4. NUNCA digas "Todavía no hay registros" sin haber ejecutado un query. Solo repetí esa frase si el SQL realmente devolvió 0 filas.
 5. FORMATO: Español profesional y conciso. NUNCA uses emojis ni emoticones en ninguna respuesta.
 
-PREGUNTAS ANALÍTICAS:
-Cuando pregunten cosas como "analiza mis ventas", "cómo vender más", "qué puedo hacer para vender más", "dame recomendaciones", "consejos para vender": SIEMPRE generá un SQL analítico que traiga contexto real (productos más vendidos por ingreso, tendencia de ventas por día, ticket promedio, categorías, stock bajo). NUNCA respondas preguntas de recomendación con consejos genéricos sin datos.
+PREGUNTAS ANALÍTICAS Y DE COMPRA / REABASTECIMIENTO:
+Cuando pregunten cosas como:
+- "qué producto debería comprar más para vender", "qué comprar", "reabastecer", "surtir", "inventario bajo":
+  SIEMPRE generá un SQL que combine ventas con stock actual (rotación vs stock disponible) para saber qué productos se venden más y tienen stock bajo o requieren compra.
+- "analiza mis ventas", "cómo vender más", "qué puedo hacer para vender más", "dame recomendaciones", "consejos para vender":
+  SIEMPRE generá un SQL analítico que traiga contexto real (productos más vendidos por ingreso, tendencia de ventas por día, ticket promedio, categorías, stock bajo). NUNCA respondas preguntas de recomendación con consejos genéricos sin datos.
+- Si no hay ventas en los últimos 7 o 30 días, NO limites estrictamente las fechas; evaluá el historial general para no devolver 0 filas en tiendas con ventas esporádicas.
+
+Ejemplo de SQL para compra y reabastecimiento (rotación vs stock):
+\`\`\`sql
+SELECT p."name",
+       COALESCE(SUM(ti."quantity"), 0) AS unidades_vendidas,
+       COALESCE(SUM(ti."subtotal"), 0) AS ingresos_totales,
+       COALESCE(bi."stock", 0) AS stock_actual,
+       COALESCE(bi."minStock", 0) AS stock_minimo,
+       CASE
+         WHEN COALESCE(bi."stock", 0) <= COALESCE(bi."minStock", 0) THEN 'CRITICO: Comprar urgente'
+         WHEN COALESCE(bi."stock", 0) < COALESCE(SUM(ti."quantity"), 0) * 0.5 THEN 'REABASTECER: Alta rotacion y stock bajo'
+         ELSE 'STOCK SUFICIENTE'
+       END AS prioridad_compra
+FROM "products" p
+LEFT JOIN "transaction_items" ti ON ti."productId" = p."id"
+LEFT JOIN "transactions" t ON t."id" = ti."transactionId" AND t."type"='SALE' AND t."status"='COMPLETED'
+LEFT JOIN "branch_inventory" bi ON bi."productId" = p."id"
+WHERE p."isActive" = true
+GROUP BY p."id", p."name", bi."stock", bi."minStock"
+ORDER BY unidades_vendidas DESC, stock_actual ASC
+LIMIT 10;
+\`\`\`
 
 Ejemplo de SQL analítico (plantilla):
 \`\`\`sql
@@ -226,6 +253,34 @@ const FORBIDDEN_TABLES = [
 
 // Columnas/secretos sensibles que jamás deben aparecer en una consulta
 const FORBIDDEN_PATTERNS = ['PASSWORD', 'JWT_SECRET', 'ADMIN_PASSWORD', 'DB_PASSWORD'];
+
+// Columnas conocidas de Prisma en camelCase que PostgreSQL exige entre comillas dobles
+export const KNOWN_CAMELCASE_COLUMNS = [
+    'transactionId', 'productId', 'minStock', 'subGroupId', 'branchId',
+    'groupId', 'unitPrice', 'multiplierUsed', 'presentationId', 'taxRate',
+    'isActive', 'trackStock', 'expectedSpoilagePercent', 'customerId',
+    'userId', 'cashRegisterId', 'bankAccountId', 'accountId', 'bankName',
+    'initialBalance', 'createdAt', 'updatedAt', 'purchaseOrderId',
+    'exchangeRate', 'invoiceNumber', 'paymentMethods', 'baseUnit',
+    'imageUrl', 'kitProductId', 'componentProductId'
+];
+const CAMELCASE_RE = new RegExp(`(?<!["a-zA-Z0-9_])(${KNOWN_CAMELCASE_COLUMNS.join('|')})(?!["a-zA-Z0-9_])`, 'gi');
+const CAMELCASE_MAP = new Map(KNOWN_CAMELCASE_COLUMNS.map(c => [c.toLowerCase(), c]));
+
+/**
+ * Corrige y asegura comillas dobles en columnas camelCase de PostgreSQL.
+ * Respeta los literales de string (no toca dentro de '...').
+ */
+export function quoteCamelCaseCols(sql: string): string {
+    const parts = sql.split(/('(?:''|[^'])*')/g);
+    return parts.map((part, i) => {
+        if (i % 2 === 1) return part; // dentro de string literal '...'
+        return part.replace(CAMELCASE_RE, (match) => {
+            const canonical = CAMELCASE_MAP.get(match.toLowerCase()) || match;
+            return `"${canonical}"`;
+        });
+    }).join('');
+}
 
 interface SqlValidation {
     valid: boolean;
@@ -388,6 +443,9 @@ export function validateSql(rawSql: string): SqlValidation {
     if (!/\bLIMIT\b/i.test(sql)) {
         sql = sql.trim().replace(/;+$/, '') + ' LIMIT 100';
     }
+
+    // Asegurar comillas en columnas camelCase requeridas por PostgreSQL
+    sql = quoteCamelCaseCols(sql);
 
     return { valid: true, sql };
 }
@@ -574,11 +632,10 @@ export const processAiQuestion = async (
             console.warn(`[ai-chat] SQL rechazado por validación (${validation.error}): ${sql.slice(0, 300)}`);
             return { answer: 'No puedo ejecutar esa consulta. Probá reformulando la pregunta.' };
         }
-        // validation.sql puede incluir un LIMIT auto-agregado (HIGH #8)
-        const safeSql = validation.sql || sql;
+        let safeSql = validation.sql || sql;
 
-        const rawResult = await prisma.$queryRawUnsafe(safeSql);
-        const data = Array.isArray(rawResult)
+        let rawResult = await prisma.$queryRawUnsafe(safeSql);
+        let data = Array.isArray(rawResult)
             ? rawResult.map((row: any) => {
                 const obj: any = {};
                 for (const [k, v] of Object.entries(row)) {
@@ -587,6 +644,29 @@ export const processAiQuestion = async (
                 return obj;
             })
             : [];
+
+        // Fallback: si es una consulta analítica/asesora y devolvió 0 filas debido a un filtro estricto de fecha,
+        // relajar el intervalo para no dejar al usuario sin datos ni recomendaciones.
+        if (data.length === 0 && isAdvisoryQuestion(question) && /INTERVAL\s+'\d+\s*days?'/i.test(safeSql)) {
+            const relaxedSql = safeSql.replace(/AND\s+t\."createdAt"\s*>=\s*NOW\(\)\s*-\s*INTERVAL\s+'\d+\s*days?'/gi, '')
+                                      .replace(/WHERE\s+t\."createdAt"\s*>=\s*NOW\(\)\s*-\s*INTERVAL\s+'\d+\s*days?'\s*AND/gi, 'WHERE')
+                                      .replace(/WHERE\s+t\."createdAt"\s*>=\s*NOW\(\)\s*-\s*INTERVAL\s+'\d+\s*days?'/gi, '');
+            try {
+                const retryResult = await prisma.$queryRawUnsafe(relaxedSql);
+                if (Array.isArray(retryResult) && retryResult.length > 0) {
+                    safeSql = relaxedSql;
+                    data = retryResult.map((row: any) => {
+                        const obj: any = {};
+                        for (const [k, v] of Object.entries(row)) {
+                            obj[k] = typeof v === 'bigint' ? Number(v) : v;
+                        }
+                        return obj;
+                    });
+                }
+            } catch (err: any) {
+                console.warn('[ai-chat] Relaxed date query fallback error:', err.message);
+            }
+        }
 
         // ── PASO 3: Formatear respuesta natural ──────────────────────────────
         const answer = (await callWithRotation([
@@ -615,9 +695,9 @@ export const processAiQuestion = async (
 };
 
 // ─── Prompt para formatear respuestas naturales ──────────────────────────────
-// Intención analítica: el usuario pide análisis, tendencias o recomendaciones.
-function isAdvisoryQuestion(question: string): boolean {
-    return /analiza|analiz|vender m[áa]s|recomend|consejo|c[óo]mo puedo|sugerenc|estrateg/i.test(question);
+// Intención analítica: el usuario pide análisis, tendencias o recomendaciones de venta/compra.
+export function isAdvisoryQuestion(question: string): boolean {
+    return /analiza|analiz|vender m[áa]s|comprar|compra|abastec|reabastec|surtir|inventario bajo|recomend|consejo|c[óo]mo puedo|sugerenc|estrateg/i.test(question);
 }
 
 function buildFormatPrompt(question: string, data: any[]): string {
@@ -626,15 +706,15 @@ function buildFormatPrompt(question: string, data: any[]): string {
         : 'La consulta no devolvió registros.';
 
     if (isAdvisoryQuestion(question)) {
-        return `Sos un analista de negocio. Respondé al dueño del negocio: "${question}"
+        return `Sos un analista de negocio y compras experto en retail. Respondé al dueño del negocio: "${question}"
 Datos: ${dataBlock}
 
 Estructura obligatoria:
-1. Qué muestran los datos — con números concretos ($ o Bs).
-2. Tendencias o hallazgos.
-3. Entre 3 y 5 recomendaciones ACCIONABLES para vender más.
+1. Qué muestran los datos — con números concretos de ventas, stock y prioridad ($ o unidades).
+2. Hallazgos clave (qué productos rotan más y cuáles necesitan compra urgente o reabastecimiento).
+3. Entre 3 y 5 recomendaciones ACCIONABLES concretas de compra y surtido para maximizar ventas y evitar roturas de stock.
 
-Reglas: español natural de dueño de tienda, sin emojis ni emoticones, sin SQL, sin tecnicismos, moneda $, máximo ~150 palabras. NO generes tablas markdown, gráficos en texto ni instrucciones de cómo usar Excel o PDF; la interfaz ya muestra el gráfico interactivo y los botones de descarga correspondientes.`;
+Reglas: español natural de dueño de tienda, sin emojis ni emoticones, sin SQL, sin tecnicismos, moneda $, máximo ~160 palabras. NO generes tablas markdown, gráficos en texto ni instrucciones de cómo usar Excel o PDF; la interfaz ya muestra el gráfico interactivo y los botones de descarga correspondientes.`;
     }
 
     return `Respondé al dueño del negocio: "${question}"
