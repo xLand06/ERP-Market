@@ -585,6 +585,31 @@ ORDER BY 1;`,
         };
     }
 
+    // 6. Optimización de precios y maximización de ganancias / márgenes
+    if (
+        /aumentar el precio|subir el precio|cambiar el precio|maximizar ganancia|margen de ganancia|a que producto subirle/.test(norm)
+    ) {
+        return {
+            type: 'PRICE_OPTIMIZATION',
+            isAdvisory: true,
+            sql: `SELECT p."name" AS producto,
+       p."price" AS precio_actual,
+       p."cost" AS costo,
+       (p."price" - p."cost") AS margen_unidad,
+       COALESCE(SUM(ti."quantity"), 0) AS unidades_vendidas,
+       COALESCE(bi."stock", 0) AS stock_actual,
+       COALESCE(bi."minStock", 0) AS stock_minimo
+FROM "products" p
+LEFT JOIN "transaction_items" ti ON ti."productId" = p."id"
+LEFT JOIN "transactions" t ON t."id" = ti."transactionId" AND t."type"='SALE' AND t."status"='COMPLETED'${branchFilterTx}
+LEFT JOIN "branch_inventory" bi ON bi."productId" = p."id"${branchFilterBi}
+WHERE p."isActive" = true
+GROUP BY p."id", p."name", p."price", p."cost", bi."stock", bi."minStock"
+ORDER BY unidades_vendidas DESC, stock_actual DESC
+LIMIT 10;`,
+        };
+    }
+
     return null;
 }
 
@@ -840,16 +865,48 @@ export const processAiQuestion = async (
         }
 
         let safeSql = validation.sql || sql;
-        let rawResult = await prisma.$queryRawUnsafe(safeSql);
-        let data = Array.isArray(rawResult)
-            ? rawResult.map((row: any) => {
-                const obj: any = {};
-                for (const [k, v] of Object.entries(row)) {
-                    obj[k] = typeof v === 'bigint' ? Number(v) : v;
-                }
-                return obj;
-            })
-            : [];
+        let data: any[] = [];
+        let sqlFailed = false;
+
+        try {
+            const rawResult = await prisma.$queryRawUnsafe(safeSql);
+            if (Array.isArray(rawResult)) {
+                data = rawResult.map((row: any) => {
+                    const obj: any = {};
+                    for (const [k, v] of Object.entries(row)) {
+                        obj[k] = typeof v === 'bigint' ? Number(v) : v;
+                    }
+                    return obj;
+                });
+            }
+        } catch (dbErr: any) {
+            console.warn('[ai-chat] Error ejecutando SQL generado:', dbErr.message, 'SQL:', safeSql);
+            sqlFailed = true;
+        }
+
+        // Si falló el SQL generado pero la pregunta pide consejo u orientación general,
+        // responder en lenguaje natural guiando al usuario en vez de tirar un error general
+        if (sqlFailed && data.length === 0) {
+            if (isAiAvailable()) {
+                try {
+                    const guidanceAnswer = await callWithRotation([
+                        { role: 'system', content: 'Sos el asesor del sistema de punto de venta y tienda. El dueño te consulta: "' + question + '". Respondé con una orientación práctica y en lenguaje natural directo al dueño, sin tecnicismos ni mencionar bases de datos ni errores.' },
+                        { role: 'user', content: question },
+                    ], 0.3, 1024);
+                    const actions = detectActions(question, null, guidanceAnswer);
+                    const fallbackResult: AiChatResponse = {
+                        answer: guidanceAnswer.trim(),
+                        actions: actions.length > 0 ? actions : undefined,
+                    };
+                    setCachedResponse(cacheKey, fallbackResult);
+                    return fallbackResult;
+                } catch {}
+            }
+            return {
+                answer: 'No pude obtener los números en este momento. Podés revisar el módulo correspondiente en el menú para consultar o modificar esta información.',
+                actions: detectActions(question),
+            };
+        }
 
         // Fallback: si es una consulta analítica y devolvió 0 filas por un filtro rígido de fecha,
         // relajar el intervalo para no dejar al dueño de tienda sin información
