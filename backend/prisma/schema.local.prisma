@@ -470,6 +470,7 @@ model Customer {
 
   transactions Transaction[]
   payments     CustomerPayment[]
+  incomingPayments IncomingPayment[]
 
   @@index([name])
   @@index([cedula])
@@ -491,10 +492,57 @@ model CustomerPayment {
   transactionId String? // Venta a crédito que se está abonando (opcional)
   transaction   Transaction? @relation(fields: [transactionId], references: [id])
 
+  incoming IncomingPayment? // Reclamo de Pago Móvil que originó este abono (si lo hubo)
+
   @@index([customerId])
   @@index([transactionId])
   @@index([createdAt])
   @@map("customer_payments")
+}
+
+// =============================================================================
+// INCOMING PAYMENTS — Reclamos de Pago Móvil recibidos y en verificación
+// =============================================================================
+enum IncomingPaymentStatus {
+  PENDING // Reclamo recibido, aún no acreditado ni rechazado
+  APPLIED // Verificado: abono creado y saldo descontado
+  REJECTED // Rechazado por el verificador (no toca saldo)
+}
+
+enum IncomingPaymentSource {
+  WEBHOOK // Payload del SMS/push enviado por el dispositivo de la caja
+  MANUAL // Captura manual de un responsable
+}
+
+model IncomingPayment {
+  id       String @id @default(cuid())
+  amountVes Float // Monto reclamado en Bs (moneda del Pago Móvil)
+  amountBase Float? // Monto acreditado en moneda base (USD) — al verificar
+  exchangeRate Float? // Tasa Bs→base usada al verificar
+  reference String // Referencia del Pago Móvil (dedupe a nivel de aplicación)
+  senderPhone String? // Teléfono emisor del pago
+  senderBank String? // Banco emisor (BDV, Banesco, Mercantil, ...)
+  status    IncomingPaymentStatus @default(PENDING)
+  source    IncomingPaymentSource @default(WEBHOOK)
+  rawPayload String? // SMS crudo o payload recibido (evidencia)
+  rejectReason String?
+  notes     String?
+  verifiedAt DateTime?
+  verifiedById String? // userId del verificador (null si lo dejó el webhook)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customerId String? // Cliente sugerido (match por teléfono) o elegido al verificar
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  appliedPaymentId String? @unique
+  appliedPayment   CustomerPayment? @relation(fields: [appliedPaymentId], references: [id])
+
+  @@index([status])
+  @@index([reference])
+  @@index([customerId])
+  @@index([createdAt])
+  @@map("incoming_payments")
 }
 
 // =============================================================================

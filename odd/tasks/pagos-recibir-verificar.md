@@ -1,0 +1,113 @@
+# Feature: Pagos — Recibir y verificar Pago Móvil (Incoming Payments)
+
+## Objetivo
+Recibir reclamos de Pago Móvil de los clientes de la tienda (por webhook/SMS o entrada manual),
+verificarlos en una cola de pendientes y acreditarlos como abono de CxC solo cuando un
+responsable los aprueba — sin comisiones de pasarela y sin intermediar dinero.
+
+## Por qué
+- Consulta del usuario (2026-10-12): adaptar a ALL MARKET el recibir y verificar pagos
+  automatizados en Venezuela (análisis previo: APIs bancarias vs pasarelas vs Gateway Android).
+- Hoy TODO es manual: `CustomerPayment` se crea al instante y descuenta saldo sin verificación
+  (`customers.service.ts:230-293`), no hay estados, no hay idempotencia, no hay webhook.
+- El teléfono de la caja de la tienda ya está afiliado a la línea receptora del Pago Móvil;
+  el APK de ALL MARKET podrá alimentar el webhook futuro (fuera de alcance v1: solo endpoint).
+
+## Decisiones de diseño (arquitecto — veto del usuario abierto hasta T2)
+1. **Aditivo, no invasivo**: los abonos manuales existentes (cash/card/transfer) siguen
+   instantáneos como hoy. La verificación aplica a los reclamos entrantes (webhook/cola).
+   No se gatea el flujo actual.
+2. **Modelo nuevo `IncomingPayment`** con enum `IncomingPaymentStatus`
+   (`PENDING → APPLIED | REJECTED`), NO se toca el modelo `CustomerPayment` (el sync
+   `push-sales.service.ts:669-696` lo upsertea; campo nuevo = riesgo de romper sync).
+3. **Acreditar = reutilizar la lógica de `recordPayment`** dentro de `prisma.$transaction`:
+   `customerPayment.create` + `customer.balance decrement` + `IncomingPayment.status=APPLIED`
+   + link `appliedPaymentId`. Guardas idénticas (cliente activo, monto ≤ saldo).
+4. **Moneda**: el Pago Móvil llega en Bs; base USD. Persistir `amountVes`, `exchangeRate`
+   (al momento de verificar) y `amountBase`. El abono se acredita en moneda base como hoy.
+5. **Webhook público** `POST /api/payments/incoming/webhook` con header `x-webhook-secret`
+   (env `PAYMENTS_WEBHOOK_SECRET`, patrón `billing.routes.ts:15`). El servidor parsea el SMS
+   crudo (parser por banco: BDV 2662, Banesco 2846, Mercantil 24024) — el parseo vive en el
+   backend, no en el cliente. Dedupe por `reference` (misma referencia no se procesa dos veces).
+6. **Sugerencia de cliente**: match por `customer.phone` vs teléfono emisor; si no hay match,
+   el gestor elige cliente al verificar.
+7. **UI**: tab "Pagos por verificar" en `CustomersPage` (patrón de tabs de `CashRegisterPage`)
+   + badge en el campana de `TopBar` (nuevo type `pago_pendiente` en `notifications.service`).
+8. **Auditoría**: `AuditActionType` += `PAYMENT_INCOMING_RECEIVED | PAYMENT_VERIFIED |
+   PAYMENT_REJECTED`; el webhook audita con `userId: null` (ya es nullable).
+
+## Alcance por tarea
+- [x] T1: Esquema — `IncomingPayment` + `IncomingPaymentStatus` en **AMBOS** schemas
+      (`backend/prisma/schema.prisma` cloud/Postgres Y `schema.local.prisma` SQLite — divergencia
+      histórica de `groupId` enseña a no repetirlo) + índices + `db:push:local` + prisma generate.
+      - Archivos: `backend/prisma/schema.prisma`, `backend/prisma/schema.local.prisma`
+      - Ruta: inline (cambio mecánico con diseño ya cerrado; 2 archivos espejo).
+- [ ] T2: Backend — módulo `incoming-payments` (routes/service/controller/zod):
+      webhook público + parser SMS (unit test colocado `sms-parser.test.ts`) + cola GET +
+      verify/reject + auditoría.
+      - Archivos: `backend/src/modules/incoming-payments/*` (nuevo),
+        `backend/src/core/middlewares/audit.middleware.ts` (+AuditActionType),
+        `backend/src/app.ts` (mount router)
+- [ ] T3: Frontend — tab de cola en `CustomersPage`, botones verificar/rechazar (con selector
+      de cliente si no hubo match), badge en `TopBar`, types + service + hooks React Query
+      (invalidate `['customer-statement', id]` + `['customers']`).
+      - Archivos: `frontend/src/features/customers/pages/CustomersPage.tsx`,
+        `frontend/src/components/layout/TopBar.tsx`, `frontend/src/services/*.service.ts`,
+        `frontend/src/features/customers/hooks/useCustomers.ts` (o nuevo hook)
+- [ ] T4: Verificación integral — `tests/incoming-payments.test.ts` (supertest: webhook happy
+      path + secret inválido 401/403 + dedupe + verify aplica saldo + reject no aplica),
+      `pnpm test` backend, `tsc --noEmit` backend+frontend, build frontend, docs de operación
+      (cómo configurar PAYMENTS_WEBHOOK_SECRET y el formato del payload).
+
+## Criterios de aceptación / Verificación
+- Webhook con secret válido + SMS BDV parseado → `IncomingPayment` PENDING con monto Bs + USD.
+- SMS duplicado (misma referencia) → NO crea segundo registro.
+- `POST /:id/verify` → en una transacción: abono creado, saldo del cliente bajado, estado
+  APPLIED, audit log con actor; monto > saldo → 422 y estado intacto.
+- `POST /:id/reject` → REJECTED, saldo intacto, audit log.
+- Abono manual existente (cash/transfer) → comportamiento SIN cambios (test de regresión).
+- Webhook sin/incorrecto `x-webhook-secret` → rechazado.
+- `pnpm test` (vitest) verde; `tsc --noEmit` backend y frontend sin errores.
+
+## Ruta declarada
+- Delegada (writer único por tarea): triggers — T2 y T3 tocan 4+ archivos no triviales cada uno
+  (writer trigger) y la lectura de preparación va junto con el writer. Mapeo inicial delegado
+  (explore, 8 archivos: completado, sesión `ses_ecd4525f5ffeBwEgJ3vozKY1dj`).
+- TDD: sin config strict TDD en sesión/proyecto → checks funcionales ordinarios + tests nuevos
+  primero en T2/T4 (parser: RED/GREEN natural).
+
+## Forecast de líneas (heurística ~400/tarea)
+- T1 ~80 · T2 ~450 · T3 ~400 · T4 ~300 → **~1.230 líneas** (suma > 400 → estrategia de
+  entrega aplica; ver Cadena abajo).
+
+## Cadena / estrategia de entrega
+- `delivery_strategy`: `ask-on-risk` (default ODD, sin preflight SDD en sesión).
+- `chain_strategy`: `stacked-to-main` — elegido por el usuario (2026-10-12) vía question.
+  Los work-unit commits aterrizan en main en orden; push al usuario.
+
+## Restricciones / estado del repo
+- Repo en `main` tras merge de `9bf47bf` (fix ai-chat). Feature en rama nueva primero.
+- `mobile/` sin trackear: NO se incluye en staging (el review nativo ya lo excluye con
+  `--untracked-scope=exclude`).
+- Deploy VPS ROTO: GitHub Actions sin secrets (`missing server host`) — push a main NO
+  despliega; el feature llega a producción cuando el usuario restaure los secrets.
+- RDD: ON (global). Tras cada work-unit commit → `gentle-ai review assess --committed-only`.
+
+## Progreso
+- [x] Exploración delegada (mapa completo de abonos/POS/banks/frontend/auditoría)
+- [x] Feature doc creado (este documento)
+- [x] Cadena decidida (`stacked-to-main`, usuario 2026-10-12)
+- [x] T1 (esquema) — ver Resultados T1 abajo
+- [ ] T2 (backend) · [ ] T3 (frontend) · [ ] T4 (verificación integral)
+
+## Resultados de verificación — T1 (2026-10-12)
+- `prisma validate` AMBOS schemas → válidos.
+- `db:generate` (cloud) + `db:generate:local` + `db:push:local` → OK (tabla `incoming_payments` creada).
+- `tsc --noEmit` backend → sin errores.
+- **Baseline de tests (IMPORTANTE)**: `pnpm test` tiene 9 fallos PREEXISTENTES en la base
+  `9bf47bf`, idénticos con y sin este cambio (verificado con stash): auth integration (5 ×
+  timeout 30s, sospecha rate-limit/bcrypt), products (2), purchases (1), pos multi-pago (1).
+  Cualquier run futuro se compara contra este baseline — no se les sube el TDD.
+
+## Commits
+- feat/incoming-payments: T1 esquema + feature doc (ver git log)
