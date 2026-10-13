@@ -245,9 +245,15 @@ export function CatalogSettings() {
 
                 {/* Slug */}
                 <div>
-                    <label htmlFor="catalog-slug" className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Slug del catálogo
-                    </label>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                        <label htmlFor="catalog-slug" className="block text-xs font-bold text-slate-700">
+                            Slug del catálogo
+                        </label>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                            <Lock className="w-3 h-3 text-slate-400" />
+                            Fijo
+                        </span>
+                    </div>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                         <span className="text-xs sm:text-sm text-slate-400 font-semibold shrink-0 select-none break-all">
                             {catalogBaseUrl}/
@@ -256,13 +262,14 @@ export function CatalogSettings() {
                             id="catalog-slug"
                             type="text"
                             value={localSlug}
-                            onChange={e => setLocalSlug(e.target.value.replace(/\s+/g, '-').toLowerCase())}
+                            readOnly
+                            disabled
                             placeholder="mi-tienda"
-                            className="flex-1 w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent min-h-[44px]"
+                            className="flex-1 w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-600 placeholder:text-slate-400 cursor-not-allowed select-none min-h-[44px]"
                         />
                     </div>
                     <p className="text-xs text-slate-400 mt-1.5 font-medium">
-                        Solo letras, números y guiones. Ej: mi-tienda → {catalogBaseUrl}/mi-tienda
+                        El enlace permanente de tu catálogo es <span className="font-semibold text-slate-600">{catalogBaseUrl}/{localSlug || 'tu-tienda'}</span> y está asociado a tu cuenta.
                     </p>
                 </div>
 

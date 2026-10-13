@@ -137,10 +137,19 @@ export async function getSettings(): Promise<SystemSettings> {
         if (config.iva > 100) config.iva = config.iva / 100;
         if (config.ivaPercent > 100) config.ivaPercent = config.ivaPercent / 100;
 
+        // El slug del catálogo está enlazado permanentemente al tenant
+        const tenantSlug = process.env.TENANT_SLUG?.trim().toLowerCase();
+        if (tenantSlug) {
+            config.catalogSlug = tenantSlug;
+        }
+
         return config as SystemSettings;
     } catch (error: any) {
         logger.error('[Settings] Error leyendo configuración desde BD:', { error: error.message || error });
-        return DEFAULT_SETTINGS;
+        const fallback = { ...DEFAULT_SETTINGS };
+        const tenantSlug = process.env.TENANT_SLUG?.trim().toLowerCase();
+        if (tenantSlug) fallback.catalogSlug = tenantSlug;
+        return fallback;
     }
 }
 
@@ -148,6 +157,14 @@ export async function saveSettings(settings: Partial<SystemSettings>): Promise<S
     try {
         const current = await getSettings();
         const updated = { ...current, ...settings };
+
+        // El slug del catálogo es inmutable por tienda/tenant (no se puede cambiar)
+        const tenantSlug = process.env.TENANT_SLUG?.trim().toLowerCase();
+        if (tenantSlug) {
+            updated.catalogSlug = tenantSlug;
+        } else if (current.catalogSlug && current.catalogSlug.trim()) {
+            updated.catalogSlug = current.catalogSlug;
+        }
 
         // Guard: never persist a corrupted iva value
         if (typeof updated.iva === 'number' && updated.iva > 100) updated.iva = updated.iva / 100;
