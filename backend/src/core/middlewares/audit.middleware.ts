@@ -70,7 +70,10 @@ export type AuditActionType =
     | 'BATCH_DELETE'
     | 'STOCKCOUNT_CREATE'
     | 'STOCKCOUNT_STATUS_UPDATE'
-    | 'STOCKCOUNT_APPLY';
+    | 'STOCKCOUNT_APPLY'
+    | 'PAYMENT_INCOMING_RECEIVED'
+    | 'PAYMENT_VERIFIED'
+    | 'PAYMENT_REJECTED';
 
 /**
  * Extrae la IP real del cliente, considerando proxies y load balancers.

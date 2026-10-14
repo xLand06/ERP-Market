@@ -42,12 +42,17 @@ responsable los aprueba — sin comisiones de pasarela y sin intermediar dinero.
       histórica de `groupId` enseña a no repetirlo) + índices + `db:push:local` + prisma generate.
       - Archivos: `backend/prisma/schema.prisma`, `backend/prisma/schema.local.prisma`
       - Ruta: inline (cambio mecánico con diseño ya cerrado; 2 archivos espejo).
-- [ ] T2: Backend — módulo `incoming-payments` (routes/service/controller/zod):
+- [x] T2: Backend — módulo `incoming-payments` (routes/service/controller/zod):
       webhook público + parser SMS (unit test colocado `sms-parser.test.ts`) + cola GET +
       verify/reject + auditoría.
-      - Archivos: `backend/src/modules/incoming-payments/*` (nuevo),
-        `backend/src/core/middlewares/audit.middleware.ts` (+AuditActionType),
-        `backend/src/app.ts` (mount router)
+      - Archivos: `backend/src/modules/incoming-payments/*` (nuevo: zod, sms-parser,
+        sms-parser.test, service, controller, routes),
+        `backend/src/core/middlewares/audit.middleware.ts` (+3 AuditActionType),
+        `backend/src/app.ts` (mount `/api/incoming-payments`)
+      - Ruta: delegada (writer, trigger 4+ archivos no triviales).
+      - Nota: verify usa updateMany condicional PENDING→APPLIED con count-check
+        (idempotencia ante doble-verificación concurrente). Dedupe de webhook por
+        `findFirst` reference (sin unique en DB: schema intocable en T2).
 - [ ] T3: Frontend — tab de cola en `CustomersPage`, botones verificar/rechazar (con selector
       de cliente si no hubo match), badge en `TopBar`, types + service + hooks React Query
       (invalidate `['customer-statement', id]` + `['customers']`).
@@ -93,12 +98,29 @@ responsable los aprueba — sin comisiones de pasarela y sin intermediar dinero.
   despliega; el feature llega a producción cuando el usuario restaure los secrets.
 - RDD: ON (global). Tras cada work-unit commit → `gentle-ai review assess --committed-only`.
 
+## Resultados de verificación — T2 (2026-10-14)
+- Writer: `npx vitest run src/modules/incoming-payments/sms-parser.test.ts` → 12/12 (RED→GREEN);
+  `npx tsc --noEmit` → sin errores; ai-chat tests → 29 passed (ver nota abajo).
+- Spot check del orquestador (re-ejecución): parser tests → 12/12 ✓; `git status` → solo los
+  3 artefactos declarados ✓.
+- Riesgos registrados del writer: (1) secret del webhook con fallback de dev (patrón de casa —
+  T4 docs debe cubrir PAYMENTS_WEBHOOK_SECRET en producción); (2) dedupe sin unique en DB;
+  (3) montos se normalizan a number → T3 debe tipar numbers.
+- Corrección de doc: el guard de ai-chat tiene 29 tests, no 24 — hay 3 commits de una sesión
+  concurrente en la rama (`491d035`, `bf4644b` ai-chat; `66ebf5c` catalog) que sumaron 5 tests
+  después de mi `9bf47bf`.
+- Review nativo T1/T2: `unavailable` (transport `immutable_review_transport_unsupported`,
+  retry_safe:false; causa raíz upstream = probe de runtime sin memoizar, fix publicado en
+  gentle-ai v4.1.1 — build instalado 3.7.0 → acción: actualizar y reproducir, sin comentario
+  en #4984 aún).
+
 ## Progreso
 - [x] Exploración delegada (mapa completo de abonos/POS/banks/frontend/auditoría)
 - [x] Feature doc creado (este documento)
 - [x] Cadena decidida (`stacked-to-main`, usuario 2026-10-12)
-- [x] T1 (esquema) — ver Resultados T1 abajo
-- [ ] T2 (backend) · [ ] T3 (frontend) · [ ] T4 (verificación integral)
+- [x] T1 (esquema) — commit 67a85dc
+- [x] T2 (backend) — commit T2 (este commit)
+- [ ] T3 (frontend) · [ ] T4 (verificación integral)
 
 ## Resultados de verificación — T1 (2026-10-12)
 - `prisma validate` AMBOS schemas → válidos.

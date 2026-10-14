@@ -19,6 +19,7 @@ import cashFlowRouter from './modules/cashFlow/cashFlow.routes';
 import salesRouter from './modules/sales/sales.routes';
 import suppliersRouter from './modules/suppliers/suppliers.routes';
 import customersRouter from './modules/customers/customers.routes';
+import incomingPaymentsRouter from './modules/incoming-payments/incoming-payments.routes';
 import purchasesRouter from './modules/purchases/purchases.routes';
 import financeRouter from './modules/finance/finance.routes';
 import reportsRouter from './modules/reports/reports.routes';
@@ -247,6 +248,8 @@ app.use('/api/cash-flow',  cashFlowRouter);
 app.use('/api/sales',      salesRouter);
 app.use('/api/suppliers',  suppliersRouter);
 app.use('/api/customers',  customersRouter);
+// Pagos entrantes de Pago Móvil: webhook público + cola de verificación
+app.use('/api/incoming-payments', incomingPaymentsRouter);
 app.use('/api/purchases',  purchasesRouter);
 app.use('/api/finance',    financeRouter);
 app.use('/api/reports',    reportsRouter);
