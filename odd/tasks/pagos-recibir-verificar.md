@@ -53,12 +53,26 @@ responsable los aprueba — sin comisiones de pasarela y sin intermediar dinero.
       - Nota: verify usa updateMany condicional PENDING→APPLIED con count-check
         (idempotencia ante doble-verificación concurrente). Dedupe de webhook por
         `findFirst` reference (sin unique en DB: schema intocable en T2).
-- [ ] T3: Frontend — tab de cola en `CustomersPage`, botones verificar/rechazar (con selector
+- [x] T3: Frontend — tab de cola en `CustomersPage`, botones verificar/rechazar (con selector
       de cliente si no hubo match), badge en `TopBar`, types + service + hooks React Query
       (invalidate `['customer-statement', id]` + `['customers']`).
       - Archivos: `frontend/src/features/customers/pages/CustomersPage.tsx`,
-        `frontend/src/components/layout/TopBar.tsx`, `frontend/src/services/*.service.ts`,
-        `frontend/src/features/customers/hooks/useCustomers.ts` (o nuevo hook)
+        `frontend/src/features/customers/components/IncomingPaymentsPanel.tsx` (nuevo),
+        `frontend/src/features/customers/hooks/useIncomingPayments.ts` (nuevo),
+        `frontend/src/services/incoming-payments.service.ts` (nuevo),
+        `frontend/src/services/notifications.service.ts`, `frontend/src/components/layout/TopBar.tsx`,
+        `backend/src/modules/notifications/notifications.service.ts` (type `pago_pendiente`)
+      - Ruta: delegada (writer, trigger 4+ archivos no triviales).
+
+## Resultados de verificación — T3 (2026-10-14)
+- Writer: frontend `pnpm build` → ✓ built (exit 0); backend `tsc --noEmit` → limpio;
+  frontend `tsc --noEmit` → 218 errores = BASELINE preexistente (verificado con
+  `git stash -u` contra HEAD limpio: idénticos 218; 0 errores nuevos de este cambio).
+- Spot check orquestador: `pnpm build` → dist generado OK; `git status` → solo los
+  7 archivos declarados ✓.
+- Riesgos registrados: badge TopBar depende del polling de 60s (invalidate de notifications
+  es no-op hoy, comentado en código); USD display-only hasta verificar; gate de acciones
+  OWNER/MANAGER en UI (la autoridad real es el roleGuard del backend).
 - [ ] T4: Verificación integral — `tests/incoming-payments.test.ts` (supertest: webhook happy
       path + secret inválido 401/403 + dedupe + verify aplica saldo + reject no aplica),
       `pnpm test` backend, `tsc --noEmit` backend+frontend, build frontend, docs de operación
@@ -119,8 +133,9 @@ responsable los aprueba — sin comisiones de pasarela y sin intermediar dinero.
 - [x] Feature doc creado (este documento)
 - [x] Cadena decidida (`stacked-to-main`, usuario 2026-10-12)
 - [x] T1 (esquema) — commit 67a85dc
-- [x] T2 (backend) — commit T2 (este commit)
-- [ ] T3 (frontend) · [ ] T4 (verificación integral)
+- [x] T2 (backend) — commit 705f800
+- [x] T3 (frontend) — commit T3 (este commit)
+- [ ] T4 (verificación integral)
 
 ## Resultados de verificación — T1 (2026-10-12)
 - `prisma validate` AMBOS schemas → válidos.

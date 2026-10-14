@@ -2,6 +2,7 @@
 // NOTIFICATIONS SERVICE — ERP-MARKET
 // Notificaciones calculadas EN VIVO desde datos reales (sin modelo de BD):
 //   - Fiados: clientes activos con saldo pendiente > 0.01
+//   - Pagos por verificar: reclamos de Pago Móvil en estado PENDING
 //   - Stock bajo: inventario con stock <= minStock (stock > 0)
 // No persiste nada: el descarte (dismiss) vive en el cliente (localStorage).
 // =============================================================================
@@ -10,7 +11,7 @@ import { prisma } from '../../config/prisma';
 
 export interface AppNotification {
     key: string;
-    type: 'fiado' | 'stock';
+    type: 'fiado' | 'stock' | 'pago_pendiente';
     title: string;
     message: string;
     createdAt: string;
@@ -71,6 +72,31 @@ async function buildFiadoNotifications(): Promise<AppNotification[]> {
 }
 
 /**
+ * Calcula la notificación de pagos Pago Móvil por verificar (cola PENDING).
+ * Una sola notificación agregada con el conteo, para no inundar la campana.
+ */
+async function buildPagoPendienteNotifications(): Promise<AppNotification[]> {
+    const count = await prisma.incomingPayment.count({ where: { status: 'PENDING' } });
+    if (count === 0) return [];
+
+    const latest = await prisma.incomingPayment.findFirst({
+        where: { status: 'PENDING' },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
+    });
+
+    return [{
+        key: 'pago-pendiente',
+        type: 'pago_pendiente',
+        title: 'Pagos por verificar',
+        message: count === 1
+            ? '1 pago de Pago Móvil esperando verificación'
+            : `${count} pagos de Pago Móvil esperando verificación`,
+        createdAt: (latest?.createdAt ?? new Date()).toISOString(),
+    }];
+}
+
+/**
  * Calcula las notificaciones de stock bajo para la sucursal del usuario.
  * Filtra en JS (stock > 0 y stock <= minStock) porque Prisma no compara
  * columnas entre sí directamente.
@@ -109,8 +135,9 @@ async function buildStockNotifications(branchId: string | null): Promise<AppNoti
 }
 
 /**
- * Endpoint principal: devuelve fiados primero y luego stock bajo,
- * acotado a `limit` (por defecto 30). Fiados toman prioridad sobre stock.
+ * Endpoint principal: devuelve fiados primero, luego pagos por verificar
+ * y al final stock bajo, acotado a `limit` (por defecto 30).
+ * Fiados toman prioridad sobre pagos pendientes y stock.
  */
 export async function getNotifications(
     userBranchId: string | undefined,
@@ -118,13 +145,14 @@ export async function getNotifications(
 ): Promise<AppNotification[]> {
     const branchId = await resolveBranchId(userBranchId);
 
-    const [fiados, stock] = await Promise.all([
+    const [fiados, pagosPendientes, stock] = await Promise.all([
         buildFiadoNotifications(),
+        buildPagoPendienteNotifications(),
         buildStockNotifications(branchId),
     ]);
 
-    // Fiados primero (mayor severidad), luego stock bajo (acotado a 20)
+    // Fiados primero (mayor severidad), luego pagos por verificar y stock bajo (acotado a 20)
     const stockLimited = stock.slice(0, STOCK_LIMIT);
 
-    return [...fiados, ...stockLimited].slice(0, limit);
+    return [...fiados, ...pagosPendientes, ...stockLimited].slice(0, limit);
 }

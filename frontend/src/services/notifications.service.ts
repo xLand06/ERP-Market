@@ -5,7 +5,7 @@
 import api from '../lib/api';
 import type { ApiResponse } from '../types';
 
-export type NotificationType = 'fiado' | 'stock';
+export type NotificationType = 'fiado' | 'stock' | 'pago_pendiente';
 
 export interface AppNotification {
     key: string;

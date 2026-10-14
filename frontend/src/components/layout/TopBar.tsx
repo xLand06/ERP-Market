@@ -98,9 +98,11 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const notificationIcon = (type: AppNotification['type']) => (
-        type === 'fiado' ? <Banknote className="w-4 h-4" /> : <Package className="w-4 h-4" />
-    );
+    const notificationIcon = (type: AppNotification['type']) => {
+        if (type === 'fiado') return <Banknote className="w-4 h-4" />;
+        if (type === 'pago_pendiente') return <Smartphone className="w-4 h-4" />;
+        return <Package className="w-4 h-4" />;
+    };
 
     const handleLogout = () => {
         logout();
@@ -594,7 +596,9 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                                                     'mt-0.5 w-7 h-7 shrink-0 rounded-lg flex items-center justify-center',
                                                     n.type === 'fiado'
                                                         ? 'bg-amber-50 text-amber-600'
-                                                        : 'bg-indigo-50 text-indigo-600'
+                                                        : n.type === 'pago_pendiente'
+                                                            ? 'bg-emerald-50 text-emerald-600'
+                                                            : 'bg-indigo-50 text-indigo-600'
                                                 )}>
                                                     {notificationIcon(n.type)}
                                                 </span>

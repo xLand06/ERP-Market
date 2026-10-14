@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Plus, Users, AlertCircle, Eye } from 'lucide-react';
+import { Search, Plus, Users, AlertCircle, Eye, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { normalizeText } from '@/lib/utils';
+import { cn, normalizeText } from '@/lib/utils';
 import { DataTable, type Column } from '@/components/ui/table';
 import { CustomerFormModal } from '../components/CustomerFormModal';
+import { IncomingPaymentsPanel } from '../components/IncomingPaymentsPanel';
 import { useCustomers } from '../hooks/useCustomers';
+import { useIncomingPaymentsQueue } from '../hooks/useIncomingPayments';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Customer } from '../types';
 
@@ -26,11 +28,17 @@ const statusCell = (row: Customer) => (
 );
 
 export default function CustomersPage() {
+    const [activeTab, setActiveTab] = useState<'clientes' | 'pagos'>('clientes');
     const [search, setSearch] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
     const queryClient = useQueryClient();
 
     const { data: customers = [], isLoading, isError } = useCustomers();
+    const {
+        data: pendingPayments = [],
+        isLoading: pendingLoading,
+        isError: pendingError,
+    } = useIncomingPaymentsQueue();
 
     const filtered = customers.filter(c =>
         normalizeText(c.name).includes(search) ||
@@ -101,57 +109,88 @@ export default function CustomersPage() {
                 onSuccess={() => queryClient.invalidateQueries({ queryKey: ['customers'] })}
             />
 
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                        Clientes (Fiados / CxC)
-                    </h1>
-                    <p className="text-xs text-slate-400 mt-1 font-medium">
-                        {filtered.length} cliente{filtered.length === 1 ? '' : 's'} ·{' '}
-                        {filtered.filter(c => c.balance > 0).length} con saldo pendiente
-                    </p>
-                </div>
-                <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={() => setModalOpen(true)}>
-                    <Plus className="w-4 h-4 mr-2" /> Nuevo Cliente
-                </Button>
+            {/* Tabs */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg w-fit shrink-0 overflow-x-auto max-w-full">
+                <button
+                    onClick={() => setActiveTab('clientes')}
+                    className={cn('flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap cursor-pointer', activeTab === 'clientes' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
+                >
+                    <Users className="w-4 h-4" /> Clientes
+                </button>
+                <button
+                    onClick={() => setActiveTab('pagos')}
+                    className={cn('flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap cursor-pointer', activeTab === 'pagos' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
+                >
+                    <Smartphone className="w-4 h-4" /> Pagos por verificar
+                    {pendingPayments.length > 0 && (
+                        <span className="min-w-4 h-4 px-1 bg-amber-500 text-white rounded-full flex items-center justify-center text-[9px] font-bold tabular-nums">
+                            {pendingPayments.length}
+                        </span>
+                    )}
+                </button>
             </div>
 
-            {/* Lista */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="flex items-center gap-3 p-4 border-b border-slate-100">
-                    <div className="relative flex-1 min-w-50">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <Input
-                            placeholder="Buscar por nombre o cédula..."
-                            value={search}
-                            onChange={e => setSearch(normalizeText(e.target.value))}
-                            className="pl-9"
-                            aria-label="Buscar clientes"
+            {activeTab === 'pagos' ? (
+                <IncomingPaymentsPanel
+                    payments={pendingPayments}
+                    isLoading={pendingLoading}
+                    isError={pendingError}
+                />
+            ) : (
+                <>
+                    {/* Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                                Clientes (Fiados / CxC)
+                            </h1>
+                            <p className="text-xs text-slate-400 mt-1 font-medium">
+                                {filtered.length} cliente{filtered.length === 1 ? '' : 's'} ·{' '}
+                                {filtered.filter(c => c.balance > 0).length} con saldo pendiente
+                            </p>
+                        </div>
+                        <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={() => setModalOpen(true)}>
+                            <Plus className="w-4 h-4 mr-2" /> Nuevo Cliente
+                        </Button>
+                    </div>
+
+                    {/* Lista */}
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="flex items-center gap-3 p-4 border-b border-slate-100">
+                            <div className="relative flex-1 min-w-50">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <Input
+                                    placeholder="Buscar por nombre o cédula..."
+                                    value={search}
+                                    onChange={e => setSearch(normalizeText(e.target.value))}
+                                    className="pl-9"
+                                    aria-label="Buscar clientes"
+                                />
+                            </div>
+                        </div>
+
+                        {isError && (
+                            <div className="p-4 bg-red-50 text-red-600 flex items-center gap-2 m-4 rounded-lg">
+                                <AlertCircle className="w-4 h-4" />
+                                <p className="text-sm">Error al cargar los clientes</p>
+                            </div>
+                        )}
+
+                        <DataTable
+                            columns={columns}
+                            rows={filtered}
+                            rowKey={row => row.id}
+                            isLoading={isLoading}
+                            empty={{
+                                icon: <Users className="w-8 h-8 text-slate-200" />,
+                                title: 'No hay clientes registrados',
+                                description: 'Crea tu primer cliente para comenzar a vender a crédito.',
+                            }}
+                            actions={renderActions}
                         />
                     </div>
-                </div>
-
-                {isError && (
-                    <div className="p-4 bg-red-50 text-red-600 flex items-center gap-2 m-4 rounded-lg">
-                        <AlertCircle className="w-4 h-4" />
-                        <p className="text-sm">Error al cargar los clientes</p>
-                    </div>
-                )}
-
-                <DataTable
-                    columns={columns}
-                    rows={filtered}
-                    rowKey={row => row.id}
-                    isLoading={isLoading}
-                    empty={{
-                        icon: <Users className="w-8 h-8 text-slate-200" />,
-                        title: 'No hay clientes registrados',
-                        description: 'Crea tu primer cliente para comenzar a vender a crédito.',
-                    }}
-                    actions={renderActions}
-                />
-            </div>
+                </>
+            )}
         </div>
     );
 }
