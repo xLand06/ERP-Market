@@ -73,10 +73,26 @@ responsable los aprueba — sin comisiones de pasarela y sin intermediar dinero.
 - Riesgos registrados: badge TopBar depende del polling de 60s (invalidate de notifications
   es no-op hoy, comentado en código); USD display-only hasta verificar; gate de acciones
   OWNER/MANAGER en UI (la autoridad real es el roleGuard del backend).
-- [ ] T4: Verificación integral — `tests/incoming-payments.test.ts` (supertest: webhook happy
-      path + secret inválido 401/403 + dedupe + verify aplica saldo + reject no aplica),
+- [x] T4: Verificación integral — `tests/incoming-payments.test.ts` (supertest: webhook happy
+      path + secret inválido 401 + dedupe + verify aplica saldo + reject no aplica),
       `pnpm test` backend, `tsc --noEmit` backend+frontend, build frontend, docs de operación
       (cómo configurar PAYMENTS_WEBHOOK_SECRET y el formato del payload).
+      - Archivos: `backend/tests/incoming-payments.test.ts` (nuevo, 15 tests),
+        `docs/pagos-webhook.md` (nuevo, ops doc ES)
+      - Ruta: delegada (writer, 2 archivos no triviales).
+
+## Resultados de verificación — T4 (2026-10-14)
+- Writer: `npx vitest run tests/incoming-payments.test.ts` → 15/15; `tsc --noEmit` → limpio;
+  `pnpm test` full → **9 failed | 102 passed | 1 skipped** — los 9 son EXACTAMENTE el baseline
+  preexistente (auth ×5 timeouts con rechazo `DEPLOY_MODE=server pero DATABASE_URL...`,
+  products ×2, purchases ×1, pos ×1); cero rotos nuevos.
+- Spot check orquestador: 15/15 ✓; status solo con los 2 archivos nuevos ✓.
+- Cobertura: secret correcto/incorrecto, dedupe, no-parseable sin fila, cola PENDING, verify
+  con delta de saldo ±0.01, 422 sin cambios, doble-verify 409 sin doble crédito, reject
+  intacto, 403 SELLER, auto-match por teléfono vs requerir customerId, y regresión del abono
+  manual instantáneo.
+- Litter de backups del suite restaurado (`git checkout -- backend/backups/` + rm del creado).
+  ⚠️ Cada `pnpm test` completo repite este efecto: limpiar igual tras cada run.
 
 ## Criterios de aceptación / Verificación
 - Webhook con secret válido + SMS BDV parseado → `IncomingPayment` PENDING con monto Bs + USD.
@@ -134,8 +150,8 @@ responsable los aprueba — sin comisiones de pasarela y sin intermediar dinero.
 - [x] Cadena decidida (`stacked-to-main`, usuario 2026-10-12)
 - [x] T1 (esquema) — commit 67a85dc
 - [x] T2 (backend) — commit 705f800
-- [x] T3 (frontend) — commit T3 (este commit)
-- [ ] T4 (verificación integral)
+- [x] T3 (frontend) — commit 547ac2a
+- [x] T4 (verificación integral) — commit T4 (este commit)
 
 ## Resultados de verificación — T1 (2026-10-12)
 - `prisma validate` AMBOS schemas → válidos.
@@ -146,5 +162,9 @@ responsable los aprueba — sin comisiones de pasarela y sin intermediar dinero.
   timeout 30s, sospecha rate-limit/bcrypt), products (2), purchases (1), pos multi-pago (1).
   Cualquier run futuro se compara contra este baseline — no se les sube el TDD.
 
-## Commits
-- feat/incoming-payments: T1 esquema + feature doc (ver git log)
+## Commits (rama feat/incoming-payments, stacked-to-main, orden de aterrizaje)
+- `67a85dc` feat(payments): add IncomingPayment schema for Pago Movil verification
+- `705f800` feat(payments): add incoming Pago Movil webhook and verification backend
+- `547ac2a` feat(payments): add payment verification queue UI
+- T4: feat(payments): add incoming payment integration tests and webhook docs (este commit)
+- Pendiente de aterrizaje: merge a main + push (decisión del usuario; push = deploy vía Actions)
