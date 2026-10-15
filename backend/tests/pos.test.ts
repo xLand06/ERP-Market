@@ -52,6 +52,23 @@ describe('POS Module', () => {
             expect(res.body.error).toContain('Stock insuficiente');
         });
 
+        it('offlineSync permite venta con stock insuficiente y cashRegisterId offline', async () => {
+            const res = await request(app)
+                .post('/api/pos/transactions')
+                .set(loginAsSeller())
+                .send({
+                    type: 'SALE',
+                    branchId: SEED.branchId,
+                    cashRegisterId: 'offline_register_branch1_12345',
+                    offlineSync: true,
+                    items: [{ productId: SEED.productId, quantity: 999, unitPrice: 10.0 }],
+                });
+
+            expect(res.status).toBe(201);
+            expect(res.body.success).toBe(true);
+            expect(res.body.data.type).toBe('SALE');
+        });
+
         it('INVENTORY_IN incrementa stock', async () => {
             // Guardar stock inicial
             const { prisma } = await import('./setup');
@@ -112,7 +129,7 @@ describe('POS Module', () => {
                 });
 
             expect(res.status).toBe(422);
-            expect(res.body.error).toContain('no coincide');
+            expect(res.body.error).toContain('menor al total requerido');
         });
 
         it('SELLER no puede hacer INVENTORY_IN sin canManageInventory', async () => {

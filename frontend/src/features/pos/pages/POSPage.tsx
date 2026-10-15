@@ -108,8 +108,9 @@ export default function POSPage() {
                     const cached = localStorage.getItem(`last_open_register_${effectiveBranch}`);
                     if (cached) return JSON.parse(cached);
                 } catch {}
-                // Si estamos sin conexión, proveer sesión offline para no bloquear la venta
-                if (!navigator.onLine) {
+                // Si no hay respuesta del servidor o estamos offline, proveer sesión offline para no bloquear la venta
+                const isNetworkFailure = !err.response || !navigator.onLine;
+                if (isNetworkFailure) {
                     return { id: `offline_register_${effectiveBranch}`, branchId: effectiveBranch, status: 'OPEN', isOffline: true };
                 }
                 throw err;
@@ -126,19 +127,25 @@ export default function POSPage() {
 
     const openMutation = useMutation({
         mutationFn: async (openingAmount: number) => {
-            if (!navigator.onLine) {
-                const offlineReg = {
-                    id: `offline_register_${effectiveBranch}_${Date.now()}`,
-                    branchId: effectiveBranch,
-                    status: 'OPEN',
-                    openingAmount,
-                    openedAt: new Date().toISOString(),
-                    isOffline: true,
-                };
-                localStorage.setItem(`last_open_register_${effectiveBranch}`, JSON.stringify(offlineReg));
-                return offlineReg;
+            try {
+                if (!navigator.onLine) throw new Error('Offline');
+                await api.post('/cash-flow/open', { branchId: effectiveBranch, openingAmount });
+            } catch (err: any) {
+                const isNetworkFailure = !err.response || !navigator.onLine;
+                if (isNetworkFailure) {
+                    const offlineReg = {
+                        id: `offline_register_${effectiveBranch}_${Date.now()}`,
+                        branchId: effectiveBranch,
+                        status: 'OPEN',
+                        openingAmount,
+                        openedAt: new Date().toISOString(),
+                        isOffline: true,
+                    };
+                    localStorage.setItem(`last_open_register_${effectiveBranch}`, JSON.stringify(offlineReg));
+                    return offlineReg;
+                }
+                throw err;
             }
-            await api.post('/cash-flow/open', { branchId: effectiveBranch, openingAmount });
         },
         onSuccess: () => {
             toast.success('Caja abierta correctamente');

@@ -64,17 +64,24 @@ export async function enqueueSale(payload: any): Promise<string> {
     });
 }
 
+const MAX_ATTEMPTS = 5;
+
 /**
- * Obtiene todas las ventas pendientes
+ * Obtiene todas las ventas pendientes de sincronización
+ * Incluye ventas en 'pending', 'syncing' interrumpidas y 'failed' reintentables
  */
 export async function getPendingSales(): Promise<PendingSale[]> {
     const db = await openDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readonly');
         const store = tx.objectStore(STORE_NAME);
-        const index = store.index('status');
-        const request = index.getAll('pending');
-        request.onsuccess = () => resolve(request.result);
+        const request = store.getAll();
+        request.onsuccess = () => {
+            const all = (request.result || []) as PendingSale[];
+            const pending = all.filter(s => s.status !== 'synced' && (s.attempts || 0) < MAX_ATTEMPTS);
+            pending.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+            resolve(pending);
+        };
         request.onerror = () => reject(request.error);
     });
 }
@@ -92,7 +99,7 @@ export async function markSyncing(id: string): Promise<void> {
             const sale = getReq.result;
             if (sale) {
                 sale.status = 'syncing';
-                sale.attempts++;
+                sale.attempts = (sale.attempts || 0) + 1;
                 store.put(sale);
             }
         };
@@ -123,7 +130,7 @@ export async function markSynced(id: string): Promise<void> {
 }
 
 /**
- * Marca una venta como fallida
+ * Marca una venta como fallida (vuelve a pending si aún tiene intentos disponibles)
  */
 export async function markFailed(id: string, error: string): Promise<void> {
     const db = await openDB();
@@ -134,8 +141,9 @@ export async function markFailed(id: string, error: string): Promise<void> {
         getReq.onsuccess = () => {
             const sale = getReq.result;
             if (sale) {
-                sale.status = 'failed';
                 sale.lastError = error;
+                // Si aún tiene intentos, volver a pending para que el próximo ciclo lo reintente
+                sale.status = (sale.attempts || 0) >= MAX_ATTEMPTS ? 'failed' : 'pending';
                 store.put(sale);
             }
         };
@@ -176,12 +184,17 @@ export async function countPending(): Promise<number> {
     return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readonly');
         const store = tx.objectStore(STORE_NAME);
-        const index = store.index('status');
-        const request = index.count('pending');
-        request.onsuccess = () => resolve(request.result);
+        const request = store.getAll();
+        request.onsuccess = () => {
+            const all = (request.result || []) as PendingSale[];
+            const count = all.filter(s => s.status !== 'synced' && (s.attempts || 0) < MAX_ATTEMPTS).length;
+            resolve(count);
+        };
         request.onerror = () => reject(request.error);
     });
 }
+
+let isDraining = false;
 
 /**
  * Drena la cola: envía todas las ventas pendientes al backend
@@ -190,24 +203,37 @@ export async function countPending(): Promise<number> {
 export async function drainQueue(
     sendFn: (payload: any) => Promise<void>
 ): Promise<{ sent: number; failed: number }> {
-    const pending = await getPendingSales();
-    let sent = 0;
-    let failed = 0;
-
-    for (const sale of pending) {
-        try {
-            await markSyncing(sale.id);
-            await sendFn(sale.payload);
-            await markSynced(sale.id);
-            sent++;
-        } catch (error: any) {
-            await markFailed(sale.id, error.message || 'Sync failed');
-            failed++;
-        }
+    if (isDraining) {
+        return { sent: 0, failed: 0 };
     }
+    isDraining = true;
 
-    // Limpiar ventas sincronizadas
-    await cleanupSynced();
+    try {
+        const pending = await getPendingSales();
+        let sent = 0;
+        let failed = 0;
 
-    return { sent, failed };
+        for (const sale of pending) {
+            try {
+                await markSyncing(sale.id);
+                const payloadWithFlag = {
+                    ...sale.payload,
+                    offlineSync: true,
+                };
+                await sendFn(payloadWithFlag);
+                await markSynced(sale.id);
+                sent++;
+            } catch (error: any) {
+                await markFailed(sale.id, error.message || 'Sync failed');
+                failed++;
+            }
+        }
+
+        // Limpiar ventas sincronizadas
+        await cleanupSynced();
+
+        return { sent, failed };
+    } finally {
+        isDraining = false;
+    }
 }

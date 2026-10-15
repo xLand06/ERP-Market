@@ -10,12 +10,31 @@ import { z } from 'zod';
  * Schema for the public webhook body (SMS forwarded by the cash-register device)
  * The secret may also arrive as the `x-webhook-secret` header instead of the body.
  */
-export const incomingWebhookSchema = z.object({
-    sender: z.string().min(1, 'sender is required').max(50, 'sender is too long'),
-    body: z.string().min(1, 'body is required').max(2000, 'body is too long'),
-    received_at: z.union([z.number(), z.string()]).optional(),
-    secret: z.string().optional(),
-});
+export const incomingWebhookSchema = z.preprocess(
+    (raw: any) => {
+        if (!raw || typeof raw !== 'object') return raw;
+        const src = raw.payload && typeof raw.payload === 'object' ? { ...raw, ...raw.payload } : raw;
+
+        const sender = src.sender || src.from || src.phone || src.address || (Array.isArray(src.phoneNumbers) ? src.phoneNumbers[0] : undefined);
+        const body = src.body || src.message || src.text || src.content || src.msg;
+        const received_at = src.received_at || src.receivedAt || src.date || src.timestamp;
+        const secret = src.secret || raw.secret;
+
+        return {
+            ...src,
+            sender: typeof sender === 'string' ? sender.trim() : sender,
+            body: typeof body === 'string' ? body.trim() : body,
+            received_at,
+            secret,
+        };
+    },
+    z.object({
+        sender: z.string().min(1, 'sender is required').max(50, 'sender is too long'),
+        body: z.string().min(1, 'body is required').max(2000, 'body is too long'),
+        received_at: z.union([z.number(), z.string()]).optional(),
+        secret: z.string().optional(),
+    })
+);
 
 /**
  * Schema for manually capturing an incoming payment claim (SELLER+)

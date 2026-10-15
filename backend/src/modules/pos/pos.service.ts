@@ -36,6 +36,8 @@ export interface CreateTransactionInput {
     paymentMethods?: PaymentMethodInput[];
     // Fiados/CxC: cliente al que se le registra la venta a crédito
     customerId?: string;
+    // Sincronización offline
+    offlineSync?: boolean;
 }
 
 // =============================================================================
@@ -125,7 +127,8 @@ export const expandKitItems = async (
 export const createTransaction = async (input: CreateTransactionInput) => {
     const {
         type, branchId, userId, items, cashRegisterId, notes, ipAddress,
-        currency = 'COP', exchangeRate, invoiceNumber, paymentMethods, customerId
+        currency = 'COP', exchangeRate, invoiceNumber, paymentMethods, customerId,
+        offlineSync
     } = input;
 
     // 1. Validar que la sede existe y está activa para nuevas operaciones
@@ -190,12 +193,46 @@ export const createTransaction = async (input: CreateTransactionInput) => {
         let assignedCashRegisterId = cashRegisterId;
         const processedItems = [];
 
-        if (type === TransactionType.SALE && !assignedCashRegisterId) {
-            const openReg = await tx.cashRegister.findFirst({
-                where: { branchId, status: 'OPEN' }
-            });
-            if (!openReg) throw new Error('No hay una caja abierta en esta sede. Abra caja antes de vender.');
-            assignedCashRegisterId = openReg.id;
+        if (type === TransactionType.SALE) {
+            let validReg: any = null;
+            if (assignedCashRegisterId && !assignedCashRegisterId.startsWith('offline_register_')) {
+                validReg = await tx.cashRegister.findUnique({
+                    where: { id: assignedCashRegisterId }
+                });
+            }
+
+            if (!validReg) {
+                validReg = await tx.cashRegister.findFirst({
+                    where: { branchId, status: 'OPEN' },
+                    orderBy: { openedAt: 'desc' }
+                });
+            }
+
+            // Si es una venta offline o no hay caja abierta en este momento, no abortar la venta
+            if (!validReg) {
+                const lastReg = await tx.cashRegister.findFirst({
+                    where: { branchId },
+                    orderBy: { openedAt: 'desc' }
+                });
+
+                if (lastReg) {
+                    validReg = lastReg;
+                } else if (offlineSync) {
+                    // Contingencia para sync offline: auto-crear caja para registrar la venta
+                    validReg = await tx.cashRegister.create({
+                        data: {
+                            branchId,
+                            userId: userId || (await tx.user.findFirst({ where: { branchId } }))?.id || '',
+                            status: 'OPEN',
+                            openingAmount: 0,
+                        }
+                    });
+                } else {
+                    throw new Error('No hay una caja abierta en esta sede. Abra caja antes de vender.');
+                }
+            }
+
+            assignedCashRegisterId = validReg.id;
         }
 
         // ── Fiado: validar límite de crédito y actualizar saldo del cliente ──
@@ -269,15 +306,21 @@ export const createTransaction = async (input: CreateTransactionInput) => {
                 if (!skipStockProducts.has(item.productId)) {
                     const availableStock = invMap.get(item.productId) ?? 0;
                     if (availableStock < totalUnitsToDeduct) {
-                        // Para componentes de kit el nombre/baseUnit vienen de la
-                        // expansión; para productos normales, del pre-fetch.
-                        const expanded = item as KitExpandedItem;
-                        const prod = productMap.get(item.productId);
-                        const name = expanded.productName || prod?.name || item.productId;
-                        const unit = expanded.baseUnit || prod?.baseUnit || 'UNIDAD';
-                        throw new Error(
-                            `Stock insuficiente para "${name}". Requerido: ${totalUnitsToDeduct} ${unit}. Disponible: ${availableStock}`
-                        );
+                        if (offlineSync) {
+                            console.warn(
+                                `[pos:offlineSync] Stock negativo permitido para producto "${item.productId}" en sucursal "${branchId}". Requerido: ${totalUnitsToDeduct}, disponible: ${availableStock}`
+                            );
+                        } else {
+                            // Para componentes de kit el nombre/baseUnit vienen de la
+                            // expansión; para productos normales, del pre-fetch.
+                            const expanded = item as KitExpandedItem;
+                            const prod = productMap.get(item.productId);
+                            const name = expanded.productName || prod?.name || item.productId;
+                            const unit = expanded.baseUnit || prod?.baseUnit || 'UNIDAD';
+                            throw new Error(
+                                `Stock insuficiente para "${name}". Requerido: ${totalUnitsToDeduct} ${unit}. Disponible: ${availableStock}`
+                            );
+                        }
                     }
                 }
             }

@@ -61,6 +61,9 @@ export const createTransactionSchema = z.object({
 
     // Fiados/CxC: cliente asociado a la venta (permite pago parcial o nulo)
     customerId: z.string().min(1, 'ID de cliente es requerido').optional(),
+
+    // Offline-first: bandera de sincronización offline
+    offlineSync: z.boolean().optional(),
 });
 
 /**

@@ -65,9 +65,9 @@ export const useSyncStore = create<SyncState & SyncActions>((set, get) => ({
         set({ isOnline: online });
 
         if (!online && wasOffline) {
-            toast.error('Sin conexión a la red', { id: 'network' });
+            toast('Cambiado a modo sin conexión', { id: 'network-mode', icon: '📶', duration: 4000 });
         } else if (online && wasOffline) {
-            toast.success('Conexión restaurada', { id: 'network' });
+            toast.success('Conexión restaurada', { id: 'network-mode', icon: '🟢', duration: 3000 });
         }
 
         return online;
@@ -90,9 +90,40 @@ export const useSyncStore = create<SyncState & SyncActions>((set, get) => ({
 }));
 
 if (typeof window !== 'undefined') {
+    let reconnectTimer: any = null;
+
+    const stopRecoveryPoll = () => {
+        if (reconnectTimer) {
+            clearInterval(reconnectTimer);
+            reconnectTimer = null;
+        }
+    };
+
+    const startRecoveryPoll = () => {
+        if (reconnectTimer) return;
+        reconnectTimer = setInterval(async () => {
+            const { isOnline: currentOnline } = useSyncStore.getState();
+            if (currentOnline) {
+                stopRecoveryPoll();
+                return;
+            }
+            try {
+                const online = await isOnline();
+                if (online) {
+                    stopRecoveryPoll();
+                    window.dispatchEvent(new Event('online'));
+                }
+            } catch {
+                // Sigue sin responder
+            }
+        }, 10_000);
+    };
+
     window.addEventListener('online', async () => {
+        stopRecoveryPoll();
         const { setOnline, syncPending, pendingSyncCount } = useSyncStore.getState();
         setOnline(true);
+        toast.success('Conexión restaurada', { id: 'network-mode', icon: '🟢', duration: 3000 });
 
         // 1. Primero drenar la cola de ventas offline
         try {
@@ -119,6 +150,8 @@ if (typeof window !== 'undefined') {
 
     window.addEventListener('offline', () => {
         useSyncStore.getState().setOnline(false);
+        toast('Cambiado a modo sin conexión', { id: 'network-mode', icon: '📶', duration: 4000 });
+        startRecoveryPoll();
     });
 }
 

@@ -266,17 +266,47 @@ api.interceptors.response.use(
 
         // Toast de error — silenciar para endpoints del dashboard, reportes o endpoints con manejo offline propio
         const url = originalRequest.url || '';
+        const method = (originalRequest.method || 'get').toLowerCase();
         const data = error.response?.data as any;
-        const isOfflineCapable = !error.response && (url.includes('/pos/transactions') || url.includes('/cash-flow/current') || url.includes('/inventory/stock'));
+        const isNetworkFailure = !error.response;
+        const isGetRequest = method === 'get';
 
-        if (!isSilent(url) && !isOfflineCapable) {
+        const isOfflineCapable = isNetworkFailure && (
+            url.includes('/pos/transactions') ||
+            url.includes('/cash-flow') ||
+            url.includes('/inventory') ||
+            url.includes('/branches') ||
+            url.includes('/customers') ||
+            url.includes('/currencies') ||
+            url.includes('/sync')
+        );
+
+        // Silenciar toasts de error cuando:
+        // 1. Es un endpoint explícitamente silenciado (isSilent)
+        // 2. Es un endpoint con estrategia offline propia (isOfflineCapable)
+        // 3. Es un fallo de red en una consulta GET (las lecturas usan caché/fallback sin asustar al usuario)
+        // 4. El dispositivo está offline según navigator.onLine y no hubo respuesta de red
+        const shouldSilenceToast =
+            isSilent(url) ||
+            isOfflineCapable ||
+            (isNetworkFailure && isGetRequest) ||
+            (isNetworkFailure && !navigator.onLine);
+
+        if (isNetworkFailure) {
+            notifyOfflineMode();
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new Event('offline'));
+            }
+        }
+
+        if (!shouldSilenceToast) {
             // Si hay detalles de validación, dejamos que el componente los maneje
             // para evitar doble toast (global + local)
             if (data?.details) {
                 console.log('[API] Validation details found, skipping global toast');
             } else {
                 const message = data?.error || describeApiError(error, originalRequest);
-                toast.error(message, { duration: 5000 });
+                toast.error(message, { id: message, duration: 4000 });
             }
         }
 
@@ -285,6 +315,19 @@ api.interceptors.response.use(
         return Promise.reject(error);
     }
 );
+
+let lastOfflineToastTime = 0;
+export function notifyOfflineMode(): void {
+    const now = Date.now();
+    if (now - lastOfflineToastTime > 15_000) {
+        lastOfflineToastTime = now;
+        toast('Cambiado a modo sin conexión', {
+            id: 'network-mode',
+            icon: '📶',
+            duration: 4000,
+        });
+    }
+}
 
 function describeApiError(error: AxiosError, config: AxiosRequestConfig): string {
     const url = config?.url || '';
