@@ -27,7 +27,12 @@ const WEBHOOK_SECRET = process.env.PAYMENTS_WEBHOOK_SECRET || process.env.JWT_SE
 // El dispositivo de caja envía el SMS crudo con el secret por header
 // `x-webhook-secret` o en el body.
 const webhookSecretGuard = (req: AuthRequest, res: Response, next: NextFunction): void => {
-    const provided = (req.headers['x-webhook-secret'] as string | undefined) || req.body?.secret;
+    const authHeader = req.headers['authorization'];
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader;
+    const provided = (req.headers['x-webhook-secret'] as string | undefined)
+        || bearerToken
+        || (req.query?.secret as string | undefined)
+        || req.body?.secret;
     if (provided !== WEBHOOK_SECRET) {
         res.status(401).json({ success: false, error: 'Invalid webhook secret' });
         return;

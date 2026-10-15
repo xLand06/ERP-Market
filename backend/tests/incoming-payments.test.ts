@@ -141,6 +141,24 @@ describe('Incoming Payments Module', () => {
             expect(await prisma.incomingPayment.count()).toBe(0);
         });
 
+        it('acepta secret por Authorization Bearer o query param ?secret=...', async () => {
+            const ref1 = uniqueRef();
+            const resBearer = await request(app)
+                .post('/api/incoming-payments/webhook')
+                .set('Authorization', `Bearer ${webhookSecret()}`)
+                .send(bdvSms('04141234567', '1.000,00', ref1));
+            expect(resBearer.status).toBe(200);
+            expect(resBearer.body.data.accepted).toBe(true);
+
+            const ref2 = uniqueRef();
+            const resQuery = await request(app)
+                .post('/api/incoming-payments/webhook')
+                .query({ secret: webhookSecret() })
+                .send(bdvSms('04141234567', '2.000,00', ref2));
+            expect(resQuery.status).toBe(200);
+            expect(resQuery.body.data.accepted).toBe(true);
+        });
+
         it('misma referencia duplicada → duplicate:true y exactamente 1 fila en la cola', async () => {
             const ref = uniqueRef();
             await createCustomerWithBalance('Cliente Duplicado', 500, '04141234567');
