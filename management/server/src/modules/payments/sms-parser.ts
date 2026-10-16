@@ -85,9 +85,9 @@ export const parsePagoMovilSms = (
     }
 
     // Referencia:
-    // ref: 12345678 | referencia: 12345678 | operacion: 12345678 | op: 12345678 | nro: 12345678
+    // ref: 12345678 | operacion: 12345678 | bajo el numero de operacion 12345678 | nro: 12345678
     let reference = '';
-    const refMatch = body.match(/\b(?:ref(?:erencia)?|operaci[oó]n|op|nro|num|numero|comprobante|transacci[oó]n|secuencia)\.?[:#]?\s*(\d{4,20})/i);
+    const refMatch = body.match(/\b(?:ref(?:erencia)?|operaci[oó]n|op|n[uú]m(?:ero)?(?:\s+de\s+operaci[oó]n)?|comprobante|transacci[oó]n|secuencia)\.?[:#]?\s*(\d{4,20})/i);
     if (refMatch) {
         reference = refMatch[1];
     } else {
@@ -105,10 +105,20 @@ export const parsePagoMovilSms = (
     // Teléfono: 0412-9657169, 0414 1234567 o 04121234567
     const phoneMatch = body.match(/\b(04(?:12|14|24|16|26)[- ]?\d{7})\b/) || body.match(/\b(04\d{9})\b/);
 
+    // Titular / Nombre (cuando es entre cuentas del mismo banco, ej. BDV a BDV)
+    let senderName: string | undefined;
+    const nameMatch = body.match(/(?:de|del)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ ]{3,45}?)\s+(?:por\s+bs|con\s+el|bajo\s+el|en\s+fecha)/i);
+    if (nameMatch) {
+        const candidate = nameMatch[1].trim();
+        if (!/^\d+$/.test(candidate) && !/^(un|una|el|la)\s+/i.test(candidate)) {
+            senderName = candidate.toUpperCase();
+        }
+    }
+
     return {
         amountVes: amountVes || 0,
         reference: reference || 'SIN_REF',
-        senderPhone: phoneMatch ? phoneMatch[1].replace(/[- ]/g, '') : undefined,
+        senderPhone: phoneMatch ? phoneMatch[1].replace(/[- ]/g, '') : (senderName || undefined),
         senderBank: inferSenderBank(sender ?? '', body),
     };
 };

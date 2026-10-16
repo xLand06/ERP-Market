@@ -83,18 +83,28 @@ export const parsePagoMovilSms = (
     const amountVes = normalizeAmount(amountMatch[1]);
     if (amountVes === null || amountVes <= 0) return null;
 
-    // Reference: first digits token (4..20) after Ref / REF / Referencia
-    const refMatch = body.match(/\bref(?:erencia)?\.?[:#]?\s*(\d{4,20})/i);
+    // Reference: first digits token (4..20) after Ref / REF / Referencia / operacion
+    const refMatch = body.match(/\b(?:ref(?:erencia)?|operaci[oó]n|op|n[uú]m(?:ero)?(?:\s+de\s+operaci[oó]n)?|comprobante|transacci[oó]n|secuencia)\.?[:#]?\s*(\d{4,20})/i);
     if (!refMatch) return null;
     const reference = refMatch[1];
 
     // Sender phone: 11-digit Venezuelan mobile (0412-1234567, 0414 1234567, 04121234567)
     const phoneMatch = body.match(/\b(04(?:12|14|24|16|26)[- ]?\d{7})\b/) || body.match(/\b(04\d{9})\b/);
 
+    // Titular / Nombre (cuando es entre cuentas del mismo banco, ej. BDV a BDV)
+    let senderName: string | undefined;
+    const nameMatch = body.match(/(?:de|del)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ ]{3,45}?)\s+(?:por\s+bs|con\s+el|bajo\s+el|en\s+fecha)/i);
+    if (nameMatch) {
+        const candidate = nameMatch[1].trim();
+        if (!/^\d+$/.test(candidate) && !/^(un|una|el|la)\s+/i.test(candidate)) {
+            senderName = candidate.toUpperCase();
+        }
+    }
+
     return {
         amountVes,
         reference,
-        senderPhone: phoneMatch ? phoneMatch[1].replace(/[- ]/g, '') : undefined,
+        senderPhone: phoneMatch ? phoneMatch[1].replace(/[- ]/g, '') : (senderName || undefined),
         senderBank: inferSenderBank(sender ?? '', body),
     };
 };
