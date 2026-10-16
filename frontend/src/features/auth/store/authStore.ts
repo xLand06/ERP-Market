@@ -29,10 +29,20 @@ export const useAuthStore = create<AuthState>()(
             user: null,
             selectedBranch: null,
             setAuth: (token, user) => {
-                set({
-                    token,
-                    user,
-                    selectedBranch: (user.role === 'SELLER' || user.role === 'MANAGER') && user.branchId ? user.branchId : null,
+                set((prev) => {
+                    const isBranched =
+                        (user.role === 'SELLER' || user.role === 'MANAGER') && Boolean(user.branchId);
+                    // OWNERs pick any branch freely: keep their persisted selection when the
+                    // same user re-authenticates, so a re-login (or support-token access) does
+                    // not silently fall back to "Todas las sucursales". Only reset when the
+                    // user identity actually changes or on logout.
+                    const preserved =
+                        !isBranched && prev.user?.id === user.id ? prev.selectedBranch : null;
+                    return {
+                        token,
+                        user,
+                        selectedBranch: isBranched ? (user.branchId as string) : preserved,
+                    };
                 });
             },
             setSelectedBranch: (branchId) => set({ selectedBranch: branchId }),
