@@ -47,15 +47,68 @@ if (typeof document !== 'undefined' && !document.getElementById('payments-page-s
 
 interface Payment {
     id: string;
+    paymentCode?: string | null;
     tenantId: string;
     amountCents: number;
     currency: string;
     status: string;
     provider: string | null;
     externalId?: string | null;
+    billingCycle?: string | null;
+    periodMonths?: number | null;
     notes: string | null;
+    dueDate?: string | null;
+    paidAt?: string | null;
     createdAt: string;
-    tenant: { slug: string; domain: string };
+    tenant: { slug: string; domain: string; plan?: string };
+}
+
+interface ParsedPaymentDetails {
+    moneda?: string;
+    montoBs?: string;
+    montoUsd?: string;
+    banco?: string;
+    ciRif?: string;
+    telefono?: string;
+    emailOrId?: string;
+    metodo?: string;
+    fecha?: string;
+    nota?: string;
+    rawRemaining?: string;
+}
+
+function parseNotesDetails(notes?: string | null): ParsedPaymentDetails {
+    if (!notes) return {};
+    const parts = notes.split(' | ');
+    const details: ParsedPaymentDetails = {};
+    const remaining: string[] = [];
+
+    for (const part of parts) {
+        const colonIdx = part.indexOf(':');
+        if (colonIdx === -1) {
+            remaining.push(part.trim());
+            continue;
+        }
+        const key = part.slice(0, colonIdx).trim().toLowerCase();
+        const value = part.slice(colonIdx + 1).trim();
+
+        if (key === 'moneda') details.moneda = value;
+        else if (key === 'monto bs') details.montoBs = value;
+        else if (key === 'monto') details.montoUsd = value;
+        else if (key === 'banco') details.banco = value;
+        else if (key === 'ci/rif' || key === 'ci' || key === 'rif' || key === 'cedula' || key === 'cédula') details.ciRif = value;
+        else if (key === 'tlf' || key === 'telefono' || key === 'teléfono') details.telefono = value;
+        else if (key === 'email/id' || key === 'email' || key === 'correo' || key === 'id') details.emailOrId = value;
+        else if (key === 'método' || key === 'metodo') details.metodo = value;
+        else if (key === 'fecha') details.fecha = value;
+        else if (key === 'nota' || key === 'notas') details.nota = value;
+        else remaining.push(part.trim());
+    }
+
+    if (remaining.length > 0) {
+        details.rawRemaining = remaining.join(' | ');
+    }
+    return details;
 }
 
 interface IncomingSms {
@@ -126,6 +179,41 @@ export default function Payments() {
         tenantId: '',
     });
     const [assigning, setAssigning] = useState(false);
+
+    // Detail modals state
+    const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+    const [selectedSms, setSelectedSms] = useState<IncomingSms | null>(null);
+    const [confirmingId, setConfirmingId] = useState<string | null>(null);
+    const [copiedRef, setCopiedRef] = useState(false);
+
+    const copyToClipboard = (text: string) => {
+        if (!navigator?.clipboard) return;
+        navigator.clipboard.writeText(text);
+        setCopiedRef(true);
+        setTimeout(() => setCopiedRef(false), 2000);
+    };
+
+    const handleConfirmPayment = async (paymentId: string) => {
+        if (!confirm('¿Confirmar este pago y renovar la suscripción del tenant?')) return;
+        setConfirmingId(paymentId);
+        try {
+            await apiFetch(`/api/payments/${paymentId}/confirm`, { method: 'POST' });
+            // Refrescar lista de pagos
+            const updated = await apiFetch<Payment[]>('/api/payments');
+            if (Array.isArray(updated)) {
+                setPayments(updated);
+                if (selectedPayment && selectedPayment.id === paymentId) {
+                    const refreshed = updated.find((p) => p.id === paymentId);
+                    if (refreshed) setSelectedPayment(refreshed);
+                }
+            }
+            alert('¡Pago confirmado con éxito! La suscripción del tenant ha sido actualizada.');
+        } catch (err: any) {
+            alert(err.message || 'Error al confirmar pago');
+        } finally {
+            setConfirmingId(null);
+        }
+    };
 
     useEffect(() => {
         setPage(1);
@@ -308,6 +396,475 @@ export default function Payments() {
                 </div>
             )}
 
+            {/* Modal de Detalle Completo de Pago */}
+            {selectedPayment && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+                        backdropFilter: 'blur(4px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                        padding: '1rem',
+                    }}
+                    onClick={() => setSelectedPayment(null)}
+                >
+                    <div
+                        style={{
+                            background: '#fff',
+                            borderRadius: 16,
+                            maxWidth: 580,
+                            width: '100%',
+                            maxHeight: '90vh',
+                            overflowY: 'auto',
+                            padding: '1.75rem',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header del Modal */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem' }}>
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.25rem' }}>
+                                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
+                                        {selectedPayment.paymentCode || `PAGO-${selectedPayment.id.slice(0, 8).toUpperCase()}`}
+                                    </h3>
+                                    {(() => {
+                                        const st = STATUS_STYLES[selectedPayment.status] || STATUS_STYLES.PENDING;
+                                        return (
+                                            <span style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: 5,
+                                                padding: '3px 9px',
+                                                borderRadius: 999,
+                                                fontSize: '0.72rem',
+                                                fontWeight: 700,
+                                                background: st.bg,
+                                                color: st.text,
+                                            }}>
+                                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: st.dot }} />
+                                                {selectedPayment.status}
+                                            </span>
+                                        );
+                                    })()}
+                                </div>
+                                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                                    Tenant: <strong style={{ color: '#0f172a' }}>{selectedPayment.tenant?.slug || selectedPayment.tenantId}</strong> {selectedPayment.tenant?.domain ? `(${selectedPayment.tenant.domain})` : ''}
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setSelectedPayment(null)}
+                                style={{
+                                    background: '#f1f5f9',
+                                    border: 'none',
+                                    borderRadius: 8,
+                                    width: 32,
+                                    height: 32,
+                                    fontSize: '1rem',
+                                    color: '#64748b',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Grid de Resumen Principal */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                            <div style={{ background: '#f8fafc', padding: '0.75rem 1rem', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
+                                    Monto Registrado
+                                </div>
+                                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#059669', marginTop: 2 }}>
+                                    {selectedPayment.currency === 'VES'
+                                        ? `Bs. ${(selectedPayment.amountCents / 100).toFixed(2)}`
+                                        : `$${(selectedPayment.amountCents / 100).toFixed(2)} USD`}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                    Moneda: {selectedPayment.currency}
+                                </div>
+                            </div>
+
+                            <div style={{ background: '#f8fafc', padding: '0.75rem 1rem', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
+                                    Método / Período
+                                </div>
+                                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', marginTop: 2 }}>
+                                    {PROVIDER_LABELS[selectedPayment.provider || ''] || selectedPayment.provider || 'Otro'}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                    {selectedPayment.billingCycle === 'ANNUAL' ? 'Plan Anual (365 días)' : 'Plan Mensual (30 días)'}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Referencia Bancaria */}
+                        <div style={{
+                            background: '#f8fafc',
+                            padding: '0.85rem 1rem',
+                            borderRadius: 10,
+                            border: '1px solid #e2e8f0',
+                            marginBottom: '1.25rem',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                        }}>
+                            <div>
+                                <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>
+                                    Número de Referencia / Operación
+                                </div>
+                                <div style={{ fontFamily: 'monospace', fontSize: '1.1rem', fontWeight: 700, color: '#0f172a', marginTop: 2 }}>
+                                    {selectedPayment.externalId || 'Sin referencia registrada'}
+                                </div>
+                            </div>
+                            {selectedPayment.externalId && (
+                                <button
+                                    onClick={() => copyToClipboard(selectedPayment.externalId!)}
+                                    style={{
+                                        padding: '0.4rem 0.8rem',
+                                        borderRadius: 6,
+                                        border: '1px solid #cbd5e1',
+                                        background: '#fff',
+                                        color: '#334155',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    {copiedRef ? '✓ Copiado' : '📋 Copiar'}
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Desglose de Datos del Pagador */}
+                        {(() => {
+                            const details = parseNotesDetails(selectedPayment.notes);
+                            const hasDetails = details.banco || details.ciRif || details.telefono || details.emailOrId || details.fecha || details.montoBs || details.montoUsd;
+
+                            return (
+                                <div style={{ marginBottom: '1.25rem' }}>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
+                                        Detalles del Pagador y Operación
+                                    </div>
+                                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '0.85rem 1rem', fontSize: '0.85rem' }}>
+                                        {details.banco && (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed #e2e8f0' }}>
+                                                <span style={{ color: '#64748b' }}>Banco Emisor:</span>
+                                                <strong style={{ color: '#1e293b' }}>{details.banco}</strong>
+                                            </div>
+                                        )}
+                                        {details.ciRif && (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed #e2e8f0' }}>
+                                                <span style={{ color: '#64748b' }}>Cédula / RIF del Titular:</span>
+                                                <strong style={{ color: '#1e293b', fontFamily: 'monospace' }}>{details.ciRif}</strong>
+                                            </div>
+                                        )}
+                                        {details.telefono && (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed #e2e8f0' }}>
+                                                <span style={{ color: '#64748b' }}>Teléfono Emisor:</span>
+                                                <strong style={{ color: '#1e293b', fontFamily: 'monospace' }}>{details.telefono}</strong>
+                                            </div>
+                                        )}
+                                        {details.emailOrId && (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed #e2e8f0' }}>
+                                                <span style={{ color: '#64748b' }}>Correo / Pay ID:</span>
+                                                <strong style={{ color: '#1e293b' }}>{details.emailOrId}</strong>
+                                            </div>
+                                        )}
+                                        {details.montoBs && (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed #e2e8f0' }}>
+                                                <span style={{ color: '#64748b' }}>Monto reportado en Bs:</span>
+                                                <strong style={{ color: '#059669' }}>Bs. {details.montoBs}</strong>
+                                            </div>
+                                        )}
+                                        {details.fecha && (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed #e2e8f0' }}>
+                                                <span style={{ color: '#64748b' }}>Fecha de Emisión:</span>
+                                                <strong style={{ color: '#1e293b' }}>{details.fecha}</strong>
+                                            </div>
+                                        )}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed #e2e8f0' }}>
+                                            <span style={{ color: '#64748b' }}>Fecha de Registro:</span>
+                                            <span style={{ color: '#334155' }}>{new Date(selectedPayment.createdAt).toLocaleString('es-AR')}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0' }}>
+                                            <span style={{ color: '#64748b' }}>Fecha de Confirmación:</span>
+                                            <span style={{ color: selectedPayment.paidAt ? '#059669' : '#d97706', fontWeight: 600 }}>
+                                                {selectedPayment.paidAt ? new Date(selectedPayment.paidAt).toLocaleString('es-AR') : 'Pendiente de confirmación'}
+                                            </span>
+                                        </div>
+
+                                        {details.nota && (
+                                            <div style={{ marginTop: '0.75rem', padding: '0.6rem 0.75rem', background: '#eff6ff', borderRadius: 8, border: '1px solid #bfdbfe', color: '#1e40af', fontSize: '0.8rem' }}>
+                                                <strong>💬 Nota del Cliente:</strong> {details.nota}
+                                            </div>
+                                        )}
+
+                                        {details.rawRemaining && (
+                                            <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', background: '#f1f5f9', borderRadius: 8, color: '#475569', fontSize: '0.78rem' }}>
+                                                <strong>Otras Notas:</strong> {details.rawRemaining}
+                                            </div>
+                                        )}
+
+                                        {!hasDetails && !details.nota && !details.rawRemaining && (
+                                            <div style={{ color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', padding: '0.5rem 0' }}>
+                                                No se registraron datos adicionales del pagador.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Footer con Acciones */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', borderTop: '1px solid #f1f5f9' }}>
+                            <button
+                                onClick={() => setSelectedPayment(null)}
+                                style={{
+                                    padding: '0.6rem 1.25rem',
+                                    borderRadius: 8,
+                                    border: '1px solid #cbd5e1',
+                                    background: '#fff',
+                                    color: '#475569',
+                                    fontWeight: 600,
+                                    fontSize: '0.85rem',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                Cerrar
+                            </button>
+
+                            {selectedPayment.status === 'PENDING' && (
+                                <button
+                                    onClick={() => handleConfirmPayment(selectedPayment.id)}
+                                    disabled={confirmingId === selectedPayment.id}
+                                    style={{
+                                        padding: '0.6rem 1.5rem',
+                                        borderRadius: 8,
+                                        border: 'none',
+                                        background: '#059669',
+                                        color: '#fff',
+                                        fontWeight: 700,
+                                        fontSize: '0.85rem',
+                                        cursor: confirmingId === selectedPayment.id ? 'not-allowed' : 'pointer',
+                                        opacity: confirmingId === selectedPayment.id ? 0.6 : 1,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        boxShadow: '0 4px 6px -1px rgba(5, 150, 105, 0.2)',
+                                    }}
+                                >
+                                    {confirmingId === selectedPayment.id ? 'Confirmando...' : '✓ Confirmar Pago y Activar'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Detalle de SMS */}
+            {selectedSms && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+                        backdropFilter: 'blur(4px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                        padding: '1rem',
+                    }}
+                    onClick={() => setSelectedSms(null)}
+                >
+                    <div
+                        style={{
+                            background: '#fff',
+                            borderRadius: 16,
+                            maxWidth: 540,
+                            width: '100%',
+                            maxHeight: '90vh',
+                            overflowY: 'auto',
+                            padding: '1.75rem',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                                    📱 Notificación Bancaria Recibida
+                                </h3>
+                                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>
+                                    Recibido el {new Date(selectedSms.createdAt).toLocaleString('es-AR')}
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setSelectedSms(null)}
+                                style={{
+                                    background: '#f1f5f9',
+                                    border: 'none',
+                                    borderRadius: 8,
+                                    width: 32,
+                                    height: 32,
+                                    fontSize: '1rem',
+                                    color: '#64748b',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Datos parseados */}
+                        <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed #e2e8f0' }}>
+                                <span style={{ color: '#64748b' }}>Banco Identificado:</span>
+                                <strong style={{ color: '#1e293b' }}>{selectedSms.senderBank || 'Desconocido'}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed #e2e8f0' }}>
+                                <span style={{ color: '#64748b' }}>Monto Acreditado:</span>
+                                <strong style={{ color: '#059669', fontSize: '1.05rem' }}>
+                                    {selectedSms.amountVes != null ? `Bs. ${selectedSms.amountVes.toFixed(2)}` : 'No detectado'}
+                                </strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed #e2e8f0', alignItems: 'center' }}>
+                                <span style={{ color: '#64748b' }}>Referencia:</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <code style={{ fontWeight: 700, fontSize: '0.95rem' }}>{selectedSms.reference || 'Sin referencia'}</code>
+                                    {selectedSms.reference && (
+                                        <button
+                                            onClick={() => copyToClipboard(selectedSms.reference!)}
+                                            style={{
+                                                padding: '0.2rem 0.5rem',
+                                                borderRadius: 4,
+                                                border: '1px solid #cbd5e1',
+                                                background: '#fff',
+                                                fontSize: '0.7rem',
+                                                cursor: 'pointer',
+                                            }}
+                                        >
+                                            {copiedRef ? '✓' : 'Copiar'}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed #e2e8f0' }}>
+                                <span style={{ color: '#64748b' }}>Remitente / Teléfono / Nombre:</span>
+                                <strong style={{ color: '#1e293b' }}>{selectedSms.senderPhone || 'No detectado'}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0' }}>
+                                <span style={{ color: '#64748b' }}>Estado de Conciliación:</span>
+                                <span style={{ fontWeight: 700, color: selectedSms.status === 'MATCHED' ? '#059669' : selectedSms.status === 'DISMISSED' ? '#64748b' : '#d97706' }}>
+                                    {selectedSms.status === 'MATCHED' ? 'Conciliado con Tenant' : selectedSms.status === 'DISMISSED' ? 'Descartado' : 'Pendiente de Conciliar'}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Mensaje Raw */}
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
+                                Texto Original del Mensaje (Payload):
+                            </div>
+                            <div style={{
+                                background: '#0f172a',
+                                color: '#f8fafc',
+                                fontFamily: 'monospace',
+                                fontSize: '0.8rem',
+                                padding: '0.85rem 1rem',
+                                borderRadius: 8,
+                                lineHeight: 1.5,
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-word',
+                                maxHeight: 160,
+                                overflowY: 'auto',
+                            }}>
+                                {selectedSms.rawPayload || '(Vacío)'}
+                            </div>
+                        </div>
+
+                        {/* Acciones */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', borderTop: '1px solid #f1f5f9' }}>
+                            <button
+                                onClick={() => setSelectedSms(null)}
+                                style={{
+                                    padding: '0.6rem 1.25rem',
+                                    borderRadius: 8,
+                                    border: '1px solid #cbd5e1',
+                                    background: '#fff',
+                                    color: '#475569',
+                                    fontWeight: 600,
+                                    fontSize: '0.85rem',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                Cerrar
+                            </button>
+
+                            {selectedSms.status === 'PENDING' && (
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <button
+                                        onClick={() => {
+                                            const target = selectedSms;
+                                            setSelectedSms(null);
+                                            handleDismissSms(target.id);
+                                        }}
+                                        style={{
+                                            padding: '0.6rem 1rem',
+                                            borderRadius: 8,
+                                            border: '1px solid #cbd5e1',
+                                            background: '#fff',
+                                            color: '#64748b',
+                                            fontWeight: 600,
+                                            fontSize: '0.85rem',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        Descartar
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const target = selectedSms;
+                                            setSelectedSms(null);
+                                            setAssignModal({ open: true, sms: target, tenantId: '' });
+                                        }}
+                                        style={{
+                                            padding: '0.6rem 1.25rem',
+                                            borderRadius: 8,
+                                            border: 'none',
+                                            background: '#059669',
+                                            color: '#fff',
+                                            fontWeight: 700,
+                                            fontSize: '0.85rem',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        Asignar a Tenant
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Pestañas Principales */}
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
                 <button
@@ -470,45 +1027,63 @@ export default function Payments() {
                                                     </span>
                                                 </td>
                                                 <td data-label="Acciones" style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                                                    {s.status === 'PENDING' ? (
-                                                        <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
-                                                            <button
-                                                                onClick={() => setAssignModal({ open: true, sms: s, tenantId: '' })}
-                                                                style={{
-                                                                    padding: '0.3rem 0.65rem',
-                                                                    borderRadius: 6,
-                                                                    border: '1px solid #059669',
-                                                                    background: '#ecfdf5',
-                                                                    color: '#065f46',
-                                                                    fontWeight: 600,
-                                                                    fontSize: '0.75rem',
-                                                                    cursor: 'pointer',
-                                                                }}
-                                                            >
-                                                                Asignar a Tenant
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDismissSms(s.id)}
-                                                                style={{
-                                                                    padding: '0.3rem 0.5rem',
-                                                                    borderRadius: 6,
-                                                                    border: '1px solid #cbd5e1',
-                                                                    background: '#fff',
-                                                                    color: '#64748b',
-                                                                    fontSize: '0.75rem',
-                                                                    cursor: 'pointer',
-                                                                }}
-                                                            >
-                                                                Descartar
-                                                            </button>
-                                                        </div>
-                                                    ) : s.matchedTenantId ? (
-                                                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                                                            Vinculado a tenant
-                                                        </span>
-                                                    ) : (
-                                                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>—</span>
-                                                    )}
+                                                    <div style={{ display: 'inline-flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                                        <button
+                                                            onClick={() => setSelectedSms(s)}
+                                                            style={{
+                                                                padding: '0.3rem 0.55rem',
+                                                                borderRadius: 6,
+                                                                border: '1px solid #cbd5e1',
+                                                                background: '#fff',
+                                                                color: '#334155',
+                                                                fontSize: '0.75rem',
+                                                                fontWeight: 600,
+                                                                cursor: 'pointer',
+                                                            }}
+                                                            title="Ver detalles completos y texto original del SMS"
+                                                        >
+                                                            👁️ Ver SMS
+                                                        </button>
+                                                        {s.status === 'PENDING' ? (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => setAssignModal({ open: true, sms: s, tenantId: '' })}
+                                                                    style={{
+                                                                        padding: '0.3rem 0.65rem',
+                                                                        borderRadius: 6,
+                                                                        border: '1px solid #059669',
+                                                                        background: '#ecfdf5',
+                                                                        color: '#065f46',
+                                                                        fontWeight: 600,
+                                                                        fontSize: '0.75rem',
+                                                                        cursor: 'pointer',
+                                                                    }}
+                                                                >
+                                                                    Asignar
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDismissSms(s.id)}
+                                                                    style={{
+                                                                        padding: '0.3rem 0.5rem',
+                                                                        borderRadius: 6,
+                                                                        border: '1px solid #cbd5e1',
+                                                                        background: '#fff',
+                                                                        color: '#64748b',
+                                                                        fontSize: '0.75rem',
+                                                                        cursor: 'pointer',
+                                                                    }}
+                                                                >
+                                                                    Descartar
+                                                                </button>
+                                                            </>
+                                                        ) : s.matchedTenantId ? (
+                                                            <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 600 }}>
+                                                                ✓ Vinculado
+                                                            </span>
+                                                        ) : (
+                                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>—</span>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
@@ -595,6 +1170,7 @@ export default function Payments() {
                                         <th style={{ padding: '0.75rem 1rem', fontWeight: 600, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b' }}>Estado</th>
                                         <th style={{ padding: '0.75rem 1rem', fontWeight: 600, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b' }}>Proveedor</th>
                                         <th style={{ padding: '0.75rem 1rem', fontWeight: 600, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b' }}>Referencia / Notas</th>
+                                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b', textAlign: 'right' }}>Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -644,12 +1220,55 @@ export default function Payments() {
                                                         </div>
                                                     ) : (!p.externalId ? '---' : null)}
                                                 </td>
+                                                <td data-label="Acciones" style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                                                    <div style={{ display: 'inline-flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                                        <button
+                                                            onClick={() => setSelectedPayment(p)}
+                                                            style={{
+                                                                padding: '0.3rem 0.65rem',
+                                                                borderRadius: 6,
+                                                                border: '1px solid #cbd5e1',
+                                                                background: '#fff',
+                                                                color: '#334155',
+                                                                fontSize: '0.75rem',
+                                                                fontWeight: 600,
+                                                                cursor: 'pointer',
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: 4,
+                                                            }}
+                                                            title="Ver todos los detalles del pago"
+                                                        >
+                                                            👁️ Detalle
+                                                        </button>
+                                                        {p.status === 'PENDING' && (
+                                                            <button
+                                                                onClick={() => handleConfirmPayment(p.id)}
+                                                                disabled={confirmingId === p.id}
+                                                                style={{
+                                                                    padding: '0.3rem 0.65rem',
+                                                                    borderRadius: 6,
+                                                                    border: '1px solid #059669',
+                                                                    background: '#ecfdf5',
+                                                                    color: '#065f46',
+                                                                    fontSize: '0.75rem',
+                                                                    fontWeight: 600,
+                                                                    cursor: confirmingId === p.id ? 'not-allowed' : 'pointer',
+                                                                    opacity: confirmingId === p.id ? 0.6 : 1,
+                                                                }}
+                                                                title="Confirmar pago y renovar suscripción del tenant"
+                                                            >
+                                                                {confirmingId === p.id ? '...' : '✓ Confirmar'}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
                                             </tr>
                                         );
                                     })}
                                     {payments.length === 0 && (
                                         <tr>
-                                            <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                                            <td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
                                                 No se encontraron pagos
                                             </td>
                                         </tr>
