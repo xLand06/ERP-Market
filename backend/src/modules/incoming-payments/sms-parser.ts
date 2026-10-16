@@ -88,13 +88,13 @@ export const parsePagoMovilSms = (
     if (!refMatch) return null;
     const reference = refMatch[1];
 
-    // Sender phone: 11-digit Venezuelan mobile starting with 04
-    const phoneMatch = body.match(/\b(04\d{9})\b/);
+    // Sender phone: 11-digit Venezuelan mobile (0412-1234567, 0414 1234567, 04121234567)
+    const phoneMatch = body.match(/\b(04(?:12|14|24|16|26)[- ]?\d{7})\b/) || body.match(/\b(04\d{9})\b/);
 
     return {
         amountVes,
         reference,
-        senderPhone: phoneMatch ? phoneMatch[1] : undefined,
+        senderPhone: phoneMatch ? phoneMatch[1].replace(/[- ]/g, '') : undefined,
         senderBank: inferSenderBank(sender ?? '', body),
     };
 };

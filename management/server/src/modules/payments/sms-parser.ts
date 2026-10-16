@@ -102,12 +102,13 @@ export const parsePagoMovilSms = (
         return null;
     }
 
-    const phoneMatch = body.match(/\b(04\d{9})\b/);
+    // Teléfono: 0412-9657169, 0414 1234567 o 04121234567
+    const phoneMatch = body.match(/\b(04(?:12|14|24|16|26)[- ]?\d{7})\b/) || body.match(/\b(04\d{9})\b/);
 
     return {
         amountVes: amountVes || 0,
         reference: reference || 'SIN_REF',
-        senderPhone: phoneMatch ? phoneMatch[1] : undefined,
+        senderPhone: phoneMatch ? phoneMatch[1].replace(/[- ]/g, '') : undefined,
         senderBank: inferSenderBank(sender ?? '', body),
     };
 };
