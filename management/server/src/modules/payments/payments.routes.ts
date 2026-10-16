@@ -22,7 +22,7 @@ const createPaymentSchema = z.object({
     tenantId: z.string().uuid(),
     amountCents: z.number().int().positive(),
     currency: z.string().length(3).optional(),
-    provider: z.enum(['zelle', 'pago_movil', 'binance', 'cash', 'other']).optional(),
+    provider: z.enum(['zelle', 'pago_movil', 'transferencia', 'binance', 'cash', 'other']).optional(),
     status: z.enum(['PENDING', 'PAID']).optional(),
     externalId: z
         .string()

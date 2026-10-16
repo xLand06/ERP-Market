@@ -52,6 +52,7 @@ interface Payment {
     currency: string;
     status: string;
     provider: string | null;
+    externalId?: string | null;
     notes: string | null;
     createdAt: string;
     tenant: { slug: string; domain: string };
@@ -90,6 +91,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> =
 const PROVIDER_LABELS: Record<string, string> = {
     zelle: 'Zelle',
     pago_movil: 'Pago Movil',
+    transferencia: 'Transferencia',
     binance: 'Binance',
     cash: 'Efectivo',
     other: 'Otro',
@@ -99,6 +101,7 @@ const PROVIDER_FILTERS = [
     { value: '', label: 'Todos' },
     { value: 'zelle', label: 'Zelle' },
     { value: 'pago_movil', label: 'Pago Movil' },
+    { value: 'transferencia', label: 'Transferencia' },
     { value: 'binance', label: 'Binance' },
     { value: 'cash', label: 'Efectivo' },
     { value: 'other', label: 'Otro' },
@@ -607,8 +610,10 @@ export default function Payments() {
                                                     {new Date(p.createdAt).toLocaleDateString('es-AR')}
                                                 </td>
                                                 <td data-label="Tenant" style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#1e293b' }}>{p.tenant?.slug || p.tenantId}</td>
-                                                <td data-label="Monto" style={{ padding: '0.75rem 1rem', color: '#1e293b', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>${(p.amountCents / 100).toFixed(2)}</td>
-                                                <td data-label="Moneda" style={{ padding: '0.75rem 1rem', color: '#475569' }}>{p.currency}</td>
+                                                <td data-label="Monto" style={{ padding: '0.75rem 1rem', color: '#1e293b', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                                                    {p.currency === 'VES' ? `Bs. ${(p.amountCents / 100).toFixed(2)}` : `$${(p.amountCents / 100).toFixed(2)}`}
+                                                </td>
+                                                <td data-label="Moneda" style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>{p.currency}</td>
                                                 <td data-label="Estado" style={{ padding: '0.75rem 1rem' }}>
                                                     <span style={{
                                                         display: 'inline-flex',
@@ -627,8 +632,17 @@ export default function Payments() {
                                                     </span>
                                                 </td>
                                                 <td data-label="Proveedor" style={{ padding: '0.75rem 1rem', color: '#475569' }}>{PROVIDER_LABELS[p.provider || ''] || p.provider || '---'}</td>
-                                                <td data-label="Notas" style={{ padding: '0.75rem 1rem', color: '#64748b', fontSize: '0.8rem', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {p.notes || '---'}
+                                                <td data-label="Referencia / Notas" style={{ padding: '0.75rem 1rem', color: '#64748b', fontSize: '0.8rem', maxWidth: 280 }}>
+                                                    {p.externalId && (
+                                                        <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0f172a', marginBottom: '2px' }}>
+                                                            Ref: {p.externalId}
+                                                        </div>
+                                                    )}
+                                                    {p.notes ? (
+                                                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.notes}>
+                                                            {p.notes}
+                                                        </div>
+                                                    ) : (!p.externalId ? '---' : null)}
                                                 </td>
                                             </tr>
                                         );

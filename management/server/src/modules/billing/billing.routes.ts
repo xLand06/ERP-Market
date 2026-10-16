@@ -267,20 +267,45 @@ router.get('/:slug/status', async (req: Request, res: Response) => {
 /**
  * POST /api/billing/:slug/pay
  * Registra un pago desde el tenant
- * El dueño envía: monto, método, referencia
+ * El dueño envía: monto, moneda, método, referencia, datos de pagador
  */
 router.post('/:slug/pay', async (req: Request, res: Response) => {
     try {
         const { slug } = req.params;
-        const { amount, provider, reference, notes, billingCycle } = req.body;
+        const {
+            amount,
+            amountVes,
+            currency,
+            provider,
+            reference,
+            notes,
+            billingCycle,
+            senderId,
+            senderPhone,
+            senderBank,
+            senderEmail,
+            paymentDate,
+            otherMethodName,
+        } = req.body;
 
-        // Validaciones
-        if (!amount || typeof amount !== 'number' || amount <= 0) {
-            res.status(422).json({ error: 'El monto debe ser un número mayor a 0' });
-            return;
+        // Validaciones de moneda y montos
+        const selectedCurrency = currency === 'VES' ? 'VES' : 'USD';
+        const numAmount = typeof amount === 'number' ? amount : parseFloat(amount);
+        const numAmountVes = amountVes ? (typeof amountVes === 'number' ? amountVes : parseFloat(amountVes)) : undefined;
+
+        if (selectedCurrency === 'VES') {
+            if ((!numAmountVes || numAmountVes <= 0) && (!numAmount || numAmount <= 0)) {
+                res.status(422).json({ error: 'El monto en Bolívares debe ser mayor a 0' });
+                return;
+            }
+        } else {
+            if (!numAmount || numAmount <= 0) {
+                res.status(422).json({ error: 'El monto en USD debe ser mayor a 0' });
+                return;
+            }
         }
 
-        const VALID_PROVIDERS = ['zelle', 'pago_movil', 'binance', 'cash', 'other'];
+        const VALID_PROVIDERS = ['zelle', 'pago_movil', 'transferencia', 'binance', 'cash', 'other'];
         if (provider && !VALID_PROVIDERS.includes(provider)) {
             res.status(422).json({ error: 'Método de pago inválido' });
             return;
@@ -360,37 +385,94 @@ router.post('/:slug/pay', async (req: Request, res: Response) => {
                 : (tenant.billingCycle || 'MONTHLY');
         const periodMonths = cycle === 'ANNUAL' ? 12 : 1;
 
-        // Crear pago como PENDING (el admin lo confirma)
-        const amountCents = Math.round(amount * 100);
+        // Construir notas detalladas para el panel de administración
+        const detailParts: string[] = [];
+        if (selectedCurrency === 'VES') {
+            detailParts.push(`Moneda: VES`);
+            if (numAmountVes) detailParts.push(`Monto Bs: ${numAmountVes.toFixed(2)}`);
+            if (senderBank) detailParts.push(`Banco: ${senderBank}`);
+            if (senderId) detailParts.push(`CI/RIF: ${senderId}`);
+            if (senderPhone) detailParts.push(`Tlf: ${senderPhone}`);
+        } else {
+            detailParts.push(`Moneda: USD`);
+            if (numAmount) detailParts.push(`Monto: $${numAmount.toFixed(2)}`);
+            if (senderEmail) detailParts.push(`Email/ID: ${senderEmail}`);
+            if (otherMethodName) detailParts.push(`Método: ${otherMethodName}`);
+        }
+        if (paymentDate) detailParts.push(`Fecha: ${paymentDate}`);
+        if (notes && typeof notes === 'string' && notes.trim()) {
+            detailParts.push(`Nota: ${notes.trim()}`);
+        }
+        const enrichedNotes = detailParts.length > 0 ? detailParts.join(' | ') : (notes || null);
+
+        // Monto en centavos (en USD o en VES según corresponda)
+        const amountCents = selectedCurrency === 'VES' && numAmountVes
+            ? Math.round(numAmountVes * 100)
+            : Math.round((numAmount || 0) * 100);
+
+        // Crear pago en estado PENDING
         const payment = await prisma.payment.create({
             data: {
                 tenantId: tenant.id,
                 amountCents,
-                currency: 'USD',
+                currency: selectedCurrency,
                 status: 'PENDING',
                 provider: provider || 'other',
                 billingCycle: cycle,
                 periodMonths,
-                externalId: reference || null,
+                externalId: reference ? reference.trim() : null,
                 paymentCode,
-                notes: notes || null,
+                notes: enrichedNotes,
                 dueDate: new Date(),
             },
         });
 
         console.log(
             `[billing] Pago ${paymentCode} registrado por tenant ${slug} — ` +
-            `${amountCents} cents via ${provider || 'other'}`
+            `${amountCents} cents (${selectedCurrency}) via ${provider || 'other'}`
         );
 
+        // Auto-conciliación con IncomingSms (Pago Móvil / Transferencia)
         if (reference) {
             const cleanRef = reference.trim();
-            const matchingSms = await (prisma as any).incomingSms.findFirst({
-                where: {
-                    status: 'PENDING',
-                    reference: cleanRef,
-                },
+            const pendingSmsList = await (prisma as any).incomingSms.findMany({
+                where: { status: 'PENDING' },
+                orderBy: { createdAt: 'desc' },
+                take: 100,
             });
+
+            const matchingSms = pendingSmsList.find((sms: any) => {
+                if (!sms.reference) return false;
+                const smsRef = sms.reference.trim();
+
+                // 1. Comparación de referencia: coincidencia exacta o sufijo (mínimo 4 dígitos)
+                const refMatch = smsRef === cleanRef ||
+                    (cleanRef.length >= 4 && smsRef.endsWith(cleanRef)) ||
+                    (smsRef.length >= 4 && cleanRef.endsWith(smsRef));
+
+                if (!refMatch) return false;
+
+                // 2. Si ambos tienen teléfono, verificar que no sean incompatibles
+                if (senderPhone && sms.senderPhone) {
+                    const cleanP1 = String(senderPhone).replace(/\D/g, '').slice(-7);
+                    const cleanP2 = String(sms.senderPhone).replace(/\D/g, '').slice(-7);
+                    if (cleanP1 && cleanP2 && cleanP1 !== cleanP2) {
+                        return false;
+                    }
+                }
+
+                // 3. Si ambos tienen monto en Bs, verificar coherencia (tolerancia de 0.10 Bs)
+                const candidateVes = numAmountVes || (selectedCurrency === 'VES' ? numAmount : null);
+                if (candidateVes && sms.amountVes) {
+                    const diff = Math.abs(sms.amountVes - Number(candidateVes));
+                    if (diff > 0.10) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
             if (matchingSms) {
                 const { confirmPayment } = await import('../payments/payments.service');
                 await confirmPayment(payment.id, 'SMS_GATEWAY_AUTO');
@@ -402,12 +484,12 @@ router.post('/:slug/pay', async (req: Request, res: Response) => {
                         matchedTenantId: tenant.id,
                     },
                 });
-                console.log(`[billing] Pago ${paymentCode} auto-confirmado por SMS previo ref=${cleanRef}`);
+                console.log(`[billing] Pago ${paymentCode} auto-confirmado por SMS previo ref=${cleanRef} (SMS id=${matchingSms.id})`);
                 res.status(201).json({
                     success: true,
                     paymentCode: payment.paymentCode,
                     autoConfirmed: true,
-                    message: '¡Pago verificado automáticamente! Tu suscripción ha sido renovada.',
+                    message: '¡Pago verificado automáticamente con el banco! Tu suscripción ha sido renovada.',
                 });
                 return;
             }
@@ -416,6 +498,7 @@ router.post('/:slug/pay', async (req: Request, res: Response) => {
         res.status(201).json({
             success: true,
             paymentCode: payment.paymentCode,
+            autoConfirmed: false,
             message: 'Pago registrado. Será confirmado por el administrador.',
         });
     } catch (error) {

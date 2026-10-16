@@ -19,7 +19,7 @@ export interface CreatePaymentInput {
 }
 
 // Metodos de pago permitidos
-export const PAYMENT_PROVIDERS = ['zelle', 'pago_movil', 'binance', 'cash', 'other'] as const;
+export const PAYMENT_PROVIDERS = ['zelle', 'pago_movil', 'transferencia', 'binance', 'cash', 'other'] as const;
 
 export function getPeriodDays(billingCycle?: string | null, periodMonths?: number | null): number {
     if (billingCycle === 'ANNUAL' || periodMonths === 12) {

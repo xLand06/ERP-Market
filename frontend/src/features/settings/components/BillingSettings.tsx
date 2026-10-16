@@ -10,7 +10,8 @@ import {
     CreditCard, Wallet, AlertTriangle, CheckCircle2, Clock,
     Loader2, Copy, Send, History, DollarSign, Calendar,
     Banknote, Smartphone, Coins, BanknoteIcon, FileText,
-    ShieldCheck, ArrowRight, Sparkles, Info, Download, X
+    ShieldCheck, ArrowRight, Sparkles, Info, Download, X,
+    Landmark, Building2, Hash, User, Phone, Mail
 } from 'lucide-react';
 
 interface PlanLimits {
@@ -81,13 +82,44 @@ interface BillingStatus {
     }[];
 }
 
-const PAYMENT_METHODS = [
+const USD_PAYMENT_METHODS = [
     { value: 'zelle', label: 'Zelle', Icon: CreditCard, color: 'text-blue-600' },
-    { value: 'pago_movil', label: 'Pago Movil', Icon: Smartphone, color: 'text-emerald-600' },
-    { value: 'binance', label: 'Binance', Icon: Coins, color: 'text-amber-600' },
-    { value: 'cash', label: 'Efectivo', Icon: Banknote, color: 'text-green-600' },
+    { value: 'binance', label: 'Binance (Pay / USDT)', Icon: Coins, color: 'text-amber-600' },
+    { value: 'cash', label: 'Efectivo (USD)', Icon: Banknote, color: 'text-green-600' },
     { value: 'other', label: 'Otro', Icon: FileText, color: 'text-slate-600' },
 ];
+
+const VES_PAYMENT_METHODS = [
+    { value: 'pago_movil', label: 'Pago Móvil', Icon: Smartphone, color: 'text-emerald-600' },
+    { value: 'transferencia', label: 'Transferencia Bancaria', Icon: Landmark, color: 'text-indigo-600' },
+];
+
+const VENEZUELAN_BANKS = [
+    '0102 - Banco de Venezuela (BDV)',
+    '0134 - Banesco',
+    '0105 - Banco Mercantil',
+    '0108 - Banco Provincial (BBVA)',
+    '0172 - Bancamiga',
+    '0191 - Banco Nacional de Crédito (BNC)',
+    '0114 - Bancaribe',
+    '0115 - Banco Exterior',
+    '0138 - Banco Plaza',
+    '0163 - Banco del Tesoro',
+    '0166 - Banco Agrícola de Venezuela',
+    '0175 - Banco Bicentenario',
+    '0174 - Banplus',
+    '0104 - Banco Venezolano de Crédito',
+    '0128 - Banco Caroní',
+    '0151 - Banco Fondo Común (BFC)',
+    '0156 - 100% Banco',
+    '0157 - Banco del Sur',
+    '0171 - Banco Activo',
+    '0177 - BANFANB',
+    'Otro Banco',
+];
+
+const PHONE_PREFIXES = ['0412', '0414', '0424', '0416', '0426'];
+const ID_TYPES = ['V', 'E', 'J', 'G'];
 
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string; dot: string }> = {
     PENDING: { label: 'Pendiente', color: 'text-amber-700', bg: 'bg-amber-50 border border-amber-200', dot: 'bg-amber-500' },
@@ -98,13 +130,32 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string; dot
 
 export function BillingSettings() {
     const queryClient = useQueryClient();
+    const [currency, setCurrency] = useState<'USD' | 'VES'>('USD');
     const [amount, setAmount] = useState('');
+    const [amountVes, setAmountVes] = useState('');
     const [provider, setProvider] = useState('zelle');
     const [selectedCycle, setSelectedCycle] = useState<'MONTHLY' | 'ANNUAL'>('MONTHLY');
     const [reference, setReference] = useState('');
+    const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().split('T')[0]);
+    const [senderBank, setSenderBank] = useState('0102 - Banco de Venezuela (BDV)');
+    const [idType, setIdType] = useState('V');
+    const [idNumber, setIdNumber] = useState('');
+    const [phonePrefix, setPhonePrefix] = useState('0412');
+    const [phoneNumber, setPhoneNumber] = useState('');
+    const [senderEmail, setSenderEmail] = useState('');
+    const [otherMethodName, setOtherMethodName] = useState('');
     const [notes, setNotes] = useState('');
     const [showTermsModal, setShowTermsModal] = useState(false);
     const [exportingBackup, setExportingBackup] = useState(false);
+
+    const handleCurrencyChange = (newCurrency: 'USD' | 'VES') => {
+        setCurrency(newCurrency);
+        if (newCurrency === 'VES') {
+            setProvider('pago_movil');
+        } else {
+            setProvider('zelle');
+        }
+    };
 
     const handleDownloadTakeout = async () => {
         setExportingBackup(true);
@@ -152,15 +203,26 @@ export function BillingSettings() {
 
     // Register payment mutation
     const payMutation = useMutation({
-        mutationFn: async (data: { amount: number; provider: string; billingCycle: 'MONTHLY' | 'ANNUAL'; periodMonths: number; reference?: string; notes?: string }) => {
-            const res = await api.post('/billing/pay', data);
+        mutationFn: async (payload: any) => {
+            const res = await api.post('/billing/pay', payload);
             return res.data;
         },
         onSuccess: (data) => {
-            toast.success(`Pago registrado — Codigo: ${data.paymentCode}`);
+            if (data?.autoConfirmed) {
+                toast.success('🎉 ¡Pago verificado automáticamente con el banco! Tu suscripción fue renovada.', {
+                    duration: 6000,
+                });
+            } else {
+                toast.success(`Pago registrado — Código: ${data.paymentCode || ''}`);
+            }
             queryClient.invalidateQueries({ queryKey: ['billing-status'] });
             setAmount('');
+            setAmountVes('');
             setReference('');
+            setIdNumber('');
+            setPhoneNumber('');
+            setSenderEmail('');
+            setOtherMethodName('');
             setNotes('');
         },
         onError: (err: any) => {
@@ -169,19 +231,84 @@ export function BillingSettings() {
     });
 
     const handlePay = () => {
-        const amountNum = parseFloat(amount);
-        if (!amountNum || amountNum <= 0) {
-            toast.error('Ingresa un monto valido');
-            return;
+        if (currency === 'VES') {
+            const vesVal = parseFloat(amountVes);
+            if (!vesVal || vesVal <= 0) {
+                toast.error('Ingresá el monto pagado en Bolívares (Bs.)');
+                return;
+            }
+            if (!idNumber.trim()) {
+                toast.error('Ingresá la cédula o RIF del pagador');
+                return;
+            }
+            if (provider === 'pago_movil' && (!phoneNumber.trim() || phoneNumber.trim().length < 7)) {
+                toast.error('Ingresá el número de teléfono emisor (7 dígitos)');
+                return;
+            }
+            if (!reference.trim()) {
+                toast.error('Ingresá el número de referencia del comprobante');
+                return;
+            }
+        } else {
+            const usdVal = parseFloat(amount);
+            if (!usdVal || usdVal <= 0) {
+                toast.error('Ingresá un monto válido en USD');
+                return;
+            }
+            if (provider === 'zelle') {
+                if (!senderEmail.trim()) {
+                    toast.error('Ingresá el correo o titular de la cuenta Zelle');
+                    return;
+                }
+                if (!reference.trim()) {
+                    toast.error('Ingresá el número de confirmación / referencia de Zelle');
+                    return;
+                }
+            } else if (provider === 'binance') {
+                if (!senderEmail.trim() && !reference.trim()) {
+                    toast.error('Ingresá tu Binance Pay ID, correo o TXID');
+                    return;
+                }
+            } else if (provider === 'other') {
+                if (!reference.trim()) {
+                    toast.error('Ingresá la referencia del pago');
+                    return;
+                }
+            }
         }
-        payMutation.mutate({
-            amount: amountNum,
+
+        const expectedUsd = selectedCycle === 'ANNUAL'
+            ? (billing?.subscription?.plan?.annualPriceCents ? billing.subscription.plan.annualPriceCents / 100 : 100)
+            : (billing?.subscription?.plan?.monthlyPriceCents ? billing.subscription.plan.monthlyPriceCents / 100 : 10);
+
+        const payload: any = {
+            amount: currency === 'VES' ? (parseFloat(amount) || expectedUsd) : parseFloat(amount),
+            currency,
+            amountVes: currency === 'VES' ? parseFloat(amountVes) : undefined,
             provider,
             billingCycle: selectedCycle,
             periodMonths: selectedCycle === 'ANNUAL' ? 12 : 1,
-            reference: reference.trim() || undefined,
+            reference: reference.trim(),
+            paymentDate,
             notes: notes.trim() || undefined,
-        });
+        };
+
+        if (currency === 'VES') {
+            payload.senderBank = senderBank;
+            payload.senderId = `${idType}-${idNumber.trim()}`;
+            if (phoneNumber.trim()) {
+                payload.senderPhone = `${phonePrefix}-${phoneNumber.trim()}`;
+            }
+        } else {
+            if (provider === 'zelle' || provider === 'binance') {
+                payload.senderEmail = senderEmail.trim();
+            }
+            if (provider === 'other' && otherMethodName.trim()) {
+                payload.otherMethodName = otherMethodName.trim();
+            }
+        }
+
+        payMutation.mutate(payload);
     };
 
     const copyCode = (code: string) => {
@@ -392,7 +519,7 @@ export function BillingSettings() {
                                 </div>
                                 <div>
                                     <span className="font-semibold text-slate-500 block text-[10px] uppercase tracking-wider mb-0.5">Monto Reportado</span>
-                                    <span className="font-bold text-emerald-600 text-sm">${(pendingPaymentItem.amount / 100).toFixed(2)} USD</span>
+                                    <span className="font-bold text-emerald-600 text-sm">${Number(pendingPaymentItem.amount).toFixed(2)} USD</span>
                                 </div>
                                 <div>
                                     <span className="font-semibold text-slate-500 block text-[10px] uppercase tracking-wider mb-0.5">Enviado</span>
@@ -499,94 +626,327 @@ export function BillingSettings() {
                         </div>
                     </div>
 
+                    {/* Currency Selector */}
+                    <div>
+                        <label className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 block">
+                            Moneda con la que Pagaste *
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                onClick={() => handleCurrencyChange('USD')}
+                                className={`p-3.5 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
+                                    currency === 'USD'
+                                        ? 'border-indigo-600 bg-indigo-50/50 shadow-sm ring-1 ring-indigo-500/20'
+                                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                                }`}
+                            >
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${
+                                    currency === 'USD' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'
+                                }`}>
+                                    $
+                                </div>
+                                <div>
+                                    <span className="block text-xs font-bold text-slate-900">Dólares (USD)</span>
+                                    <span className="block text-[11px] text-slate-500">Zelle, Binance, Efectivo</span>
+                                </div>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleCurrencyChange('VES')}
+                                className={`p-3.5 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
+                                    currency === 'VES'
+                                        ? 'border-emerald-600 bg-emerald-50/50 shadow-sm ring-1 ring-emerald-500/20'
+                                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                                }`}
+                            >
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
+                                    currency === 'VES' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
+                                }`}>
+                                    Bs.
+                                </div>
+                                <div>
+                                    <span className="block text-xs font-bold text-slate-900">Bolívares (VES)</span>
+                                    <span className="block text-[11px] text-slate-500">Pago Móvil, Transferencia</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
                     {/* Payment method grid */}
                     <div>
                         <label className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 block">
                             Método de Pago *
                         </label>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                            {PAYMENT_METHODS.map(m => (
+                        <div className={`grid gap-2 ${currency === 'VES' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}>
+                            {(currency === 'VES' ? VES_PAYMENT_METHODS : USD_PAYMENT_METHODS).map(m => (
                                 <button
                                     key={m.value}
                                     type="button"
                                     onClick={() => setProvider(m.value)}
-                                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-center min-h-[64px] active:scale-95 ${
+                                    className={`flex items-center sm:flex-col sm:justify-center gap-2.5 p-3 rounded-xl border-2 transition-all text-left sm:text-center min-h-[58px] active:scale-95 ${
                                         provider === m.value
                                             ? 'border-emerald-500 bg-emerald-50 shadow-sm'
                                             : 'border-slate-200 hover:border-slate-300 bg-white'
                                     }`}
                                 >
-                                    <m.Icon className={`w-5 h-5 ${provider === m.value ? m.color : 'text-slate-400'}`} />
-                                    <span className={`text-[10px] font-bold ${provider === m.value ? 'text-slate-800' : 'text-slate-500'}`}>{m.label}</span>
+                                    <m.Icon className={`w-5 h-5 shrink-0 ${provider === m.value ? m.color : 'text-slate-400'}`} />
+                                    <span className={`text-xs font-bold ${provider === m.value ? 'text-slate-900' : 'text-slate-600'}`}>{m.label}</span>
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {/* Amount */}
-                        <div>
-                            <label className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 block">
-                                Monto (USD) *
-                            </label>
-                            <div className="relative">
-                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                <Input
-                                    type="number"
-                                    min="0.01"
-                                    step="0.01"
-                                    placeholder="25.00"
-                                    value={amount}
-                                    onChange={e => setAmount(e.target.value)}
-                                    className="pl-9 text-lg font-bold min-h-[48px]"
-                                />
+                    {/* Dynamic Fields for VES (Pago Móvil / Transferencia) */}
+                    {currency === 'VES' && (
+                        <div className="space-y-4 p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {/* Banco */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                                        Banco *
+                                    </label>
+                                    <select
+                                        value={senderBank}
+                                        onChange={e => setSenderBank(e.target.value)}
+                                        className="w-full h-11 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    >
+                                        {VENEZUELAN_BANKS.map(b => (
+                                            <option key={b} value={b}>{b}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Cédula / RIF */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                                        Cédula / RIF del Pagador *
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <select
+                                            value={idType}
+                                            onChange={e => setIdType(e.target.value)}
+                                            className="w-16 h-11 px-2 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 shrink-0"
+                                        >
+                                            {ID_TYPES.map(t => (
+                                                <option key={t} value={t}>{t}</option>
+                                            ))}
+                                        </select>
+                                        <Input
+                                            type="text"
+                                            placeholder="12345678"
+                                            value={idNumber}
+                                            onChange={e => setIdNumber(e.target.value.replace(/\D/g, ''))}
+                                            className="h-11 font-medium"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Teléfono emisor */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                                        Teléfono Emisor {provider === 'pago_movil' ? '*' : '(opcional)'}
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <select
+                                            value={phonePrefix}
+                                            onChange={e => setPhonePrefix(e.target.value)}
+                                            className="w-24 h-11 px-2 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 shrink-0"
+                                        >
+                                            {PHONE_PREFIXES.map(p => (
+                                                <option key={p} value={p}>{p}</option>
+                                            ))}
+                                        </select>
+                                        <Input
+                                            type="tel"
+                                            maxLength={7}
+                                            placeholder="9657169"
+                                            value={phoneNumber}
+                                            onChange={e => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                                            className="h-11 font-medium"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Referencia */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                                        Referencia / Nro. de Operación *
+                                    </label>
+                                    <Input
+                                        placeholder="Ej: 000926865591 o últimos dígitos"
+                                        value={reference}
+                                        onChange={e => setReference(normalizeText(e.target.value))}
+                                        className="h-11 font-mono font-semibold"
+                                    />
+                                </div>
+
+                                {/* Monto en Bs */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                                        Monto Pagado (Bs. VES) *
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Bs.</span>
+                                        <Input
+                                            type="number"
+                                            min="0.01"
+                                            step="0.01"
+                                            placeholder="Ej: 3500.00"
+                                            value={amountVes}
+                                            onChange={e => setAmountVes(e.target.value)}
+                                            className="pl-9 h-11 text-base font-bold text-emerald-700"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Fecha de Pago */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                                        Fecha del Pago *
+                                    </label>
+                                    <Input
+                                        type="date"
+                                        value={paymentDate}
+                                        onChange={e => setPaymentDate(e.target.value)}
+                                        className="h-11 text-xs font-medium"
+                                    />
+                                </div>
                             </div>
                         </div>
+                    )}
 
-                        {/* Reference */}
-                        <div>
-                            <label className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 block">
-                                Referencia / Nro. de Operacion
-                            </label>
-                            <Input
-                                placeholder="Nro de transferencia, TXID, etc."
-                                value={reference}
-                                onChange={e => setReference(normalizeText(e.target.value))}
-                                className="min-h-[48px]"
-                            />
+                    {/* Dynamic Fields for USD (Zelle / Binance / Cash / Other) */}
+                    {currency === 'USD' && (
+                        <div className="space-y-4 p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {provider === 'zelle' && (
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                                            Correo o Titular Zelle *
+                                        </label>
+                                        <div className="relative">
+                                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                            <Input
+                                                placeholder="titular@gmail.com o Nombre"
+                                                value={senderEmail}
+                                                onChange={e => setSenderEmail(normalizeText(e.target.value))}
+                                                className="pl-9 h-11"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {provider === 'binance' && (
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                                            Binance Pay ID / Correo / TXID *
+                                        </label>
+                                        <div className="relative">
+                                            <Coins className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                            <Input
+                                                placeholder="Pay ID, email o Hash TXID"
+                                                value={senderEmail}
+                                                onChange={e => setSenderEmail(normalizeText(e.target.value))}
+                                                className="pl-9 h-11 font-mono text-xs"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {provider === 'other' && (
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                                            Nombre del Método *
+                                        </label>
+                                        <Input
+                                            placeholder="Ej: PayPal, Zinli, Wally..."
+                                            value={otherMethodName}
+                                            onChange={e => setOtherMethodName(normalizeText(e.target.value))}
+                                            className="h-11"
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Reference (except Cash where it is optional) */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                                        Referencia / Nro. de Operación {provider === 'cash' ? '(opcional)' : '*'}
+                                    </label>
+                                    <Input
+                                        placeholder={provider === 'zelle' ? 'Nro de confirmación Zelle' : provider === 'binance' ? 'Order ID o Referencia' : 'Nro de comprobante'}
+                                        value={reference}
+                                        onChange={e => setReference(normalizeText(e.target.value))}
+                                        className="h-11 font-mono font-semibold"
+                                    />
+                                </div>
+
+                                {/* Monto USD */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                                        Monto (USD) *
+                                    </label>
+                                    <div className="relative">
+                                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                        <Input
+                                            type="number"
+                                            min="0.01"
+                                            step="0.01"
+                                            placeholder="25.00"
+                                            value={amount}
+                                            onChange={e => setAmount(e.target.value)}
+                                            className="pl-9 h-11 text-base font-bold text-indigo-700"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Fecha de Pago */}
+                                <div>
+                                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                                        Fecha del Pago *
+                                    </label>
+                                    <Input
+                                        type="date"
+                                        value={paymentDate}
+                                        onChange={e => setPaymentDate(e.target.value)}
+                                        className="h-11 text-xs font-medium"
+                                    />
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Notes */}
                     <div>
                         <label className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 block">
-                            Notas (opcional)
+                            Notas u Observaciones (opcional)
                         </label>
                         <Input
-                            placeholder="Observaciones del pago"
+                            placeholder="Detalles adicionales sobre el pago..."
                             value={notes}
                             onChange={e => setNotes(normalizeText(e.target.value))}
-                            className="min-h-[48px]"
+                            className="min-h-[44px]"
                         />
                     </div>
 
                     <Button
                         onClick={handlePay}
-                        disabled={!amount || parseFloat(amount) <= 0 || payMutation.isPending}
+                        disabled={payMutation.isPending || (currency === 'VES' ? (!amountVes || parseFloat(amountVes) <= 0 || !reference.trim()) : (!amount || parseFloat(amount) <= 0))}
                         className="w-full bg-emerald-600 hover:bg-emerald-700 font-bold min-h-[48px] text-sm shadow-sm shadow-emerald-500/20"
                     >
                         {payMutation.isPending ? (
-                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Enviando...</>
+                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verificando y registrando...</>
                         ) : (
-                            <><Send className="w-4 h-4 mr-2" /> Enviar Pago</>
+                            <><Send className="w-4 h-4 mr-2" /> Enviar y Verificar Pago</>
                         )}
                     </Button>
 
-                    <div className="flex items-start gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                        <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                        <p className="text-[11px] text-slate-500 leading-relaxed">
-                            Tu pago sera verificado por el administrador y confirmado en un plazo de 24 horas. Recibiras una notificacion cuando se confirme.
-                        </p>
+                    <div className="flex items-start gap-2.5 p-3.5 bg-emerald-50/80 border border-emerald-200/80 rounded-xl">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <div className="text-[11px] text-emerald-800 leading-relaxed">
+                            <strong>⚡ Conciliación bancaria automática:</strong> Si realizaste tu pago por Pago Móvil (BDV, Banesco, Mercantil, etc.), el sistema verificará instantáneamente tu referencia con las notificaciones recibidas en el servidor y renovará tu plan de inmediato sin esperas.
+                        </div>
                     </div>
                 </div>
             )}
