@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Plus, Users, AlertCircle, Eye, Smartphone } from 'lucide-react';
+import { Search, Plus, Users, AlertCircle, Eye, Smartphone, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -181,11 +181,28 @@ export default function CustomersPage() {
                             rows={filtered}
                             rowKey={row => row.id}
                             isLoading={isLoading}
-                            empty={{
-                                icon: <Users className="w-8 h-8 text-slate-200" />,
-                                title: 'No hay clientes registrados',
-                                description: 'Crea tu primer cliente para comenzar a vender a crédito.',
-                            }}
+                            empty={
+                                search.trim()
+                                    ? {
+                                        icon: <Users className="w-8 h-8 text-slate-300" />,
+                                        title: 'No se encontraron clientes',
+                                        description: 'Ajustá el término de búsqueda para encontrar lo que buscás.',
+                                    }
+                                    : {
+                                        icon: <Sparkles className="w-8 h-8 text-indigo-500" />,
+                                        title: '¡Todo está preparado para tu primer cliente!',
+                                        description: 'Registrá tus clientes para llevar control de cuentas por cobrar, saldo a favor y fiados.',
+                                        action: (
+                                            <Button
+                                                type="button"
+                                                onClick={() => setModalOpen(true)}
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs gap-1.5 shadow-sm"
+                                            >
+                                                <Plus className="w-4 h-4" /> Crear Primer Cliente
+                                            </Button>
+                                        ),
+                                    }
+                            }
                             actions={renderActions}
                         />
                     </div>

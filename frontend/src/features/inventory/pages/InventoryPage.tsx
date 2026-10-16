@@ -1,5 +1,5 @@
 import { useState, useId, useMemo, useEffect, useRef } from 'react';
-import { Search, Plus, Download, Pencil, Check, X, Package, Loader2, ClipboardList, PackageX } from 'lucide-react';
+import { Search, Plus, Download, Pencil, Check, X, Package, Loader2, ClipboardList, PackageX, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -520,11 +520,28 @@ export default function InventoryPage() {
                             level === 'warning' && 'bg-amber-50/40',
                         );
                     }}
-                    empty={{
-                        icon: <PackageX className="w-8 h-8 text-slate-200" />,
-                        title: 'No se encontraron productos',
-                        description: 'Ajusta los filtros o la búsqueda para ver resultados.',
-                    }}
+                    empty={
+                        search.trim() || filterGroup !== 'all' || filterCategory !== 'all' || filterStatus !== 'all'
+                            ? {
+                                icon: <PackageX className="w-8 h-8 text-slate-300" />,
+                                title: 'No se encontraron artículos',
+                                description: 'Ajustá los filtros o la búsqueda para ver resultados.',
+                            }
+                            : {
+                                icon: <Sparkles className="w-8 h-8 text-indigo-500" />,
+                                title: '¡Todo está preparado para tu inventario!',
+                                description: 'Comenzá ingresando tus existencias o realizando una entrada de stock.',
+                                action: isOwner ? (
+                                    <Button
+                                        type="button"
+                                        onClick={() => setEntryModalOpen(true)}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs gap-1.5 shadow-sm"
+                                    >
+                                        <Plus className="w-4 h-4" /> Entrada de Inventario
+                                    </Button>
+                                ) : undefined,
+                            }
+                    }
                     actions={isOwner ? renderActions : undefined}
                 />
 

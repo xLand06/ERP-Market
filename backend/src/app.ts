@@ -41,6 +41,7 @@ import uploadRouter from './modules/upload/upload.routes';
 import aiChatRouter from './modules/ai-chat/ai-chat.routes';
 
 const app = express();
+app.set('trust proxy', 1);
 
 /**
  * Request ID middleware - genera UUID único para cada petición

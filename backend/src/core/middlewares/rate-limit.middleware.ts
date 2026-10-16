@@ -5,7 +5,7 @@ const isDev = env.NODE_ENV === 'development';
 
 export const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: isDev ? 100 : 10,
+    max: isDev ? 100 : 30,
     message: {
         status: 'error',
         message: 'Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.',
@@ -15,11 +15,9 @@ export const authLimiter = rateLimit({
     skipSuccessfulRequests: true,
 });
 
-
-
 export const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    max: isDev ? 10000 : 3000,
     message: {
         status: 'error',
         message: 'Demasiadas solicitudes. Intenta de nuevo más tarde.',
@@ -30,10 +28,10 @@ export const apiLimiter = rateLimit({
 
 export const strictLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 10,
+    max: 60,
     message: {
         status: 'error',
-        message: 'Límite estricto alcanzado. Intenta de nuevo en 1 minuto.',
+        message: 'Límite alcanzado. Intenta de nuevo en 1 minuto.',
     },
     standardHeaders: true,
     legacyHeaders: false,

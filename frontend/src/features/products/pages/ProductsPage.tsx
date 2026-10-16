@@ -480,9 +480,20 @@ export default function ProductsPage() {
                 </div>
 
                 {isError && (
-                    <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-4 flex items-center gap-3">
-                        <AlertCircle className="w-5 h-5" />
-                        <p className="text-sm font-medium">Error al cargar el catálogo de productos. Verifica tu conexión offline/local.</p>
+                    <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                            <p className="text-sm font-medium">No se pudo sincronizar el catálogo con el servidor. Reintentá en un instante.</p>
+                        </div>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => refetch()}
+                            className="border-amber-300 text-amber-900 hover:bg-amber-100 text-xs font-bold"
+                        >
+                            Reintentar
+                        </Button>
                     </div>
                 )}
 
@@ -524,11 +535,28 @@ export default function ProductsPage() {
                         rowKey={prod => prod.id}
                         isLoading={isLoading}
                         rowClassName={prod => (prod.isActive ? '' : 'opacity-60 bg-slate-50')}
-                        empty={{
-                            icon: <PackageX className="w-8 h-8 text-slate-200" />,
-                            title: 'No se encontraron productos',
-                            description: 'Ajusta los filtros o crea un nuevo registro.',
-                        }}
+                        empty={
+                            search.trim() || filterGroup !== 'all' || filterCategory !== 'all' || filterStatus !== 'all'
+                                ? {
+                                    icon: <PackageX className="w-8 h-8 text-slate-300" />,
+                                    title: 'No se encontraron productos',
+                                    description: 'Ajustá los filtros o el texto de búsqueda para encontrar lo que buscás.',
+                                }
+                                : {
+                                    icon: <Sparkles className="w-8 h-8 text-indigo-500" />,
+                                    title: '¡Todo está preparado para tu primer producto!',
+                                    description: 'Comenzá agregando tu catálogo de artículos para empezar a facturar y controlar stock.',
+                                    action: isOwner ? (
+                                        <Button
+                                            type="button"
+                                            onClick={handleOpenCreate}
+                                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs gap-1.5 shadow-sm"
+                                        >
+                                            <Plus className="w-4 h-4" /> Crear Primer Producto
+                                        </Button>
+                                    ) : undefined,
+                                }
+                        }
                         actions={isOwner ? renderActions : undefined}
                     />
 
