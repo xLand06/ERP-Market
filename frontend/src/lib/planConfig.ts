@@ -1,7 +1,7 @@
 import { useConfigStore } from '@/hooks/useConfigStore';
 
 export type PlanType = 'BASICO' | 'PRO' | 'PREMIUM';
-export type RoleType = 'OWNER' | 'SELLER';
+export type RoleType = 'OWNER' | 'MANAGER' | 'SELLER';
 
 export interface PlanConfig {
     allowedPaths: string[];
@@ -42,17 +42,17 @@ export const normalizePlanType = (raw?: string | null): PlanType => {
 export const getEffectivePlan = (): PlanType => {
     try {
         const state = useConfigStore.getState();
-        // Si las configuraciones ya cargaron desde el backend, usamos el plan del backend
+        // Si ya hay un planTier persistido o cargado del backend, usarlo inmediatamente
+        if (state.planTier) {
+            return normalizePlanType(state.planTier);
+        }
+        // Si las configuraciones ya cargaron desde el backend
         if (state.settingsLoaded && state.planTier) {
             return normalizePlanType(state.planTier);
         }
         // Si hay un ACTIVE_PLAN configurado por env diferente a BASICO, respetarlo
         if (ACTIVE_PLAN !== 'BASICO') {
             return ACTIVE_PLAN;
-        }
-        // Si ya hay un planTier persistido o configurado
-        if (state.planTier) {
-            return normalizePlanType(state.planTier);
         }
     } catch {
         // Fallback si zustand aún no montó
@@ -171,6 +171,32 @@ export const ROLE_CONFIG: Record<RoleType, RoleConfig> = {
             '/reports',
             '/quotes',
             '/banks',
+            '/catalogo',
+            '/catalog'
+        ]
+    },
+    MANAGER: {
+        allowedPaths: [
+            '/dashboard',
+            '/pos',
+            '/inventory',
+            '/inventory/batches',
+            '/inventory/stocktaking',
+            '/products',
+            '/products/categories',
+            '/sales',
+            '/finance',
+            '/finance/cash-register',
+            '/cash-registers',
+            '/cash-register',
+            '/merma',
+            '/customers',
+            '/suppliers',
+            '/purchases',
+            '/reports',
+            '/quotes',
+            '/banks',
+            '/settings',
             '/catalogo',
             '/catalog'
         ]

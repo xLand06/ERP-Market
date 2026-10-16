@@ -45,7 +45,7 @@ const navItems: NavItem[] = [
     { nameKey: 'nav.reports', fallbackName: 'Reportes', path: '/reports', icon: BarChart2 },
     { nameKey: 'nav.users', fallbackName: 'Usuarios', path: '/users', icon: Users, roles: ['OWNER'] },
     { nameKey: 'nav.audit', fallbackName: 'Auditoría', path: '/audit', icon: ShieldCheck, roles: ['OWNER'] },
-    { nameKey: 'nav.settings', fallbackName: 'Configuración', path: '/settings', icon: Settings, roles: ['OWNER', 'SELLER'] },
+    { nameKey: 'nav.settings', fallbackName: 'Configuración', path: '/settings', icon: Settings, roles: ['OWNER', 'MANAGER', 'SELLER'] },
 ];
 
 export interface SidebarProps {

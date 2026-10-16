@@ -8,7 +8,7 @@ interface User {
     apellido?: string;
     email?: string;
     telefono?: string;
-    role: 'OWNER' | 'SELLER';
+    role: 'OWNER' | 'MANAGER' | 'SELLER';
     canManageInventory?: boolean;
     branchId?: string;
 }
@@ -29,7 +29,11 @@ export const useAuthStore = create<AuthState>()(
             user: null,
             selectedBranch: null,
             setAuth: (token, user) => {
-                set({ token, user, selectedBranch: user.role === 'SELLER' && user.branchId ? user.branchId : null });
+                set({
+                    token,
+                    user,
+                    selectedBranch: (user.role === 'SELLER' || user.role === 'MANAGER') && user.branchId ? user.branchId : null,
+                });
             },
             setSelectedBranch: (branchId) => set({ selectedBranch: branchId }),
             logout: () => set({ token: null, user: null, selectedBranch: null }),

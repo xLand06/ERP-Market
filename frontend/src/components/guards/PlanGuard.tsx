@@ -26,9 +26,9 @@ export function PlanGuard({ children }: PlanGuardProps) {
         return <>{children}</>;
     }
 
-    // Si aún no tenemos usuario (pero hay token) o la configuración está cargando por primera vez,
-    // esperamos un instante para evitar falsos positivos de bloqueo
-    if (token && (!user || (!settingsLoaded && isSettingsLoading))) {
+    // Si aún no tenemos usuario (pero hay token) o la configuración no ha terminado de cargar,
+    // esperamos un instante para evitar falsos positivos de bloqueo por plan o permisos.
+    if (token && (!user || !settingsLoaded)) {
         return <>{children}</>;
     }
 
