@@ -4,7 +4,7 @@ import { roleGuard } from '../../core/middlewares/roleGuard';
 import { prisma } from '../../config/prisma';
 
 const router = Router();
-router.use(authMiddleware, roleGuard('SELLER'));
+router.use(authMiddleware, roleGuard('MANAGER'));
 
 // Helper: convert Decimal to number
 const toNum = (v: any): number => {
