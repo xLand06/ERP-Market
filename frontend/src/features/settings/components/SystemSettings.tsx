@@ -62,7 +62,7 @@ export function SystemSettings() {
 
     const { 
         rates, iva, mainCurrency, activeCurrencies, autoOpenTime, autoCloseTime, purgeRetentionDays, purgeLogRetentionDays,
-        activeTheme, setTheme, updateRate, updateSettings, fetchSettings
+        activeTheme, setTheme, updateRate, updateSettings, fetchSettings, fetchRates
     } = useConfigStore();
 
     const [localMainCurrency, setLocalMainCurrency] = useState(mainCurrency || 'USD');
@@ -83,6 +83,7 @@ export function SystemSettings() {
 
     useEffect(() => {
         fetchSettings();
+        fetchRates();
     }, []);
 
     // Sincronizar el estado local cuando los datos terminen de cargar desde la API/Store
@@ -93,8 +94,8 @@ export function SystemSettings() {
         Object.entries(rates || {}).forEach(([k, v]) => {
             initialRates[k] = v.toString();
         });
-        if (!initialRates['VES']) initialRates['VES'] = '5.5';
-        if (!initialRates['USD'] && !initialRates['COP']) initialRates['COP'] = '3600';
+        if (!initialRates['VES'] && rates?.['VES']) initialRates['VES'] = rates['VES'].toString();
+        if (!initialRates['USD'] && !initialRates['COP']) initialRates['COP'] = rates?.['COP'] ? rates['COP'].toString() : '3600';
         setLocalRates(initialRates);
         setLocalIva(iva.toString());
         setLocalCloseTime(autoCloseTime || '');
@@ -453,8 +454,8 @@ export function SystemSettings() {
                                         .map((c) => {
                                             const info = getCurrencyInfo(c);
                                             const currentVal = localRates[c] ?? (
-                                                localMainCurrency === 'USD' && c === 'VES' ? '5.5' :
-                                                localMainCurrency === 'USD' && c === 'COP' ? '3600' : '1'
+                                                localMainCurrency === 'USD' && c === 'VES' ? (rates?.['VES'] ? rates['VES'].toString() : '') :
+                                                localMainCurrency === 'USD' && c === 'COP' ? (rates?.['COP'] ? rates['COP'].toString() : '3600') : '1'
                                             );
                                             return (
                                                 <div key={c} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
@@ -509,7 +510,10 @@ export function SystemSettings() {
                                                     const applied = res.data.data.appliedRate;
                                                     toast.success(`Tasa ${applied} VES aplicada desde DolarApi`);
                                                     setLocalRates(prev => ({ ...prev, VES: applied.toString() }));
-                                                    fetchSettings();
+                                                    useConfigStore.setState(state => ({
+                                                        rates: { ...state.rates, VES: applied }
+                                                    }));
+                                                    await fetchRates();
                                                 }
                                             } catch (err: any) {
                                                 toast.error(err.response?.data?.error || 'Error al conectar con DolarApi');
@@ -541,7 +545,10 @@ export function SystemSettings() {
                                                             const applied = res.data.data.appliedRate;
                                                             toast.success(`Tasa ${applied} VES aplicada`);
                                                             setLocalRates(prev => ({ ...prev, VES: applied.toString() }));
-                                                            fetchSettings();
+                                                            useConfigStore.setState(state => ({
+                                                                rates: { ...state.rates, VES: applied }
+                                                            }));
+                                                            await fetchRates();
                                                         }
                                                     } catch (err: any) {
                                                         toast.error(err.response?.data?.error || 'Error DolarApi');

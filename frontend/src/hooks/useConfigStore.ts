@@ -149,7 +149,7 @@ export const useConfigStore = create<ConfigState>()(
         (set, get) => ({
             updatedAt: null,
             rates: {
-                VES: 5.5,
+                VES: 0,
                 USD: 3600,
                 COP: 1,
             },
@@ -208,7 +208,7 @@ export const useConfigStore = create<ConfigState>()(
             dismissedNotice: null,
             dismissNotice: (notice: string) => set({ dismissedNotice: notice }),
 
-            get vesRate() { return get().rates['VES'] || 5.5; },
+            get vesRate() { return get().rates['VES'] || 0; },
             get copRate() { return get().rates['USD'] || get().rates['COP'] || 3600; },
 
             // ── Conversión Universal ────────────────────────────────────────
@@ -220,7 +220,7 @@ export const useConfigStore = create<ConfigState>()(
                 const getRate = (code: string) => {
                     if (code === main) return 1;
                     if (main === 'USD') {
-                        if (code === 'VES') return rates['VES'] || 5.5;
+                        if (code === 'VES') return rates['VES'] || 0;
                         if (code === 'COP') return rates['USD'] || rates['COP'] || 3600;
                     }
                     return rates[code] || 1;

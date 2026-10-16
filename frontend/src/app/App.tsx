@@ -28,7 +28,7 @@ import toast from 'react-hot-toast';
 
 
 export default function App() {
-    const { fetchSettings, activeTheme, businessName } = useConfigStore();
+    const { fetchSettings, fetchRates, activeTheme, businessName } = useConfigStore();
     const [initialSyncDone, setInitialSyncDone] = useState(true);
     const [checking, setChecking] = useState(true);
     const [serverUrlReady, setServerUrlReady] = useState(false);
@@ -87,7 +87,8 @@ export default function App() {
             return; // ConnectScreen will handle it
         }
         void fetchSettings();
-    }, [fetchSettings, serverUrlReady]);
+        void fetchRates();
+    }, [fetchSettings, fetchRates, serverUrlReady]);
 
     // ── Inicializar serverUrl desde SQLite/localStorage ─────────────────────
     useEffect(() => {
