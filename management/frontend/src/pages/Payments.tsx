@@ -441,7 +441,11 @@ export default function Payments() {
                                                     {s.amountVes != null ? `Bs. ${s.amountVes.toFixed(2)}` : '---'}
                                                 </td>
                                                 <td data-label="Referencia" style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontWeight: 600 }}>
-                                                    {s.reference || '---'}
+                                                    {s.reference ? s.reference : (
+                                                        <span style={{ fontSize: '0.75rem', color: '#d97706', fontStyle: 'italic' }} title={s.rawPayload}>
+                                                            {s.rawPayload ? (s.rawPayload.length > 35 ? s.rawPayload.slice(0, 35) + '…' : s.rawPayload) : 'Sin referencia'}
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td data-label="Teléfono" style={{ padding: '0.75rem 1rem', color: '#64748b', fontSize: '0.8rem' }}>
                                                     {s.senderPhone || '---'}

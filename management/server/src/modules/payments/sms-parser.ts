@@ -1,6 +1,6 @@
 // =============================================================================
-// SMS PARSER — Pago Móvil bank SMS parsing for Management Server
-// Extracts amount (Bs), reference and sender phone from Venezuelan bank SMS.
+// SMS & NOTIFICATION PARSER — Pago Móvil bank parsing for Management Server
+// Extracts amount (Bs), reference and sender phone from Venezuelan bank SMS / push notifications.
 // Supported banks: BDV, Banesco, Mercantil, Provincial, Bancamiga, etc.
 // =============================================================================
 
@@ -37,41 +37,76 @@ const normalizeAmount = (raw: string): number | null => {
     return Number.isFinite(n) ? n : null;
 };
 
-const inferSenderBank = (sender: string, body: string): string => {
+export const inferSenderBank = (sender: string, body: string): string => {
     if (sender.includes('2661') || sender.includes('2662')) return 'BDV';
     if (sender.includes('2846')) return 'Banesco';
     if (sender.includes('24024')) return 'Mercantil';
     if (sender.includes('provincial') || sender.includes('bbva')) return 'Provincial';
 
-    if (/\bbdv\b|banco de\s+venezuela/i.test(body)) return 'BDV';
+    if (/\bbdv\b|banco de\s+venezuela|bdvapp|bdv digital/i.test(body)) return 'BDV';
     if (/banesco/i.test(body)) return 'Banesco';
     if (/mercantil/i.test(body)) return 'Mercantil';
     if (/provincial|bbva/i.test(body)) return 'Provincial';
     if (/bancamiga/i.test(body)) return 'Bancamiga';
+    if (/bancaribe/i.test(body)) return 'Bancaribe';
+    if (/bnc\b|banco nacional de credito/i.test(body)) return 'BNC';
 
-    return 'UNKNOWN';
+    return 'BDV'; // Default común si vino de notificación bancaria
 };
 
 export const parsePagoMovilSms = (
     sender: string,
     body: string
 ): ParsedPagoMovil | null => {
-    if (!body) return null;
+    if (!body || !body.trim()) return null;
 
-    const amountMatch = body.match(/\bbs\.?\s*([\d][\d.,]*)/i);
-    if (!amountMatch) return null;
-    const amountVes = normalizeAmount(amountMatch[1]);
-    if (amountVes === null || amountVes <= 0) return null;
+    // Monto:
+    // Patrón 1: Bs. 1.000,00 | Bs 100 | BsD 100 | BsS 100 | VES 100
+    let amountVes: number | null = null;
+    const amountPrefixMatch = body.match(/\b(?:bs\.?(?:d|s)?|ves)\s*([\d][\d.,]*)/i);
+    if (amountPrefixMatch) {
+        amountVes = normalizeAmount(amountPrefixMatch[1]);
+    }
 
-    const refMatch = body.match(/\bref(?:erencia)?\.?[:#]?\s*(\d{4,20})/i);
-    if (!refMatch) return null;
-    const reference = refMatch[1];
+    // Patrón 2: 1.000,00 Bs | 100 Bs. | 100 VES
+    if (!amountVes) {
+        const amountSuffixMatch = body.match(/([\d][\d.,]*)\s*(?:bs\.?(?:d|s)?|ves)\b/i);
+        if (amountSuffixMatch) {
+            amountVes = normalizeAmount(amountSuffixMatch[1]);
+        }
+    }
+
+    // Patrón 3: "monto: 1.000,00" o "por 1.000,00"
+    if (!amountVes) {
+        const amountGenericMatch = body.match(/\b(?:monto|por|valor|importe)\.?[:#]?\s*([\d][\d.,]*)/i);
+        if (amountGenericMatch) {
+            amountVes = normalizeAmount(amountGenericMatch[1]);
+        }
+    }
+
+    // Referencia:
+    // ref: 12345678 | referencia: 12345678 | operacion: 12345678 | op: 12345678 | nro: 12345678
+    let reference = '';
+    const refMatch = body.match(/\b(?:ref(?:erencia)?|operaci[oó]n|op|nro|num|numero|comprobante|transacci[oó]n|secuencia)\.?[:#]?\s*(\d{4,20})/i);
+    if (refMatch) {
+        reference = refMatch[1];
+    } else {
+        // Fallback: secuencia de 6 a 12 dígitos
+        const digitsMatch = body.match(/\b(\d{6,12})\b/);
+        if (digitsMatch) {
+            reference = digitsMatch[1];
+        }
+    }
+
+    if (!amountVes && !reference) {
+        return null;
+    }
 
     const phoneMatch = body.match(/\b(04\d{9})\b/);
 
     return {
-        amountVes,
-        reference,
+        amountVes: amountVes || 0,
+        reference: reference || 'SIN_REF',
         senderPhone: phoneMatch ? phoneMatch[1] : undefined,
         senderBank: inferSenderBank(sender ?? '', body),
     };

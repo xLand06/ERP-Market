@@ -3,7 +3,7 @@ import { prisma } from '../../config/prisma';
 import { Prisma, PaymentStatus } from '@prisma/client';
 import { createAuditEntry } from '../audit/audit.service';
 import { resumeTenant, syncTenantPlan } from '../../services/provisioner';
-import { parsePagoMovilSms } from './sms-parser';
+import { parsePagoMovilSms, inferSenderBank } from './sms-parser';
 
 export interface CreatePaymentInput {
     tenantId: string;
@@ -485,11 +485,27 @@ export async function processIncomingSmsWebhook(rawPayload: any, rawSender?: str
     const sender = rawSender || raw.from || raw.sender || raw.phone || raw.phoneNumber || '';
     const text = rawText || raw.text || raw.message || raw.sms || raw.body || raw.content || '';
 
+    console.log(`[payments] Webhook recibido: sender="${sender}" text="${text}" raw=${JSON.stringify(raw)}`);
+
     const parsed = parsePagoMovilSms(String(sender), String(text));
-    if (!parsed) {
+    if (!parsed || parsed.reference === 'SIN_REF') {
+        const fallbackRecord = await (prisma as any).incomingSms.create({
+            data: {
+                reference: parsed?.reference !== 'SIN_REF' ? parsed?.reference : null,
+                amountVes: parsed?.amountVes || null,
+                senderBank: parsed?.senderBank || inferSenderBank(String(sender), String(text)),
+                senderPhone: parsed?.senderPhone || (String(sender).startsWith('04') ? String(sender) : null),
+                rawPayload: typeof rawPayload === 'string' ? rawPayload : JSON.stringify(rawPayload),
+                status: 'PENDING',
+            },
+        });
+        console.log(`[payments] Guardado en cola PENDING para revisión manual: id=${fallbackRecord.id}`);
         return {
-            accepted: false,
-            reason: 'unparseable_sms',
+            accepted: true,
+            duplicate: false,
+            matched: false,
+            incomingSmsId: fallbackRecord.id,
+            manualReview: true,
             raw: { sender, text },
         };
     }
