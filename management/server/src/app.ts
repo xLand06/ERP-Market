@@ -8,6 +8,7 @@ import { authMiddleware } from './middlewares/auth';
 import authRoutes from './modules/auth/auth.routes';
 import tenantsRoutes from './modules/tenants/tenants.routes';
 import paymentsRoutes from './modules/payments/payments.routes';
+import { webhookHandler } from './modules/payments/payments.controller';
 import auditRoutes from './modules/audit/audit.routes';
 import healthRoutes from './modules/health/health.routes';
 import { startHealthCron, startAuditRetention } from './services/health-cron';
@@ -74,6 +75,25 @@ app.get('/api/health', async (_req, res) => {
         });
     }
 });
+
+// ── Webhook público para SMS Gateway (protegido por secret) ─────────────────
+const webhookSecretGuard = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const expected = process.env.BILLING_SECRET || process.env.JWT_SECRET || 'dev-secret-change-in-production';
+    const authHeader = req.headers['authorization'];
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader;
+    const provided = (req.headers['x-webhook-secret'] as string | undefined)
+        || bearerToken
+        || (req.query?.secret as string | undefined)
+        || req.body?.secret;
+    if (provided !== expected) {
+        res.status(401).json({ success: false, error: 'Invalid webhook secret' });
+        return;
+    }
+    next();
+};
+
+app.post('/api/payments/webhook', webhookSecretGuard, webhookHandler);
+app.post('/api/incoming-payments/webhook', webhookSecretGuard, webhookHandler);
 
 // Rutas API
 // /api/auth, /api/health, POST /api/trials y GET /api/resolve-business son publicos; /api/billing valida por tenant secret

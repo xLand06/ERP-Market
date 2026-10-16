@@ -133,3 +133,20 @@ model TrialRegistration {
     updatedAt    DateTime           @updatedAt
 }
 
+model IncomingSms {
+    id               String    @id @default(uuid())
+    reference        String?
+    amountVes        Float?
+    senderBank       String?
+    senderPhone      String?
+    rawPayload       String
+    status           String    @default("PENDING") // PENDING | MATCHED | DISMISSED
+    matchedPaymentId String?
+    matchedTenantId  String?
+    createdAt        DateTime  @default(now())
+
+    @@index([reference])
+    @@index([status])
+    @@index([createdAt])
+}
+

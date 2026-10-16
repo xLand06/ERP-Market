@@ -383,6 +383,36 @@ router.post('/:slug/pay', async (req: Request, res: Response) => {
             `${amountCents} cents via ${provider || 'other'}`
         );
 
+        if (reference) {
+            const cleanRef = reference.trim();
+            const matchingSms = await (prisma as any).incomingSms.findFirst({
+                where: {
+                    status: 'PENDING',
+                    reference: cleanRef,
+                },
+            });
+            if (matchingSms) {
+                const { confirmPayment } = await import('../payments/payments.service');
+                await confirmPayment(payment.id, 'SMS_GATEWAY_AUTO');
+                await (prisma as any).incomingSms.update({
+                    where: { id: matchingSms.id },
+                    data: {
+                        status: 'MATCHED',
+                        matchedPaymentId: payment.id,
+                        matchedTenantId: tenant.id,
+                    },
+                });
+                console.log(`[billing] Pago ${paymentCode} auto-confirmado por SMS previo ref=${cleanRef}`);
+                res.status(201).json({
+                    success: true,
+                    paymentCode: payment.paymentCode,
+                    autoConfirmed: true,
+                    message: '¡Pago verificado automáticamente! Tu suscripción ha sido renovada.',
+                });
+                return;
+            }
+        }
+
         res.status(201).json({
             success: true,
             paymentCode: payment.paymentCode,

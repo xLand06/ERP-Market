@@ -161,3 +161,72 @@ export async function dailyStatsHandler(req: Request, res: Response): Promise<vo
         res.status(500).json({ error: 'Error al obtener estadísticas diarias' });
     }
 }
+
+/**
+ * POST /api/payments/webhook
+ * Recibe SMS entrante desde la app SMS Gateway en el teléfono.
+ */
+export async function webhookHandler(req: Request, res: Response): Promise<void> {
+    try {
+        const sender = (req.body?.from || req.body?.sender || req.body?.phone || req.query?.from) as string | undefined;
+        const text = (req.body?.text || req.body?.message || req.body?.content || req.body?.sms) as string | undefined;
+
+        const result = await paymentsService.processIncomingSmsWebhook(req.body, sender, text);
+        res.json({ success: true, data: result });
+    } catch (error) {
+        console.error('[payments] Error procesando webhook SMS:', error);
+        res.status(500).json({ success: false, error: 'Error procesando webhook' });
+    }
+}
+
+/**
+ * GET /api/payments/incoming-sms
+ * Lista los SMS recibidos por el gateway.
+ */
+export async function listIncomingSmsHandler(req: Request, res: Response): Promise<void> {
+    try {
+        const status = req.query.status as string | undefined;
+        const list = await paymentsService.listIncomingSms(status);
+        res.json(list);
+    } catch (error) {
+        console.error('[payments] Error listando incoming SMS:', error);
+        res.status(500).json({ error: 'Error al listar SMS entrantes' });
+    }
+}
+
+/**
+ * POST /api/payments/incoming-sms/:id/match
+ * Asocia manualmente un SMS a un tenant.
+ */
+export async function matchIncomingSmsHandler(req: Request, res: Response): Promise<void> {
+    try {
+        const { tenantId } = req.body;
+        if (!tenantId) {
+            res.status(400).json({ error: 'tenantId es requerido' });
+            return;
+        }
+        const result = await paymentsService.matchIncomingSmsToTenant(
+            req.params.id,
+            tenantId,
+            actorOf(req)
+        );
+        res.json(result);
+    } catch (error) {
+        console.error('[payments] Error asociando SMS a tenant:', error);
+        res.status(errorStatus(error)).json({ error: messageOf(error) });
+    }
+}
+
+/**
+ * POST /api/payments/incoming-sms/:id/dismiss
+ * Descarta un SMS entrante.
+ */
+export async function dismissIncomingSmsHandler(req: Request, res: Response): Promise<void> {
+    try {
+        const result = await paymentsService.dismissIncomingSms(req.params.id, actorOf(req));
+        res.json(result);
+    } catch (error) {
+        console.error('[payments] Error descartando SMS:', error);
+        res.status(errorStatus(error)).json({ error: messageOf(error) });
+    }
+}

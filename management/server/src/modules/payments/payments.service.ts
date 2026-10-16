@@ -3,6 +3,7 @@ import { prisma } from '../../config/prisma';
 import { Prisma, PaymentStatus } from '@prisma/client';
 import { createAuditEntry } from '../audit/audit.service';
 import { resumeTenant, syncTenantPlan } from '../../services/provisioner';
+import { parsePagoMovilSms } from './sms-parser';
 
 export interface CreatePaymentInput {
     tenantId: string;
@@ -472,4 +473,213 @@ export async function getDailyRevenue(days: number = 7) {
         revenueCents: data.revenueCents,
         count: data.count,
     }));
+}
+
+/**
+ * Procesa un webhook de SMS entrante (desde la app de SMS Gateway en el teléfono del admin).
+ * Extrae monto, referencia y banco; detecta duplicados;
+ * si coincide con un pago PENDING de un tenant, lo confirma automáticamente.
+ */
+export async function processIncomingSmsWebhook(rawPayload: any, rawSender?: string, rawText?: string) {
+    const raw = typeof rawPayload === 'object' && rawPayload !== null ? rawPayload : {};
+    const sender = rawSender || raw.from || raw.sender || raw.phone || raw.phoneNumber || '';
+    const text = rawText || raw.text || raw.message || raw.sms || raw.body || raw.content || '';
+
+    const parsed = parsePagoMovilSms(String(sender), String(text));
+    if (!parsed) {
+        return {
+            accepted: false,
+            reason: 'unparseable_sms',
+            raw: { sender, text },
+        };
+    }
+
+    // Comprobar duplicado
+    const existing = await (prisma as any).incomingSms.findFirst({
+        where: {
+            reference: parsed.reference,
+            status: { not: 'DISMISSED' },
+        },
+    });
+
+    if (existing) {
+        return {
+            accepted: true,
+            duplicate: true,
+            reference: parsed.reference,
+            existingId: existing.id,
+            status: existing.status,
+        };
+    }
+
+    // Buscar si existe un pago PENDING con esa referencia en algun tenant
+    const pendingPayments = await prisma.payment.findMany({
+        where: {
+            status: 'PENDING',
+            externalId: { not: null },
+        },
+        include: { tenant: { select: { id: true, slug: true, domain: true } } },
+    });
+
+    const matchedPayment = pendingPayments.find(p => {
+        if (!p.externalId) return false;
+        const cleanExt = p.externalId.trim();
+        return cleanExt === parsed.reference ||
+               (cleanExt.length >= 4 && parsed.reference.endsWith(cleanExt)) ||
+               (parsed.reference.length >= 4 && cleanExt.endsWith(parsed.reference));
+    });
+
+    if (matchedPayment) {
+        // Auto-confirmar el pago del tenant
+        await confirmPayment(matchedPayment.id, 'SMS_GATEWAY_AUTO');
+
+        const incomingRecord = await (prisma as any).incomingSms.create({
+            data: {
+                reference: parsed.reference,
+                amountVes: parsed.amountVes,
+                senderBank: parsed.senderBank,
+                senderPhone: parsed.senderPhone || sender || null,
+                rawPayload: typeof rawPayload === 'string' ? rawPayload : JSON.stringify(rawPayload),
+                status: 'MATCHED',
+                matchedPaymentId: matchedPayment.id,
+                matchedTenantId: matchedPayment.tenantId,
+            },
+        });
+
+        await createAuditEntry({
+            actor: 'SYSTEM:SMS_GATEWAY',
+            action: 'PAYMENT_AUTO_CONFIRMED',
+            tenantId: matchedPayment.tenantId,
+            details: {
+                paymentId: matchedPayment.id,
+                incomingSmsId: incomingRecord.id,
+                reference: parsed.reference,
+                amountVes: parsed.amountVes,
+                bank: parsed.senderBank,
+                tenantSlug: matchedPayment.tenant.slug,
+            },
+        });
+
+        return {
+            accepted: true,
+            duplicate: false,
+            matched: true,
+            tenantSlug: matchedPayment.tenant.slug,
+            paymentId: matchedPayment.id,
+            reference: parsed.reference,
+            amountVes: parsed.amountVes,
+            bank: parsed.senderBank,
+        };
+    } else {
+        // Guardar en cola como PENDING
+        const incomingRecord = await (prisma as any).incomingSms.create({
+            data: {
+                reference: parsed.reference,
+                amountVes: parsed.amountVes,
+                senderBank: parsed.senderBank,
+                senderPhone: parsed.senderPhone || sender || null,
+                rawPayload: typeof rawPayload === 'string' ? rawPayload : JSON.stringify(rawPayload),
+                status: 'PENDING',
+            },
+        });
+
+        return {
+            accepted: true,
+            duplicate: false,
+            matched: false,
+            incomingSmsId: incomingRecord.id,
+            reference: parsed.reference,
+            amountVes: parsed.amountVes,
+            bank: parsed.senderBank,
+        };
+    }
+}
+
+/**
+ * Lista SMS entrantes recibidos por el gateway.
+ */
+export async function listIncomingSms(status?: string) {
+    const where: any = {};
+    if (status) {
+        where.status = status;
+    }
+    return (prisma as any).incomingSms.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+    });
+}
+
+/**
+ * Asocia manualmente un SMS a un tenant y confirma su pago.
+ */
+export async function matchIncomingSmsToTenant(smsId: string, tenantId: string, actor: string) {
+    const sms = await (prisma as any).incomingSms.findUnique({ where: { id: smsId } });
+    if (!sms) {
+        throw new PaymentError('SMS no encontrado', 'NOT_FOUND');
+    }
+    if (sms.status === 'MATCHED') {
+        throw new PaymentError('Este SMS ya fue conciliado', 'INVALID_STATUS');
+    }
+
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+        throw new PaymentError('Tenant no encontrado', 'TENANT_NOT_FOUND');
+    }
+
+    // Buscar si el tenant tiene un pago PENDING
+    let payment = await prisma.payment.findFirst({
+        where: { tenantId, status: 'PENDING' },
+    });
+
+    if (payment) {
+        await prisma.payment.update({
+            where: { id: payment.id },
+            data: { externalId: sms.reference || payment.externalId },
+        });
+        await confirmPayment(payment.id, actor);
+    } else {
+        // Crear un pago para el tenant y confirmarlo
+        payment = await createPayment({
+            tenantId,
+            amountCents: tenant.customPriceCents || 2000,
+            currency: 'USD',
+            status: 'PAID',
+            provider: 'pago_movil',
+            externalId: sms.reference || undefined,
+            notes: `Conciliado manualmente desde SMS de ${sms.senderBank || 'banco'} (${sms.amountVes ? 'Bs. ' + sms.amountVes : ''}) por ${actor}`,
+        }, actor);
+    }
+
+    await (prisma as any).incomingSms.update({
+        where: { id: smsId },
+        data: {
+            status: 'MATCHED',
+            matchedPaymentId: payment.id,
+            matchedTenantId: tenantId,
+        },
+    });
+
+    return { success: true, paymentId: payment.id, tenantSlug: tenant.slug };
+}
+
+/**
+ * Descarta un SMS entrante.
+ */
+export async function dismissIncomingSms(smsId: string, actor: string) {
+    const sms = await (prisma as any).incomingSms.findUnique({ where: { id: smsId } });
+    if (!sms) throw new PaymentError('SMS no encontrado', 'NOT_FOUND');
+
+    await (prisma as any).incomingSms.update({
+        where: { id: smsId },
+        data: { status: 'DISMISSED' },
+    });
+
+    await createAuditEntry({
+        actor,
+        action: 'SMS_DISMISSED',
+        details: { smsId, reference: sms.reference },
+    });
+
+    return { success: true };
 }

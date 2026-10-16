@@ -10,6 +10,9 @@ import {
     updateHandler,
     confirmHandler,
     dailyStatsHandler,
+    listIncomingSmsHandler,
+    matchIncomingSmsHandler,
+    dismissIncomingSmsHandler,
 } from './payments.controller';
 
 const router = Router();
@@ -62,6 +65,15 @@ router.get('/stats', statsHandler);
 
 // GET /api/payments/pending — pagos pendientes vencidos
 router.get('/pending', validate(querySchema, 'query'), pendingHandler);
+
+// GET /api/payments/incoming-sms
+router.get('/incoming-sms', listIncomingSmsHandler);
+
+// POST /api/payments/incoming-sms/:id/match
+router.post('/incoming-sms/:id/match', validate(idParam, 'params'), matchIncomingSmsHandler);
+
+// POST /api/payments/incoming-sms/:id/dismiss
+router.post('/incoming-sms/:id/dismiss', validate(idParam, 'params'), dismissIncomingSmsHandler);
 
 // GET /api/payments
 router.get('/', validate(querySchema, 'query'), listHandler);
