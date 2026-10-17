@@ -108,7 +108,17 @@ export const syncSelectedRateFromDolarApi = async (provider: string, userId: str
     // Actualizar tasa VES en la base de datos
     const updatedRate = await updateExchangeRate({ code: 'VES', rate: rateToApply });
 
-    // updateExchangeRate ya invalida el cache internamente
+    // Guardar estado de sincronización en settings
+    try {
+        const { saveSettings } = await import('../settings/settings.service');
+        await saveSettings({
+            bcvRateType: provider as any,
+            bcvLastSync: new Date().toISOString(),
+            useOfficialRateForVes: true,
+        });
+    } catch {
+        // non-fatal
+    }
 
     const { logAudit } = await import('../../core/middlewares/audit.middleware');
     await logAudit({

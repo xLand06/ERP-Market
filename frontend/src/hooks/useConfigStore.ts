@@ -32,6 +32,9 @@ export interface ConfigState {
     activeCurrencies: string[];
     rates: Record<string, number>;
     updatedAt: string | null;
+    useOfficialRateForVes: boolean;
+    bcvRateType: 've_dolar_oficial' | 've_dolar_paralelo' | 've_euro_oficial';
+    bcvLastSync: string | null;
 
     // Tema de Interfaz
     activeTheme: UITheme;
@@ -149,10 +152,13 @@ export const useConfigStore = create<ConfigState>()(
         (set, get) => ({
             updatedAt: null,
             rates: {
-                VES: 0,
-                USD: 3600,
-                COP: 1,
+                VES: 880.12,
+                COP: 3600,
+                USD: 1,
             },
+            useOfficialRateForVes: true,
+            bcvRateType: 've_dolar_oficial',
+            bcvLastSync: null,
             iva: 16,
             ivaEnabled: true,
             ivaPercent: 16,
@@ -208,8 +214,8 @@ export const useConfigStore = create<ConfigState>()(
             dismissedNotice: null,
             dismissNotice: (notice: string) => set({ dismissedNotice: notice }),
 
-            get vesRate() { return get().rates['VES'] || 0; },
-            get copRate() { return get().rates['USD'] || get().rates['COP'] || 3600; },
+            get vesRate() { return get().rates['VES'] || 880.12; },
+            get copRate() { return get().rates['COP'] || 3600; },
 
             // ── Conversión Universal ────────────────────────────────────────
             convert: (amount: number, fromCurrency: string, toCurrency: string) => {
@@ -220,8 +226,8 @@ export const useConfigStore = create<ConfigState>()(
                 const getRate = (code: string) => {
                     if (code === main) return 1;
                     if (main === 'USD') {
-                        if (code === 'VES') return rates['VES'] || 0;
-                        if (code === 'COP') return rates['USD'] || rates['COP'] || 3600;
+                        if (code === 'VES') return rates['VES'] || 880.12;
+                        if (code === 'COP') return rates['COP'] || 3600;
                     }
                     return rates[code] || 1;
                 };

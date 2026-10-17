@@ -23,6 +23,7 @@ const isCapacitor = typeof window !== 'undefined' && (
     (window as any).Capacitor?.platform === 'ios' ||
     window.location.protocol === 'capacitor:'
 );
+export const APP_BUILD = '2026-10-17.1';
 const DESKTOP_WINDOWS_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Setup-Windows.exe';
 const DESKTOP_WIN7_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Setup-Win7-x64.exe';
 const DESKTOP_LINUX_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Linux.AppImage';

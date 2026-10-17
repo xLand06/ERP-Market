@@ -6,8 +6,12 @@ export interface SystemSettings {
     ivaEnabled: boolean;
     ivaPercent: number;
     ivaMode: 'included' | 'added';
+    // Monedas & Tasas
     mainCurrency: string;
     activeCurrencies: string[];
+    useOfficialRateForVes: boolean;
+    bcvRateType: 've_dolar_oficial' | 've_dolar_paralelo' | 've_euro_oficial';
+    bcvLastSync: string | null;
     autoOpenTime: string | null;
     autoCloseTime: string | null;
     purgeRetentionDays: number;
@@ -64,6 +68,9 @@ const DEFAULT_SETTINGS: SystemSettings = {
     ivaMode: 'added',
     mainCurrency: 'USD',
     activeCurrencies: ['USD', 'COP', 'VES'],
+    useOfficialRateForVes: true,
+    bcvRateType: 've_dolar_oficial',
+    bcvLastSync: null,
     autoOpenTime: null,
     autoCloseTime: null,
     purgeRetentionDays: 30,
@@ -118,7 +125,7 @@ export async function getSettings(): Promise<SystemSettings> {
         for (const s of dbSettings) {
             if (s.key === 'iva' || s.key === 'ivaPercent' || s.key === 'purgeRetentionDays' || s.key === 'purgeLogRetentionDays' || s.key === 'printCopies') {
                 config[s.key] = Number(s.value);
-            } else if (s.key === 'ivaEnabled' || s.key === 'autoCut' || s.key === 'openCashDrawer' || s.key === 'autoPrintOnCheckout' || s.key === 'catalogActive' || s.key.startsWith('show')) {
+            } else if (s.key === 'ivaEnabled' || s.key === 'autoCut' || s.key === 'openCashDrawer' || s.key === 'autoPrintOnCheckout' || s.key === 'catalogActive' || s.key === 'useOfficialRateForVes' || s.key.startsWith('show')) {
                 config[s.key] = s.value === 'true';
             } else if (s.key === 'activeCurrencies') {
                 // Stored as JSON array; fall back to comma-split for legacy rows
