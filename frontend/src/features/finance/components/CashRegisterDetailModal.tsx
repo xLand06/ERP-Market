@@ -1,7 +1,8 @@
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { DollarSign, TrendingUp, Calendar } from 'lucide-react';
+import { DollarSign, TrendingUp, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useConfigStore } from '@/hooks/useConfigStore';
@@ -14,6 +15,15 @@ interface Props {
 }
 
 export function CashRegisterDetailModal({ id, open, onClose, onSaleClick }: Props) {
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
+    useEffect(() => {
+        if (open) {
+            setPage(1);
+        }
+    }, [open, id]);
+
     const { data: register, isLoading } = useQuery({
         queryKey: ['cashRegisterDetail', id],
         queryFn: async () => {
@@ -203,61 +213,120 @@ export function CashRegisterDetailModal({ id, open, onClose, onSaleClick }: Prop
                     </div>
                 </div>
 
-                <div>
-                    <h3 className="font-bold text-slate-800 mb-3 text-sm uppercase tracking-wider">Movimientos del Turno ({transactions.length})</h3>
-                    {transactions.length === 0 ? (
-                        <div className="text-center py-8 text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                            No hay movimientos registrados
-                        </div>
-                    ) : (
-                        <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
-                            {transactions.map((t: any) => (
-                                <div key={t.id} 
-                                    className={cn("px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors", t.type === 'SALE' && onSaleClick && "cursor-pointer group")}
-                                    onClick={() => t.type === 'SALE' && onSaleClick && onSaleClick(t.id)}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', t.type === 'SALE' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}>
-                                            {t.type === 'SALE' ? <TrendingUp className="w-4 h-4" /> : <DollarSign className="w-4 h-4" />}
-                                        </div>
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <p className="text-sm font-medium text-slate-800">{t.type === 'SALE' ? 'Venta' : 'Ajuste'}</p>
-                                                {t.type === 'SALE' && (
-                                                    <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono">
-                                                        #{t.id.slice(-6).toUpperCase()}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                                                <Calendar className="w-3 h-3" />
-                                                {new Date(t.createdAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
-                                            </p>
-                                            {t.notes && (
-                                                <p className="text-[10px] bg-slate-100/80 text-slate-600 px-2 py-0.5 rounded font-semibold mt-1 border border-slate-200/50 w-fit">
-                                                    {t.notes}
-                                                </p>
-                                            )}
-                                        </div>
+                {(() => {
+                    const totalPages = Math.max(1, Math.ceil(transactions.length / pageSize));
+                    const safePage = Math.min(page, totalPages);
+                    const paginatedTransactions = transactions.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+                    return (
+                        <div>
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">
+                                    Movimientos del Turno ({transactions.length})
+                                </h3>
+                                {transactions.length > 5 && (
+                                    <div className="flex items-center gap-2 text-xs">
+                                        <select
+                                            value={pageSize}
+                                            onChange={(e) => {
+                                                setPageSize(Number(e.target.value));
+                                                setPage(1);
+                                            }}
+                                            className="h-7 px-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 font-medium outline-none cursor-pointer"
+                                        >
+                                            <option value={5}>5 / pág</option>
+                                            <option value={10}>10 / pág</option>
+                                            <option value={20}>20 / pág</option>
+                                        </select>
                                     </div>
-                                    <div className="text-right">
-                                        <p className={cn('text-sm font-bold tabular-nums', t.type === 'SALE' ? 'text-emerald-600' : 'text-amber-600')}>
-                                            {t.type === 'SALE' ? '+' : ''}{formatCurrency(t.total)}
-                                        </p>
-                                        <div className="flex gap-2 justify-end mt-0.5">
-                                            {t.currency && t.currency !== 'COP' && (
-                                                <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono">
-                                                    Pagado en {t.currency}
-                                                </span>
-                                            )}
-                                            <p className="text-[10px] text-slate-400 capitalize font-semibold">{t.status.toLowerCase()}</p>
-                                        </div>
-                                    </div>
+                                )}
+                            </div>
+
+                            {transactions.length === 0 ? (
+                                <div className="text-center py-8 text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                    No hay movimientos registrados
                                 </div>
-                            ))}
+                            ) : (
+                                <>
+                                    <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                                        {paginatedTransactions.map((t: any) => (
+                                            <div key={t.id} 
+                                                className={cn("px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors", t.type === 'SALE' && onSaleClick && "cursor-pointer group")}
+                                                onClick={() => t.type === 'SALE' && onSaleClick && onSaleClick(t.id)}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', t.type === 'SALE' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}>
+                                                        {t.type === 'SALE' ? <TrendingUp className="w-4 h-4" /> : <DollarSign className="w-4 h-4" />}
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="text-sm font-medium text-slate-800">{t.type === 'SALE' ? 'Venta' : 'Ajuste'}</p>
+                                                            {t.type === 'SALE' && (
+                                                                <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono">
+                                                                    #{t.id.slice(-6).toUpperCase()}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                                                            <Calendar className="w-3 h-3" />
+                                                            {new Date(t.createdAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}
+                                                        </p>
+                                                        {t.notes && (
+                                                            <p className="text-[10px] bg-slate-100/80 text-slate-600 px-2 py-0.5 rounded font-semibold mt-1 border border-slate-200/50 w-fit">
+                                                                {t.notes}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className={cn('text-sm font-bold tabular-nums', t.type === 'SALE' ? 'text-emerald-600' : 'text-amber-600')}>
+                                                        {t.type === 'SALE' ? '+' : ''}{formatCurrency(t.total)}
+                                                    </p>
+                                                    <div className="flex gap-2 justify-end mt-0.5">
+                                                        {t.currency && t.currency !== 'COP' && (
+                                                            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono">
+                                                                Pagado en {t.currency}
+                                                            </span>
+                                                        )}
+                                                        <p className="text-[10px] text-slate-400 capitalize font-semibold">{t.status.toLowerCase()}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {totalPages > 1 && (
+                                        <div className="mt-2.5 flex items-center justify-between text-xs px-1">
+                                            <span className="text-slate-500">
+                                                Página <span className="font-bold text-slate-700">{safePage}</span> de <span className="font-bold text-slate-700">{totalPages}</span>
+                                            </span>
+                                            <div className="flex items-center gap-1">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={safePage <= 1}
+                                                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                                                    className="h-7 px-2 text-xs"
+                                                >
+                                                    <ChevronLeft className="w-3 h-3 mr-1" /> Ant
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={safePage >= totalPages}
+                                                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                                    className="h-7 px-2 text-xs"
+                                                >
+                                                    Sig <ChevronRight className="w-3 h-3 ml-1" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
                         </div>
-                    )}
-                </div>
+                    );
+                })()}
 
                 <div className="mt-6 flex justify-end">
                     <Button onClick={onClose}>Cerrar Detalle</Button>

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
     TrendingUp, TrendingDown, DollarSign, ArrowUpCircle,
-    Plus, Lock, Circle, Play, History, ChevronLeft, ChevronRight, Calendar, Copy, Eye, ShoppingBag, PackageMinus, Store, Receipt
+    Plus, Lock, Circle, Play, History, ChevronLeft, ChevronRight, Calendar, Copy, Eye, ShoppingBag, PackageMinus, Store, Receipt, Search
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,6 +54,12 @@ export default function CashRegisterPage() {
     const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
     const [searchTxId, setSearchTxId] = useState('');
     const [searchLoading, setSearchLoading] = useState(false);
+    
+    // Paginación y filtros para Movimientos del Día (Turno Actual)
+    const [movimientosPage, setMovimientosPage] = useState(1);
+    const [movimientosPageSize, setMovimientosPageSize] = useState(10);
+    const [movimientosSearch, setMovimientosSearch] = useState('');
+    const [movimientosFilter, setMovimientosFilter] = useState<'ALL' | 'SALE' | 'ADJUSTMENT'>('ALL');
     
     const [searchParams] = useSearchParams();
 
@@ -496,63 +502,242 @@ export default function CashRegisterPage() {
                             </div>
                         );
                     })()}
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                        <div className="px-5 py-4 border-b border-slate-100"><h2 className="font-bold text-slate-800">Movimientos del Día</h2></div>
-                        {transactions.length === 0 ? (
-                            <div className="p-8 text-center text-slate-400 text-sm">No hay movimientos registrados</div>
-                        ) : (
-                            <div className="divide-y divide-slate-100">
-                                {transactions.map((t: any) => (
-                                    <div key={t.id} className={cn("px-3 sm:px-5 py-3 flex items-center justify-between gap-2 hover:bg-slate-50 transition-colors group", t.type === 'SALE' && "cursor-pointer")} onClick={() => t.type === 'SALE' && setSelectedSaleId(t.id)}>
-                                        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                                            <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', t.type === 'SALE' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}>
-                                                {t.type === 'SALE' ? <TrendingUp className="w-4 h-4" /> : <DollarSign className="w-4 h-4" />}
-                                            </div>
-                                            <div className="min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <p className="text-sm font-medium text-slate-800">{t.type === 'SALE' ? 'Venta' : 'Ajuste'}</p>
-                                                    {t.type === 'SALE' && (
-                                                        <span 
-                                                            className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono hover:bg-slate-200 transition-colors flex items-center gap-1"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                navigator.clipboard.writeText(t.id);
-                                                                toast.success('Código copiado');
-                                                            }}
-                                                            title="Copiar código de venta"
-                                                        >
-                                                            #{t.id.slice(-6).toUpperCase()}
-                                                            <Copy className="w-3 h-3" />
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                                                    <Calendar className="w-3 h-3 shrink-0" />
-                                                    <span className="truncate">{new Date(t.createdAt).toLocaleDateString('es-VE')} {new Date(t.createdAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}</span>
-                                                </p>
-                                                {t.notes && (
-                                                    <p className="text-[10px] bg-slate-100/80 text-slate-600 px-2 py-0.5 rounded font-semibold mt-1 border border-slate-200/50 w-fit max-w-full truncate">
-                                                        {t.notes}
-                                                    </p>
+                    {(() => {
+                        const filteredTransactions = transactions.filter((t: any) => {
+                            if (movimientosFilter !== 'ALL' && t.type !== movimientosFilter) return false;
+                            if (movimientosSearch.trim()) {
+                                const q = movimientosSearch.toLowerCase().trim();
+                                const idMatch = t.id?.toLowerCase().includes(q);
+                                const notesMatch = t.notes?.toLowerCase().includes(q);
+                                const totalMatch = String(t.total).includes(q);
+                                if (!idMatch && !notesMatch && !totalMatch) return false;
+                            }
+                            return true;
+                        });
+
+                        const totalMovimientosPages = Math.max(1, Math.ceil(filteredTransactions.length / movimientosPageSize));
+                        const safeMovimientosPage = Math.min(movimientosPage, totalMovimientosPages);
+                        const paginatedTransactions = filteredTransactions.slice(
+                            (safeMovimientosPage - 1) * movimientosPageSize,
+                            safeMovimientosPage * movimientosPageSize
+                        );
+
+                        return (
+                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                                <div className="px-4 sm:px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2.5">
+                                        <h2 className="font-bold text-slate-800 text-base">Movimientos del Día</h2>
+                                        <span className="text-xs bg-indigo-50 text-indigo-700 font-bold px-2.5 py-0.5 rounded-full border border-indigo-100 tabular-nums">
+                                            {filteredTransactions.length} {filteredTransactions.length === 1 ? 'movimiento' : 'movimientos'}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {/* Filtro por tipo */}
+                                        <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/60 text-xs font-semibold">
+                                            <button
+                                                type="button"
+                                                onClick={() => { setMovimientosFilter('ALL'); setMovimientosPage(1); }}
+                                                className={cn(
+                                                    "px-2.5 py-1 rounded-md transition-all cursor-pointer",
+                                                    movimientosFilter === 'ALL'
+                                                        ? "bg-white text-indigo-700 shadow-2xs font-bold"
+                                                        : "text-slate-500 hover:text-slate-700"
                                                 )}
-                                            </div>
+                                            >
+                                                Todos
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setMovimientosFilter('SALE'); setMovimientosPage(1); }}
+                                                className={cn(
+                                                    "px-2.5 py-1 rounded-md transition-all cursor-pointer",
+                                                    movimientosFilter === 'SALE'
+                                                        ? "bg-white text-emerald-700 shadow-2xs font-bold"
+                                                        : "text-slate-500 hover:text-slate-700"
+                                                )}
+                                            >
+                                                Ventas
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setMovimientosFilter('ADJUSTMENT'); setMovimientosPage(1); }}
+                                                className={cn(
+                                                    "px-2.5 py-1 rounded-md transition-all cursor-pointer",
+                                                    movimientosFilter === 'ADJUSTMENT'
+                                                        ? "bg-white text-amber-700 shadow-2xs font-bold"
+                                                        : "text-slate-500 hover:text-slate-700"
+                                                )}
+                                            >
+                                                Ajustes
+                                            </button>
                                         </div>
-                                        <div className="text-right flex items-center gap-2 sm:gap-4 shrink-0">
-                                            <div>
-                                                <p className={cn('text-sm font-bold', t.type === 'SALE' ? 'text-emerald-600' : 'text-amber-600')}>{t.type === 'SALE' ? '+' : ''}{formatCurrency(t.total)}</p>
-                                                <p className="text-[10px] text-slate-400 capitalize font-semibold mt-0.5">{t.status.toLowerCase()}</p>
-                                            </div>
-                                            {t.type === 'SALE' && (
-                                                <div className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-slate-100 rounded-md">
-                                                    <Eye className="w-4 h-4 text-slate-500" />
+
+                                        {/* Buscador rápido */}
+                                        <div className="relative min-w-[140px] sm:w-44">
+                                            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Filtrar por ticket o nota..."
+                                                value={movimientosSearch}
+                                                onChange={(e) => {
+                                                    setMovimientosSearch(e.target.value);
+                                                    setMovimientosPage(1);
+                                                }}
+                                                className="w-full pl-8 pr-6 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                            />
+                                            {movimientosSearch && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setMovimientosSearch(''); setMovimientosPage(1); }}
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer font-bold"
+                                                >
+                                                    ×
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Selector de items por página */}
+                                        <select
+                                            value={movimientosPageSize}
+                                            onChange={(e) => {
+                                                setMovimientosPageSize(Number(e.target.value));
+                                                setMovimientosPage(1);
+                                            }}
+                                            className="h-7 px-2 text-xs bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-600 outline-none cursor-pointer"
+                                            title="Movimientos por página"
+                                        >
+                                            <option value={5}>5 / pág</option>
+                                            <option value={10}>10 / pág</option>
+                                            <option value={20}>20 / pág</option>
+                                            <option value={50}>50 / pág</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {filteredTransactions.length === 0 ? (
+                                    <div className="p-8 text-center text-slate-400 text-sm">
+                                        {transactions.length === 0
+                                            ? 'No hay movimientos registrados en este turno'
+                                            : 'No se encontraron movimientos con los filtros aplicados'}
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="divide-y divide-slate-100">
+                                            {paginatedTransactions.map((t: any) => (
+                                                <div key={t.id} className={cn("px-3 sm:px-5 py-3 flex items-center justify-between gap-2 hover:bg-slate-50 transition-colors group", t.type === 'SALE' && "cursor-pointer")} onClick={() => t.type === 'SALE' && setSelectedSaleId(t.id)}>
+                                                    <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                                                        <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', t.type === 'SALE' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}>
+                                                            {t.type === 'SALE' ? <TrendingUp className="w-4 h-4" /> : <DollarSign className="w-4 h-4" />}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <p className="text-sm font-medium text-slate-800">{t.type === 'SALE' ? 'Venta' : 'Ajuste'}</p>
+                                                                {t.type === 'SALE' && (
+                                                                    <span 
+                                                                        className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono hover:bg-slate-200 transition-colors flex items-center gap-1 cursor-pointer"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            navigator.clipboard.writeText(t.id);
+                                                                            toast.success('Código copiado');
+                                                                        }}
+                                                                        title="Copiar código de venta"
+                                                                    >
+                                                                        #{t.id.slice(-6).toUpperCase()}
+                                                                        <Copy className="w-3 h-3" />
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                                                                <Calendar className="w-3 h-3 shrink-0" />
+                                                                <span className="truncate">{new Date(t.createdAt).toLocaleDateString('es-VE')} {new Date(t.createdAt).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                            </p>
+                                                            {t.notes && (
+                                                                <p className="text-[10px] bg-slate-100/80 text-slate-600 px-2 py-0.5 rounded font-semibold mt-1 border border-slate-200/50 w-fit max-w-full truncate">
+                                                                    {t.notes}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right flex items-center gap-2 sm:gap-4 shrink-0">
+                                                        <div>
+                                                            <p className={cn('text-sm font-bold', t.type === 'SALE' ? 'text-emerald-600' : 'text-amber-600')}>{t.type === 'SALE' ? '+' : ''}{formatCurrency(t.total)}</p>
+                                                            <p className="text-[10px] text-slate-400 capitalize font-semibold mt-0.5">{t.status.toLowerCase()}</p>
+                                                        </div>
+                                                        {t.type === 'SALE' && (
+                                                            <div className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-slate-100 rounded-md">
+                                                                <Eye className="w-4 h-4 text-slate-500" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Barra de paginación */}
+                                        <div className="px-4 sm:px-5 py-3 border-t border-slate-100 bg-slate-50/70 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
+                                            <span className="text-slate-500 font-medium">
+                                                Mostrando <span className="font-bold text-slate-800">{(safeMovimientosPage - 1) * movimientosPageSize + 1}</span> a <span className="font-bold text-slate-800">{Math.min(safeMovimientosPage * movimientosPageSize, filteredTransactions.length)}</span> de <span className="font-bold text-slate-800">{filteredTransactions.length}</span> movimientos
+                                            </span>
+
+                                            {totalMovimientosPages > 1 && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={safeMovimientosPage <= 1}
+                                                        onClick={() => setMovimientosPage(p => Math.max(1, p - 1))}
+                                                        className="h-8 px-2.5 text-xs font-semibold"
+                                                    >
+                                                        <ChevronLeft className="w-3.5 h-3.5 mr-1" />
+                                                        Anterior
+                                                    </Button>
+
+                                                    <div className="flex items-center gap-1">
+                                                        {Array.from({ length: totalMovimientosPages }, (_, i) => i + 1)
+                                                            .filter(p => p === 1 || p === totalMovimientosPages || Math.abs(p - safeMovimientosPage) <= 1)
+                                                            .map((p, idx, arr) => {
+                                                                const prev = arr[idx - 1];
+                                                                const showEllipsis = prev && p - prev > 1;
+                                                                return (
+                                                                    <div key={p} className="flex items-center gap-1">
+                                                                        {showEllipsis && <span className="text-slate-400 px-0.5">...</span>}
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setMovimientosPage(p)}
+                                                                            className={cn(
+                                                                                "w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center",
+                                                                                safeMovimientosPage === p
+                                                                                    ? "bg-indigo-600 text-white shadow-2xs"
+                                                                                    : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                                                                            )}
+                                                                        >
+                                                                            {p}
+                                                                        </button>
+                                                                    </div>
+                                                                );
+                                                            })
+                                                        }
+                                                    </div>
+
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={safeMovimientosPage >= totalMovimientosPages}
+                                                        onClick={() => setMovimientosPage(p => Math.min(totalMovimientosPages, p + 1))}
+                                                        className="h-8 px-2.5 text-xs font-semibold"
+                                                    >
+                                                        Siguiente
+                                                        <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                                                    </Button>
                                                 </div>
                                             )}
                                         </div>
-                                    </div>
-                                ))}
+                                    </>
+                                )}
                             </div>
-                        )}
-                    </div>
+                        );
+                    })()}
                 </div>
             </>
         );
