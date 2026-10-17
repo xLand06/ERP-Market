@@ -1,0 +1,40 @@
+appId: com.allcode.allmarket
+productName: ALL-MARKET
+copyright: Copyright © 2026 ALLCODE
+electronVersion: 22.3.27
+
+protocols:
+  - name: ALLMARKET
+    schemes:
+      - allmarket
+
+directories:
+  output: dist-win7
+  buildResources: resources
+
+files:
+  - out/**/*
+  - node_modules/**/*
+  - "!node_modules/electron/**"
+  - "!node_modules/electron-builder/**"
+  - "!node_modules/electron-vite/**"
+  - "!node_modules/ts-node/**"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+
+nsis:
+  artifactName: "${productName}-Setup-Win7-${arch}.${ext}"
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+portable:
+  artifactName: "${productName}-Portable-Win7-${arch}.${ext}"

@@ -37,6 +37,7 @@ temp-backend/
 ##Electron
 out/
 dist/
+dist-win7/
 
 .unlighthouse
 standalone/
