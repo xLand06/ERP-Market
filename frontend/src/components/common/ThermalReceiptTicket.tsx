@@ -88,9 +88,6 @@ export function ThermalReceiptTicket({
         hour12: false,
     });
 
-    // Subtotales simulados para el desglose de IVA (16%)
-    const gravableUSD = computedTotalUSD / 1.16;
-    const ivaUSD = computedTotalUSD - gravableUSD;
 
     return (
         <div className={cn(
