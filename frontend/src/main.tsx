@@ -33,7 +33,13 @@ if ((window as any).Capacitor?.isNativePlatform?.()) {
 // Vite emite 'vite:preloadError'. Recargamos UNA vez: el index.html fresco
 // referencia los hashes actuales y la app arranca bien.
 window.addEventListener('vite:preloadError', () => {
-    window.location.reload();
+    const key = 'am_chunk_reload_ts';
+    const last = parseInt(sessionStorage.getItem(key) || '0', 10);
+    const now = Date.now();
+    if (now - last > 15_000) {
+        sessionStorage.setItem(key, String(now));
+        window.location.reload();
+    }
 });
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

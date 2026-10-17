@@ -245,11 +245,18 @@ api.interceptors.response.use(
 
         if (!originalRequest) return Promise.reject(error);
 
-        // 401 → cierra sesión inmediatamente
+        // 401 → cierra sesión inmediatamente si no estamos ya en la pantalla de login
         if (error.response?.status === 401) {
             useAuthStore.getState().logout();
             const isElectron = window.location.protocol === 'file:' || (window as any).erpApi?.isElectron;
-            window.location.href = isElectron ? '#/login' : '/login';
+            const target = isElectron ? '#/login' : '/login';
+            const pathname = (typeof window !== 'undefined' ? window.location.pathname : '').toLowerCase();
+            const hash = (typeof window !== 'undefined' ? window.location.hash : '').toLowerCase();
+            const alreadyOnLogin = pathname === '/login' || hash.includes('/login');
+
+            if (!alreadyOnLogin && typeof window !== 'undefined') {
+                window.location.href = target;
+            }
             return Promise.reject(error);
         }
 

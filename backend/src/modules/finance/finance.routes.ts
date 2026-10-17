@@ -11,12 +11,13 @@ import { updateExchangeRateSchema } from '../../core/validations/finance.zod';
 import * as ctrl from './finance.controller';
 
 const router = Router();
-router.use(authMiddleware);
 
 /**
- * GET /api/finance/rates — Obtener todas las tasas de cambio
+ * GET /api/finance/rates — Obtener todas las tasas de cambio (pública para App, POS y Catálogo)
  */
 router.get('/rates', ctrl.getRates);
+
+router.use(authMiddleware);
 
 /**
  * POST /api/finance/rates — Crear o actualizar una tasa de cambio (Solo OWNER)
