@@ -153,7 +153,7 @@ export const useConfigStore = create<ConfigState>()(
             updatedAt: null,
             rates: {
                 VES: 880.12,
-                COP: 3600,
+                COP: 2857.15,
                 USD: 1,
             },
             useOfficialRateForVes: true,
@@ -215,32 +215,43 @@ export const useConfigStore = create<ConfigState>()(
             dismissNotice: (notice: string) => set({ dismissedNotice: notice }),
 
             get vesRate() { return get().rates['VES'] || 880.12; },
-            get copRate() { return get().rates['COP'] || 3600; },
+            get copRate() { return get().rates['COP'] || 2857.15; },
 
-            // ── Conversión Universal ────────────────────────────────────────
+            // ── Conversión Universal (Triangulación USD / COP / VES) ────────
             convert: (amount: number, fromCurrency: string, toCurrency: string) => {
-                if (!amount || fromCurrency === toCurrency) return amount;
-                const main = get().mainCurrency || 'USD';
+                if (!amount) return 0;
+                const from = (fromCurrency || 'USD').toUpperCase();
+                const to = (toCurrency || 'USD').toUpperCase();
+                if (from === to) return amount;
+
                 const rates = get().rates;
+                const vesRate = Number(rates['VES']) || 880.12;
+                const copRate = Number(rates['COP']) || 2857.15;
 
-                const getRate = (code: string) => {
-                    if (code === main) return 1;
-                    if (main === 'USD') {
-                        if (code === 'VES') return rates['VES'] || 880.12;
-                        if (code === 'COP') return rates['COP'] || 3600;
-                    }
-                    return rates[code] || 1;
-                };
-
-                let amountInMain = amount;
-                if (fromCurrency !== main) {
-                    const rFrom = getRate(fromCurrency);
-                    amountInMain = rFrom > 0 ? amount / rFrom : amount;
+                // 1. Normalizar origen al pivote universal (USD)
+                let amountInUSD = amount;
+                if (from === 'USD') {
+                    amountInUSD = amount;
+                } else if (from === 'VES') {
+                    amountInUSD = vesRate > 0 ? amount / vesRate : amount;
+                } else if (from === 'COP') {
+                    amountInUSD = copRate > 0 ? amount / copRate : amount;
+                } else {
+                    const r = Number(rates[from]) || 1;
+                    amountInUSD = r > 0 ? amount / r : amount;
                 }
 
-                if (toCurrency === main) return amountInMain;
-                const rTo = getRate(toCurrency);
-                return amountInMain * rTo;
+                // 2. Convertir desde USD a destino
+                if (to === 'USD') {
+                    return amountInUSD;
+                } else if (to === 'VES') {
+                    return amountInUSD * vesRate;
+                } else if (to === 'COP') {
+                    return amountInUSD * copRate;
+                } else {
+                    const r = Number(rates[to]) || 1;
+                    return amountInUSD * r;
+                }
             },
 
             formatCurrency: (amount: number, currencyCode?: string) => {

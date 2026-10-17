@@ -89,6 +89,9 @@ export function SystemSettings() {
         fetchRates();
     }, []);
 
+    const [pesoRateInput, setPesoRateInput] = useState<string>('');
+    const [isEditingPesoRate, setIsEditingPesoRate] = useState<boolean>(false);
+
     // Sincronizar el estado local cuando los datos terminen de cargar desde la API/Store
     useEffect(() => {
         setLocalMainCurrency(mainCurrency || 'USD');
@@ -106,7 +109,46 @@ export function SystemSettings() {
         setLocalCloseTime(autoCloseTime || '');
         setLocalPurgeDays(purgeRetentionDays.toString());
         setLocalLogDays(purgeLogRetentionDays.toString());
+
+        const vRate = parseFloat(initialRates['VES'] || rates?.['VES']?.toString() || '880.12') || 880.12;
+        const cRate = parseFloat(initialRates['COP'] || rates?.['COP']?.toString() || '2857.15') || 2857.15;
+        if (cRate > 0) {
+            setPesoRateInput((vRate / cRate).toFixed(6));
+        }
     }, [rates, iva, mainCurrency, activeCurrencies, autoCloseTime, purgeRetentionDays, purgeLogRetentionDays, useOfficialRateForVes, bcvRateType]);
+
+    // Mantener pesoRateInput sincronizado si no se está escribiendo en él
+    useEffect(() => {
+        if (!isEditingPesoRate) {
+            const vRate = parseFloat(localRates['VES'] || rates?.['VES']?.toString() || '880.12') || 880.12;
+            const cRate = parseFloat(localRates['COP'] || rates?.['COP']?.toString() || '2857.15') || 2857.15;
+            if (cRate > 0) {
+                setPesoRateInput((vRate / cRate).toFixed(6));
+            }
+        }
+    }, [localRates['VES'], localRates['COP'], isEditingPesoRate]);
+
+    const handleCopRateChange = (val: string) => {
+        if (val === '' || /^\d+(\.\d{0,4})?$/.test(val)) {
+            setLocalRates(prev => ({ ...prev, COP: val }));
+            const cNum = parseFloat(val);
+            if (cNum > 0) {
+                const vRate = parseFloat(localRates['VES'] || rates?.['VES']?.toString() || '880.12') || 880.12;
+                setPesoRateInput((vRate / cNum).toFixed(6));
+            }
+        }
+    };
+
+    const handlePesoRateChange = (val: string) => {
+        setPesoRateInput(val);
+        if (val === '' || !/^\d+(\.\d{0,6})?$/.test(val)) return;
+        const pNum = parseFloat(val);
+        if (pNum > 0) {
+            const vRate = parseFloat(localRates['VES'] || rates?.['VES']?.toString() || '880.12') || 880.12;
+            const newCop = (vRate / pNum).toFixed(2);
+            setLocalRates(prev => ({ ...prev, COP: newCop }));
+        }
+    };
 
     const toggleCurrency = (code: string) => {
         if (code === localMainCurrency) {
@@ -602,7 +644,7 @@ export function SystemSettings() {
                                                 ? '1.000000' 
                                                 : (localRates[code] ?? (
                                                     code === 'VES' ? (rates?.['VES'] ? rates['VES'].toString() : '880.12') :
-                                                    code === 'COP' ? (rates?.['COP'] ? rates['COP'].toString() : '3600') : '1'
+                                                    code === 'COP' ? (rates?.['COP'] ? rates['COP'].toString() : '2857.15') : '1'
                                                 ));
 
                                             return (
@@ -653,6 +695,49 @@ export function SystemSettings() {
                                                                     <Check className="w-3 h-3 text-emerald-600" /> Sincronización BCV Activa
                                                                 </span>
                                                             </div>
+                                                        ) : code === 'COP' ? (
+                                                            <div className="space-y-1.5 py-1">
+                                                                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
+                                                                    <div>
+                                                                        <input
+                                                                            type="text"
+                                                                            inputMode="decimal"
+                                                                            value={currentVal}
+                                                                            onChange={(e) => handleCopRateChange(e.target.value)}
+                                                                            placeholder="2857.15"
+                                                                            className="w-32 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none shadow-2xs"
+                                                                        />
+                                                                        <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
+                                                                            1 {localMainCurrency} = X COP
+                                                                        </span>
+                                                                    </div>
+
+                                                                    {/* Dual input: 1 Peso en Bs */}
+                                                                    <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-1.5 px-2.5 shadow-2xs">
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <span className="text-[10px] font-black uppercase text-amber-900 whitespace-nowrap">
+                                                                                1 COP en Bs:
+                                                                            </span>
+                                                                            <div className="flex items-center gap-1">
+                                                                                <span className="text-xs font-mono font-bold text-amber-700">Bs.</span>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    inputMode="decimal"
+                                                                                    value={pesoRateInput}
+                                                                                    onFocus={() => setIsEditingPesoRate(true)}
+                                                                                    onBlur={() => setIsEditingPesoRate(false)}
+                                                                                    onChange={(e) => handlePesoRateChange(e.target.value)}
+                                                                                    placeholder="0.308041"
+                                                                                    className="w-24 rounded-lg border border-amber-300 bg-white px-1.5 py-0.5 text-xs font-mono font-black text-amber-950 focus:ring-2 focus:ring-amber-500 outline-none"
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                        <span className="text-[9px] font-mono font-bold text-amber-800/90 block mt-0.5">
+                                                                            1.000 COP = Bs. {((parseFloat(localRates['VES'] || rates?.['VES']?.toString() || '880.12') || 880.12) / (parseFloat(currentVal || '2857.15') || 2857.15) * 1000).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
                                                         ) : (
                                                             <div>
                                                                 <input
@@ -697,24 +782,32 @@ export function SystemSettings() {
                                     <span className="text-slate-400">1 {localMainCurrency} =</span>
                                     {localActiveCurrencies.filter(c => c !== localMainCurrency).map((c, i) => {
                                         const info = getCurrencyInfo(c);
-                                        const rateVal = parseFloat(localRates[c] || (c === 'VES' ? rates?.['VES']?.toString() || '880.12' : c === 'COP' ? rates?.['COP']?.toString() || '3600' : '1')) || 1;
+                                        const rateVal = parseFloat(localRates[c] || (c === 'VES' ? rates?.['VES']?.toString() || '880.12' : c === 'COP' ? rates?.['COP']?.toString() || '2857.15' : '1')) || 1;
                                         return (
                                             <span key={c} className="flex items-center gap-1">
                                                 {i > 0 && <span className="text-slate-500">•</span>}
                                                 <span className="text-emerald-400">
-                                                    {c === 'COP' ? Math.round(rateVal).toLocaleString('es-CO') : rateVal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {info.symbol} ({c})
+                                                    {c === 'COP' ? rateVal.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : rateVal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {info.symbol} ({c})
                                                 </span>
                                             </span>
                                         );
                                     })}
                                 </div>
-                                {localActiveCurrencies.includes('VES') && localActiveCurrencies.includes('COP') && localMainCurrency === 'USD' && (
-                                    <div className="flex items-center gap-1.5 bg-indigo-950/60 px-2.5 py-1 rounded-lg border border-indigo-800/60 text-slate-300">
-                                        <span className="text-slate-400">1.000 COP =</span>
-                                        <span className="text-amber-400">
-                                            Bs. {(((parseFloat(localRates['VES'] || rates?.['VES']?.toString() || '880.12') || 880.12) / (parseFloat(localRates['COP'] || rates?.['COP']?.toString() || '3600') || 3600)) * 1000).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES
-                                        </span>
-                                    </div>
+                                {localActiveCurrencies.includes('VES') && localActiveCurrencies.includes('COP') && (
+                                    <>
+                                        <div className="flex items-center gap-1.5 bg-amber-500/15 px-2.5 py-1 rounded-lg border border-amber-500/30 text-amber-200">
+                                            <span className="text-amber-400/80">1 Peso (COP) =</span>
+                                            <span className="text-amber-300 font-black">
+                                                {(((parseFloat(localRates['VES'] || rates?.['VES']?.toString() || '880.12') || 880.12) / (parseFloat(localRates['COP'] || rates?.['COP']?.toString() || '2857.15') || 2857.15))).toFixed(6)} Bs.
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 bg-indigo-950/60 px-2.5 py-1 rounded-lg border border-indigo-800/60 text-slate-300">
+                                            <span className="text-slate-400">1.000 COP =</span>
+                                            <span className="text-amber-400">
+                                                Bs. {(((parseFloat(localRates['VES'] || rates?.['VES']?.toString() || '880.12') || 880.12) / (parseFloat(localRates['COP'] || rates?.['COP']?.toString() || '2857.15') || 2857.15)) * 1000).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES
+                                            </span>
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         </div>
