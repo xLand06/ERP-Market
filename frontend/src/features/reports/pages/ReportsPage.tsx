@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart2, TrendingUp, TrendingDown, Package, DollarSign, Download, ArrowRight, AlertCircle } from 'lucide-react';
+import { BarChart2, TrendingUp, TrendingDown, Package, DollarSign, Download, ArrowRight, AlertCircle, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { exportToExcel } from '@/lib/exportUtils';
+import { exportToExcel, exportReportToPDF } from '@/lib/exportUtils';
+import { useConfigStore } from '@/hooks/useConfigStore';
+import toast from 'react-hot-toast';
 import {
     useReportSummary,
     useSalesByDay,
@@ -172,8 +174,18 @@ export default function ReportsPage() {
     // Estimate profit (30% margin)
     const estimatedProfit = (summary.data?.totalSales ?? 0) * 0.3;
 
-    // Export
-    const handleExportReports = () => {
+    const { businessName, taxId, fiscalAddress, fiscalPhone } = useConfigStore();
+    const activePresetLabel = DATE_PRESETS.find((p) => p.key === datePreset)?.label || 'Período seleccionado';
+
+    const businessInfo = useMemo(() => ({
+        businessName: businessName || 'ERP Market',
+        taxId,
+        fiscalAddress,
+        fiscalPhone,
+    }), [businessName, taxId, fiscalAddress, fiscalPhone]);
+
+    // Export All to Excel
+    const handleExportExcelAll = () => {
         const s = summary.data;
         exportToExcel(
             [
@@ -207,6 +219,191 @@ export default function ReportsPage() {
         }
     };
 
+    // Export All to PDF (Consolidated Report without logos)
+    const handleExportAllPDF = () => {
+        const s = summary.data;
+        if (!s) {
+            toast.error('No hay datos disponibles para exportar');
+            return;
+        }
+
+        const tables: any[] = [];
+
+        // Table 1: Top Products
+        if (topProducts.data && topProducts.data.length > 0) {
+            tables.push({
+                title: 'Top Productos Más Vendidos',
+                headers: ['#', 'Producto', 'Unidades', 'Ingresos (USD)'],
+                rows: topProducts.data.map((p, idx) => [
+                    idx + 1,
+                    p.productName,
+                    FORMAT_NUM(p.quantity),
+                    FORMAT_USD(p.total),
+                ]),
+            });
+        }
+
+        // Table 2: Sales by Branch
+        if (branchSales.data && branchSales.data.length > 0) {
+            tables.push({
+                title: 'Ventas por Sucursal',
+                headers: ['Sucursal', 'Total Ventas (USD)', 'Participación (%)'],
+                rows: branchSales.data.map((b) => {
+                    const pct = branchTotal > 0 ? Math.round((b.total / branchTotal) * 100) : 0;
+                    return [b.branchName, FORMAT_USD(b.total), `${pct}%`];
+                }),
+            });
+        }
+
+        // Table 3: Daily Sales Breakdown
+        if (dailySales.data && dailySales.data.length > 0) {
+            tables.push({
+                title: 'Historial de Ventas Diarias',
+                headers: ['Fecha', 'Total Ventas (USD)', 'Transacciones'],
+                rows: dailySales.data.map((d) => [
+                    d.date,
+                    FORMAT_USD(d.total),
+                    FORMAT_NUM(d.count),
+                ]),
+            });
+        }
+
+        exportReportToPDF({
+            title: 'Reporte Gerencial Consolidado',
+            periodLabel: activePresetLabel,
+            business: businessInfo,
+            fileName: 'Reporte_Consolidado',
+            summaryCards: [
+                { label: 'Ventas Totales', value: FORMAT_USD(s.totalSales) },
+                { label: 'Transacciones', value: FORMAT_NUM(s.transactionCount) },
+                { label: 'Ticket Promedio', value: FORMAT_USD(s.avgTicket) },
+                { label: 'Ganancia Est. (30%)', value: FORMAT_USD(estimatedProfit) },
+            ],
+            tables,
+        });
+    };
+
+    // Export Top Products to PDF
+    const handleExportTopProductsPDF = () => {
+        if (!topProducts.data || topProducts.data.length === 0) {
+            toast.error('No hay datos de productos para exportar');
+            return;
+        }
+
+        const totalQty = topProducts.data.reduce((sum, p) => sum + p.quantity, 0);
+        const totalRev = topProducts.data.reduce((sum, p) => sum + p.total, 0);
+
+        exportReportToPDF({
+            title: 'Reporte: Top Productos Más Vendidos',
+            periodLabel: activePresetLabel,
+            business: businessInfo,
+            fileName: 'Reporte_Top_Productos',
+            summaryCards: [
+                { label: 'Productos Listados', value: String(topProducts.data.length) },
+                { label: 'Unidades Totales', value: FORMAT_NUM(totalQty) },
+                { label: 'Ingresos Totales', value: FORMAT_USD(totalRev) },
+            ],
+            tables: [
+                {
+                    headers: ['#', 'Nombre del Producto', 'Unidades Vendidas', 'Ingresos Totales (USD)'],
+                    rows: topProducts.data.map((p, idx) => [
+                        idx + 1,
+                        p.productName,
+                        FORMAT_NUM(p.quantity),
+                        FORMAT_USD(p.total),
+                    ]),
+                },
+            ],
+        });
+    };
+
+    // Export Top Products to Excel
+    const handleExportTopProductsExcel = () => {
+        if (!topProducts.data || topProducts.data.length === 0) {
+            toast.error('No hay datos de productos para exportar');
+            return;
+        }
+
+        exportToExcel(
+            topProducts.data.map((p, idx) => ({
+                ranking: idx + 1,
+                producto: p.productName,
+                unidades: p.quantity,
+                ingresos: FORMAT_USD(p.total),
+            })),
+            [
+                { header: 'Ranking', key: 'ranking' },
+                { header: 'Producto', key: 'producto' },
+                { header: 'Unidades', key: 'unidades' },
+                { header: 'Ingresos', key: 'ingresos' },
+            ],
+            'Top_Productos'
+        );
+    };
+
+    // Export Sales by Branch to PDF
+    const handleExportBranchesPDF = () => {
+        if (!branchSales.data || branchSales.data.length === 0) {
+            toast.error('No hay datos de sucursales para exportar');
+            return;
+        }
+
+        exportReportToPDF({
+            title: 'Reporte: Ventas por Sucursal',
+            periodLabel: activePresetLabel,
+            business: businessInfo,
+            fileName: 'Reporte_Ventas_Sucursal',
+            summaryCards: [
+                { label: 'Total Ventas', value: FORMAT_USD(branchTotal) },
+                { label: 'Sucursales Activas', value: String(branchSales.data.length) },
+            ],
+            tables: [
+                {
+                    headers: ['Sucursal', 'Total Ventas (USD)', 'Participación (%)'],
+                    rows: branchSales.data.map((b) => {
+                        const pct = branchTotal > 0 ? Math.round((b.total / branchTotal) * 100) : 0;
+                        return [b.branchName, FORMAT_USD(b.total), `${pct}%`];
+                    }),
+                },
+            ],
+        });
+    };
+
+    // Export Summary to PDF
+    const handleExportSummaryPDF = () => {
+        const s = summary.data;
+        if (!s) {
+            toast.error('No hay resumen disponible para exportar');
+            return;
+        }
+
+        exportReportToPDF({
+            title: 'Reporte: Resumen Ejecutivo del Período',
+            periodLabel: activePresetLabel,
+            business: businessInfo,
+            fileName: 'Reporte_Resumen_Periodo',
+            summaryCards: [
+                { label: 'Ventas Totales', value: FORMAT_USD(s.totalSales) },
+                { label: 'Transacciones', value: FORMAT_NUM(s.transactionCount) },
+                { label: 'Ticket Promedio', value: FORMAT_USD(s.avgTicket) },
+                { label: 'Ganancia Est. (30%)', value: FORMAT_USD(estimatedProfit) },
+            ],
+            tables: [
+                {
+                    title: 'Métricas Consolidadas de Rendimiento',
+                    headers: ['Indicador Clave', 'Valor Registrado', 'Observaciones'],
+                    rows: [
+                        ['Ventas Totales', FORMAT_USD(s.totalSales), 'Facturación bruta acumulada'],
+                        ['Total de Transacciones', FORMAT_NUM(s.transactionCount), 'Operaciones de caja registradas'],
+                        ['Ticket Promedio', FORMAT_USD(s.avgTicket), 'Gasto promedio por cliente'],
+                        ['Ganancia Estimada', FORMAT_USD(estimatedProfit), 'Margen referencial del 30%'],
+                        ['Sucursal Principal', (branchSales.data ?? [])[0]?.branchName ?? 'N/A', 'Mayor volumen de venta'],
+                    ],
+                },
+            ],
+        });
+    };
+
     if (isLoading) return <LoadingSkeleton />;
     if (isError) return <ErrorState message="Error al cargar los datos. Verifica tu conexión." />;
 
@@ -224,7 +421,7 @@ export default function ReportsPage() {
                         Datos del período seleccionado
                     </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                     <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5">
                         {DATE_PRESETS.map((p) => (
                             <button
@@ -241,8 +438,11 @@ export default function ReportsPage() {
                             </button>
                         ))}
                     </div>
-                    <Button onClick={handleExportReports} variant="outline" size="lg" className="h-10 font-bold text-slate-700 w-fit">
-                        <Download className="w-4.5 h-4.5 mr-2" /> Exportar todo
+                    <Button onClick={handleExportExcelAll} variant="outline" size="sm" className="h-9 font-bold text-slate-700">
+                        <Download className="w-4 h-4 mr-1.5 text-emerald-600" /> Excel
+                    </Button>
+                    <Button onClick={handleExportAllPDF} size="sm" className="h-9 font-bold bg-slate-900 text-white hover:bg-slate-800">
+                        <FileText className="w-4 h-4 mr-1.5 text-rose-400" /> Descargar PDF
                     </Button>
                 </div>
             </div>
@@ -304,6 +504,26 @@ export default function ReportsPage() {
                         <h2 className="text-sm font-bold text-slate-900">Top {topProducts.data?.length ?? 0} Productos Más Vendidos</h2>
                         <p className="text-xs text-slate-400 mt-0.5">Ranking por ingresos</p>
                     </div>
+                    <div className="flex items-center gap-1.5">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleExportTopProductsPDF}
+                            className="h-8 px-2.5 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                            title="Descargar PDF de Top Productos"
+                        >
+                            <FileText className="w-3.5 h-3.5 mr-1 text-rose-500" /> PDF
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleExportTopProductsExcel}
+                            className="h-8 px-2.5 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                            title="Exportar a Excel"
+                        >
+                            <Download className="w-3.5 h-3.5 mr-1 text-emerald-600" /> Excel
+                        </Button>
+                    </div>
                 </div>
                 <div className="divide-y divide-slate-100">
                     {(topProducts.data ?? []).length === 0 ? (
@@ -345,9 +565,20 @@ export default function ReportsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Branch comparison */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="px-5 pt-5 pb-4 border-b border-slate-100">
-                        <h2 className="text-sm font-bold text-slate-900">Ventas por Sucursal</h2>
-                        <p className="text-xs text-slate-400 mt-0.5">Distribución del período</p>
+                    <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
+                        <div>
+                            <h2 className="text-sm font-bold text-slate-900">Ventas por Sucursal</h2>
+                            <p className="text-xs text-slate-400 mt-0.5">Distribución del período</p>
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleExportBranchesPDF}
+                            className="h-8 px-2.5 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                            title="Descargar PDF de Ventas por Sucursal"
+                        >
+                            <FileText className="w-3.5 h-3.5 mr-1 text-rose-500" /> PDF
+                        </Button>
                     </div>
                     <div className="p-5 space-y-4">
                         {(branchSales.data ?? []).length === 0 ? (
@@ -379,9 +610,20 @@ export default function ReportsPage() {
 
                 {/* Summary card */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="px-5 pt-5 pb-4 border-b border-slate-100">
-                        <h2 className="text-sm font-bold text-slate-900">Resumen del Período</h2>
-                        <p className="text-xs text-slate-400 mt-0.5">Métricas consolidadas</p>
+                    <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
+                        <div>
+                            <h2 className="text-sm font-bold text-slate-900">Resumen del Período</h2>
+                            <p className="text-xs text-slate-400 mt-0.5">Métricas consolidadas</p>
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleExportSummaryPDF}
+                            className="h-8 px-2.5 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                            title="Descargar PDF de Resumen del Período"
+                        >
+                            <FileText className="w-3.5 h-3.5 mr-1 text-rose-500" /> PDF
+                        </Button>
                     </div>
                     <div className="p-5 space-y-4">
                         {[
