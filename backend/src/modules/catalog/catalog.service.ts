@@ -132,6 +132,8 @@ export const getPublicCatalog = async (slug: string): Promise<PublicCatalog | nu
     for (const r of dbRates) {
         exchangeRates[r.code] = Number(r.rate);
     }
+    // La moneda base principal del catálogo siempre tiene tasa 1.0
+    exchangeRates[settings.mainCurrency || 'USD'] = 1.0;
 
     // En plan PREMIUM se habilitan logo, banner y datos completos de marca
     const isPremium = (settings.planTier || '').toLowerCase() === 'premium';

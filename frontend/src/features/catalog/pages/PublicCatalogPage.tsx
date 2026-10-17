@@ -16,6 +16,7 @@ import type { CatalogGroup, CatalogProduct, CatalogPresentation, SocialLinks } f
 import { CameraBarcodeScannerModal } from '@/components/scanner/CameraBarcodeScannerModal';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { getCurrencyInfo } from '@/constants/currencies';
 import toast from 'react-hot-toast';
 
 // ─── Conversión y Formato de Precios ──────────────────────────────────────────
@@ -25,40 +26,52 @@ const convertCatalogPrice = (
     targetCurrency: string,
     rates: Record<string, number> = {}
 ): number => {
-    if (baseCurrency === targetCurrency) return basePrice;
-    
-    const getRate = (code: string) => {
-        if (code === baseCurrency) return 1;
-        if (baseCurrency === 'USD') {
-            if (code === 'VES') return rates['VES'] || 5.5;
-            if (code === 'COP') return rates['USD'] || rates['COP'] || 3600;
-        }
-        return rates[code] || 1;
-    };
+    if (!basePrice || isNaN(basePrice)) return 0;
+    const base = (baseCurrency || 'USD').toUpperCase();
+    const target = (targetCurrency || 'USD').toUpperCase();
+    if (base === target) return basePrice;
 
-    let amountInBase = basePrice;
-    if (baseCurrency !== 'USD' && targetCurrency === 'USD') {
-        const rFrom = getRate(baseCurrency);
-        amountInBase = rFrom > 0 ? basePrice / rFrom : basePrice;
-        return amountInBase;
+    // En ERP-Market, las tasas de cambio almacenadas (rates[code]) representan:
+    // 1 [baseCurrency] = rate [code]
+    // Por ende: Precio(target) = Precio(base) * rate[target]
+    const targetRate = Number(rates[target]);
+    if (targetRate && targetRate > 0) {
+        return basePrice * targetRate;
     }
 
-    const rate = getRate(targetCurrency);
-    return basePrice * rate;
+    return basePrice;
 };
 
 const formatCurrencyPrice = (value: number, currency: string): string => {
+    const code = (currency || 'USD').toUpperCase();
+    const info = getCurrencyInfo(code);
     try {
-        const locale = currency === 'VES' ? 'es-VE' : currency === 'COP' ? 'es-CO' : 'en-US';
-        const decimals = currency === 'COP' ? 0 : 2;
-        return new Intl.NumberFormat(locale, {
+        if (code === 'VES') {
+            return `Bs. ${new Intl.NumberFormat('es-VE', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }).format(value)}`;
+        }
+        if (code === 'COP') {
+            return `$ ${new Intl.NumberFormat('es-CO', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+            }).format(Math.round(value))}`;
+        }
+        if (code === 'USD') {
+            return `$ ${new Intl.NumberFormat('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }).format(value)}`;
+        }
+        return new Intl.NumberFormat('es-CO', {
             style: 'currency',
-            currency: currency,
-            minimumFractionDigits: decimals,
-            maximumFractionDigits: decimals,
+            currency: code,
+            minimumFractionDigits: info.decimals,
+            maximumFractionDigits: info.decimals,
         }).format(value);
     } catch {
-        return `${currency} ${value.toFixed(2)}`;
+        return `${info.symbol} ${value.toFixed(info.decimals)}`;
     }
 };
 
