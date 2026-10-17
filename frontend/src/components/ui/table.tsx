@@ -38,7 +38,7 @@ export interface DataTableProps<T> {
     isLoading?: boolean;
     /** Number of skeleton rows/cards shown while loading. Default 6. */
     loadingRows?: number;
-    empty?: { icon?: React.ReactNode; title: string; description?: string };
+    empty?: EmptyStateProps;
     /** Renders per-row actions: last table column (text-right) and a bottom row on each card. */
     actions?: (row: T) => React.ReactNode;
     onRowClick?: (row: T) => void;

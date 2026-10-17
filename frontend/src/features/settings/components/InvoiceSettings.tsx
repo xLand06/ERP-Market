@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ThermalReceiptTicket } from '@/components/common/ThermalReceiptTicket';
 import { cn } from '@/lib/utils';
+import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
 // Helper para probar envio de bytes ESC/POS reales por Web Serial (como ZeuFood)

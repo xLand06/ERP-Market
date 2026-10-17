@@ -521,7 +521,7 @@ export default function InventoryPage() {
                         );
                     }}
                     empty={
-                        search.trim() || filterGroup !== 'all' || filterCategory !== 'all' || filterStatus !== 'all'
+                        search.trim() || filterGroup !== 'all' || filterCategory !== 'all'
                             ? {
                                 icon: <PackageX className="w-8 h-8 text-slate-300" />,
                                 title: 'No se encontraron artículos',
@@ -534,7 +534,7 @@ export default function InventoryPage() {
                                 action: isOwner ? (
                                     <Button
                                         type="button"
-                                        onClick={() => setEntryModalOpen(true)}
+                                        onClick={() => setStockEntryOpen(true)}
                                         className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs gap-1.5 shadow-sm"
                                     >
                                         <Plus className="w-4 h-4" /> Entrada de Inventario

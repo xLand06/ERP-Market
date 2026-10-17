@@ -94,6 +94,8 @@ const VES_PAYMENT_METHODS = [
     { value: 'transferencia', label: 'Transferencia Bancaria', Icon: Landmark, color: 'text-indigo-600' },
 ];
 
+const PAYMENT_METHODS = [...USD_PAYMENT_METHODS, ...VES_PAYMENT_METHODS];
+
 const VENEZUELAN_BANKS = [
     '0102 - Banco de Venezuela (BDV)',
     '0134 - Banesco',

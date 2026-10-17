@@ -125,7 +125,7 @@ async function writeChunks(writer: WritableStreamDefaultWriter<Uint8Array>, data
     }
 }
 
-async function openSerialPort(baudRate: number): Promise<SerialPort> {
+async function openSerialPort(baudRate: number): Promise<any> {
     if (!('serial' in navigator)) {
         throw new Error('Web Serial no está soportado en este navegador. Usa Chrome o Edge con HTTPS.');
     }

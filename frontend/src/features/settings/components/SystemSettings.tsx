@@ -285,9 +285,9 @@ export function SystemSettings() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-8">
                     
-                    {/* SECCIÓN 1: SISTEMA MULTI-MONEDA GLOBAL Y TASAS */}
+                    {/* SECCIÓN 1: SISTEMA MULTI-MONEDA GLOBAL Y TASAS (FULL WIDTH) */}
                     <div className="space-y-5">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
                             <div className="flex items-center gap-2 text-indigo-600">
@@ -383,11 +383,13 @@ export function SystemSettings() {
                             );
                         })()}
 
-                        {/* 1. Moneda Base Principal */}
-                        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
-                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                                <div className="flex items-center gap-3.5">
-                                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center border border-indigo-200 font-black text-xl shadow-xs">
+                        {/* Fila Responsiva: 1. Moneda Base y 2. Tasa BCV */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                            {/* 1. Moneda Base Principal */}
+                            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4 flex flex-col justify-between">
+                                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3.5">
+                                        <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center border border-indigo-200 font-black text-xl shadow-xs shrink-0">
                                         {getCurrencyInfo(localMainCurrency).symbol}
                                     </div>
                                     <div>
@@ -565,6 +567,7 @@ export function SystemSettings() {
                                 </div>
                             </div>
                         )}
+                        </div>
 
                         {/* 3. Tabla de Tasas de Cambio por Moneda (Idéntica a ZeuFood) */}
                         <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-3">
@@ -577,8 +580,8 @@ export function SystemSettings() {
                                 </span>
                             </div>
 
-                            <div className="rounded-xl border border-slate-200 overflow-hidden">
-                                <table className="w-full text-left text-xs text-slate-900 border-collapse">
+                            <div className="overflow-x-auto rounded-xl border border-slate-200">
+                                <table className="w-full min-w-[560px] text-left text-xs text-slate-900 border-collapse">
                                     <thead className="bg-slate-50 text-slate-700 uppercase tracking-wider text-[10px] font-black border-b border-slate-200">
                                         <tr>
                                             <th className="py-2.5 px-3">#</th>
@@ -716,81 +719,132 @@ export function SystemSettings() {
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-semibold text-slate-700">Porcentaje IVA (%)</label>
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={localIva}
-                                    disabled={!isOwner}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        if (val === '' || /^\d+$/.test(val)) setLocalIva(val);
-                                    }}
-                                    className="w-full pl-4 pr-10 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono disabled:opacity-60 disabled:bg-slate-100 disabled:cursor-not-allowed"
-                                />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">%</span>
-                            </div>
-                        </div>
                     </div>
 
-                    {/* SECCIÓN 2: OPERACIONES */}
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-2 text-amber-600 border-b border-slate-100 pb-2 mb-4">
-                            <Clock className="w-4 h-4" />
-                            <h4 className="text-sm font-bold">Automatización</h4>
+                    {/* SECCIÓN 2: PARÁMETROS FISCALES Y OPERACIONES (GRID 2 COLUMNAS) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200">
+                        {/* Impuestos y Facturación (IVA) */}
+                        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4 flex flex-col justify-between">
+                            <div>
+                                <div className="flex items-center gap-2 text-indigo-600 border-b border-slate-100 pb-2 mb-3">
+                                    <Percent className="w-4 h-4" />
+                                    <h4 className="text-sm font-bold text-slate-900">Impuestos y Facturación</h4>
+                                </div>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-700 block mb-1">
+                                            Porcentaje IVA General (%)
+                                        </label>
+                                        <p className="text-[11px] text-slate-500 mb-2.5">
+                                            Tasa de impuesto aplicada a los artículos gravados en el POS y emisión de facturas.
+                                        </p>
+                                        <div className="relative max-w-xs">
+                                            <input
+                                                type="text"
+                                                inputMode="numeric"
+                                                value={localIva}
+                                                disabled={!isOwner}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val === '' || /^\d+$/.test(val)) setLocalIva(val);
+                                                }}
+                                                className="w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono font-bold text-slate-900 disabled:opacity-60 disabled:bg-slate-100 disabled:cursor-not-allowed shadow-2xs"
+                                            />
+                                            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Botones de Preconfiguración Rápida */}
+                            {isOwner && (
+                                <div className="pt-3 border-t border-slate-100">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Tasas Frecuentes (Presets):</span>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        {[
+                                            { label: '16% (Venezuela)', val: '16' },
+                                            { label: '19% (Colombia)', val: '19' },
+                                            { label: '0% (Exento)', val: '0' },
+                                        ].map(preset => (
+                                            <button
+                                                key={preset.val}
+                                                type="button"
+                                                onClick={() => setLocalIva(preset.val)}
+                                                className={cn(
+                                                    "px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer",
+                                                    localIva === preset.val
+                                                        ? "bg-indigo-600 text-white shadow-2xs"
+                                                        : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                                                )}
+                                            >
+                                                {preset.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-slate-700">Cierre Automático de Seguridad</label>
-                                <div className="relative">
-                                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                    <input
-                                        type="time"
-                                        value={localCloseTime}
-                                        disabled={!isOwner}
-                                        onChange={(e) => setLocalCloseTime(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all font-mono disabled:opacity-60 disabled:bg-slate-100 disabled:cursor-not-allowed"
-                                    />
-                                </div>
-                                <p className="text-xs text-slate-400 px-1">Si una caja queda abierta, se cerrará automáticamente a esta hora con el saldo del sistema.</p>
+                        {/* Operaciones y Automatización */}
+                        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+                            <div className="flex items-center gap-2 text-amber-600 border-b border-slate-100 pb-2 mb-3">
+                                <Clock className="w-4 h-4" />
+                                <h4 className="text-sm font-bold text-slate-900">Automatización y Mantenimiento</h4>
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-slate-700">Retención de Ventas (Nube)</label>
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={localPurgeDays}
-                                        disabled={!isOwner}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            if (val === '' || /^\d+$/.test(val)) setLocalPurgeDays(val);
-                                        }}
-                                        className="w-full pl-4 pr-12 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono disabled:opacity-60 disabled:bg-slate-100 disabled:cursor-not-allowed"
-                                    />
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] font-bold uppercase">días</span>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                                        Cierre Automático de Seguridad
+                                    </label>
+                                    <div className="relative max-w-xs">
+                                        <Clock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                        <input
+                                            type="time"
+                                            value={localCloseTime}
+                                            disabled={!isOwner}
+                                            onChange={(e) => setLocalCloseTime(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 outline-none transition-all font-mono font-bold text-slate-900 disabled:opacity-60 disabled:bg-slate-100 disabled:cursor-not-allowed shadow-2xs"
+                                        />
+                                    </div>
+                                    <p className="text-[11px] text-slate-400 mt-1">Si una caja queda abierta, se cerrará automáticamente a esta hora con el saldo del sistema.</p>
                                 </div>
-                            </div>
 
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-slate-700">Retención de Logs</label>
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={localLogDays}
-                                        disabled={!isOwner}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            if (val === '' || /^\d+$/.test(val)) setLocalLogDays(val);
-                                        }}
-                                        className="w-full pl-4 pr-12 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono disabled:opacity-60 disabled:bg-slate-100 disabled:cursor-not-allowed"
-                                    />
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] font-bold uppercase">días</span>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-100">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-700 block mb-1">Retención de Ventas</label>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                inputMode="numeric"
+                                                value={localPurgeDays}
+                                                disabled={!isOwner}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val === '' || /^\d+$/.test(val)) setLocalPurgeDays(val);
+                                                }}
+                                                className="w-full pl-3 pr-11 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono font-bold text-slate-900 shadow-2xs"
+                                            />
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] font-bold uppercase">días</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-700 block mb-1">Retención de Logs</label>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                inputMode="numeric"
+                                                value={localLogDays}
+                                                disabled={!isOwner}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val === '' || /^\d+$/.test(val)) setLocalLogDays(val);
+                                                }}
+                                                className="w-full pl-3 pr-11 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono font-bold text-slate-900 shadow-2xs"
+                                            />
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] font-bold uppercase">días</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
