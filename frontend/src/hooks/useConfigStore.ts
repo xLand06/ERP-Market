@@ -217,7 +217,7 @@ export const useConfigStore = create<ConfigState>()(
             get vesRate() { return get().rates['VES'] || 880.12; },
             get copRate() { return get().rates['COP'] || 2857.15; },
 
-            // ── Conversión Universal (Triangulación USD / COP / VES) ────────
+            // ── Conversión Universal (Basada en la Moneda Base Activa) ─────
             convert: (amount: number, fromCurrency: string, toCurrency: string) => {
                 if (!amount) return 0;
                 const from = (fromCurrency || 'USD').toUpperCase();
@@ -225,33 +225,21 @@ export const useConfigStore = create<ConfigState>()(
                 if (from === to) return amount;
 
                 const rates = get().rates;
-                const vesRate = Number(rates['VES']) || 880.12;
-                const copRate = Number(rates['COP']) || 2857.15;
+                const main = (get().mainCurrency || 'USD').toUpperCase();
 
-                // 1. Normalizar origen al pivote universal (USD)
-                let amountInUSD = amount;
-                if (from === 'USD') {
-                    amountInUSD = amount;
-                } else if (from === 'VES') {
-                    amountInUSD = vesRate > 0 ? amount / vesRate : amount;
-                } else if (from === 'COP') {
-                    amountInUSD = copRate > 0 ? amount / copRate : amount;
-                } else {
-                    const r = Number(rates[from]) || 1;
-                    amountInUSD = r > 0 ? amount / r : amount;
-                }
+                const getRate = (cur: string) => {
+                    if (cur === main) return 1.0;
+                    const r = Number(rates[cur]);
+                    return r > 0 ? r : 1.0;
+                };
 
-                // 2. Convertir desde USD a destino
-                if (to === 'USD') {
-                    return amountInUSD;
-                } else if (to === 'VES') {
-                    return amountInUSD * vesRate;
-                } else if (to === 'COP') {
-                    return amountInUSD * copRate;
-                } else {
-                    const r = Number(rates[to]) || 1;
-                    return amountInUSD * r;
-                }
+                // 1. Convertir de la divisa origen a la Moneda Base Principal
+                const rFrom = getRate(from);
+                const amountInMain = from === main ? amount : (amount / rFrom);
+
+                // 2. Convertir de la Moneda Base Principal a la divisa destino
+                const rTo = getRate(to);
+                return to === main ? amountInMain : (amountInMain * rTo);
             },
 
             formatCurrency: (amount: number, currencyCode?: string) => {

@@ -105,8 +105,30 @@ export const syncSelectedRateFromDolarApi = async (provider: string, userId: str
         throw new Error('No se pudo obtener una tasa válida desde DolarApi');
     }
 
+    // Calcular tasa relativa a la moneda base principal (idéntico a ZeuFood)
+    let rateToStore = rateToApply;
+    try {
+        const { getSettings } = await import('../settings/settings.service');
+        const settings = await getSettings();
+        const mainCurrency = settings.mainCurrency || 'USD';
+
+        if (mainCurrency === 'COP') {
+            const usdRateRecord = await prisma.exchangeRate.findUnique({ where: { code: 'USD' } });
+            const usdRate = usdRateRecord ? Number(usdRateRecord.rate) : 0;
+            if (usdRate > 0) {
+                rateToStore = Number((rateToApply * usdRate).toFixed(6));
+            } else {
+                rateToStore = Number((rateToApply / 3200).toFixed(6));
+            }
+        } else if (mainCurrency === 'VES') {
+            rateToStore = 1;
+        }
+    } catch {
+        // Fallback a rateToApply directo
+    }
+
     // Actualizar tasa VES en la base de datos
-    const updatedRate = await updateExchangeRate({ code: 'VES', rate: rateToApply });
+    const updatedRate = await updateExchangeRate({ code: 'VES', rate: rateToStore });
 
     // Guardar estado de sincronización en settings
     try {

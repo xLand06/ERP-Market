@@ -607,7 +607,7 @@ model PurchaseOrderItem {
 model ExchangeRate {
   id        String   @id @default(cuid())
   code      String   @unique // 'VES', 'COP', etc.
-  rate      Decimal  @db.Decimal(18, 4)
+  rate      Decimal  @db.Decimal(24, 8)
   updatedAt DateTime @updatedAt
 
   @@map("exchange_rates")

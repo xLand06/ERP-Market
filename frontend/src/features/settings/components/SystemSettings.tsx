@@ -72,7 +72,7 @@ export function SystemSettings() {
     const [localUseOfficialRate, setLocalUseOfficialRate] = useState<boolean>(useOfficialRateForVes ?? true);
     const [localBcvRateType, setLocalBcvRateType] = useState<string>(bcvRateType || 've_dolar_oficial');
     const [isSyncingBcv, setIsSyncingBcv] = useState(false);
-    const [showCatalogSelector, setShowCatalogSelector] = useState(true);
+    const [showCatalogSelector, setShowCatalogSelector] = useState(false);
     const [catalogSearch, setCatalogSearch] = useState('');
 
     const [localIva, setLocalIva] = useState(iva.toString());
@@ -83,70 +83,123 @@ export function SystemSettings() {
 
     const currentLanguage = i18n.language?.slice(0, 2) as AppLanguage;
 
+    const [copPerUsdInput, setCopPerUsdInput] = useState<string>('3200');
 
     useEffect(() => {
         fetchSettings();
         fetchRates();
     }, []);
 
-    const [pesoRateInput, setPesoRateInput] = useState<string>('');
-    const [isEditingPesoRate, setIsEditingPesoRate] = useState<boolean>(false);
-
     // Sincronizar el estado local cuando los datos terminen de cargar desde la API/Store
     useEffect(() => {
-        setLocalMainCurrency(mainCurrency || 'USD');
+        const activeMain = mainCurrency || 'USD';
+        setLocalMainCurrency(activeMain);
         setLocalActiveCurrencies(activeCurrencies?.length ? activeCurrencies : ['USD', 'COP', 'VES']);
         setLocalUseOfficialRate(useOfficialRateForVes ?? true);
         setLocalBcvRateType(bcvRateType || 've_dolar_oficial');
+
         const initialRates: Record<string, string> = {};
         Object.entries(rates || {}).forEach(([k, v]) => {
             initialRates[k] = v.toString();
         });
-        if (!initialRates['VES'] && rates?.['VES']) initialRates['VES'] = rates['VES'].toString();
-        if (!initialRates['COP'] && rates?.['COP']) initialRates['COP'] = rates['COP'].toString();
+
+        // Extraer valores base fundamentales
+        let bcv = 985.73;
+        let copUsd = 3200;
+
+        if (activeMain === 'USD') {
+            bcv = parseFloat(initialRates['VES'] || rates?.['VES']?.toString() || '985.73') || 985.73;
+            copUsd = parseFloat(initialRates['COP'] || rates?.['COP']?.toString() || '3200') || 3200;
+        } else if (activeMain === 'COP') {
+            const usdRate = parseFloat(initialRates['USD'] || '0.0003125') || 0.0003125;
+            copUsd = usdRate > 0 && usdRate < 1 ? Math.round(1 / usdRate) : (parseFloat(rates?.['COP']?.toString() || '3200') || 3200);
+            const vesRate = parseFloat(initialRates['VES'] || '0.308041') || 0.308041;
+            bcv = Math.round(vesRate * copUsd * 100) / 100;
+        } else if (activeMain === 'VES') {
+            const usdRate = parseFloat(initialRates['USD'] || '0.001014') || 0.001014;
+            bcv = usdRate > 0 && usdRate < 1 ? Math.round(1 / usdRate * 100) / 100 : 985.73;
+            const copRate = parseFloat(initialRates['COP'] || '3.2463') || 3.2463;
+            copUsd = Math.round(copRate * bcv);
+        }
+
+        setCopPerUsdInput(copUsd.toString());
+
+        // Garantizar que localRates tenga los valores según la moneda base activa
+        initialRates[activeMain] = '1.000000';
+        if (activeMain === 'COP') {
+            if (!initialRates['USD'] || parseFloat(initialRates['USD']) >= 1) {
+                initialRates['USD'] = (1 / copUsd).toFixed(6);
+            }
+            if (!initialRates['VES'] || parseFloat(initialRates['VES']) > 50) {
+                initialRates['VES'] = (bcv / copUsd).toFixed(6);
+            }
+        } else if (activeMain === 'USD') {
+            if (!initialRates['COP'] || parseFloat(initialRates['COP']) < 1) {
+                initialRates['COP'] = copUsd.toFixed(2);
+            }
+            if (!initialRates['VES'] || parseFloat(initialRates['VES']) < 1) {
+                initialRates['VES'] = bcv.toFixed(2);
+            }
+        }
+
         setLocalRates(initialRates);
         setLocalIva(iva.toString());
         setLocalCloseTime(autoCloseTime || '');
         setLocalPurgeDays(purgeRetentionDays.toString());
         setLocalLogDays(purgeLogRetentionDays.toString());
-
-        const vRate = parseFloat(initialRates['VES'] || rates?.['VES']?.toString() || '880.12') || 880.12;
-        const cRate = parseFloat(initialRates['COP'] || rates?.['COP']?.toString() || '2857.15') || 2857.15;
-        if (cRate > 0) {
-            setPesoRateInput((vRate / cRate).toFixed(6));
-        }
     }, [rates, iva, mainCurrency, activeCurrencies, autoCloseTime, purgeRetentionDays, purgeLogRetentionDays, useOfficialRateForVes, bcvRateType]);
 
-    // Mantener pesoRateInput sincronizado si no se está escribiendo en él
-    useEffect(() => {
-        if (!isEditingPesoRate) {
-            const vRate = parseFloat(localRates['VES'] || rates?.['VES']?.toString() || '880.12') || 880.12;
-            const cRate = parseFloat(localRates['COP'] || rates?.['COP']?.toString() || '2857.15') || 2857.15;
-            if (cRate > 0) {
-                setPesoRateInput((vRate / cRate).toFixed(6));
-            }
-        }
-    }, [localRates['VES'], localRates['COP'], isEditingPesoRate]);
+    // Cambiar la moneda base y recalcular todas las tasas respecto a la nueva base
+    const handleMainCurrencyChange = (newMain: string) => {
+        setLocalMainCurrency(newMain);
 
-    const handleCopRateChange = (val: string) => {
-        if (val === '' || /^\d+(\.\d{0,4})?$/.test(val)) {
-            setLocalRates(prev => ({ ...prev, COP: val }));
-            const cNum = parseFloat(val);
-            if (cNum > 0) {
-                const vRate = parseFloat(localRates['VES'] || rates?.['VES']?.toString() || '880.12') || 880.12;
-                setPesoRateInput((vRate / cNum).toFixed(6));
-            }
+        const bcv = parseFloat(rates?.['VES'] ? rates['VES'].toString() : '985.73') || 985.73;
+        const copUsd = parseFloat(copPerUsdInput || '3200') || 3200;
+
+        const updated: Record<string, string> = { ...localRates };
+        updated[newMain] = '1.000000';
+
+        if (newMain === 'COP') {
+            updated['USD'] = (1 / copUsd).toFixed(6); // ej. 0.000313
+            updated['VES'] = (bcv / copUsd).toFixed(6); // ej. 0.308041
+        } else if (newMain === 'USD') {
+            updated['COP'] = copUsd.toFixed(2); // ej. 3200.00
+            updated['VES'] = bcv.toFixed(2); // ej. 985.73
+        } else if (newMain === 'VES') {
+            updated['USD'] = (1 / bcv).toFixed(6); // ej. 0.001014
+            updated['COP'] = (copUsd / bcv).toFixed(6); // ej. 3.246345
         }
+
+        setLocalRates(updated);
     };
 
-    const handlePesoRateChange = (val: string) => {
-        setPesoRateInput(val);
-        if (val === '' || !/^\d+(\.\d{0,6})?$/.test(val)) return;
-        const pNum = parseFloat(val);
-        if (pNum > 0) {
-            const vRate = parseFloat(localRates['VES'] || rates?.['VES']?.toString() || '880.12') || 880.12;
-            const newCop = (vRate / pNum).toFixed(2);
-            setLocalRates(prev => ({ ...prev, COP: newCop }));
+    // Al editar comercialmente el valor del dólar en pesos (ej. 3200)
+    const handleCopPerUsdChange = (val: string) => {
+        setCopPerUsdInput(val);
+        if (val === '' || !/^\d+(\.\d{0,2})?$/.test(val)) return;
+        const parsed = parseFloat(val);
+        if (parsed <= 0) return;
+
+        const bcv = parseFloat(rates?.['VES'] ? rates['VES'].toString() : '985.73') || 985.73;
+
+        if (localMainCurrency === 'COP') {
+            setLocalRates(prev => ({
+                ...prev,
+                USD: (1 / parsed).toFixed(6), // 0.000313
+                VES: localUseOfficialRate ? (bcv / parsed).toFixed(6) : (prev['VES'] || (bcv / parsed).toFixed(6)) // 0.308041
+            }));
+        } else if (localMainCurrency === 'USD') {
+            setLocalRates(prev => ({
+                ...prev,
+                COP: parsed.toFixed(2),
+                VES: localUseOfficialRate ? bcv.toFixed(2) : (prev['VES'] || bcv.toFixed(2))
+            }));
+        } else if (localMainCurrency === 'VES') {
+            setLocalRates(prev => ({
+                ...prev,
+                COP: (parsed / bcv).toFixed(6),
+                USD: (1 / bcv).toFixed(6)
+            }));
         }
     };
 
@@ -196,7 +249,7 @@ export function SystemSettings() {
     };
 
     return (
-        <div className="max-w-4xl space-y-6 animate-fade-in">
+        <div className="w-full max-w-full space-y-6 animate-fade-in">
             
             {/* SECCIÓN TEMA DE INTERFAZ Y APARIENCIA (5 PRESETS) */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
@@ -468,7 +521,7 @@ export function SystemSettings() {
                                             <button
                                                 key={code}
                                                 type="button"
-                                                onClick={() => setLocalMainCurrency(code)}
+                                                onClick={() => handleMainCurrencyChange(code)}
                                                 className={cn(
                                                     "p-2.5 rounded-xl border text-center transition-all flex items-center justify-between gap-2 cursor-pointer",
                                                     isSel
@@ -494,126 +547,150 @@ export function SystemSettings() {
                             </div>
                         </div>
 
-                        {/* 2. Card de Tasa de Cambio BCV / DolarApi (Idéntico a ZeuFood) */}
-                        {localActiveCurrencies.includes('VES') && (
-                            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
-                                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                                    {/* Display de Tasa */}
-                                    <div className="flex flex-wrap items-center gap-6">
-                                        <div className="space-y-0.5">
-                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
-                                                Tasa BCV {localBcvRateType === 've_dolar_oficial' ? '(Dólar Oficial)' : localBcvRateType === 've_dolar_paralelo' ? '(Dólar Paralelo)' : '(Euro Oficial)'}
-                                            </span>
-                                            <div className="text-3xl font-black text-slate-900 flex items-baseline gap-1.5">
-                                                {rates?.['VES'] ? Number(rates['VES']).toFixed(2) : '880.12'}
-                                                <span className="text-xs text-slate-500 font-mono font-bold">BS / USD</span>
+                        {/* 2. Card de Tasa de Cambio BCV / DolarApi */}
+                        {localActiveCurrencies.includes('VES') && (() => {
+                            const rawBcv = parseFloat(rates?.['VES'] ? rates['VES'].toString() : '985.73') || 985.73;
+                            const copUsd = parseFloat(copPerUsdInput || '3200') || 3200;
+                            const effectiveBaseBcv = localMainCurrency === 'COP'
+                                ? (rawBcv / copUsd).toFixed(6)
+                                : localMainCurrency === 'USD'
+                                ? rawBcv.toFixed(2)
+                                : '1.000000';
+
+                            return (
+                                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4 min-w-0">
+                                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                                        {/* Display de Tasa */}
+                                        <div className="flex flex-wrap items-center gap-5">
+                                            <div className="space-y-0.5">
+                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                                                    Tasa BCV {localBcvRateType === 've_dolar_oficial' ? '(Dólar Oficial)' : localBcvRateType === 've_dolar_paralelo' ? '(Dólar Paralelo)' : '(Euro Oficial)'}
+                                                </span>
+                                                <div className="text-3xl font-black text-slate-900 flex items-baseline gap-1.5">
+                                                    {rawBcv.toFixed(2)}
+                                                    <span className="text-xs text-slate-500 font-mono font-bold">BS / USD</span>
+                                                </div>
+                                                {localMainCurrency === 'COP' && (
+                                                    <span className="text-[11px] font-bold text-amber-700 block mt-0.5">
+                                                        Equivalente Base: 1 COP = {effectiveBaseBcv} Bs.
+                                                    </span>
+                                                )}
                                             </div>
-                                        </div>
 
-                                        <div className="pl-5 border-l border-slate-200 space-y-1">
-                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Origen</span>
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                API Oficial BCV / DolarApi
-                                            </span>
-                                        </div>
-
-                                        {bcvLastSync && (
-                                            <div className="pl-5 border-l border-slate-200 space-y-1">
-                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Última Actualización</span>
-                                                <span className="text-xs font-mono font-bold text-slate-700">
-                                                    {new Date(bcvLastSync).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' })}
+                                            <div className="pl-4 border-l border-slate-200 space-y-1">
+                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Origen</span>
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                    API Oficial BCV / DolarApi
                                                 </span>
                                             </div>
-                                        )}
-                                    </div>
 
-                                    {/* Controles de Sincronización */}
-                                    <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-                                        {/* Selector de Tipo */}
-                                        <select
-                                            value={localBcvRateType}
-                                            onChange={async (e) => {
-                                                const newType = e.target.value;
-                                                setLocalBcvRateType(newType);
-                                                if (localUseOfficialRate) {
+                                            {bcvLastSync && (
+                                                <div className="pl-4 border-l border-slate-200 space-y-1">
+                                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Última Actualización</span>
+                                                    <span className="text-xs font-mono font-bold text-slate-700">
+                                                        {new Date(bcvLastSync).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' })}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Controles de Sincronización */}
+                                        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                                            <select
+                                                value={localBcvRateType}
+                                                onChange={async (e) => {
+                                                    const newType = e.target.value;
+                                                    setLocalBcvRateType(newType);
+                                                    if (localUseOfficialRate) {
+                                                        try {
+                                                            setIsSyncingBcv(true);
+                                                            const res = await api.post('/finance/rates/sync-dolarapi', { provider: newType });
+                                                            if (res.data.success) {
+                                                                const applied = res.data.data.appliedRate;
+                                                                toast.success(`Tasa ${applied} VES aplicada desde DolarApi`);
+                                                                const copUsdVal = parseFloat(copPerUsdInput || '3200') || 3200;
+                                                                const baseApplied = localMainCurrency === 'COP'
+                                                                    ? (applied / copUsdVal).toFixed(6)
+                                                                    : localMainCurrency === 'USD'
+                                                                    ? applied.toFixed(2)
+                                                                    : '1.000000';
+                                                                setLocalRates(prev => ({ ...prev, VES: baseApplied }));
+                                                                useConfigStore.setState(state => ({
+                                                                    rates: { ...state.rates, VES: parseFloat(baseApplied) }
+                                                                }));
+                                                                await fetchRates();
+                                                                await fetchSettings();
+                                                            }
+                                                        } catch (err: any) {
+                                                            toast.error(err.response?.data?.error || 'Error al conectar con DolarApi');
+                                                        } finally {
+                                                            setIsSyncingBcv(false);
+                                                        }
+                                                    }
+                                                }}
+                                                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
+                                            >
+                                                <option value="ve_dolar_oficial">BCV (Oficial)</option>
+                                                <option value="ve_dolar_paralelo">Dólar Paralelo</option>
+                                                <option value="ve_euro_oficial">BCV Euro Oficial</option>
+                                            </select>
+
+                                            <label className="flex items-center gap-2 cursor-pointer bg-slate-50 hover:bg-slate-100 px-3 py-2 rounded-xl border border-slate-200 transition-colors">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={localUseOfficialRate}
+                                                    onChange={(e) => setLocalUseOfficialRate(e.target.checked)}
+                                                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                                                />
+                                                <span className="text-xs font-black text-slate-800 whitespace-nowrap">
+                                                    Aplicar a Bolívares (VES)
+                                                </span>
+                                            </label>
+
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
                                                     try {
                                                         setIsSyncingBcv(true);
-                                                        const res = await api.post('/finance/rates/sync-dolarapi', { provider: newType });
+                                                        const res = await api.post('/finance/rates/sync-dolarapi', { provider: localBcvRateType });
                                                         if (res.data.success) {
                                                             const applied = res.data.data.appliedRate;
-                                                            toast.success(`Tasa ${applied} VES aplicada desde DolarApi`);
-                                                            setLocalRates(prev => ({ ...prev, VES: applied.toString() }));
+                                                            toast.success(`Tasa ${applied} VES actualizada`);
+                                                            const copUsdVal = parseFloat(copPerUsdInput || '3200') || 3200;
+                                                            const baseApplied = localMainCurrency === 'COP'
+                                                                ? (applied / copUsdVal).toFixed(6)
+                                                                : localMainCurrency === 'USD'
+                                                                ? applied.toFixed(2)
+                                                                : '1.000000';
+                                                            setLocalRates(prev => ({ ...prev, VES: baseApplied }));
                                                             useConfigStore.setState(state => ({
-                                                                rates: { ...state.rates, VES: applied }
+                                                                rates: { ...state.rates, VES: parseFloat(baseApplied) }
                                                             }));
                                                             await fetchRates();
                                                             await fetchSettings();
                                                         }
                                                     } catch (err: any) {
-                                                        toast.error(err.response?.data?.error || 'Error al conectar con DolarApi');
+                                                        toast.error(err.response?.data?.error || 'Error al actualizar desde DolarApi');
                                                     } finally {
                                                         setIsSyncingBcv(false);
                                                     }
-                                                }
-                                            }}
-                                            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
-                                        >
-                                            <option value="ve_dolar_oficial">BCV (Oficial)</option>
-                                            <option value="ve_dolar_paralelo">Dólar Paralelo</option>
-                                            <option value="ve_euro_oficial">BCV Euro Oficial</option>
-                                        </select>
-
-                                        {/* Switch Aplicar a VES */}
-                                        <label className="flex items-center gap-2 cursor-pointer bg-slate-50 hover:bg-slate-100 px-3 py-2 rounded-xl border border-slate-200 transition-colors">
-                                            <input
-                                                type="checkbox"
-                                                checked={localUseOfficialRate}
-                                                onChange={(e) => setLocalUseOfficialRate(e.target.checked)}
-                                                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                                            />
-                                            <span className="text-xs font-black text-slate-800 whitespace-nowrap">
-                                                Aplicar a Bolívares (VES)
-                                            </span>
-                                        </label>
-
-                                        {/* Botón Actualizar */}
-                                        <button
-                                            type="button"
-                                            onClick={async () => {
-                                                try {
-                                                    setIsSyncingBcv(true);
-                                                    const res = await api.post('/finance/rates/sync-dolarapi', { provider: localBcvRateType });
-                                                    if (res.data.success) {
-                                                        const applied = res.data.data.appliedRate;
-                                                        toast.success(`Tasa ${applied} VES actualizada`);
-                                                        setLocalRates(prev => ({ ...prev, VES: applied.toString() }));
-                                                        useConfigStore.setState(state => ({
-                                                            rates: { ...state.rates, VES: applied }
-                                                        }));
-                                                        await fetchRates();
-                                                        await fetchSettings();
-                                                    }
-                                                } catch (err: any) {
-                                                    toast.error(err.response?.data?.error || 'Error al actualizar desde DolarApi');
-                                                } finally {
-                                                    setIsSyncingBcv(false);
-                                                }
-                                            }}
-                                            disabled={isSyncingBcv}
-                                            className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                        >
-                                            <RefreshCw className={cn("w-3.5 h-3.5", isSyncingBcv && "animate-spin")} />
-                                            <span>Actualizar Tasa BCV</span>
-                                        </button>
+                                                }}
+                                                disabled={isSyncingBcv}
+                                                className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                            >
+                                                <RefreshCw className={cn("w-3.5 h-3.5", isSyncingBcv && "animate-spin")} />
+                                                <span>Actualizar Tasa BCV</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })()}
                         </div>
 
-                        {/* 3. Tabla de Tasas de Cambio por Moneda (Idéntica a ZeuFood) */}
-                        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-3">
-                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                        {/* 3. Tabla de Tasas de Cambio por Moneda */}
+                        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3 min-w-0">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
                                 <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                                     <Coins className="w-4 h-4 text-indigo-600" /> Tasas de Cambio por Moneda
                                 </h4>
@@ -622,7 +699,7 @@ export function SystemSettings() {
                                 </span>
                             </div>
 
-                            <div className="overflow-x-auto rounded-xl border border-slate-200">
+                            <div className="overflow-x-auto rounded-xl border border-slate-200 w-full">
                                 <table className="w-full min-w-[560px] text-left text-xs text-slate-900 border-collapse">
                                     <thead className="bg-slate-50 text-slate-700 uppercase tracking-wider text-[10px] font-black border-b border-slate-200">
                                         <tr>
@@ -643,8 +720,8 @@ export function SystemSettings() {
                                             const currentVal = isBase 
                                                 ? '1.000000' 
                                                 : (localRates[code] ?? (
-                                                    code === 'VES' ? (rates?.['VES'] ? rates['VES'].toString() : '880.12') :
-                                                    code === 'COP' ? (rates?.['COP'] ? rates['COP'].toString() : '2857.15') : '1'
+                                                    code === 'VES' ? (rates?.['VES'] ? rates['VES'].toString() : '0.308041') :
+                                                    code === 'COP' ? (rates?.['COP'] ? rates['COP'].toString() : '3200') : '1'
                                                 ));
 
                                             return (
@@ -684,73 +761,73 @@ export function SystemSettings() {
                                                                 className="w-36 rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-mono font-bold text-slate-400 cursor-not-allowed"
                                                             />
                                                         ) : isBcvLocked ? (
-                                                            <div>
+                                                            <div className="space-y-1">
                                                                 <input
                                                                     type="text"
                                                                     value={currentVal}
                                                                     disabled
                                                                     className="w-36 rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-mono font-bold text-slate-700 cursor-not-allowed"
                                                                 />
-                                                                <span className="text-emerald-700 text-[10px] font-black block mt-0.5 flex items-center gap-1">
+                                                                <span className="text-emerald-700 text-[10px] font-black block flex items-center gap-1">
                                                                     <Check className="w-3 h-3 text-emerald-600" /> Sincronización BCV Activa
                                                                 </span>
+                                                                {localMainCurrency === 'COP' && (
+                                                                    <span className="text-[10px] font-mono text-slate-500 font-bold block">
+                                                                        1 COP = {currentVal} Bs. • 1.000 COP = Bs. {((parseFloat(currentVal || '0.308041') || 0.308041) * 1000).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES
+                                                                    </span>
+                                                                )}
                                                             </div>
-                                                        ) : code === 'COP' ? (
-                                                            <div className="space-y-1.5 py-1">
-                                                                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
-                                                                    <div>
-                                                                        <input
-                                                                            type="text"
-                                                                            inputMode="decimal"
-                                                                            value={currentVal}
-                                                                            onChange={(e) => handleCopRateChange(e.target.value)}
-                                                                            placeholder="2857.15"
-                                                                            className="w-32 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none shadow-2xs"
-                                                                        />
-                                                                        <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
-                                                                            1 {localMainCurrency} = X COP
-                                                                        </span>
-                                                                    </div>
-
-                                                                    {/* Dual input: 1 Peso en Bs */}
-                                                                    <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-1.5 px-2.5 shadow-2xs">
-                                                                        <div className="flex items-center gap-1.5">
-                                                                            <span className="text-[10px] font-black uppercase text-amber-900 whitespace-nowrap">
-                                                                                1 COP en Bs:
-                                                                            </span>
-                                                                            <div className="flex items-center gap-1">
-                                                                                <span className="text-xs font-mono font-bold text-amber-700">Bs.</span>
-                                                                                <input
-                                                                                    type="text"
-                                                                                    inputMode="decimal"
-                                                                                    value={pesoRateInput}
-                                                                                    onFocus={() => setIsEditingPesoRate(true)}
-                                                                                    onBlur={() => setIsEditingPesoRate(false)}
-                                                                                    onChange={(e) => handlePesoRateChange(e.target.value)}
-                                                                                    placeholder="0.308041"
-                                                                                    className="w-24 rounded-lg border border-amber-300 bg-white px-1.5 py-0.5 text-xs font-mono font-black text-amber-950 focus:ring-2 focus:ring-amber-500 outline-none"
-                                                                                />
-                                                                            </div>
-                                                                        </div>
-                                                                        <span className="text-[9px] font-mono font-bold text-amber-800/90 block mt-0.5">
-                                                                            1.000 COP = Bs. {((parseFloat(localRates['VES'] || rates?.['VES']?.toString() || '880.12') || 880.12) / (parseFloat(currentVal || '2857.15') || 2857.15) * 1000).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES
-                                                                        </span>
-                                                                    </div>
+                                                        ) : localMainCurrency === 'COP' && code === 'USD' ? (
+                                                            <div className="space-y-1 py-1">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap">1 USD =</span>
+                                                                    <input
+                                                                        type="text"
+                                                                        inputMode="decimal"
+                                                                        value={copPerUsdInput}
+                                                                        onChange={(e) => handleCopPerUsdChange(e.target.value)}
+                                                                        placeholder="3200"
+                                                                        className="w-28 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-mono font-black text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none shadow-2xs"
+                                                                    />
+                                                                    <span className="text-xs font-bold text-slate-600">COP</span>
                                                                 </div>
+                                                                <span className="text-[10px] font-mono text-indigo-700 font-bold block">
+                                                                    Tasa Base: {currentVal} USD
+                                                                </span>
+                                                            </div>
+                                                        ) : localMainCurrency === 'USD' && code === 'COP' ? (
+                                                            <div className="space-y-1 py-1">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap">1 USD =</span>
+                                                                    <input
+                                                                        type="text"
+                                                                        inputMode="decimal"
+                                                                        value={copPerUsdInput}
+                                                                        onChange={(e) => handleCopPerUsdChange(e.target.value)}
+                                                                        placeholder="3200"
+                                                                        className="w-28 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-mono font-black text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none shadow-2xs"
+                                                                    />
+                                                                    <span className="text-xs font-bold text-slate-600">COP</span>
+                                                                </div>
+                                                                {localActiveCurrencies.includes('VES') && (
+                                                                    <span className="text-[10px] font-mono text-amber-700 font-bold block">
+                                                                        1 COP = {((parseFloat(localRates['VES'] || '985.73') || 985.73) / (parseFloat(copPerUsdInput || '3200') || 3200)).toFixed(6)} Bs.
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         ) : (
                                                             <div>
                                                                 <input
                                                                     type="text"
-                                                                    inputMode="numeric"
+                                                                    inputMode="decimal"
                                                                     value={currentVal}
                                                                     onChange={(e) => {
                                                                         const val = e.target.value;
-                                                                        if (val === '' || /^\d+(\.\d{0,4})?$/.test(val)) {
+                                                                        if (val === '' || /^\d+(\.\d{0,6})?$/.test(val)) {
                                                                             setLocalRates(prev => ({ ...prev, [code]: val }));
                                                                         }
                                                                     }}
-                                                                    placeholder="0.00"
+                                                                    placeholder="0.000000"
                                                                     className="w-36 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none shadow-2xs"
                                                                 />
                                                                 <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
@@ -768,8 +845,8 @@ export function SystemSettings() {
                         </div>
 
                         {/* 4. Equivalencias en Vivo (Referencia Rápida) */}
-                        <div className="p-4 bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-2xl space-y-2 shadow-sm">
-                            <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 uppercase tracking-wider">
+                        <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-2xl space-y-3 shadow-sm min-w-0">
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold text-slate-300 uppercase tracking-wider">
                                 <span className="flex items-center gap-1.5">
                                     <Coins className="w-3.5 h-3.5 text-emerald-400" /> Equivalencias de Tasas en Vivo
                                 </span>
@@ -777,38 +854,63 @@ export function SystemSettings() {
                                     Base: 1 {localMainCurrency}
                                 </span>
                             </div>
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1 font-mono text-xs font-bold text-slate-200">
-                                <div className="flex items-center gap-1.5 bg-slate-800/60 px-2.5 py-1 rounded-lg border border-slate-700/60">
+                            
+                            <div className="flex flex-wrap items-center gap-2 pt-1 font-mono text-xs font-bold text-slate-200">
+                                <div className="flex items-center gap-1.5 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/80">
                                     <span className="text-slate-400">1 {localMainCurrency} =</span>
                                     {localActiveCurrencies.filter(c => c !== localMainCurrency).map((c, i) => {
                                         const info = getCurrencyInfo(c);
-                                        const rateVal = parseFloat(localRates[c] || (c === 'VES' ? rates?.['VES']?.toString() || '880.12' : c === 'COP' ? rates?.['COP']?.toString() || '2857.15' : '1')) || 1;
+                                        const rateVal = parseFloat(localRates[c] || '1') || 1;
                                         return (
                                             <span key={c} className="flex items-center gap-1">
                                                 {i > 0 && <span className="text-slate-500">•</span>}
                                                 <span className="text-emerald-400">
-                                                    {c === 'COP' ? rateVal.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : rateVal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {info.symbol} ({c})
+                                                    {rateVal < 0.01 ? rateVal.toFixed(6) : rateVal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} {info.symbol} ({c})
                                                 </span>
                                             </span>
                                         );
                                     })}
                                 </div>
-                                {localActiveCurrencies.includes('VES') && localActiveCurrencies.includes('COP') && (
-                                    <>
-                                        <div className="flex items-center gap-1.5 bg-amber-500/15 px-2.5 py-1 rounded-lg border border-amber-500/30 text-amber-200">
-                                            <span className="text-amber-400/80">1 Peso (COP) =</span>
-                                            <span className="text-amber-300 font-black">
-                                                {(((parseFloat(localRates['VES'] || rates?.['VES']?.toString() || '880.12') || 880.12) / (parseFloat(localRates['COP'] || rates?.['COP']?.toString() || '2857.15') || 2857.15))).toFixed(6)} Bs.
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 bg-indigo-950/60 px-2.5 py-1 rounded-lg border border-indigo-800/60 text-slate-300">
-                                            <span className="text-slate-400">1.000 COP =</span>
-                                            <span className="text-amber-400">
-                                                Bs. {(((parseFloat(localRates['VES'] || rates?.['VES']?.toString() || '880.12') || 880.12) / (parseFloat(localRates['COP'] || rates?.['COP']?.toString() || '2857.15') || 2857.15)) * 1000).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES
-                                            </span>
-                                        </div>
-                                    </>
+
+                                {localActiveCurrencies.includes('USD') && localActiveCurrencies.includes('COP') && (
+                                    <div className="flex items-center gap-1.5 bg-emerald-500/15 px-3 py-1.5 rounded-xl border border-emerald-500/30 text-emerald-200">
+                                        <span className="text-emerald-400/80">1 USD =</span>
+                                        <span className="text-emerald-300 font-black">
+                                            {parseFloat(copPerUsdInput || '3200').toLocaleString('es-CO')} $ (COP)
+                                        </span>
+                                    </div>
                                 )}
+
+                                {localActiveCurrencies.includes('USD') && localActiveCurrencies.includes('VES') && (
+                                    <div className="flex items-center gap-1.5 bg-indigo-500/15 px-3 py-1.5 rounded-xl border border-indigo-500/30 text-indigo-200">
+                                        <span className="text-indigo-400/80">1 USD =</span>
+                                        <span className="text-indigo-300 font-black">
+                                            {(rates?.['VES'] && localMainCurrency === 'USD' ? Number(rates['VES']) : (parseFloat(rates?.['VES'] ? rates['VES'].toString() : '985.73') || 985.73)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs. (VES)
+                                        </span>
+                                    </div>
+                                )}
+
+                                {localActiveCurrencies.includes('VES') && localActiveCurrencies.includes('COP') && (() => {
+                                    const bcvVal = rates?.['VES'] && localMainCurrency === 'USD' ? Number(rates['VES']) : (parseFloat(rates?.['VES'] ? rates['VES'].toString() : '985.73') || 985.73);
+                                    const copUsdVal = parseFloat(copPerUsdInput || '3200') || 3200;
+                                    const copToVes = bcvVal / copUsdVal;
+                                    return (
+                                        <>
+                                            <div className="flex items-center gap-1.5 bg-amber-500/15 px-3 py-1.5 rounded-xl border border-amber-500/30 text-amber-200">
+                                                <span className="text-amber-400/80">1 Peso (COP) =</span>
+                                                <span className="text-amber-300 font-black">
+                                                    {copToVes.toFixed(6)} Bs.
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 bg-amber-500/15 px-3 py-1.5 rounded-xl border border-amber-500/30 text-amber-200">
+                                                <span className="text-amber-400/80">1.000 COP =</span>
+                                                <span className="text-amber-300 font-black">
+                                                    Bs. {(copToVes * 1000).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES
+                                                </span>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
                             </div>
                         </div>
 
