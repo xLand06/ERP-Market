@@ -46,6 +46,7 @@ interface UseNotificationsResult {
     loading: boolean;
     refresh: () => Promise<void>;
     dismiss: (key: string) => void;
+    dismissAll: () => void;
 }
 
 export function useNotifications(): UseNotificationsResult {
@@ -102,6 +103,14 @@ export function useNotifications(): UseNotificationsResult {
         });
     }, []);
 
+    const dismissAll = useCallback(() => {
+        setDismissed((prev) => {
+            const next = new Set(prev);
+            items.forEach((item) => next.add(item.key));
+            return next;
+        });
+    }, [items]);
+
     // Filtrar las notificaciones descartadas por el usuario
     const visibleItems = items.filter((item) => !dismissed.has(item.key));
 
@@ -110,5 +119,6 @@ export function useNotifications(): UseNotificationsResult {
         loading,
         refresh,
         dismiss,
+        dismissAll,
     };
 }

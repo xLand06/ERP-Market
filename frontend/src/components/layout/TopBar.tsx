@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import {
     ArrowLeftRight, ChevronDown, LogOut, Settings, User, Menu, Keyboard,
     ShoppingCart, Package, Layers, Banknote, Bell, Palette, Check, X,
-    QrCode, Smartphone, Download
+    QrCode, Smartphone, Download, Calculator, CheckCheck, RotateCw, ExternalLink
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { cn } from '@/lib/utils';
@@ -75,7 +75,43 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
     const rateRef = useRef<HTMLDivElement>(null);
     const themeRef = useRef<HTMLDivElement>(null);
     const profileRef = useRef<HTMLDivElement>(null);
-    const { items: notifications, dismiss: dismissNotification } = useNotifications();
+    const {
+        items: notifications,
+        dismiss: dismissNotification,
+        dismissAll: dismissAllNotifications,
+        refresh: refreshNotifications,
+        loading: notificationsLoading
+    } = useNotifications();
+
+    const formatTimeAgo = (isoString?: string): string => {
+        if (!isoString) return '';
+        try {
+            const date = new Date(isoString);
+            if (isNaN(date.getTime())) return '';
+            const now = new Date();
+            const diffMs = now.getTime() - date.getTime();
+            const diffMins = Math.floor(diffMs / (1000 * 60));
+            if (diffMins < 1) return 'Hace un momento';
+            if (diffMins < 60) return `Hace ${diffMins} min`;
+            const diffHours = Math.floor(diffMins / 60);
+            if (diffHours < 24) return `Hace ${diffHours} h`;
+            const diffDays = Math.floor(diffHours / 24);
+            return `Hace ${diffDays} d`;
+        } catch {
+            return '';
+        }
+    };
+
+    const handleNotificationClick = (n: AppNotification) => {
+        setNotifOpen(false);
+        if (n.type === 'fiado') {
+            navigate('/customers');
+        } else if (n.type === 'pago_pendiente') {
+            navigate('/finance');
+        } else if (n.type === 'stock') {
+            navigate('/inventory');
+        }
+    };
 
     // Cierra todos los popovers al hacer clic fuera
     useEffect(() => {
@@ -197,12 +233,12 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                 </button>
             </div>
 
-            {/* Center – Exchange Rate Widget */}
-            <div className="flex items-center justify-center min-w-0 flex-1">
-                {/* Desktop Full Rates Bar (>= xl or >= lg when collapsed) */}
+            {/* Center – Exchange Rate Widget & Converter */}
+            <div ref={rateRef} className="relative flex items-center justify-center min-w-0 flex-1">
+                {/* Desktop Full Rates Bar (>= 2xl, or >= lg when collapsed) */}
                 <div className={cn(
-                    'hidden items-center gap-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl p-1 text-xs max-w-full shadow-2xs',
-                    collapsed ? 'lg:flex' : 'xl:flex'
+                    'items-center gap-1.5 sm:gap-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl p-1 text-xs max-w-full shadow-2xs',
+                    collapsed ? 'hidden lg:flex' : 'hidden 2xl:flex'
                 )}>
                     <div className="flex items-center gap-1.5 px-2 text-slate-500 dark:text-slate-400">
                         <ArrowLeftRight className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
@@ -230,8 +266,13 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
 
                     <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
 
-                    {/* Rates display */}
-                    <div className="flex items-center min-w-0 overflow-hidden pr-1">
+                    {/* Rates display - clickable to open calculator */}
+                    <button
+                        type="button"
+                        onClick={() => setRatePopoverOpen(!ratePopoverOpen)}
+                        className="flex items-center min-w-0 overflow-hidden px-1 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-lg transition-colors cursor-pointer text-left"
+                        title="Ver detalles y calculadora de conversión"
+                    >
                         {others.map((cur, i) => {
                             const pair = getPairInfo(base, cur);
                             return (
@@ -244,220 +285,303 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                                 </div>
                             );
                         })}
-                    </div>
+                    </button>
+
+                    <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+
+                    {/* Dedicated Calculadora trigger button */}
+                    <button
+                        type="button"
+                        onClick={() => setRatePopoverOpen(!ratePopoverOpen)}
+                        className={cn(
+                            "flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-black text-[11px] transition-all cursor-pointer shadow-2xs",
+                            ratePopoverOpen
+                                ? "bg-indigo-600 text-white shadow-xs"
+                                : "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border border-indigo-200/80 dark:border-indigo-800/80"
+                        )}
+                        title="Abrir Calculadora de Conversión"
+                        aria-label="Abrir Calculadora de Conversión"
+                    >
+                        <Calculator className="w-3.5 h-3.5" />
+                        <span>Calculadora</span>
+                    </button>
                 </div>
 
-                {/* Mobile / Tablet Compact Rate Trigger */}
-                <div ref={rateRef} className={cn(
+                {/* Compact Rate Trigger (when sidebar is open or on smaller screens) */}
+                <div className={cn(
                     'relative max-w-full',
-                    collapsed ? 'lg:hidden' : 'xl:hidden'
+                    collapsed ? 'lg:hidden' : '2xl:hidden'
                 )}>
                     <button
                         onClick={() => setRatePopoverOpen(!ratePopoverOpen)}
-                        className="flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 bg-slate-50 dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-95 shadow-2xs cursor-pointer min-w-0"
-                        title="Ver tasas de cambio"
-                        aria-label="Ver tasas de cambio"
+                        className={cn(
+                            "flex items-center gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 bg-slate-50 dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-95 shadow-2xs cursor-pointer min-w-0",
+                            ratePopoverOpen && "ring-2 ring-indigo-500/30 border-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/40"
+                        )}
+                        title="Ver tasas de cambio y calculadora de conversión"
+                        aria-label="Ver tasas de cambio y calculadora"
                     >
                         <ArrowLeftRight className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
                         <div className="flex items-center gap-1 text-[11px] font-bold tabular-nums min-w-0">
                             <span className="hidden xs:inline text-slate-400 dark:text-slate-500 font-medium truncate">
                                 {activeMobilePair.left} =
                             </span>
-                            <span className="text-slate-900 dark:text-slate-100 font-black truncate max-w-[70px] xs:max-w-none">
+                            <span className="text-slate-900 dark:text-slate-100 font-black truncate max-w-[85px] xs:max-w-none">
                                 {activeMobilePair.short}
                             </span>
                         </div>
+                        <div className="w-px h-3.5 bg-slate-200 dark:bg-slate-700 mx-0.5 shrink-0" />
+                        <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-bold text-[11px]">
+                            <Calculator className="w-3.5 h-3.5 shrink-0" />
+                            <span className="hidden sm:inline">Calculadora</span>
+                        </span>
                         <ChevronDown className={cn("w-3 h-3 text-slate-400 transition-transform shrink-0", ratePopoverOpen && "rotate-180")} />
                     </button>
+                </div>
 
-                    {ratePopoverOpen && (
-                        <>
-                            {/* Backdrop para cerrar al hacer tap fuera */}
-                            <div 
-                                className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-2xs"
-                                onClick={() => setRatePopoverOpen(false)}
-                            />
+                {ratePopoverOpen && (
+                    <>
+                        {/* Backdrop para cerrar al hacer tap fuera */}
+                        <div 
+                            className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-2xs"
+                            onClick={() => setRatePopoverOpen(false)}
+                        />
 
-                            {/* Modal Bottom Sheet en Móvil (< sm) */}
-                            <div className="fixed inset-x-0 bottom-16 z-50 p-4 sm:p-5 pb-4 bg-white dark:bg-slate-900 rounded-t-3xl border-t border-slate-200 dark:border-slate-800 shadow-2xl sm:hidden animate-slide-up max-h-[80vh] overflow-y-auto">
-                                <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mb-3" />
-                                
-                                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-3">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                                            <ArrowLeftRight className="w-4 h-4" />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">Tasas de Cambio</h3>
-                                            <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">Cotización en tiempo real</p>
-                                        </div>
+                        {/* Modal Bottom Sheet en Móvil (< sm) */}
+                        <div className="fixed inset-x-0 bottom-16 z-50 p-4 sm:p-5 pb-4 bg-white dark:bg-slate-900 rounded-t-3xl border-t border-slate-200 dark:border-slate-800 shadow-2xl sm:hidden animate-slide-up max-h-[80vh] overflow-y-auto">
+                            <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mb-3" />
+                            
+                            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-3">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                        <Calculator className="w-4 h-4" />
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setRatePopoverOpen(false)}
-                                        className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 flex items-center justify-center cursor-pointer"
-                                        aria-label="Cerrar"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-
-                                {/* Selector de Moneda Base */}
-                                <div className="mb-3.5">
-                                    <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider mb-2 block">
-                                        Seleccionar Moneda Base
-                                    </label>
-                                    <div className="grid grid-cols-3 gap-2 bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-700/50">
-                                        {CURRENCIES.map(cur => {
-                                            const isSelected = base === cur;
-                                            const meta = cur === 'USD' ? { flag: '🇺🇸', name: 'Dólar' } : cur === 'COP' ? { flag: '🇨🇴', name: 'Pesos' } : { flag: '🇻🇪', name: 'Bolívares' };
-                                            return (
-                                                <button
-                                                    key={cur}
-                                                    type="button"
-                                                    onClick={() => setBase(cur)}
-                                                    className={cn(
-                                                        'flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-all cursor-pointer',
-                                                        isSelected
-                                                            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 scale-[1.02]'
-                                                            : 'text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-700/60'
-                                                    )}
-                                                >
-                                                    <span className="text-base leading-none mb-0.5">{meta.flag}</span>
-                                                    <span className="text-xs font-black">{cur}</span>
-                                                    <span className={cn('text-[10px] font-medium', isSelected ? 'text-indigo-100' : 'text-slate-400 dark:text-slate-500')}>
-                                                        {meta.name}
-                                                    </span>
-                                                </button>
-                                            );
-                                        })}
+                                    <div>
+                                        <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">Tasas y Calculadora</h3>
+                                        <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">Cotización y conversor en vivo</p>
                                     </div>
                                 </div>
-
-                                {/* Tarjetas de Conversión para las demás monedas */}
-                                <div className="space-y-2 mb-3.5">
-                                    <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider block">
-                                        Equivalencias para 1 {base}
-                                    </label>
-                                    {others.map((cur) => {
-                                        const pair = getPairInfo(base, cur);
-                                        const meta = cur === 'USD' ? { flag: '🇺🇸', name: 'Dólar Estadounidense' } : cur === 'COP' ? { flag: '🇨🇴', name: 'Peso Colombiano' } : { flag: '🇻🇪', name: 'Bolívar Venezolano' };
-                                        return (
-                                            <div key={cur} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-2xl">{meta.flag}</span>
-                                                    <div>
-                                                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{pair.left}</p>
-                                                        <p className="text-[11px] text-slate-400 dark:text-slate-500">{meta.name}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-sm font-black text-slate-900 dark:text-slate-100 tabular-nums">{pair.right}</p>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Conversor Rápido */}
-                                <div className="bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-2xl p-3 mb-3.5">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200">Conversor Rápido</span>
-                                        <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">En vivo</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 px-2 py-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">{base}</span>
-                                        <input
-                                            type="number"
-                                            value={calcAmount}
-                                            onChange={(e) => setCalcAmount(e.target.value)}
-                                            placeholder="1"
-                                            min="0"
-                                            step="any"
-                                            className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-sm font-bold text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-indigo-500 tabular-nums"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                        {others.map(cur => {
-                                            const parsed = parseFloat(calcAmount) || 1;
-                                            const valInUsd = toUSD(parsed, base);
-                                            const converted = fromUSD(valInUsd, cur);
-                                            const formatted = cur === 'COP' ? converted.toLocaleString('es-CO', { maximumFractionDigits: 0 }) : converted.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                            return (
-                                                <div key={cur} className="bg-white/80 dark:bg-slate-900/80 p-2 rounded-xl border border-indigo-100/50 dark:border-indigo-900/40">
-                                                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block">{cur}</span>
-                                                    <span className="font-black text-slate-900 dark:text-slate-100 tabular-nums">{SYMBOLS[cur]} {formatted}</span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                <div className="pt-1 flex items-center justify-between text-xs text-slate-400 dark:text-slate-500">
-                                    <span>Actualizado automáticamente</span>
-                                    <button 
-                                        type="button" 
-                                        onClick={() => { setRatePopoverOpen(false); navigate('/finance'); }}
-                                        className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
-                                    >
-                                        Finanzas →
-                                    </button>
-                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setRatePopoverOpen(false)}
+                                    className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 flex items-center justify-center cursor-pointer"
+                                    aria-label="Cerrar"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
                             </div>
 
-                            {/* Dropdown Popover en Tablet / Desktop (>= sm) */}
-                            <div className="hidden sm:block absolute left-1/2 -translate-x-1/2 top-full mt-2 w-80 max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-3.5 sm:p-4 z-50 animate-slide-up">
-                                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800 mb-3">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                                            <ArrowLeftRight className="w-3.5 h-3.5" />
-                                        </div>
-                                        <span className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">Tasas de Cambio</span>
-                                    </div>
-                                    <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
-                                        {CURRENCIES.map(cur => (
+                            {/* Selector de Moneda Base */}
+                            <div className="mb-3.5">
+                                <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider mb-2 block">
+                                    Seleccionar Moneda Base
+                                </label>
+                                <div className="grid grid-cols-3 gap-2 bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-700/50">
+                                    {CURRENCIES.map(cur => {
+                                        const isSelected = base === cur;
+                                        const meta = cur === 'USD' ? { flag: '🇺🇸', name: 'Dólar' } : cur === 'COP' ? { flag: '🇨🇴', name: 'Pesos' } : { flag: '🇻🇪', name: 'Bolívares' };
+                                        return (
                                             <button
                                                 key={cur}
+                                                type="button"
                                                 onClick={() => setBase(cur)}
                                                 className={cn(
-                                                    'px-2 py-1 rounded-md text-[11px] font-black transition-all cursor-pointer',
-                                                    base === cur
-                                                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                                                        : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                                                    'flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-all cursor-pointer',
+                                                    isSelected
+                                                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 scale-[1.02]'
+                                                        : 'text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-700/60'
                                                 )}
                                             >
-                                                {cur}
+                                                <span className="text-base leading-none mb-0.5">{meta.flag}</span>
+                                                <span className="text-xs font-black">{cur}</span>
+                                                <span className={cn('text-[10px] font-medium', isSelected ? 'text-indigo-100' : 'text-slate-400 dark:text-slate-500')}>
+                                                    {meta.name}
+                                                </span>
                                             </button>
-                                        ))}
-                                    </div>
+                                        );
+                                    })}
                                 </div>
+                            </div>
 
-                                <div className="space-y-2">
-                                    {others.map((cur) => {
-                                        const pair = getPairInfo(base, cur);
+                            {/* Tarjetas de Conversión para las demás monedas */}
+                            <div className="space-y-2 mb-3.5">
+                                <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider block">
+                                    Equivalencias para 1 {base}
+                                </label>
+                                {others.map((cur) => {
+                                    const pair = getPairInfo(base, cur);
+                                    const meta = cur === 'USD' ? { flag: '🇺🇸', name: 'Dólar Estadounidense' } : cur === 'COP' ? { flag: '🇨🇴', name: 'Peso Colombiano' } : { flag: '🇻🇪', name: 'Bolívar Venezolano' };
+                                    return (
+                                        <div key={cur} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-2xl">{meta.flag}</span>
+                                                <div>
+                                                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{pair.left}</p>
+                                                    <p className="text-[11px] text-slate-400 dark:text-slate-500">{meta.name}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm font-black text-slate-900 dark:text-slate-100 tabular-nums">{pair.right}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Conversor Rápido */}
+                            <div className="bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-2xl p-3 mb-3.5">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                                        <Calculator className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                                        Conversor Rápido
+                                    </span>
+                                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">En vivo</span>
+                                </div>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 px-2 py-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">{base}</span>
+                                    <input
+                                        type="number"
+                                        value={calcAmount}
+                                        onChange={(e) => setCalcAmount(e.target.value)}
+                                        placeholder="1"
+                                        min="0"
+                                        step="any"
+                                        className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-sm font-bold text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-indigo-500 tabular-nums"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    {others.map(cur => {
+                                        const parsed = parseFloat(calcAmount) || 0;
+                                        const valInUsd = toUSD(parsed, base);
+                                        const converted = fromUSD(valInUsd, cur);
+                                        const formatted = cur === 'COP' ? converted.toLocaleString('es-CO', { maximumFractionDigits: 0 }) : converted.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                                         return (
-                                            <div key={cur} className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs">
-                                                <span className="text-slate-500 dark:text-slate-400 font-semibold">{pair.left} =</span>
-                                                <span className="text-slate-950 dark:text-slate-100 font-black tabular-nums">{pair.right}</span>
+                                            <div key={cur} className="bg-white/80 dark:bg-slate-900/80 p-2 rounded-xl border border-indigo-100/50 dark:border-indigo-900/40">
+                                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block">{cur}</span>
+                                                <span className="font-black text-slate-900 dark:text-slate-100 tabular-nums">{SYMBOLS[cur]} {formatted}</span>
                                             </div>
                                         );
                                     })}
                                 </div>
+                            </div>
 
-                                <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500">
-                                    <span>Actualizado automáticamente</span>
-                                    <button 
-                                        type="button" 
-                                        onClick={() => { setRatePopoverOpen(false); navigate('/finance'); }}
-                                        className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
-                                    >
-                                        Finanzas →
-                                    </button>
+                            <div className="pt-1 flex items-center justify-between text-xs text-slate-400 dark:text-slate-500">
+                                <span>Actualizado automáticamente</span>
+                                <button 
+                                    type="button" 
+                                    onClick={() => { setRatePopoverOpen(false); navigate('/finance'); }}
+                                    className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                                >
+                                    Finanzas →
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Dropdown Popover en Tablet / Desktop (>= sm) */}
+                        <div className="hidden sm:block absolute left-1/2 -translate-x-1/2 top-full mt-2 w-96 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-4 z-50 animate-slide-up">
+                            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800 mb-3">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-7 h-7 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                        <Calculator className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <span className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider block">Tasas y Calculadora</span>
+                                        <span className="text-[10px] text-slate-400 dark:text-slate-500">Conversor instantáneo</span>
+                                    </div>
+                                </div>
+                                <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                                    {CURRENCIES.map(cur => (
+                                        <button
+                                            key={cur}
+                                            onClick={() => setBase(cur)}
+                                            className={cn(
+                                                'px-2 py-1 rounded-md text-[11px] font-black transition-all cursor-pointer',
+                                                base === cur
+                                                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                                                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                                            )}
+                                        >
+                                            {cur}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
-                        </>
-                    )}
-                </div>
+
+                            {/* Tarjetas de equivalencia para 1 base */}
+                            <div className="space-y-1.5 mb-3">
+                                <div className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">
+                                    Equivalencias para 1 {base}
+                                </div>
+                                {others.map((cur) => {
+                                    const pair = getPairInfo(base, cur);
+                                    return (
+                                        <div key={cur} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs">
+                                            <span className="text-slate-500 dark:text-slate-400 font-semibold">{pair.left} =</span>
+                                            <span className="text-slate-950 dark:text-slate-100 font-black tabular-nums">{pair.right}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Conversor Rápido en Tablet/Desktop */}
+                            <div className="bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-2xl p-3 my-2.5">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-black text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                                        <Calculator className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                                        Conversor Rápido
+                                    </span>
+                                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-100/80 dark:bg-indigo-900/60 px-1.5 py-0.5 rounded-full">
+                                        En vivo
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-xs font-black text-slate-700 dark:text-slate-300 px-2.5 py-1.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
+                                        {base}
+                                    </span>
+                                    <input
+                                        type="number"
+                                        value={calcAmount}
+                                        onChange={(e) => setCalcAmount(e.target.value)}
+                                        placeholder="1"
+                                        min="0"
+                                        step="any"
+                                        className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-sm font-black text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-indigo-500 tabular-nums shadow-2xs"
+                                        autoFocus
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    {others.map(cur => {
+                                        const parsed = parseFloat(calcAmount) || 0;
+                                        const valInUsd = toUSD(parsed, base);
+                                        const converted = fromUSD(valInUsd, cur);
+                                        const formatted = cur === 'COP'
+                                            ? converted.toLocaleString('es-CO', { maximumFractionDigits: 0 })
+                                            : converted.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                        return (
+                                            <div key={cur} className="bg-white/90 dark:bg-slate-900/90 p-2 rounded-xl border border-indigo-100/60 dark:border-indigo-900/40 shadow-2xs">
+                                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block uppercase">{cur}</span>
+                                                <span className="font-black text-slate-900 dark:text-slate-100 tabular-nums text-xs">
+                                                    {SYMBOLS[cur]} {formatted}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500">
+                                <span>Actualizado automáticamente</span>
+                                <button 
+                                    type="button" 
+                                    onClick={() => { setRatePopoverOpen(false); navigate('/finance'); }}
+                                    className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                                >
+                                    Finanzas →
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Right – BranchSelector + Shortcuts + Profile
@@ -471,7 +595,7 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                     <BranchSelector />
                 </div>
 
-                <div ref={themeRef} className="relative shrink-0">
+                <div className="relative shrink-0">
                     <div className="flex items-center gap-0.5 sm:gap-1 bg-transparent sm:bg-slate-100/80 sm:dark:bg-slate-800/80 p-0 sm:p-1 rounded-xl sm:border sm:border-slate-200/50 sm:dark:border-slate-700/50 max-w-full">
                         {/* Mobile App Connect QR (Only for desktop/tablets) */}
                         <button
@@ -494,14 +618,61 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                             <span className="font-mono text-[11px] font-black hidden md:inline">{currentLanguage.toUpperCase()}</span>
                         </button>
 
-                        {/* Theme Selector Trigger (sm+) */}
-                        <button
-                            onClick={() => setThemePopoverOpen(!themePopoverOpen)}
-                            className="hidden sm:flex min-w-[38px] min-h-[38px] items-center justify-center text-slate-500 hover:bg-white dark:hover:bg-slate-700 hover:text-indigo-600 rounded-lg transition-all active:scale-95 cursor-pointer shrink-0"
-                            title="Cambiar Tema de Interfaz"
-                        >
-                            <Palette className="w-4 h-4" />
-                        </button>
+                        {/* Theme Selector Trigger & Popover (sm+) */}
+                        <div ref={themeRef} className="relative">
+                            <button
+                                onClick={() => setThemePopoverOpen(!themePopoverOpen)}
+                                className={cn(
+                                    "hidden sm:flex min-w-[38px] min-h-[38px] items-center justify-center rounded-lg transition-all active:scale-95 cursor-pointer shrink-0",
+                                    themePopoverOpen
+                                        ? "bg-white dark:bg-slate-700 text-indigo-600 shadow-xs"
+                                        : "text-slate-500 hover:bg-white dark:hover:bg-slate-700 hover:text-indigo-600"
+                                )}
+                                title="Cambiar Tema de Interfaz"
+                                aria-label="Cambiar Tema de Interfaz"
+                            >
+                                <Palette className="w-4 h-4" />
+                            </button>
+
+                            {themePopoverOpen && (
+                                <div className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-2 z-50 animate-slide-up">
+                                    <div className="px-2 py-1.5 border-b border-slate-100 dark:border-slate-800 mb-1">
+                                        <p className="text-[11px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">Tema de Interfaz</p>
+                                    </div>
+                                    {[
+                                        { id: 'emerald', name: 'Esmeralda', color: 'bg-emerald-500' },
+                                        { id: 'indigo', name: 'Índigo Royal', color: 'bg-indigo-600' },
+                                        { id: 'amber', name: 'Espresso / Ámbar', color: 'bg-amber-600' },
+                                        { id: 'rose', name: 'Bordó / Rosa', color: 'bg-rose-600' },
+                                        { id: 'dark', name: 'Modo Oscuro Total', color: 'bg-slate-900 border border-slate-700' },
+                                    ].map((t) => {
+                                        const isSel = (activeTheme || 'emerald') === t.id;
+                                        return (
+                                            <button
+                                                key={t.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setTheme(t.id as any);
+                                                    setThemePopoverOpen(false);
+                                                }}
+                                                className={cn(
+                                                    'w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all text-left cursor-pointer mb-0.5',
+                                                    isSel
+                                                        ? 'bg-indigo-50 dark:bg-slate-800 text-indigo-700 dark:text-indigo-300'
+                                                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                                                )}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className={cn('w-3 h-3 rounded-full shrink-0', t.color)} />
+                                                    <span className="truncate">{t.name}</span>
+                                                </div>
+                                                {isSel && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
 
                         {/* Shortcuts Trigger (sm+) */}
                         <button
@@ -515,112 +686,171 @@ export function TopBar({ onToggleSidebar, collapsed }: TopBarProps) {
                             <Keyboard className="w-4 h-4" />
                         </button>
 
-                        {/* Notifications (Always visible) */}
-                        <div ref={notifRef}>
+                        {/* Notifications Bell & Popover (Always visible) */}
+                        <div ref={notifRef} className="relative">
                             <button
                                 onClick={() => setNotifOpen(!notifOpen)}
-                                className="relative min-w-[36px] min-h-[36px] sm:min-w-[38px] sm:min-h-[38px] flex items-center justify-center text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 sm:bg-transparent hover:bg-slate-200/80 sm:hover:bg-white sm:dark:hover:bg-slate-700 hover:text-indigo-600 rounded-xl sm:rounded-lg transition-all active:scale-95 cursor-pointer"
+                                className={cn(
+                                    "relative min-w-[36px] min-h-[36px] sm:min-w-[38px] sm:min-h-[38px] flex items-center justify-center rounded-xl sm:rounded-lg transition-all active:scale-95 cursor-pointer",
+                                    notifOpen
+                                        ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 ring-2 ring-indigo-500/20"
+                                        : notifications.length > 0
+                                            ? "text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 sm:bg-transparent hover:bg-slate-200/80 sm:hover:bg-white sm:dark:hover:bg-slate-700 hover:text-indigo-600"
+                                            : "text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 sm:bg-transparent hover:bg-slate-200/80 sm:hover:bg-white sm:dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200"
+                                )}
                                 aria-label="Notificaciones"
+                                title={notifications.length > 0 ? `${notifications.length} notificaciones activas` : 'Notificaciones'}
                             >
-                                <Bell className="w-4 h-4" />
+                                <Bell className={cn("w-4 h-4 transition-transform", notifications.length > 0 && "text-slate-800 dark:text-slate-100")} />
                                 {notifications.length > 0 && (
-                                    <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-red-500 text-white rounded-full flex items-center justify-center text-[9px] font-bold border border-white dark:border-slate-900">
-                                        {notifications.length > 9 ? '9+' : notifications.length}
+                                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                                        <span className="relative inline-flex items-center justify-center h-4 min-w-4 px-1 bg-rose-600 text-white rounded-full text-[9px] font-black border-2 border-white dark:border-slate-900 shadow-xs tabular-nums">
+                                            {notifications.length > 9 ? '9+' : notifications.length}
+                                        </span>
                                     </span>
                                 )}
                             </button>
+
+                            {/* ── Notifications Popover ── */}
+                            {notifOpen && (
+                                <div className="absolute right-0 top-full mt-2 w-[calc(100vw-1.5rem)] sm:w-96 max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 animate-slide-up overflow-hidden max-h-[calc(100vh-6rem)] flex flex-col">
+                                    {/* Header */}
+                                    <div className="px-3.5 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/50">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-2xs">
+                                                <Bell className="w-3.5 h-3.5" />
+                                            </div>
+                                            <div>
+                                                <span className="text-xs font-black text-slate-800 dark:text-slate-100 tracking-wide block">Notificaciones</span>
+                                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                                                    {notifications.length} activa{notifications.length !== 1 ? 's' : ''}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => void refreshNotifications()}
+                                                className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-white dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                                title="Actualizar"
+                                                aria-label="Actualizar notificaciones"
+                                            >
+                                                <RotateCw className={cn("w-3.5 h-3.5", notificationsLoading && "animate-spin text-indigo-600")} />
+                                            </button>
+                                            {notifications.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={dismissAllNotifications}
+                                                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs transition-all cursor-pointer"
+                                                    title="Descartar todas las notificaciones"
+                                                >
+                                                    <CheckCheck className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
+                                                    <span>Limpiar todo</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* List */}
+                                    <div className="overflow-y-auto max-h-88 divide-y divide-slate-100 dark:divide-slate-800/80">
+                                        {notifications.length === 0 ? (
+                                            <div className="px-4 py-10 text-center flex flex-col items-center justify-center">
+                                                <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-2.5 shadow-2xs">
+                                                    <CheckCheck className="w-6 h-6" />
+                                                </div>
+                                                <p className="text-xs font-black text-slate-800 dark:text-slate-100">¡Todo al día!</p>
+                                                <p className="text-[11px] text-slate-400 dark:text-slate-500 max-w-[220px] mt-0.5 leading-snug">
+                                                    No hay alertas de fiados, pagos pendientes ni stock crítico.
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <ul>
+                                                {notifications.map((n) => {
+                                                    const isFiado = n.type === 'fiado';
+                                                    const isPago = n.type === 'pago_pendiente';
+                                                    const badgeLabel = isFiado ? 'Fiado / Crédito' : isPago ? 'Pago Móvil' : 'Stock Bajo';
+                                                    const badgeColor = isFiado
+                                                        ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
+                                                        : isPago
+                                                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20'
+                                                            : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20';
+
+                                                    return (
+                                                        <li
+                                                            key={n.key}
+                                                            className="p-3 hover:bg-slate-50/90 dark:hover:bg-slate-800/50 transition-colors group flex items-start gap-2.5 cursor-pointer relative"
+                                                            onClick={() => handleNotificationClick(n)}
+                                                        >
+                                                            <span className={cn(
+                                                                'mt-0.5 w-8 h-8 shrink-0 rounded-xl flex items-center justify-center border shadow-2xs',
+                                                                isFiado
+                                                                    ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/60'
+                                                                    : isPago
+                                                                        ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60'
+                                                                        : 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800/60'
+                                                            )}>
+                                                                {notificationIcon(n.type)}
+                                                            </span>
+
+                                                            <div className="flex-1 min-w-0 pr-6">
+                                                                <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                                                                    <span className={cn('text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded-md border', badgeColor)}>
+                                                                        {badgeLabel}
+                                                                    </span>
+                                                                    {n.createdAt && (
+                                                                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                                                                            {formatTimeAgo(n.createdAt)}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+
+                                                                <p className="text-xs font-black text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-tight">
+                                                                    {n.title}
+                                                                </p>
+                                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug mt-0.5 break-words">
+                                                                    {n.message}
+                                                                </p>
+
+                                                                <div className="flex items-center gap-1 mt-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <span>Ir a ver</span>
+                                                                    <ExternalLink className="w-2.5 h-2.5" />
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Botón descartar individual */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    dismissNotification(n.key);
+                                                                }}
+                                                                className="absolute top-2.5 right-2.5 w-6 h-6 flex items-center justify-center rounded-lg text-slate-300 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-colors cursor-pointer"
+                                                                aria-label="Descartar notificación"
+                                                                title="Descartar"
+                                                            >
+                                                                <X className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        )}
+                                    </div>
+
+                                    {/* Footer */}
+                                    {notifications.length > 0 && (
+                                        <div className="p-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-center">
+                                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                                                Haz clic en una alerta para ir directamente al módulo correspondiente
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
-
-                    {/* ── Theme Popover (fuera del contenedor de iconos) ── */}
-                    {themePopoverOpen && (
-                        <div className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-2 z-50 animate-slide-up">
-                            <div className="px-2 py-1.5 border-b border-slate-100 dark:border-slate-800 mb-1">
-                                <p className="text-[11px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">Tema de Interfaz</p>
-                            </div>
-                            {[
-                                { id: 'emerald', name: 'Esmeralda', color: 'bg-emerald-500' },
-                                { id: 'indigo', name: 'Índigo Royal', color: 'bg-indigo-600' },
-                                { id: 'amber', name: 'Espresso / Ámbar', color: 'bg-amber-600' },
-                                { id: 'rose', name: 'Bordó / Rosa', color: 'bg-rose-600' },
-                                { id: 'dark', name: 'Modo Oscuro Total', color: 'bg-slate-900 border border-slate-700' },
-                            ].map((t) => {
-                                const isSel = (activeTheme || 'emerald') === t.id;
-                                return (
-                                    <button
-                                        key={t.id}
-                                        type="button"
-                                        onClick={() => {
-                                            setTheme(t.id as any);
-                                            setThemePopoverOpen(false);
-                                        }}
-                                        className={cn(
-                                            'w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all text-left cursor-pointer mb-0.5',
-                                            isSel
-                                                ? 'bg-indigo-50 dark:bg-slate-800 text-indigo-700 dark:text-indigo-300'
-                                                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                                        )}
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <span className={cn('w-3 h-3 rounded-full shrink-0', t.color)} />
-                                            <span className="truncate">{t.name}</span>
-                                        </div>
-                                        {isSel && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )}
-
-                    {/* ── Notifications Popover (fuera del contenedor de iconos) ── */}
-                    {notifOpen && (
-                        <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 animate-slide-up overflow-hidden max-h-[calc(100vh-8rem)]">
-                            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100">
-                                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Notificaciones</span>
-                                <span className="text-[10px] font-semibold text-slate-400">
-                                    {notifications.length} activa{notifications.length !== 1 ? 's' : ''}
-                                </span>
-                            </div>
-
-                            <div className="max-h-80 overflow-y-auto">
-                                {notifications.length === 0 ? (
-                                    <div className="px-3 py-8 text-center">
-                                        <Bell className="w-6 h-6 text-slate-300 mx-auto mb-2" />
-                                        <p className="text-sm font-medium text-slate-400">Sin notificaciones</p>
-                                    </div>
-                                ) : (
-                                    <ul className="divide-y divide-slate-100">
-                                        {notifications.map((n) => (
-                                            <li key={n.key} className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-slate-50 transition-colors group">
-                                                <span className={cn(
-                                                    'mt-0.5 w-7 h-7 shrink-0 rounded-lg flex items-center justify-center',
-                                                    n.type === 'fiado'
-                                                        ? 'bg-amber-50 text-amber-600'
-                                                        : n.type === 'pago_pendiente'
-                                                            ? 'bg-emerald-50 text-emerald-600'
-                                                            : 'bg-indigo-50 text-indigo-600'
-                                                )}>
-                                                    {notificationIcon(n.type)}
-                                                </span>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-xs font-bold text-slate-800">{n.title}</p>
-                                                    <p className="text-xs text-slate-500 leading-snug break-words">{n.message}</p>
-                                                </div>
-                                                <button
-                                                    onClick={() => dismissNotification(n.key)}
-                                                    className="shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                                                    aria-label="Descartar notificación"
-                                                    title="Descartar"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 <div ref={profileRef} className="relative shrink-0 min-w-0">
