@@ -145,9 +145,8 @@ export function ThermalReceiptTicket({
                                     <span className="truncate pr-1">{item.qty}x {item.name}</span>
                                     <span className="tabular-nums">Bs. {itemVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
-                                <div className="flex justify-between text-[9px] text-slate-500 pl-3">
+                                <div className="text-[9px] text-slate-500 pl-3">
                                     <span>{item.qty} x Bs. {unitPriceVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                    <span>Ref: ${item.total.toFixed(2)} USD</span>
                                 </div>
                             </div>
                         );
