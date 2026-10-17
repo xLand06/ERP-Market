@@ -62,7 +62,7 @@ export function SystemSettings() {
 
     const { 
         rates, iva, mainCurrency, activeCurrencies, autoOpenTime, autoCloseTime, purgeRetentionDays, purgeLogRetentionDays,
-        useOfficialRateForVes, bcvRateType, bcvLastSync,
+        useOfficialRateForVes, bcvRateType, bcvLastSync, bcvOfficialRate,
         activeTheme, setTheme, updateRate, updateSettings, fetchSettings, fetchRates
     } = useConfigStore();
 
@@ -71,6 +71,7 @@ export function SystemSettings() {
     const [localRates, setLocalRates] = useState<Record<string, string>>({});
     const [localUseOfficialRate, setLocalUseOfficialRate] = useState<boolean>(useOfficialRateForVes ?? true);
     const [localBcvRateType, setLocalBcvRateType] = useState<string>(bcvRateType || 've_dolar_oficial');
+    const [localBcvOfficialRate, setLocalBcvOfficialRate] = useState<number | null>(bcvOfficialRate || null);
     const [isSyncingBcv, setIsSyncingBcv] = useState(false);
     const [showCatalogSelector, setShowCatalogSelector] = useState(false);
     const [catalogSearch, setCatalogSearch] = useState('');
@@ -83,7 +84,7 @@ export function SystemSettings() {
 
     const currentLanguage = i18n.language?.slice(0, 2) as AppLanguage;
 
-    const [copPerUsdInput, setCopPerUsdInput] = useState<string>('3200');
+    const [copPerUsdInput, setCopPerUsdInput] = useState<string>('2857.15');
 
     useEffect(() => {
         fetchSettings();
@@ -97,6 +98,7 @@ export function SystemSettings() {
         setLocalActiveCurrencies(activeCurrencies?.length ? activeCurrencies : ['USD', 'COP', 'VES']);
         setLocalUseOfficialRate(useOfficialRateForVes ?? true);
         setLocalBcvRateType(bcvRateType || 've_dolar_oficial');
+        setLocalBcvOfficialRate(bcvOfficialRate || null);
 
         const initialRates: Record<string, string> = {};
         Object.entries(rates || {}).forEach(([k, v]) => {
@@ -104,22 +106,24 @@ export function SystemSettings() {
         });
 
         // Extraer valores base fundamentales
-        let bcv = 985.73;
-        let copUsd = 3200;
+        let bcv = bcvOfficialRate || 880.12;
+        let copUsd = 2857.15;
 
         if (activeMain === 'USD') {
-            bcv = parseFloat(initialRates['VES'] || rates?.['VES']?.toString() || '985.73') || 985.73;
-            copUsd = parseFloat(initialRates['COP'] || rates?.['COP']?.toString() || '3200') || 3200;
+            bcv = bcvOfficialRate || (parseFloat(initialRates['VES'] || '880.12') || 880.12);
+            copUsd = parseFloat(initialRates['COP'] || '2857.15') || 2857.15;
         } else if (activeMain === 'COP') {
-            const usdRate = parseFloat(initialRates['USD'] || '0.0003125') || 0.0003125;
-            copUsd = usdRate > 0 && usdRate < 1 ? Math.round(1 / usdRate) : (parseFloat(rates?.['COP']?.toString() || '3200') || 3200);
-            const vesRate = parseFloat(initialRates['VES'] || '0.308041') || 0.308041;
-            bcv = Math.round(vesRate * copUsd * 100) / 100;
+            const usdRate = parseFloat(initialRates['USD'] || '0.000350') || 0.000350;
+            copUsd = usdRate > 0 && usdRate < 1 ? Math.round(1 / usdRate * 100) / 100 : (parseFloat(rates?.['COP']?.toString() || '2857.15') || 2857.15);
+            const currentVes = parseFloat(initialRates['VES'] || '0.308041') || 0.308041;
+            if (currentVes > 50) {
+                initialRates['VES'] = (bcv / copUsd).toFixed(6);
+            }
         } else if (activeMain === 'VES') {
-            const usdRate = parseFloat(initialRates['USD'] || '0.001014') || 0.001014;
-            bcv = usdRate > 0 && usdRate < 1 ? Math.round(1 / usdRate * 100) / 100 : 985.73;
+            const usdRate = parseFloat(initialRates['USD'] || '0.001136') || 0.001136;
+            bcv = bcvOfficialRate || (usdRate > 0 && usdRate < 1 ? Math.round(1 / usdRate * 100) / 100 : 880.12);
             const copRate = parseFloat(initialRates['COP'] || '3.2463') || 3.2463;
-            copUsd = Math.round(copRate * bcv);
+            copUsd = Math.round(copRate * bcv * 100) / 100;
         }
 
         setCopPerUsdInput(copUsd.toString());
@@ -147,46 +151,46 @@ export function SystemSettings() {
         setLocalCloseTime(autoCloseTime || '');
         setLocalPurgeDays(purgeRetentionDays.toString());
         setLocalLogDays(purgeLogRetentionDays.toString());
-    }, [rates, iva, mainCurrency, activeCurrencies, autoCloseTime, purgeRetentionDays, purgeLogRetentionDays, useOfficialRateForVes, bcvRateType]);
+    }, [rates, iva, mainCurrency, activeCurrencies, autoCloseTime, purgeRetentionDays, purgeLogRetentionDays, useOfficialRateForVes, bcvRateType, bcvOfficialRate]);
 
     // Cambiar la moneda base y recalcular todas las tasas respecto a la nueva base
     const handleMainCurrencyChange = (newMain: string) => {
         setLocalMainCurrency(newMain);
 
-        const bcv = parseFloat(rates?.['VES'] ? rates['VES'].toString() : '985.73') || 985.73;
-        const copUsd = parseFloat(copPerUsdInput || '3200') || 3200;
+        const bcv = localBcvOfficialRate || bcvOfficialRate || 880.12;
+        const copUsd = parseFloat(copPerUsdInput || '2857.15') || 2857.15;
 
         const updated: Record<string, string> = { ...localRates };
         updated[newMain] = '1.000000';
 
         if (newMain === 'COP') {
-            updated['USD'] = (1 / copUsd).toFixed(6); // ej. 0.000313
+            updated['USD'] = (1 / copUsd).toFixed(6); // ej. 0.000350
             updated['VES'] = (bcv / copUsd).toFixed(6); // ej. 0.308041
         } else if (newMain === 'USD') {
-            updated['COP'] = copUsd.toFixed(2); // ej. 3200.00
-            updated['VES'] = bcv.toFixed(2); // ej. 985.73
+            updated['COP'] = copUsd.toFixed(2); // ej. 2857.15
+            updated['VES'] = bcv.toFixed(2); // ej. 880.12
         } else if (newMain === 'VES') {
-            updated['USD'] = (1 / bcv).toFixed(6); // ej. 0.001014
+            updated['USD'] = (1 / bcv).toFixed(6); // ej. 0.001136
             updated['COP'] = (copUsd / bcv).toFixed(6); // ej. 3.246345
         }
 
         setLocalRates(updated);
     };
 
-    // Al editar comercialmente el valor del dólar en pesos (ej. 3200)
+    // Al editar comercialmente el valor del dólar en pesos (ej. 2857.15)
     const handleCopPerUsdChange = (val: string) => {
         setCopPerUsdInput(val);
         if (val === '' || !/^\d+(\.\d{0,2})?$/.test(val)) return;
         const parsed = parseFloat(val);
         if (parsed <= 0) return;
 
-        const bcv = parseFloat(rates?.['VES'] ? rates['VES'].toString() : '985.73') || 985.73;
+        const bcv = localBcvOfficialRate || bcvOfficialRate || 880.12;
 
         if (localMainCurrency === 'COP') {
             setLocalRates(prev => ({
                 ...prev,
-                USD: (1 / parsed).toFixed(6), // 0.000313
-                VES: localUseOfficialRate ? (bcv / parsed).toFixed(6) : (prev['VES'] || (bcv / parsed).toFixed(6)) // 0.308041
+                USD: (1 / parsed).toFixed(6), // ej. 0.000350
+                VES: localUseOfficialRate ? (bcv / parsed).toFixed(6) : (prev['VES'] || (bcv / parsed).toFixed(6))
             }));
         } else if (localMainCurrency === 'USD') {
             setLocalRates(prev => ({
@@ -549,12 +553,21 @@ export function SystemSettings() {
 
                         {/* 2. Card de Tasa de Cambio BCV / DolarApi */}
                         {localActiveCurrencies.includes('VES') && (() => {
-                            const rawBcv = parseFloat(rates?.['VES'] ? rates['VES'].toString() : '985.73') || 985.73;
-                            const copUsd = parseFloat(copPerUsdInput || '3200') || 3200;
+                            const copUsd = parseFloat(copPerUsdInput || '2857.15') || 2857.15;
+                            const vesBaseRate = parseFloat(localRates['VES'] || '0.308041') || 0.308041;
+
+                            // Tasa BCV Real en Bs / USD
+                            const displayBcvDollar = localBcvOfficialRate || bcvOfficialRate || (
+                                localMainCurrency === 'COP'
+                                    ? (vesBaseRate < 50 ? vesBaseRate * copUsd : 880.12)
+                                    : (vesBaseRate >= 50 ? vesBaseRate : 880.12)
+                            );
+
+                            // Tasa equivalente en la moneda base activa
                             const effectiveBaseBcv = localMainCurrency === 'COP'
-                                ? (rawBcv / copUsd).toFixed(6)
+                                ? (displayBcvDollar / copUsd).toFixed(6)
                                 : localMainCurrency === 'USD'
-                                ? rawBcv.toFixed(2)
+                                ? displayBcvDollar.toFixed(2)
                                 : '1.000000';
 
                             return (
@@ -567,7 +580,7 @@ export function SystemSettings() {
                                                     Tasa BCV {localBcvRateType === 've_dolar_oficial' ? '(Dólar Oficial)' : localBcvRateType === 've_dolar_paralelo' ? '(Dólar Paralelo)' : '(Euro Oficial)'}
                                                 </span>
                                                 <div className="text-3xl font-black text-slate-900 flex items-baseline gap-1.5">
-                                                    {rawBcv.toFixed(2)}
+                                                    {displayBcvDollar.toFixed(2)}
                                                     <span className="text-xs text-slate-500 font-mono font-bold">BS / USD</span>
                                                 </div>
                                                 {localMainCurrency === 'COP' && (
@@ -607,16 +620,14 @@ export function SystemSettings() {
                                                             const res = await api.post('/finance/rates/sync-dolarapi', { provider: newType });
                                                             if (res.data.success) {
                                                                 const applied = res.data.data.appliedRate;
-                                                                toast.success(`Tasa ${applied} VES aplicada desde DolarApi`);
-                                                                const copUsdVal = parseFloat(copPerUsdInput || '3200') || 3200;
-                                                                const baseApplied = localMainCurrency === 'COP'
-                                                                    ? (applied / copUsdVal).toFixed(6)
-                                                                    : localMainCurrency === 'USD'
-                                                                    ? applied.toFixed(2)
-                                                                    : '1.000000';
-                                                                setLocalRates(prev => ({ ...prev, VES: baseApplied }));
+                                                                const officialUsd = res.data.data.bcvOfficialRate;
+                                                                toast.success(`Tasa ${officialUsd} BS/USD aplicada`);
+                                                                setLocalBcvOfficialRate(officialUsd);
+                                                                setLocalRates(prev => ({ ...prev, VES: applied.toString() }));
                                                                 useConfigStore.setState(state => ({
-                                                                    rates: { ...state.rates, VES: parseFloat(baseApplied) }
+                                                                    rates: { ...state.rates, VES: applied },
+                                                                    bcvOfficialRate: officialUsd,
+                                                                    bcvRateType: newType as any,
                                                                 }));
                                                                 await fetchRates();
                                                                 await fetchSettings();
@@ -655,16 +666,13 @@ export function SystemSettings() {
                                                         const res = await api.post('/finance/rates/sync-dolarapi', { provider: localBcvRateType });
                                                         if (res.data.success) {
                                                             const applied = res.data.data.appliedRate;
-                                                            toast.success(`Tasa ${applied} VES actualizada`);
-                                                            const copUsdVal = parseFloat(copPerUsdInput || '3200') || 3200;
-                                                            const baseApplied = localMainCurrency === 'COP'
-                                                                ? (applied / copUsdVal).toFixed(6)
-                                                                : localMainCurrency === 'USD'
-                                                                ? applied.toFixed(2)
-                                                                : '1.000000';
-                                                            setLocalRates(prev => ({ ...prev, VES: baseApplied }));
+                                                            const officialUsd = res.data.data.bcvOfficialRate;
+                                                            toast.success(`Tasa ${officialUsd} BS/USD actualizada`);
+                                                            setLocalBcvOfficialRate(officialUsd);
+                                                            setLocalRates(prev => ({ ...prev, VES: applied.toString() }));
                                                             useConfigStore.setState(state => ({
-                                                                rates: { ...state.rates, VES: parseFloat(baseApplied) }
+                                                                rates: { ...state.rates, VES: applied },
+                                                                bcvOfficialRate: officialUsd,
                                                             }));
                                                             await fetchRates();
                                                             await fetchSettings();
@@ -876,24 +884,38 @@ export function SystemSettings() {
                                     <div className="flex items-center gap-1.5 bg-emerald-500/15 px-3 py-1.5 rounded-xl border border-emerald-500/30 text-emerald-200">
                                         <span className="text-emerald-400/80">1 USD =</span>
                                         <span className="text-emerald-300 font-black">
-                                            {parseFloat(copPerUsdInput || '3200').toLocaleString('es-CO')} $ (COP)
+                                            {parseFloat(copPerUsdInput || '2857.15').toLocaleString('es-CO')} $ (COP)
                                         </span>
                                     </div>
                                 )}
 
-                                {localActiveCurrencies.includes('USD') && localActiveCurrencies.includes('VES') && (
-                                    <div className="flex items-center gap-1.5 bg-indigo-500/15 px-3 py-1.5 rounded-xl border border-indigo-500/30 text-indigo-200">
-                                        <span className="text-indigo-400/80">1 USD =</span>
-                                        <span className="text-indigo-300 font-black">
-                                            {(rates?.['VES'] && localMainCurrency === 'USD' ? Number(rates['VES']) : (parseFloat(rates?.['VES'] ? rates['VES'].toString() : '985.73') || 985.73)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs. (VES)
-                                        </span>
-                                    </div>
-                                )}
+                                {localActiveCurrencies.includes('USD') && localActiveCurrencies.includes('VES') && (() => {
+                                    const copUsdVal = parseFloat(copPerUsdInput || '2857.15') || 2857.15;
+                                    const vesBaseRate = parseFloat(localRates['VES'] || '0.308041') || 0.308041;
+                                    const bcvUsd = localBcvOfficialRate || bcvOfficialRate || (
+                                        localMainCurrency === 'COP'
+                                            ? (vesBaseRate < 50 ? vesBaseRate * copUsdVal : 880.12)
+                                            : (vesBaseRate >= 50 ? vesBaseRate : 880.12)
+                                    );
+                                    return (
+                                        <div className="flex items-center gap-1.5 bg-indigo-500/15 px-3 py-1.5 rounded-xl border border-indigo-500/30 text-indigo-200">
+                                            <span className="text-indigo-400/80">1 USD =</span>
+                                            <span className="text-indigo-300 font-black">
+                                                {bcvUsd.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs. (VES)
+                                            </span>
+                                        </div>
+                                    );
+                                })()}
 
                                 {localActiveCurrencies.includes('VES') && localActiveCurrencies.includes('COP') && (() => {
-                                    const bcvVal = rates?.['VES'] && localMainCurrency === 'USD' ? Number(rates['VES']) : (parseFloat(rates?.['VES'] ? rates['VES'].toString() : '985.73') || 985.73);
-                                    const copUsdVal = parseFloat(copPerUsdInput || '3200') || 3200;
-                                    const copToVes = bcvVal / copUsdVal;
+                                    const copUsdVal = parseFloat(copPerUsdInput || '2857.15') || 2857.15;
+                                    const vesBaseRate = parseFloat(localRates['VES'] || '0.308041') || 0.308041;
+                                    const bcvUsd = localBcvOfficialRate || bcvOfficialRate || (
+                                        localMainCurrency === 'COP'
+                                            ? (vesBaseRate < 50 ? vesBaseRate * copUsdVal : 880.12)
+                                            : (vesBaseRate >= 50 ? vesBaseRate : 880.12)
+                                    );
+                                    const copToVes = bcvUsd / copUsdVal;
                                     return (
                                         <>
                                             <div className="flex items-center gap-1.5 bg-amber-500/15 px-3 py-1.5 rounded-xl border border-amber-500/30 text-amber-200">

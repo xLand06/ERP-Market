@@ -115,28 +115,30 @@ export const syncSelectedRateFromDolarApi = async (provider: string, userId: str
         if (mainCurrency === 'COP') {
             const usdRateRecord = await prisma.exchangeRate.findUnique({ where: { code: 'USD' } });
             const usdRate = usdRateRecord ? Number(usdRateRecord.rate) : 0;
-            if (usdRate > 0) {
-                rateToStore = Number((rateToApply * usdRate).toFixed(6));
-            } else {
-                rateToStore = Number((rateToApply / 3200).toFixed(6));
-            }
+            // Si usdRate >= 1 (ej. 2857.15 o 3200 COP por USD), copPerUsd = usdRate
+            // Si usdRate < 1 (ej. 0.000350 o 0.000313 USD por COP), copPerUsd = 1 / usdRate
+            const copPerUsd = usdRate >= 1 ? usdRate : (usdRate > 0 ? (1 / usdRate) : 2857.15);
+            rateToStore = Number((rateToApply / copPerUsd).toFixed(6));
         } else if (mainCurrency === 'VES') {
             rateToStore = 1;
+        } else {
+            rateToStore = rateToApply;
         }
     } catch {
         // Fallback a rateToApply directo
     }
 
-    // Actualizar tasa VES en la base de datos
+    // Actualizar tasa VES en la base de datos (relativa a la moneda base)
     const updatedRate = await updateExchangeRate({ code: 'VES', rate: rateToStore });
 
-    // Guardar estado de sincronización en settings
+    // Guardar estado de sincronización y tasa oficial en settings
     try {
         const { saveSettings } = await import('../settings/settings.service');
         await saveSettings({
             bcvRateType: provider as any,
             bcvLastSync: new Date().toISOString(),
             useOfficialRateForVes: true,
+            bcvOfficialRate: rateToApply,
         });
     } catch {
         // non-fatal
@@ -146,7 +148,7 @@ export const syncSelectedRateFromDolarApi = async (provider: string, userId: str
     await logAudit({
         action: 'FINANCE_DOLARAPI_SYNC',
         module: 'finance',
-        details: { provider, rate: rateToApply, liveRates },
+        details: { provider, rate: rateToStore, bcvOfficialRate: rateToApply, liveRates },
         userId,
         ipAddress,
     });
@@ -154,7 +156,8 @@ export const syncSelectedRateFromDolarApi = async (provider: string, userId: str
     return {
         rate: updatedRate,
         provider,
-        appliedRate: rateToApply,
+        appliedRate: rateToStore,
+        bcvOfficialRate: rateToApply,
         liveRates,
     };
 };

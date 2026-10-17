@@ -12,6 +12,7 @@ export interface SystemSettings {
     useOfficialRateForVes: boolean;
     bcvRateType: 've_dolar_oficial' | 've_dolar_paralelo' | 've_euro_oficial';
     bcvLastSync: string | null;
+    bcvOfficialRate?: number | null;
     autoOpenTime: string | null;
     autoCloseTime: string | null;
     purgeRetentionDays: number;
@@ -71,6 +72,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
     useOfficialRateForVes: true,
     bcvRateType: 've_dolar_oficial',
     bcvLastSync: null,
+    bcvOfficialRate: null,
     autoOpenTime: null,
     autoCloseTime: null,
     purgeRetentionDays: 30,
@@ -123,7 +125,7 @@ export async function getSettings(): Promise<SystemSettings> {
 
         const config: any = { ...DEFAULT_SETTINGS };
         for (const s of dbSettings) {
-            if (s.key === 'iva' || s.key === 'ivaPercent' || s.key === 'purgeRetentionDays' || s.key === 'purgeLogRetentionDays' || s.key === 'printCopies') {
+            if (s.key === 'iva' || s.key === 'ivaPercent' || s.key === 'purgeRetentionDays' || s.key === 'purgeLogRetentionDays' || s.key === 'printCopies' || s.key === 'bcvOfficialRate') {
                 config[s.key] = Number(s.value);
             } else if (s.key === 'ivaEnabled' || s.key === 'autoCut' || s.key === 'openCashDrawer' || s.key === 'autoPrintOnCheckout' || s.key === 'catalogActive' || s.key === 'useOfficialRateForVes' || s.key.startsWith('show')) {
                 config[s.key] = s.value === 'true';

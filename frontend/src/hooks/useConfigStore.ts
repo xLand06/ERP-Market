@@ -35,6 +35,7 @@ export interface ConfigState {
     useOfficialRateForVes: boolean;
     bcvRateType: 've_dolar_oficial' | 've_dolar_paralelo' | 've_euro_oficial';
     bcvLastSync: string | null;
+    bcvOfficialRate: number | null;
 
     // Tema de Interfaz
     activeTheme: UITheme;
@@ -159,6 +160,7 @@ export const useConfigStore = create<ConfigState>()(
             useOfficialRateForVes: true,
             bcvRateType: 've_dolar_oficial',
             bcvLastSync: null,
+            bcvOfficialRate: null,
             iva: 16,
             ivaEnabled: true,
             ivaPercent: 16,
