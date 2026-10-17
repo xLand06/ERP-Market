@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Loader2, Plus, Trash2, Wallet, Send, CreditCard, ArrowRightLeft, Printer, BookOpenCheck, UserPlus, Search } from 'lucide-react';
+import { Loader2, Plus, Trash2, Wallet, Send, CreditCard, ArrowRightLeft, Printer, BookOpenCheck, UserPlus, Search, CheckCircle } from 'lucide-react';
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -25,7 +25,7 @@ interface PaymentDialogProps {
         amount: number;
         currency: Currency;
         exchangeRate?: number;
-    }>, customerId?: string) => void;
+    }>, customerId?: string, shouldPrint?: boolean) => void;
     isSubmitting: boolean;
 }
 
@@ -210,9 +210,47 @@ export function PaymentDialog({
     const totalVES = fromUSD(total, 'VES');
     const totalCOP = fromUSD(total, 'COP');
 
-    // Vuelto en las 3 monedas
+    // Vuelto en USD
     const changeUSD = Math.max(0, changeInUSD);
-    const changeVES = fromUSD(changeUSD, 'VES');
+
+    // ¿Se registró pago en efectivo en alguna fila? El vuelto solo aplica si se paga en efectivo
+    const hasCashPayment = useMemo(() => {
+        return rows.some(r => r.type === 'cash' && (r.amount || 0) > 0);
+    }, [rows]);
+
+    // Vuelto en la moneda principal configurada
+    const changeInMainCurrency = useMemo(() => {
+        if (!hasCashPayment || changeUSD <= 0.005) return 0;
+        return convert(changeUSD, 'USD', mainCurrency);
+    }, [hasCashPayment, changeUSD, convert, mainCurrency]);
+
+    // Formateo del vuelto en la moneda principal:
+    // En COP: sin céntimos (redondeado a entero)
+    // En USD: redondeado a billetes enteros sin céntimos
+    // En VES: formato estándar con 2 decimales
+    const formattedMainChange = useMemo(() => {
+        if (mainCurrency === 'COP') {
+            return `$ ${Math.round(changeInMainCurrency).toLocaleString('es-CO')} COP`;
+        }
+        if (mainCurrency === 'USD') {
+            const roundedUSD = Math.round(changeInMainCurrency);
+            const isExact = Math.abs(changeInMainCurrency - roundedUSD) < 0.01;
+            return `$ ${roundedUSD} USD${!isExact ? ` ($${changeInMainCurrency.toFixed(2)})` : ''}`;
+        }
+        return `Bs. ${changeInMainCurrency.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES`;
+    }, [mainCurrency, changeInMainCurrency]);
+
+    // Vuelto alternativo en efectivo para entregar:
+    // Solo en USD o COP redondeado y sin céntimos. NO se entrega vuelto en efectivo VES.
+    const changeCashOptions = useMemo(() => {
+        if (!hasCashPayment || changeUSD <= 0.005) return null;
+        const inUSD = Math.round(changeUSD);
+        const inCOP = Math.round(fromUSD(changeUSD, 'COP'));
+        return {
+            usd: `$ ${inUSD} USD`,
+            cop: `$ ${inCOP.toLocaleString('es-CO')} COP`,
+        };
+    }, [hasCashPayment, changeUSD, fromUSD]);
 
     // Generante de billetes rápidos dinámico por moneda específica
     const getQuickBills = (currency: string) => {
@@ -247,9 +285,12 @@ export function PaymentDialog({
         ];
     };
 
+    // Imprimir factura al confirmar (opcional, configurable por el cajero en el modal)
+    const [shouldPrint, setShouldPrint] = useState(config.autoPrintOnCheckout ?? false);
+
     const handleConfirm = () => {
         const payload = getPayload();
-        onConfirm(payload, fiadoMode && customer ? customer.id : undefined);
+        onConfirm(payload, fiadoMode && customer ? customer.id : undefined, shouldPrint);
     };
 
     return (
@@ -493,12 +534,35 @@ export function PaymentDialog({
                             )}
                         </div>
 
-                        {/* Vuelto / Cambio al Cliente - Alto Contraste */}
-                        {changeInUSD > 0.01 && (
-                            <div className="mt-auto p-4 bg-emerald-100/80 border-2 border-emerald-400 rounded-2xl space-y-1">
-                                <span className="text-xs font-black text-emerald-950 uppercase tracking-wider block">Vuelto al Cliente</span>
-                                <p className="text-2xl font-black text-emerald-800 tabular-nums">${changeUSD.toFixed(2)} USD</p>
-                                <span className="text-xs font-black text-emerald-800 block">Bs. {changeVES.toFixed(2)} VES</span>
+                        {/* Vuelto / Cambio al Cliente - Solo si paga en efectivo */}
+                        {hasCashPayment && changeUSD > 0.005 && (
+                            <div className="mt-auto p-4 bg-emerald-50 border-2 border-emerald-400 rounded-2xl space-y-2 shadow-xs">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-black text-emerald-950 uppercase tracking-wider block">
+                                        Vuelto al Cliente
+                                    </span>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-200 text-emerald-900 rounded-full">
+                                        Base {mainCurrency}
+                                    </span>
+                                </div>
+                                <p className="text-2xl font-black text-emerald-800 tabular-nums">
+                                    {formattedMainChange}
+                                </p>
+                                {changeCashOptions && (
+                                    <div className="pt-2 border-t border-emerald-200/80 space-y-1.5 text-xs">
+                                        <span className="text-[10px] font-black text-emerald-900 uppercase tracking-wider block">
+                                            Entrega en Efectivo (Sin céntimos):
+                                        </span>
+                                        <div className="flex justify-between items-center text-slate-800 font-bold">
+                                            <span className="flex items-center gap-1">🇺🇸 Dólares:</span>
+                                            <span className="text-slate-950 font-black tabular-nums">{changeCashOptions.usd}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-slate-800 font-bold">
+                                            <span className="flex items-center gap-1">🇨🇴 Pesos COP:</span>
+                                            <span className="text-slate-950 font-black tabular-nums">{changeCashOptions.cop}</span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -638,50 +702,68 @@ export function PaymentDialog({
                     </div>
                 </div>
 
-                {/* Footer sticky — siempre visible en mobile */}
-                <div className="shrink-0 p-3 sm:p-5 pb-safe sm:pb-5 bg-white border-t border-slate-200 flex gap-2 sm:gap-3 z-20">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={onClose}
-                        disabled={isSubmitting}
-                        className="px-3.5 sm:px-6 shrink-0 sm:flex-1 h-12 sm:h-14 rounded-2xl font-black text-slate-700 border-2 border-slate-300 text-xs sm:text-sm hover:bg-slate-200"
-                    >
-                        Cancelar
-                    </Button>
-                    <Button
-                        type="button"
-                        onClick={fiadoCanConfirm ? handleConfirm : undefined}
-                        disabled={!fiadoCanConfirm || isSubmitting}
-                        className={cn(
-                            'flex-1 sm:flex-[2] h-12 sm:h-14 rounded-2xl font-black text-xs sm:text-sm md:text-base text-white transition-all shadow-lg flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-6 min-w-0',
-                            fiadoCanConfirm && !isSubmitting
-                                ? fiadoMode
-                                    ? 'bg-amber-500 hover:bg-amber-600 active:scale-[0.99] shadow-amber-500/30 ring-2 ring-amber-500/30'
-                                    : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] shadow-emerald-600/30 ring-2 ring-emerald-600/30'
-                                : 'bg-slate-300 cursor-not-allowed shadow-none border-0'
-                        )}
-                    >
-                        {isSubmitting ? (
-                            <>
-                                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin shrink-0" />
-                                <span className="truncate">Procesando Venta...</span>
-                            </>
-                        ) : fiadoMode ? (
-                            <>
-                                <BookOpenCheck className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                                <span className="truncate">Confirmar Fiado</span>
-                            </>
-                        ) : (
-                            <>
-                                <Printer className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                                <span className="truncate">
-                                    <span className="xs:hidden">Confirmar e Imprimir</span>
-                                    <span className="hidden xs:inline">Confirmar e Imprimir Factura</span>
-                                </span>
-                            </>
-                        )}
-                    </Button>
+                {/* Footer sticky con amplio margen del borde inferior del modal */}
+                <div className="shrink-0 px-4 sm:px-6 py-4 sm:py-5 pb-5 sm:pb-6 bg-white border-t border-slate-200/90 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 z-20 shadow-sm">
+                    {/* Toggle opcional de imprimir */}
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none self-start sm:self-auto px-1 py-1">
+                        <input
+                            type="checkbox"
+                            checked={shouldPrint}
+                            onChange={(e) => setShouldPrint(e.target.checked)}
+                            className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                        />
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                            <Printer className="w-4 h-4 text-slate-500" />
+                            Imprimir factura al confirmar
+                        </span>
+                    </label>
+
+                    <div className="flex items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                            disabled={isSubmitting}
+                            className="flex-1 sm:flex-none px-4 sm:px-7 h-12 sm:h-13 rounded-2xl font-black text-slate-700 border-2 border-slate-300 text-xs sm:text-sm hover:bg-slate-100"
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={fiadoCanConfirm ? handleConfirm : undefined}
+                            disabled={!fiadoCanConfirm || isSubmitting}
+                            className={cn(
+                                'flex-[2] sm:flex-none px-5 sm:px-8 h-12 sm:h-13 rounded-2xl font-black text-xs sm:text-sm text-white transition-all shadow-md flex items-center justify-center gap-2',
+                                fiadoCanConfirm && !isSubmitting
+                                    ? fiadoMode
+                                        ? 'bg-amber-500 hover:bg-amber-600 active:scale-[0.99] shadow-amber-500/30 ring-2 ring-amber-500/30'
+                                        : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] shadow-emerald-600/30 ring-2 ring-emerald-600/30'
+                                    : 'bg-slate-300 cursor-not-allowed shadow-none border-0'
+                            )}
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin shrink-0" />
+                                    <span className="truncate">Procesando Venta...</span>
+                                </>
+                            ) : fiadoMode ? (
+                                <>
+                                    <BookOpenCheck className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                                    <span className="truncate">Confirmar Fiado</span>
+                                </>
+                            ) : shouldPrint ? (
+                                <>
+                                    <Printer className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                                    <span className="truncate">Confirmar e Imprimir</span>
+                                </>
+                            ) : (
+                                <>
+                                    <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                                    <span className="truncate">Confirmar Venta</span>
+                                </>
+                            )}
+                        </Button>
+                    </div>
                 </div>
             </DialogContent>
         </Dialog>

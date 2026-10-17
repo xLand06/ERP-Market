@@ -253,7 +253,7 @@ export default function POSPage() {
     // ── Handle Payment Confirm ───────────────────────────────────────
     const handlePayment = async (paymentMethods: Array<{
         type: PaymentMethodType; amount: number; currency: Currency; exchangeRate?: number;
-    }>, customerId?: string) => {
+    }>, customerId?: string, shouldPrint: boolean = false) => {
         if (!selectedBranch) { toast.error('No hay una sede seleccionada'); return; }
         if (!effectiveBranch) { toast.error('Seleccioná una sucursal antes de vender'); return; }
         if (!openRegister) { toast.error('No hay una caja abierta. Abrí una caja antes de vender.'); return; }
@@ -335,9 +335,9 @@ export default function POSPage() {
                 currency: pm.currency,
             }));
 
-            // Actualizar datos del ticket impreso en el DOM (sin mostrar modal en pantalla)
+            // Actualizar datos del ticket impreso en el DOM (mostrar resumen si no se mandó a imprimir directo)
             setSummary({
-                visible: false,
+                visible: !shouldPrint,
                 items: saleItems,
                 total: totals.total,
                 paymentMethods: formattedPayMethods,
@@ -358,38 +358,40 @@ export default function POSPage() {
                 queryClient.invalidateQueries({ queryKey: ['openRegister'] });
             }
 
-            // Intentar imprimir el ticket térmico de forma asíncrona sin bloquear la venta realizada
-            try {
-                let toastId: string | undefined;
-                if (primaryPrinter) {
-                    toastId = toast.loading(`Imprimiendo factura en ${primaryPrinter.name}...`);
-                }
-
-                const res = await printThermalReceiptReal(primaryPrinter, {
-                    invoiceNumber: invoiceNum,
-                    customerName: 'Consumidor Final',
-                    customerTaxId: 'V-00000000-0',
-                    businessName: config.businessName,
-                    taxId: config.taxId,
-                    fiscalAddress: config.fiscalAddress,
-                    fiscalPhone: config.fiscalPhone,
-                    items: saleItems,
-                    totalUSD: totals.total,
-                    totalVES: config.fromUSD(totals.total, 'VES'),
-                    totalCOP: config.fromUSD(totals.total, 'COP'),
-                    paymentMethods: formattedPayMethods,
-                    footerMessage: config.footerMessage,
-                });
-
-                if (toastId) {
-                    if (res.method === 'webusb' || res.method === 'browser') {
-                        toast.success(res.message, { id: toastId });
-                    } else {
-                        toast.dismiss(toastId);
+            // Solo imprimir automáticamente si el usuario lo seleccionó
+            if (shouldPrint) {
+                try {
+                    let toastId: string | undefined;
+                    if (primaryPrinter) {
+                        toastId = toast.loading(`Imprimiendo factura en ${primaryPrinter.name}...`);
                     }
+
+                    const res = await printThermalReceiptReal(primaryPrinter, {
+                        invoiceNumber: invoiceNum,
+                        customerName: 'Consumidor Final',
+                        customerTaxId: 'V-00000000-0',
+                        businessName: config.businessName,
+                        taxId: config.taxId,
+                        fiscalAddress: config.fiscalAddress,
+                        fiscalPhone: config.fiscalPhone,
+                        items: saleItems,
+                        totalUSD: totals.total,
+                        totalVES: config.fromUSD(totals.total, 'VES'),
+                        totalCOP: config.fromUSD(totals.total, 'COP'),
+                        paymentMethods: formattedPayMethods,
+                        footerMessage: config.footerMessage,
+                    });
+
+                    if (toastId) {
+                        if (res.method === 'webusb' || res.method === 'browser') {
+                            toast.success(res.message, { id: toastId });
+                        } else {
+                            toast.dismiss(toastId);
+                        }
+                    }
+                } catch (printErr) {
+                    console.warn('Aviso: No se completó el envío a la impresora:', printErr);
                 }
-            } catch (printErr) {
-                console.warn('Aviso: No se completó el envío a la impresora:', printErr);
             }
         } catch (error: any) {
             toast.error(error.response?.data?.error || 'Error al procesar la venta en la sucursal');

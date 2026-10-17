@@ -205,12 +205,13 @@ function ticketToLines(data: TicketPrintData, profile: ReturnType<typeof getPrin
         L.push({ t: LINE });
     }
 
-    // 4. TABLA DE PRODUCTOS
-    L.push({ t: padRight('Concepto', profile.chars - 13) + padLeft('Cant', 5) + padLeft('Importe', 8), b: true });
+    // 4. TABLA DE PRODUCTOS (SIEMPRE EXPRESADOS EN BS.)
+    const vesRate = (data.totalUSD > 0 && data.totalVES) ? data.totalVES / data.totalUSD : 1;
+    L.push({ t: padRight('Concepto', profile.chars - 14) + padLeft('Cant', 5) + padLeft('Total Bs', 9), b: true });
 
     for (const item of data.items) {
-        const unitPrice = item.unitPrice || (item.qty ? item.total / item.qty : item.total);
-        const priceStr = `$${item.total.toFixed(2)}`;
+        const itemVES = (item.total || 0) * vesRate;
+        const priceStr = `Bs.${itemVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         const head = `${item.qty}x ${item.name}`;
         const avail = profile.chars - priceStr.length;
 
@@ -225,26 +226,38 @@ function ticketToLines(data: TicketPrintData, profile: ReturnType<typeof getPrin
 
     L.push({ t: LINE });
 
-    // 5. TOTALES
-    const gravable = data.totalUSD / 1.16;
-    const iva = data.totalUSD - gravable;
-    L.push({ t: totalLine('BASE IMPONIBLE (G 16%):', `$${gravable.toFixed(2)}`, profile.chars) });
-    L.push({ t: totalLine('IVA (16.00%):', `$${iva.toFixed(2)}`, profile.chars) });
+    // 5. TOTALES EN BOLÍVARES (SENIAT) Y REFERENCIAS
+    const totalVES = data.totalVES || (data.totalUSD * vesRate);
+    const gravableVES = totalVES / 1.16;
+    const ivaVES = totalVES - gravableVES;
+
+    L.push({ t: totalLine('BASE IMPONIBLE (16%):', `Bs. ${gravableVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, profile.chars) });
+    L.push({ t: totalLine('IVA (16.00%):', `Bs. ${ivaVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, profile.chars) });
     L.push({ t: LINE });
-    L.push({ t: totalLine('TOTAL USD:', `$${data.totalUSD.toFixed(2)}`, profile.chars), b: true });
-    if (data.totalVES) L.push({ t: totalLine('TOTAL VES:', `Bs. ${data.totalVES.toFixed(2)}`, profile.chars) });
-    if (data.totalCOP) L.push({ t: totalLine('TOTAL COP:', `$${data.totalCOP.toLocaleString('es-CO')}`, profile.chars) });
+    L.push({ t: totalLine('TOTAL FACTURA:', `Bs. ${totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, profile.chars), b: true });
+    L.push({ t: totalLine('REF. USD (BCV):', `$ ${data.totalUSD.toFixed(2)}`, profile.chars) });
+    if (data.totalCOP) {
+        L.push({ t: totalLine('REF. COP:', `$ ${Math.round(data.totalCOP).toLocaleString('es-CO')}`, profile.chars) });
+    }
 
     // 6. PAGO
     if (data.paymentMethods?.length) {
         L.push({ t: LINE });
         L.push({ t: 'FORMAS DE PAGO:' });
         for (const m of data.paymentMethods) {
-            const val = m.currency === 'VES' ? `Bs. ${m.amount.toFixed(2)}` : `$${m.amount.toFixed(2)}`;
+            const val = m.currency === 'VES' 
+                ? `Bs. ${m.amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
+                : m.currency === 'COP'
+                ? `$ ${Math.round(m.amount).toLocaleString('es-CO')}`
+                : `$ ${m.amount.toFixed(2)}`;
             L.push({ t: totalLine(`- ${m.type.toUpperCase()} (${m.currency}):`, val, profile.chars) });
         }
-        if (data.changeUSD && data.changeUSD > 0) {
-            L.push({ t: totalLine('- CAMBIO USD:', `$${data.changeUSD.toFixed(2)}`, profile.chars) });
+        if (data.changeUSD && data.changeUSD > 0.005) {
+            L.push({ t: totalLine('- VUELTO USD (Billetes):', `$ ${Math.round(data.changeUSD)}`, profile.chars) });
+            if (data.totalCOP && data.totalUSD > 0) {
+                const copRate = data.totalCOP / data.totalUSD;
+                L.push({ t: totalLine('- VUELTO COP (Efectivo):', `$ ${Math.round(data.changeUSD * copRate).toLocaleString('es-CO')}`, profile.chars) });
+            }
         }
     }
 

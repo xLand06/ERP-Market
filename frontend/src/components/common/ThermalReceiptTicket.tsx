@@ -128,25 +128,26 @@ export function ThermalReceiptTicket({
 
             <div className="border-b border-dashed border-slate-400 my-1" />
 
-            {/* 3. PRODUCTOS EN TICKET */}
+            {/* 3. PRODUCTOS EN TICKET (SIEMPRE EXPRESADOS EN BS.) */}
             <div className="space-y-1.5">
                 <div className="flex justify-between text-[9px] font-black text-slate-500 uppercase border-b border-slate-200 pb-0.5">
                     <span>CANT / DESCRIPCION</span>
-                    <span>TOTAL USD</span>
+                    <span>TOTAL BS.</span>
                 </div>
                 {items.length > 0 ? (
                     items.map((item, idx) => {
                         const unitPriceUSD = item.unitPrice || (item.qty ? item.total / item.qty : item.total);
                         const itemVES = config.fromUSD(item.total, 'VES');
+                        const unitPriceVES = config.fromUSD(unitPriceUSD, 'VES');
                         return (
                             <div key={idx} className="space-y-0.5">
                                 <div className="flex justify-between font-bold text-slate-950">
                                     <span className="truncate pr-1">{item.qty}x {item.name}</span>
-                                    <span>${item.total.toFixed(2)}</span>
+                                    <span className="tabular-nums">Bs. {itemVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                                 <div className="flex justify-between text-[9px] text-slate-500 pl-3">
-                                    <span>{item.qty} x ${unitPriceUSD.toFixed(2)} USD</span>
-                                    <span>Bs. {itemVES.toFixed(2)}</span>
+                                    <span>{item.qty} x Bs. {unitPriceVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    <span>Ref: ${item.total.toFixed(2)} USD</span>
                                 </div>
                             </div>
                         );
@@ -156,37 +157,39 @@ export function ThermalReceiptTicket({
                 )}
             </div>
 
-            {/* 4. BASE IMPONIBLE E IVA (Normativa SENIAT Venezuela) */}
+            {/* 4. BASE IMPONIBLE E IVA EN BS. (Normativa Fiscal SENIAT Venezuela) */}
             {showIvaBreakdown && computedTotalUSD > 0 && (
                 <div className="border-t border-dashed border-slate-300 pt-1.5 space-y-0.5 text-right text-[10px] text-slate-700">
                     <div className="flex justify-between font-medium">
                         <span>BASE IMPONIBLE (G 16.00%):</span>
-                        <span>${gravableUSD.toFixed(2)}</span>
+                        <span className="tabular-nums">Bs. {(totalVES / 1.16).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex justify-between font-bold text-slate-950">
                         <span>IVA (16.00%):</span>
-                        <span>${ivaUSD.toFixed(2)}</span>
+                        <span className="tabular-nums">Bs. {(totalVES - (totalVES / 1.16)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                 </div>
             )}
 
             <div className="border-b border-dashed border-slate-400 my-1" />
 
-            {/* 5. TOTAL A PAGAR Y RESUMEN MULTI-MONEDA */}
+            {/* 5. TOTAL A PAGAR EN BS. (OBLIGATORIO) Y EQUIVALENCIAS REFERENCIALES */}
             <div className="space-y-1 text-right font-black">
                 <div className="flex justify-between text-xs font-black text-slate-950 pt-0.5">
-                    <span>TOTAL USD:</span>
-                    <span className="text-emerald-700 font-extrabold text-sm">${computedTotalUSD.toFixed(2)}</span>
+                    <span>TOTAL FACTURA:</span>
+                    <span className="text-emerald-700 font-extrabold text-sm tabular-nums">
+                        Bs. {totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
                 </div>
                 {showMultiCurrencySummary && computedTotalUSD > 0 && (
                     <div className="text-[10px] text-slate-700 space-y-0.5 font-bold pt-1 border-t border-slate-100">
                         <div className="flex justify-between">
-                            <span>TOTAL VES (Bs. {vesRate.toFixed(2)}):</span>
-                            <span>Bs. {totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span>REF. USD (Tasa BCV Bs. {vesRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}):</span>
+                            <span className="tabular-nums">$ {computedTotalUSD.toFixed(2)} USD</span>
                         </div>
                         <div className="flex justify-between">
-                            <span>TOTAL COP (${copRate.toLocaleString('es-CO')}):</span>
-                            <span>${totalCOP.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span>REF. COP (Tasa ${copRate.toLocaleString('es-CO')}):</span>
+                            <span className="tabular-nums">$ {Math.round(totalCOP).toLocaleString('es-CO')} COP</span>
                         </div>
                     </div>
                 )}
@@ -200,21 +203,31 @@ export function ThermalReceiptTicket({
                         paymentMethods.map((m, idx) => (
                             <div key={idx} className="flex justify-between text-slate-800 font-medium">
                                 <span>{m.type.toUpperCase()} ({m.currency}):</span>
-                                <span className="font-bold">
-                                    {m.currency === 'VES' ? `Bs. ${m.amount.toFixed(2)}` : `$${m.amount.toFixed(2)}`}
+                                <span className="font-bold tabular-nums">
+                                    {m.currency === 'VES' 
+                                        ? `Bs. ${m.amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
+                                        : m.currency === 'COP'
+                                        ? `$ ${Math.round(m.amount).toLocaleString('es-CO')}`
+                                        : `$ ${m.amount.toFixed(2)}`}
                                 </span>
                             </div>
                         ))
                     ) : (
                         <div className="flex justify-between text-slate-800 font-medium">
-                            <span>EFECTIVO USD:</span>
-                            <span className="font-bold">${computedTotalUSD.toFixed(2)}</span>
+                            <span>EFECTIVO BS:</span>
+                            <span className="font-bold tabular-nums">Bs. {totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                     )}
-                    {changeUSD > 0 && (
-                        <div className="flex justify-between text-emerald-800 font-bold border-t border-slate-200 pt-0.5">
-                            <span>CAMBIO / VUELTO USD:</span>
-                            <span>${changeUSD.toFixed(2)}</span>
+                    {changeUSD > 0.005 && (
+                        <div className="space-y-0.5 border-t border-slate-200 pt-1">
+                            <div className="flex justify-between text-emerald-800 font-bold">
+                                <span>VUELTO USD (Billetes sin céntimos):</span>
+                                <span className="tabular-nums">$ {Math.round(changeUSD)} USD</span>
+                            </div>
+                            <div className="flex justify-between text-emerald-800 font-bold">
+                                <span>VUELTO COP (Efectivo sin céntimos):</span>
+                                <span className="tabular-nums">$ {Math.round(config.fromUSD(changeUSD, 'COP')).toLocaleString('es-CO')} COP</span>
+                            </div>
                         </div>
                     )}
                 </div>
