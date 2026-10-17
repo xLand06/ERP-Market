@@ -38,6 +38,7 @@ vi.mock('@/features/auth/store/authStore', () => ({
 vi.mock('@tanstack/react-query', () => ({
     useQuery: vi.fn(() => ({ data: [], isLoading: false })),
     useMutation: vi.fn(() => ({ mutate: vi.fn() })),
+    useQueryClient: vi.fn(() => ({ invalidateQueries: vi.fn() })),
     QueryClient: vi.fn(),
 }));
 

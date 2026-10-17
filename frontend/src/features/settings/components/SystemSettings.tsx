@@ -113,8 +113,9 @@ export function SystemSettings() {
             bcv = bcvOfficialRate || (parseFloat(initialRates['VES'] || '880.12') || 880.12);
             copUsd = parseFloat(initialRates['COP'] || '2857.15') || 2857.15;
         } else if (activeMain === 'COP') {
-            const usdRate = parseFloat(initialRates['USD'] || '0.000350') || 0.000350;
-            copUsd = usdRate > 0 && usdRate < 1 ? Math.round(1 / usdRate * 100) / 100 : (parseFloat(rates?.['COP']?.toString() || '2857.15') || 2857.15);
+            const usdRate = parseFloat(initialRates['USD'] || '0.0003125') || 0.0003125;
+            const inv = usdRate > 0 && usdRate < 1 ? (1 / usdRate) : (parseFloat(rates?.['COP']?.toString() || '3200') || 3200);
+            copUsd = Math.abs(inv - Math.round(inv)) < 0.06 ? Math.round(inv) : Math.round(inv * 100) / 100;
             const currentVes = parseFloat(initialRates['VES'] || '0.308041') || 0.308041;
             if (currentVes > 50) {
                 initialRates['VES'] = (bcv / copUsd).toFixed(6);
@@ -132,7 +133,7 @@ export function SystemSettings() {
         initialRates[activeMain] = '1.000000';
         if (activeMain === 'COP') {
             if (!initialRates['USD'] || parseFloat(initialRates['USD']) >= 1) {
-                initialRates['USD'] = (1 / copUsd).toFixed(6);
+                initialRates['USD'] = (1 / copUsd).toFixed(8);
             }
             if (!initialRates['VES'] || parseFloat(initialRates['VES']) > 50) {
                 initialRates['VES'] = (bcv / copUsd).toFixed(6);
@@ -164,13 +165,13 @@ export function SystemSettings() {
         updated[newMain] = '1.000000';
 
         if (newMain === 'COP') {
-            updated['USD'] = (1 / copUsd).toFixed(6); // ej. 0.000350
+            updated['USD'] = (1 / copUsd).toFixed(8); // e.g. 1/3200 = 0.00031250
             updated['VES'] = (bcv / copUsd).toFixed(6); // ej. 0.308041
         } else if (newMain === 'USD') {
             updated['COP'] = copUsd.toFixed(2); // ej. 2857.15
             updated['VES'] = bcv.toFixed(2); // ej. 880.12
         } else if (newMain === 'VES') {
-            updated['USD'] = (1 / bcv).toFixed(6); // ej. 0.001136
+            updated['USD'] = (1 / bcv).toFixed(8); // ej. 0.00113636
             updated['COP'] = (copUsd / bcv).toFixed(6); // ej. 3.246345
         }
 
@@ -189,7 +190,7 @@ export function SystemSettings() {
         if (localMainCurrency === 'COP') {
             setLocalRates(prev => ({
                 ...prev,
-                USD: (1 / parsed).toFixed(6), // ej. 0.000350
+                USD: (1 / parsed).toFixed(8), // e.g. 1/3200 = 0.00031250
                 VES: localUseOfficialRate ? (bcv / parsed).toFixed(6) : (prev['VES'] || (bcv / parsed).toFixed(6))
             }));
         } else if (localMainCurrency === 'USD') {
@@ -202,7 +203,7 @@ export function SystemSettings() {
             setLocalRates(prev => ({
                 ...prev,
                 COP: (parsed / bcv).toFixed(6),
-                USD: (1 / bcv).toFixed(6)
+                USD: (1 / bcv).toFixed(8)
             }));
         }
     };
@@ -873,7 +874,7 @@ export function SystemSettings() {
                                             <span key={c} className="flex items-center gap-1">
                                                 {i > 0 && <span className="text-slate-500">•</span>}
                                                 <span className="text-emerald-400">
-                                                    {rateVal < 0.01 ? rateVal.toFixed(6) : rateVal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} {info.symbol} ({c})
+                                                    {rateVal < 0.01 ? rateVal.toFixed(8) : rateVal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} {info.symbol} ({c})
                                                 </span>
                                             </span>
                                         );

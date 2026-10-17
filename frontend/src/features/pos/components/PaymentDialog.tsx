@@ -16,7 +16,8 @@ import type { PaymentMethodType, Currency, CartItem } from '../types';
 
 interface PaymentDialogProps {
     open: boolean;
-    total: number; // En USD base de referencia
+    total: number; // En USD base de referencia (con IVA si aplica)
+    subtotal?: number; // Subtotal sin IVA en moneda base
     cartItems: CartItem[];
     onUpdateQty: (productId: string, presentationId: string | undefined, newQty: number) => void;
     onClose: () => void;
@@ -81,6 +82,7 @@ function WeightItemRow({
 export function PaymentDialog({
     open,
     total,
+    subtotal,
     cartItems = [],
     onUpdateQty,
     onClose,
@@ -116,18 +118,37 @@ export function PaymentDialog({
         getPayload,
     } = usePayment(rates, fmtCOP, mainCurrency, convert);
 
+    // Si todos los métodos de pago son en efectivo, la venta queda exenta de IVA
+    const isAllCash = useMemo(() => {
+        return rows.length > 0 && rows.every(r => r.type === 'cash');
+    }, [rows]);
+
+    const effectiveTotal = useMemo(() => {
+        if ((config.iva || 0) > 0 && subtotal !== undefined && isAllCash) {
+            return subtotal;
+        }
+        return total;
+    }, [config.iva, subtotal, isAllCash, total]);
+
     const [prevOpen, setPrevOpen] = useState(open);
 
     useEffect(() => {
         if (open) {
             if (!prevOpen) {
-                reset(total);
-            } else {
-                updateTotal(total);
+                // Al abrir, el método por defecto es efectivo, por lo que usa subtotal si hay IVA activo
+                const initialTarget = ((config.iva || 0) > 0 && subtotal !== undefined) ? subtotal : total;
+                reset(initialTarget);
             }
         }
         setPrevOpen(open);
-    }, [open, prevOpen, total, reset, updateTotal]);
+    }, [open, prevOpen, total, subtotal, config.iva, reset]);
+
+    // Actualizar reactivamente si cambia entre 100% efectivo y tarjeta/transferencia/mixto
+    useEffect(() => {
+        if (open && prevOpen && typeof updateTotal === 'function') {
+            updateTotal(effectiveTotal);
+        }
+    }, [open, prevOpen, effectiveTotal, updateTotal]);
 
     // ── Fiado / Crédito ───────────────────────────────────────────────────────
     const [fiadoMode, setFiadoMode] = useState(false);
@@ -205,10 +226,10 @@ export function PaymentDialog({
         });
     }, [cartItems]);
 
-    // Totales en las 3 monedas
-    const totalUSD = convert(total, mainCurrency, 'USD');
-    const totalVES = convert(total, mainCurrency, 'VES');
-    const totalCOP = convert(total, mainCurrency, 'COP');
+    // Totales en las 3 monedas según el método seleccionado (con o sin IVA)
+    const totalUSD = convert(effectiveTotal, mainCurrency, 'USD');
+    const totalVES = convert(effectiveTotal, mainCurrency, 'VES');
+    const totalCOP = convert(effectiveTotal, mainCurrency, 'COP');
 
     // Vuelto en USD
     const changeUSD = Math.max(0, changeInUSD);
@@ -330,14 +351,31 @@ export function PaymentDialog({
                     <div className="w-full lg:w-80 bg-white border-b lg:border-b-0 lg:border-r border-slate-200/80 p-5 flex flex-col gap-4 shrink-0">
                         
                         {/* Total Hero Card - Alto Contraste */}
-                        <div className="p-5 bg-gradient-to-br from-slate-950 to-slate-900 text-white rounded-2xl shadow-md border border-slate-800 space-y-1.5">
-                            <span className="text-[11px] font-black text-slate-300 uppercase tracking-wider block">Monto Total a Cobrar</span>
+                        <div className="p-5 bg-gradient-to-br from-slate-950 to-slate-900 text-white rounded-2xl shadow-md border border-slate-800 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="text-[11px] font-black text-slate-300 uppercase tracking-wider block">Monto Total a Cobrar</span>
+                                {(config.iva || 0) > 0 && (
+                                    <span className={cn(
+                                        "text-[10px] font-black px-2 py-0.5 rounded-full border",
+                                        isAllCash
+                                            ? "bg-emerald-950/80 text-emerald-300 border-emerald-500/50"
+                                            : "bg-indigo-950/80 text-indigo-300 border-indigo-500/50"
+                                    )}>
+                                        {isAllCash ? 'Exento de IVA (Efectivo)' : `IVA ${config.iva}% incluido`}
+                                    </span>
+                                )}
+                            </div>
                             <p className="text-3xl font-black text-emerald-400 tabular-nums leading-none">
-                                {formatCurrency(total, mainCurrency)}
+                                {formatCurrency(effectiveTotal, mainCurrency)}
                             </p>
-                            <span className="text-xs text-slate-300 font-bold block pt-1">
-                                {cartItems.length} {cartItems.length === 1 ? 'producto' : 'productos'} en el ticket
-                            </span>
+                            <div className="flex items-center justify-between text-xs text-slate-300 font-bold pt-1">
+                                <span>{cartItems.length} {cartItems.length === 1 ? 'producto' : 'productos'} en ticket</span>
+                                {(config.iva || 0) > 0 && subtotal !== undefined && (
+                                    <span className="text-[11px] text-slate-400">
+                                        {isAllCash ? `Base: ${formatCurrency(subtotal, mainCurrency)}` : `Subtotal: ${formatCurrency(subtotal, mainCurrency)} + IVA`}
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
                         {/* Equivalencias en otras monedas activas - Alto Contraste */}

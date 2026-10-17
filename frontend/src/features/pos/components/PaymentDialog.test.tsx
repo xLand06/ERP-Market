@@ -17,6 +17,7 @@ vi.mock('@/features/pos/hooks/usePayment', () => ({
         updateRow: vi.fn(),
         removeRow: vi.fn(),
         reset: vi.fn(),
+        updateTotal: vi.fn(),
         getPayload: vi.fn(() => []),
     })),
 }));

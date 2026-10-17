@@ -156,18 +156,42 @@ export function ThermalReceiptTicket({
             </div>
 
             {/* 4. BASE IMPONIBLE E IVA EN BS. (Normativa Fiscal SENIAT Venezuela) */}
-            {showIvaBreakdown && computedTotal > 0 && (
-                <div className="border-t border-dashed border-slate-300 pt-1.5 space-y-0.5 text-right text-[10px] text-slate-700">
-                    <div className="flex justify-between font-medium">
-                        <span>BASE IMPONIBLE (G 16.00%):</span>
-                        <span className="tabular-nums">Bs. {(totalVES / 1.16).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex justify-between font-bold text-slate-950">
-                        <span>IVA (16.00%):</span>
-                        <span className="tabular-nums">Bs. {(totalVES - (totalVES / 1.16)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                </div>
-            )}
+            {showIvaBreakdown && computedTotal > 0 && (() => {
+                const isAllCashPayment = paymentMethods && paymentMethods.length > 0 && paymentMethods.every(p => p.type === 'cash');
+                const ivaPercent = config.iva || 0;
+
+                if (ivaPercent > 0 && isAllCashPayment) {
+                    return (
+                        <div className="border-t border-dashed border-slate-300 pt-1.5 space-y-0.5 text-right text-[10px] text-slate-700">
+                            <div className="flex justify-between font-bold text-slate-700">
+                                <span>CONDICIÓN FISCAL:</span>
+                                <span className="font-bold text-slate-900">EXENTO (PAGO EN EFECTIVO)</span>
+                            </div>
+                        </div>
+                    );
+                }
+
+                if (ivaPercent > 0) {
+                    const ivaDivisor = 1 + (ivaPercent / 100);
+                    const baseImponible = totalVES / ivaDivisor;
+                    const ivaMonto = totalVES - baseImponible;
+
+                    return (
+                        <div className="border-t border-dashed border-slate-300 pt-1.5 space-y-0.5 text-right text-[10px] text-slate-700">
+                            <div className="flex justify-between font-medium">
+                                <span>BASE IMPONIBLE (G {ivaPercent.toFixed(2)}%):</span>
+                                <span className="tabular-nums">Bs. {baseImponible.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="flex justify-between font-bold text-slate-950">
+                                <span>IVA ({ivaPercent.toFixed(2)}%):</span>
+                                <span className="tabular-nums">Bs. {ivaMonto.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                        </div>
+                    );
+                }
+
+                return null;
+            })()}
 
             <div className="border-b border-dashed border-slate-400 my-1" />
 

@@ -340,18 +340,21 @@ export default function POSPage() {
                 currency: pm.currency,
             }));
 
+            const isAllCashPayment = paymentMethods.length > 0 && paymentMethods.every(pm => pm.type === 'cash');
+            const effectiveSaleTotal = (isAllCashPayment && (config.iva || 0) > 0) ? totals.subtotal : totals.total;
+
             // Actualizar datos del ticket impreso en el DOM (mostrar resumen si no se mandó a imprimir directo)
             setSummary({
                 visible: !shouldPrint,
                 items: saleItems,
-                total: totals.total,
+                total: effectiveSaleTotal,
                 paymentMethods: formattedPayMethods,
                 type: 'SALE',
             });
 
             // Impresora configurada como principal en /settings
-            const config = useConfigStore.getState();
-            const primaryPrinter = config.printers.find(p => p.isPrimary) || config.printers[0] || null;
+            const configState = useConfigStore.getState();
+            const primaryPrinter = configState.printers.find(p => p.isPrimary) || configState.printers[0] || null;
 
             if (!isOfflineSale) {
                 toast.success(customerId ? '¡Venta a crédito registrada!' : '¡Venta realizada con éxito!');
@@ -375,16 +378,16 @@ export default function POSPage() {
                         invoiceNumber: invoiceNum,
                         customerName: 'Consumidor Final',
                         customerTaxId: 'V-00000000-0',
-                        businessName: config.businessName,
-                        taxId: config.taxId,
-                        fiscalAddress: config.fiscalAddress,
-                        fiscalPhone: config.fiscalPhone,
+                        businessName: configState.businessName,
+                        taxId: configState.taxId,
+                        fiscalAddress: configState.fiscalAddress,
+                        fiscalPhone: configState.fiscalPhone,
                         items: saleItems,
-                        totalUSD: convert(totals.total, mainCurrency || 'USD', 'USD'),
-                        totalVES: convert(totals.total, mainCurrency || 'USD', 'VES'),
-                        totalCOP: convert(totals.total, mainCurrency || 'USD', 'COP'),
+                        totalUSD: convert(effectiveSaleTotal, mainCurrency || 'USD', 'USD'),
+                        totalVES: convert(effectiveSaleTotal, mainCurrency || 'USD', 'VES'),
+                        totalCOP: convert(effectiveSaleTotal, mainCurrency || 'USD', 'COP'),
                         paymentMethods: formattedPayMethods,
-                        footerMessage: config.footerMessage,
+                        footerMessage: configState.footerMessage,
                     });
 
                     if (toastId) {
@@ -730,6 +733,7 @@ export default function POSPage() {
                 <PaymentDialog
                     open={payOpen}
                     total={totals.total}
+                    subtotal={totals.subtotal}
                     cartItems={cart}
                     onUpdateQty={updateCartItemQty}
                     onClose={() => setPayOpen(false)}
