@@ -23,9 +23,16 @@ const isCapacitor = typeof window !== 'undefined' && (
     (window as any).Capacitor?.platform === 'ios' ||
     window.location.protocol === 'capacitor:'
 );
-export const APP_BUILD = '2.1';
 const DESKTOP_WINDOWS_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Setup-Windows.exe';
+const DESKTOP_WIN7_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Setup-Win7-x64.exe';
 const DESKTOP_LINUX_URL = 'https://mgmt.allcode.site/downloads/ALL-MARKET-Linux.AppImage';
+
+const APP_DOWNLOADS = [
+    { href: DESKTOP_WINDOWS_URL, label: 'Windows 10 / 11', badge: 'Actual', icon: Download, color: 'text-blue-500' },
+    { href: DESKTOP_WIN7_URL, label: 'Windows 7 / 8', badge: 'Legacy', icon: Download, color: 'text-sky-400' },
+    { href: DESKTOP_LINUX_URL, label: 'Linux', badge: 'AppImage', icon: Download, color: 'text-amber-400' },
+    { href: '/apk/allmarket.apk', label: 'Android APK', badge: 'v2.4', icon: Smartphone, color: 'text-emerald-500 dark:text-teal-400' }
+];
 
 const ECOSYSTEM = [
     { name: 'ALL MARKET', desc: 'ERP para bodegas y supermercados', icon: ShoppingCart, color: 'from-emerald-500 to-emerald-700', active: true },
@@ -727,12 +734,19 @@ export default function LoginPage() {
                         {/* Downloads desktop */}
                         <div className="pt-2 border-t border-slate-200 dark:border-[#30363D]">
                             <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center mb-2">Descargar app</p>
-                            {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/allmarket.apk', label: 'Android APK', icon: Smartphone, color: 'text-emerald-500 dark:text-teal-400' }].map(d => (
+                            {APP_DOWNLOADS.map(d => (
                                 <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')}
-                                    className="flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl border border-slate-200 dark:border-[#30363D] text-slate-700 dark:text-slate-200 hover:border-emerald-500/40 hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all active:scale-95">
-                                    <d.icon className={`w-5 h-5 ${d.color} shrink-0`} />
-                                    <span className="text-sm font-bold">{d.label}</span>
-                                    <Download className="w-4 h-4 text-slate-400 ml-auto" />
+                                    className="flex items-center gap-3 w-full px-3.5 py-2.5 mb-1.5 rounded-xl border border-slate-200 dark:border-[#30363D] text-slate-700 dark:text-slate-200 hover:border-emerald-500/40 hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all active:scale-95">
+                                    <d.icon className={`w-4 h-4 ${d.color} shrink-0`} />
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <span className="text-xs font-bold truncate">{d.label}</span>
+                                        {d.badge && (
+                                            <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shrink-0">
+                                                {d.badge}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <Download className="w-3.5 h-3.5 text-slate-400 ml-auto shrink-0" />
                                 </a>
                             ))}
                         </div>
@@ -812,12 +826,19 @@ export default function LoginPage() {
                             {/* Downloads */}
                             <div className="bg-white dark:bg-[#161B22] rounded-2xl p-3 space-y-2 shadow-sm border border-slate-200/60 dark:border-[#30363D]">
                                 <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Descargar app</p>
-                                {[{ href: DESKTOP_WINDOWS_URL, label: 'Windows', icon: Download, color: 'text-blue-400' }, { href: DESKTOP_LINUX_URL, label: 'Linux', icon: Download, color: 'text-amber-400' }, { href: '/apk/allmarket.apk', label: 'Android APK', icon: Smartphone, color: 'text-emerald-500 dark:text-teal-400' }].map(d => (
+                                {APP_DOWNLOADS.map(d => (
                                     <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" download={d.href.endsWith('.apk')}
-                                        className="flex items-center gap-3 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-[#30363D] text-slate-700 dark:text-slate-200 hover:border-emerald-500/40 hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all active:scale-95">
-                                        <d.icon className={`w-5 h-5 ${d.color} shrink-0`} />
-                                        <span className="text-sm font-bold">{d.label}</span>
-                                        <Download className="w-4 h-4 text-slate-400 ml-auto" />
+                                        className="flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-[#30363D] text-slate-700 dark:text-slate-200 hover:border-emerald-500/40 hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all active:scale-95">
+                                        <d.icon className={`w-4 h-4 ${d.color} shrink-0`} />
+                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                            <span className="text-xs font-bold truncate">{d.label}</span>
+                                            {d.badge && (
+                                                <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shrink-0">
+                                                    {d.badge}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <Download className="w-3.5 h-3.5 text-slate-400 ml-auto shrink-0" />
                                     </a>
                                 ))}
                             </div>
