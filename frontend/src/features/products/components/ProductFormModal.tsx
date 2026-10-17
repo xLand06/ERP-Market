@@ -7,8 +7,10 @@ import { CameraBarcodeScannerModal } from '@/components/scanner/CameraBarcodeSca
 import { api } from '@/lib/api';
 import { normalizeText } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { useConfigStore } from '@/hooks/useConfigStore';
 import { useAuthStore } from '@/features/auth/store/authStore';
+import { useGroups, useSubgroups } from '../hooks';
 import type { Product, ProductBarcode, ProductPresentation, Group, Category } from '../types';
 import {
   BARCODE_LABELS,
@@ -22,8 +24,8 @@ interface ProductFormModalProps {
     open: boolean;
     onClose: () => void;
     product?: Product | null;
-    groups: Group[];
-    subgroups: Category[];
+    groups?: Group[];
+    subgroups?: Category[];
     onSuccess: () => void;
 }
 
@@ -137,8 +139,24 @@ function PriceField({
 }
 
 // ─── Modal Principal ──────────────────────────────────────────────────────────
-export function ProductFormModal({ open, onClose, product, groups, subgroups, onSuccess }: ProductFormModalProps) {
+export function ProductFormModal({ open, onClose, product, groups: propGroups, subgroups: propSubgroups, onSuccess }: ProductFormModalProps) {
     const { fmtMain, mainCurrency } = useConfigStore();
+    const queryClient = useQueryClient();
+
+    // Consultas automáticas de grupos y subgrupos para asegurar datos frescos
+    const { data: fetchedGroups = [], refetch: refetchGroups } = useGroups();
+    const { data: fetchedSubgroups = [], refetch: refetchSubgroups } = useSubgroups();
+
+    const groups = (propGroups && propGroups.length > 0) ? propGroups : fetchedGroups;
+    const subgroups = (propSubgroups && propSubgroups.length > 0) ? propSubgroups : fetchedSubgroups;
+
+    // Refrescar catálogos al abrir el modal
+    useEffect(() => {
+        if (open) {
+            refetchGroups();
+            refetchSubgroups();
+        }
+    }, [open, refetchGroups, refetchSubgroups]);
 
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -154,7 +172,66 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
     const [minStock, setMinStock] = useState<number | ''>('');
     const [trackStock, setTrackStock] = useState(true);
     const [imageUrl, setImageUrl] = useState<string | null>(null);
-    const [uploadingImage, setUploadingImage] = useState(false);    // ── Kits / Combos ──────────────────────────────────────────────────────
+    const [uploadingImage, setUploadingImage] = useState(false);
+
+    // ── Creación rápida de Grupo y Subgrupo ─────────────────────────────────
+    const [quickGroupModalOpen, setQuickGroupModalOpen] = useState(false);
+    const [quickGroupName, setQuickGroupName] = useState('');
+    const [creatingGroup, setCreatingGroup] = useState(false);
+
+    const [quickSubGroupModalOpen, setQuickSubGroupModalOpen] = useState(false);
+    const [quickSubGroupName, setQuickSubGroupName] = useState('');
+    const [creatingSubGroup, setCreatingSubGroup] = useState(false);
+
+    const handleQuickCreateGroup = async () => {
+        const trimmed = quickGroupName.trim().toUpperCase();
+        if (!trimmed) { toast.error('El nombre del grupo es obligatorio'); return; }
+        setCreatingGroup(true);
+        try {
+            const res = await api.post('/groups', { name: trimmed });
+            const created = res.data?.data;
+            queryClient.invalidateQueries({ queryKey: ['groups'] });
+            queryClient.invalidateQueries({ queryKey: ['subgroups'] });
+            await refetchGroups();
+            if (created?.id) {
+                setSelectedGroupId(created.id);
+                setSubGroupId('');
+            }
+            setQuickGroupName('');
+            setQuickGroupModalOpen(false);
+            toast.success(`Grupo "${trimmed}" creado correctamente`);
+        } catch (err: any) {
+            toast.error(err?.response?.data?.error || 'Error al crear grupo');
+        } finally {
+            setCreatingGroup(false);
+        }
+    };
+
+    const handleQuickCreateSubGroup = async () => {
+        const trimmed = quickSubGroupName.trim().toUpperCase();
+        if (!trimmed) { toast.error('El nombre del subgrupo es obligatorio'); return; }
+        if (!selectedGroupId) { toast.error('Seleccioná un grupo primero'); return; }
+        setCreatingSubGroup(true);
+        try {
+            const res = await api.post('/groups/subgroups', { name: trimmed, groupId: selectedGroupId });
+            const created = res.data?.data;
+            queryClient.invalidateQueries({ queryKey: ['groups'] });
+            queryClient.invalidateQueries({ queryKey: ['subgroups'] });
+            await refetchSubgroups();
+            if (created?.id) {
+                setSubGroupId(created.id);
+            }
+            setQuickSubGroupName('');
+            setQuickSubGroupModalOpen(false);
+            toast.success(`Subgrupo "${trimmed}" creado correctamente`);
+        } catch (err: any) {
+            toast.error(err?.response?.data?.error || 'Error al crear subgrupo');
+        } finally {
+            setCreatingSubGroup(false);
+        }
+    };
+
+    // ── Kits / Combos ──────────────────────────────────────────────────────
     const [isKit, setIsKit] = useState(false);
     const [kitRows, setKitRows] = useState<KitComponentRow[]>([]);
     const [componentSearch, setComponentSearch] = useState('');
@@ -179,6 +256,11 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
         ? (((priceNum - costNum) / costNum) * 100).toFixed(1)
         : null;
 
+    // Grupo activo reactivo derivado inmediatamente si subGroupId está presente
+    const activeGroupId = selectedGroupId || (
+        subGroupId ? subgroups.find(s => String(s.id) === String(subGroupId))?.groupId : ''
+    ) || '';
+
     useEffect(() => {
         if (open) {
             if (product) {
@@ -191,8 +273,14 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                 setImageUrl(product.imageUrl || null);
                 setSubGroupId(product.subGroupId || '');
                 setTrackStock(product.trackStock !== false);
-                const sg = subgroups.find((s: any) => s.id === product.subGroupId);
-                setSelectedGroupId(sg?.groupId || '');
+
+                // Resolver grupo desde el producto directamente o desde la lista de subgrupos
+                const initialGroupId = (product as any)?.subGroup?.groupId
+                    || (product as any)?.subGroup?.group?.id
+                    || (product as any)?.groupId
+                    || subgroups.find((s: any) => String(s.id) === String(product.subGroupId))?.groupId
+                    || '';
+                setSelectedGroupId(initialGroupId ? String(initialGroupId) : '');
                 const bcs = product.barcodes?.length > 0 ? product.barcodes : [];
                 setBarcodes(bcs);
                 setBarcodeKeys(bcs.map(() => ++barcodeKeyRef.current));
@@ -258,6 +346,20 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
             setTimeout(() => initialFocusRef.current?.focus(), 100);
         }
     }, [open, product]);
+
+    // Sincronización reactiva del grupo cuando los subgrupos terminan de cargar asíncronamente
+    useEffect(() => {
+        if (open && (product?.subGroupId || subGroupId) && !selectedGroupId && subgroups.length > 0) {
+            const targetSubId = product?.subGroupId || subGroupId;
+            const found = (product as any)?.subGroup?.groupId
+                || (product as any)?.subGroup?.group?.id
+                || (product as any)?.groupId
+                || subgroups.find((s: any) => String(s.id) === String(targetSubId))?.groupId;
+            if (found) {
+                setSelectedGroupId(String(found));
+            }
+        }
+    }, [open, product, subGroupId, subgroups, selectedGroupId]);
 
     // ── Barcodes ─────────────────────────────────────────────────────────────
     const addBarcode = () => {
@@ -615,9 +717,18 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                 </div>
                             )}
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Grupo</label>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <label className="block text-sm font-semibold text-slate-700">Grupo</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setQuickGroupModalOpen(true)}
+                                        className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                                    >
+                                        + Nuevo Grupo
+                                    </button>
+                                </div>
                                 <select
-                                    value={selectedGroupId}
+                                    value={activeGroupId}
                                     onChange={(e) => {
                                         setSelectedGroupId(e.target.value);
                                         setSubGroupId('');
@@ -633,16 +744,27 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Subgrupo</label>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <label className="block text-sm font-semibold text-slate-700">Subgrupo</label>
+                                    {activeGroupId && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setQuickSubGroupModalOpen(true)}
+                                            className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                                        >
+                                            + Nuevo Subgrupo
+                                        </button>
+                                    )}
+                                </div>
                                 <select
                                     value={subGroupId}
                                     onChange={(e) => setSubGroupId(e.target.value)}
                                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm bg-white"
-                                    disabled={!selectedGroupId}
+                                    disabled={!activeGroupId}
                                 >
                                     <option value="">Sin subgrupo</option>
                                     {subgroups
-                                        .filter((s: any) => s.groupId === selectedGroupId)
+                                        .filter((s: any) => String(s.groupId) === String(activeGroupId))
                                         .map((s: any) => (
                                             <option key={s.id} value={s.id}>
                                                 {s.name}
@@ -1108,6 +1230,100 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
             onClose={() => { setCameraScanOpen(false); setCameraScanIndex(null); }}
             onScan={handleCameraScan}
         />
+
+        {/* Modal de Creación Rápida de Grupo */}
+        <Dialog open={quickGroupModalOpen} onOpenChange={o => !o && setQuickGroupModalOpen(false)}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="text-base font-bold text-slate-900">Nuevo Grupo</DialogTitle>
+                    <DialogDescription className="text-xs text-slate-500">
+                        Crea un grupo de productos para organizar tu catálogo.
+                    </DialogDescription>
+                </DialogHeader>
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        handleQuickCreateGroup();
+                    }}
+                    className="space-y-4 pt-2"
+                >
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Nombre del Grupo *</label>
+                        <input
+                            type="text"
+                            value={quickGroupName}
+                            onChange={(e) => setQuickGroupName(normalizeText(e.target.value))}
+                            placeholder="Ej: BEBIDAS, LACTEOS, VIVERES"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none uppercase"
+                            autoFocus
+                        />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button
+                            type="button"
+                            onClick={() => { setQuickGroupName(''); setQuickGroupModalOpen(false); }}
+                            className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={creatingGroup || !quickGroupName.trim()}
+                            className="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50"
+                        >
+                            {creatingGroup ? 'Creando...' : 'Crear Grupo'}
+                        </button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
+
+        {/* Modal de Creación Rápida de Subgrupo */}
+        <Dialog open={quickSubGroupModalOpen} onOpenChange={o => !o && setQuickSubGroupModalOpen(false)}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="text-base font-bold text-slate-900">Nuevo Subgrupo</DialogTitle>
+                    <DialogDescription className="text-xs text-slate-500">
+                        Crea un subgrupo dentro del grupo seleccionado.
+                    </DialogDescription>
+                </DialogHeader>
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        handleQuickCreateSubGroup();
+                    }}
+                    className="space-y-4 pt-2"
+                >
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Nombre del Subgrupo *</label>
+                        <input
+                            type="text"
+                            value={quickSubGroupName}
+                            onChange={(e) => setQuickSubGroupName(normalizeText(e.target.value))}
+                            placeholder="Ej: GASEOSAS, JUGOS, ENERGETICAS"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none uppercase"
+                            autoFocus
+                        />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button
+                            type="button"
+                            onClick={() => { setQuickSubGroupName(''); setQuickSubGroupModalOpen(false); }}
+                            className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={creatingSubGroup || !quickSubGroupName.trim()}
+                            className="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50"
+                        >
+                            {creatingSubGroup ? 'Creando...' : 'Crear Subgrupo'}
+                        </button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
         </>
     );
 }

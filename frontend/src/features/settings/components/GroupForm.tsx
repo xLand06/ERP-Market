@@ -39,6 +39,7 @@ export function GroupForm({ group, open, onClose }: GroupFormProps) {
                 toast.success('Grupo creado');
             }
             queryClient.invalidateQueries({ queryKey: ['groups'] });
+            queryClient.invalidateQueries({ queryKey: ['subgroups'] });
             onClose();
         } catch (error: any) {
             toast.error(error.response?.data?.error || 'Error al guardar');

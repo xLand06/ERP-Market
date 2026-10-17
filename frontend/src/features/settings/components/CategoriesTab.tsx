@@ -45,6 +45,7 @@ export function CategoriesTab() {
         },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['groups'] });
+            queryClient.invalidateQueries({ queryKey: ['subgroups'] });
             toast.success(variables.isActive ? 'Grupo activado' : 'Grupo desactivado');
         },
         onError: (error: any) => {
@@ -58,6 +59,7 @@ export function CategoriesTab() {
         },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['groups'] });
+            queryClient.invalidateQueries({ queryKey: ['subgroups'] });
             toast.success(variables.isActive ? 'Subgrupo activado' : 'Subgrupo desactivado');
         },
         onError: (error: any) => {
