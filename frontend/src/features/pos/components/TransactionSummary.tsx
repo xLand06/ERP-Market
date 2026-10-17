@@ -57,9 +57,9 @@ export function TransactionSummary({
             fiscalAddress: config.fiscalAddress,
             fiscalPhone: config.fiscalPhone,
             items,
-            totalUSD: total,
-            totalVES: config.fromUSD(total, 'VES'),
-            totalCOP: config.fromUSD(total, 'COP'),
+            totalUSD: config.convert(total, config.mainCurrency || 'USD', 'USD'),
+            totalVES: config.convert(total, config.mainCurrency || 'USD', 'VES'),
+            totalCOP: config.convert(total, config.mainCurrency || 'USD', 'COP'),
             paymentMethods,
             footerMessage: config.footerMessage,
         });

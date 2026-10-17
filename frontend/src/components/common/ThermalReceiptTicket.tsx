@@ -68,14 +68,16 @@ export function ThermalReceiptTicket({
     const showPaymentMethods = config.showPaymentMethods ?? true;
     const footerMessage = config.footerMessage || '¡Gracias por su compra! Vuelva pronto';
 
-    const computedTotalUSD = overrideTotalUSD !== undefined
+    const computedTotal = overrideTotalUSD !== undefined
         ? overrideTotalUSD
         : items.reduce((acc, item) => acc + item.total, 0);
 
-    const totalVES = config.fromUSD(computedTotalUSD, 'VES');
-    const totalCOP = config.fromUSD(computedTotalUSD, 'COP');
-    const vesRate = config.fromUSD(1, 'VES');
-    const copRate = config.fromUSD(1, 'COP');
+    const mainCurrency = config.mainCurrency || 'USD';
+    const totalVES = config.convert(computedTotal, mainCurrency, 'VES');
+    const totalCOP = config.convert(computedTotal, mainCurrency, 'COP');
+    const totalUSD = config.convert(computedTotal, mainCurrency, 'USD');
+    const vesRate = config.convert(1, 'USD', 'VES');
+    const copRate = config.convert(1, 'USD', 'COP');
 
     const formattedDate = date || new Date().toLocaleString('es-VE', {
         day: '2-digit',
@@ -157,7 +159,7 @@ export function ThermalReceiptTicket({
             </div>
 
             {/* 4. BASE IMPONIBLE E IVA EN BS. (Normativa Fiscal SENIAT Venezuela) */}
-            {showIvaBreakdown && computedTotalUSD > 0 && (
+            {showIvaBreakdown && computedTotal > 0 && (
                 <div className="border-t border-dashed border-slate-300 pt-1.5 space-y-0.5 text-right text-[10px] text-slate-700">
                     <div className="flex justify-between font-medium">
                         <span>BASE IMPONIBLE (G 16.00%):</span>
@@ -180,16 +182,20 @@ export function ThermalReceiptTicket({
                         Bs. {totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                 </div>
-                {showMultiCurrencySummary && computedTotalUSD > 0 && (
+                {showMultiCurrencySummary && computedTotal > 0 && (
                     <div className="text-[10px] text-slate-700 space-y-0.5 font-bold pt-1 border-t border-slate-100">
-                        <div className="flex justify-between">
-                            <span>REF. USD (Tasa BCV Bs. {vesRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}):</span>
-                            <span className="tabular-nums">$ {computedTotalUSD.toFixed(2)} USD</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>REF. COP (Tasa ${copRate.toLocaleString('es-CO')}):</span>
-                            <span className="tabular-nums">$ {Math.round(totalCOP).toLocaleString('es-CO')} COP</span>
-                        </div>
+                        {mainCurrency !== 'USD' && (
+                            <div className="flex justify-between">
+                                <span>REF. USD:</span>
+                                <span className="tabular-nums">$ {totalUSD.toFixed(2)} USD</span>
+                            </div>
+                        )}
+                        {mainCurrency !== 'COP' && (
+                            <div className="flex justify-between">
+                                <span>REF. COP (Tasa ${copRate.toLocaleString('es-CO')}):</span>
+                                <span className="tabular-nums">$ {Math.round(totalCOP).toLocaleString('es-CO')} COP</span>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

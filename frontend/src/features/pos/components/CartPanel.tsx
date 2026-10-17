@@ -52,7 +52,7 @@ const CartItemRow = React.memo(function CartItemRow({
     onRemoveItem: (productId: string, presentationId: string | undefined) => void;
 }) {
     const config = useConfigStore();
-    const fmtUSD = config.fmtUSD || config.fmtMain || ((v: number) => `$ ${v}`);
+    const fmtMain = config.fmtMain || ((v: number) => `$ ${v}`);
     const { Icon, style } = getCartCategoryIcon(product?.category?.name, item.name);
 
     return (
@@ -112,8 +112,8 @@ const CartItemRow = React.memo(function CartItemRow({
                     </button>
                 </div>
                 <div className="text-right">
-                    <p className="text-[10px] text-slate-400">{fmtUSD(item.currentPrice)} c/u</p>
-                    <p className="text-sm font-black text-slate-900">{fmtUSD(item.currentPrice * item.qty)}</p>
+                    <p className="text-[10px] text-slate-400">{fmtMain(item.currentPrice)} c/u</p>
+                    <p className="text-sm font-black text-slate-900">{fmtMain(item.currentPrice * item.qty)}</p>
                 </div>
             </div>
         </div>

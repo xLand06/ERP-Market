@@ -101,7 +101,7 @@ const ProductCard = React.memo(function ProductCard({
     onAdd,
     onShowPresentations,
 }: ProductCardProps) {
-    const { fmtCOP } = useConfigStore();
+    const { fmtMain } = useConfigStore();
     const [flash, setFlash] = useState(false);
     const { Icon, badgeStyle } = getProductCategoryIcon(product.category?.name, product.name);
 
@@ -146,7 +146,7 @@ const ProductCard = React.memo(function ProductCard({
 
                 <div className="pt-2 border-t border-slate-100 space-y-2">
                     <p className="text-sm sm:text-base font-black text-slate-950 tabular-nums leading-none">
-                        {fmtCOP(isSaleMode ? product.price : product.cost)}
+                        {fmtMain(isSaleMode ? product.price : product.cost)}
                         {!isSaleMode && <span className="text-[10px] text-slate-400 font-normal ml-1">Costo</span>}
                     </p>
                     <div className="flex items-center justify-between gap-1.5 flex-wrap">

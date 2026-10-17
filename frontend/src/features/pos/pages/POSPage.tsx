@@ -78,9 +78,14 @@ export default function POSPage() {
         return branches.find((b: any) => b.id === selectedBranch);
     }, [selectedBranch, branches]);
 
-    const { iva, ivaEnabled, fmtCOP, fmtMain, rates } = useConfigStore();
+    const { iva, ivaEnabled, fmtCOP, fmtMain, rates, mainCurrency, convert, fetchSettings, fetchRates } = useConfigStore();
     const effectiveBranch = selectedBranchData?.id || (selectedBranch === 'all' && user?.role === 'OWNER' ? null : selectedBranch);
     const effectiveIva = ivaEnabled ? iva : 0;
+
+    useEffect(() => {
+        void fetchSettings();
+        void fetchRates();
+    }, [fetchSettings, fetchRates]);
 
     // ── Open Register Query ──────────────────────────────────────────
     const { data: openRegister, isLoading: registerLoading, refetch: refetchRegister } = useQuery({
@@ -272,7 +277,7 @@ export default function POSPage() {
                 type: 'SALE',
                 branchId: effectiveBranch!,
                 items,
-                currency: 'COP',
+                currency: mainCurrency || 'USD',
                 exchangeRate: 1,
                 paymentMethods,
                 ...(customerId ? { customerId } : {}),
@@ -375,9 +380,9 @@ export default function POSPage() {
                         fiscalAddress: config.fiscalAddress,
                         fiscalPhone: config.fiscalPhone,
                         items: saleItems,
-                        totalUSD: totals.total,
-                        totalVES: config.fromUSD(totals.total, 'VES'),
-                        totalCOP: config.fromUSD(totals.total, 'COP'),
+                        totalUSD: convert(totals.total, mainCurrency || 'USD', 'USD'),
+                        totalVES: convert(totals.total, mainCurrency || 'USD', 'VES'),
+                        totalCOP: convert(totals.total, mainCurrency || 'USD', 'COP'),
                         paymentMethods: formattedPayMethods,
                         footerMessage: config.footerMessage,
                     });
@@ -423,7 +428,7 @@ export default function POSPage() {
                 customerName: payload.customerName,
                 validityDays: payload.validityDays,
                 notes: payload.notes,
-                currency: 'COP',
+                currency: mainCurrency || 'USD',
             });
             setQuoteOpen(false);
             clearCart();
@@ -564,11 +569,15 @@ export default function POSPage() {
                             </div>
                             <div className="p-3 sm:p-4 bg-slate-900 rounded-xl text-white">
                                 <div className="flex justify-between items-center mb-1">
-                                    <span className="text-[10px] sm:text-xs text-slate-400 font-medium uppercase tracking-wider">Total Estimado (COP)</span>
+                                    <span className="text-[10px] sm:text-xs text-slate-400 font-medium uppercase tracking-wider">Total Estimado ({mainCurrency || 'USD'})</span>
                                     <Badge variant="outline" className="text-[9px] border-slate-700 text-slate-500 uppercase">Base</Badge>
                                 </div>
                                 <p className="text-lg sm:text-2xl font-black tabular-nums">
-                                    {fmtCOP((parseFloat(openCopVal) || 0) + ((parseFloat(openUsdVal) || 0) * usdRate) + ((parseFloat(openVesVal) || 0) * vesRate))}
+                                    {fmtMain(
+                                        convert(parseFloat(openCopVal) || 0, 'COP', mainCurrency || 'USD') +
+                                        convert(parseFloat(openUsdVal) || 0, 'USD', mainCurrency || 'USD') +
+                                        convert(parseFloat(openVesVal) || 0, 'VES', mainCurrency || 'USD')
+                                    )}
                                 </p>
                             </div>
                             <div className="flex gap-2 sm:gap-3 pt-2">
@@ -580,7 +589,10 @@ export default function POSPage() {
                                         const cop = parseFloat(openCopVal) || 0;
                                         const usd = parseFloat(openUsdVal) || 0;
                                         const ves = parseFloat(openVesVal) || 0;
-                                        openMutation.mutate(cop + (usd * usdRate) + (ves * vesRate));
+                                        const totalOpening = convert(cop, 'COP', mainCurrency || 'USD') +
+                                            convert(usd, 'USD', mainCurrency || 'USD') +
+                                            convert(ves, 'VES', mainCurrency || 'USD');
+                                        openMutation.mutate(totalOpening);
                                     }}>
                                     {openMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Abriendo...</> : <><Play className="w-4 h-4 mr-2" /> Confirmar Apertura</>}
                                 </Button>

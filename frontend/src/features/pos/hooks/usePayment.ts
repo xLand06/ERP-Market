@@ -7,6 +7,7 @@ export const DEFAULT_PAYMENT_OPTIONS: Array<{
     currency: Currency;
 }> = [
     { type: 'cash', label: 'Efectivo USD', currency: 'USD' },
+    { type: 'cash', label: 'Efectivo COP', currency: 'COP' },
     { type: 'cash', label: 'Efectivo VES', currency: 'VES' },
     { type: 'transfer', label: 'Pago Móvil / Transf.', currency: 'VES' },
     { type: 'card', label: 'Tarjeta / Punto', currency: 'VES' },
@@ -28,8 +29,8 @@ export interface UsePaymentReturn {
     splitEvenly: (parts: number) => void;
     updateRow: (key: string, updates: Partial<Omit<PaymentMethodRow, 'key'>>) => void;
     removeRow: (key: string) => void;
-    reset: (totalInUSD: number) => void;
-    updateTotal: (newTotalInUSD: number) => void;
+    reset: (totalInMain: number) => void;
+    updateTotal: (newTotalInMain: number) => void;
     getPayload: () => Array<{
         type: PaymentMethodType;
         amount: number;
@@ -41,85 +42,99 @@ export interface UsePaymentReturn {
 
 /**
  * Hook para gestionar los métodos de pago en el modal de cobro del POS.
- * Trabaja con USD como referencia base principal.
+ * Dinámicamente trabaja con la moneda base configurada (mainCurrency).
  */
 export function usePayment(
     rates: Record<string, number>,
-    fmtCOP: (n: number) => string
+    fmtCOP?: (n: number) => string,
+    mainCurrency: string = 'USD',
+    convertFn?: (amount: number, from: string, to: string) => number
 ): UsePaymentReturn {
-    const usdRate = rates['USD'] || rates['COP'] || 3600;
-    const vesRate = rates['VES'] || 5.5;
+    const convert = useCallback((amount: number, from: string, to: string) => {
+        if (!amount) return 0;
+        const f = (from || mainCurrency || 'USD').toUpperCase();
+        const t = (to || mainCurrency || 'USD').toUpperCase();
+        if (f === t) return amount;
+        if (convertFn) return convertFn(amount, f, t);
 
-    const getRate = useCallback((code: string) => {
-        if (code === 'USD') return 1;
-        if (code === 'VES') return rates['VES'] || 5.5;
-        if (code === 'COP') return rates['USD'] || rates['COP'] || 3600;
-        return rates[code] || 1;
-    }, [rates]);
+        const m = (mainCurrency || 'USD').toUpperCase();
+        const getR = (c: string) => {
+            if (c === m) return 1.0;
+            const r = Number(rates[c]);
+            return r > 0 ? r : 1.0;
+        };
 
-    const [totalInUSD, setTotalInUSD] = useState(0);
+        const rFrom = getR(f);
+        const inMain = f === m ? amount : (amount / rFrom);
+        const rTo = getR(t);
+        return t === m ? inMain : (inMain * rTo);
+    }, [convertFn, mainCurrency, rates]);
+
+    const [totalInMain, setTotalInMain] = useState(0);
     const [rows, setRows] = useState<PaymentMethodRow[]>([]);
 
-    // Reset cuando se abre el diálogo con un nuevo total en USD
-    const reset = useCallback((usdTotal: number) => {
-        setTotalInUSD(usdTotal);
+    // Reset cuando se abre el diálogo con un nuevo total en la moneda base
+    const reset = useCallback((newTotal: number) => {
+        setTotalInMain(newTotal);
+        const cur = (mainCurrency || 'USD').toUpperCase();
         setRows([{
             key: crypto.randomUUID(),
             type: 'cash',
-            currency: 'USD',
-            amount: Number(usdTotal.toFixed(2)),
+            currency: cur,
+            amount: cur === 'COP' ? Math.round(newTotal) : Number(newTotal.toFixed(2)),
         }]);
-    }, []);
+    }, [mainCurrency]);
 
     // Actualiza el total cuando cambia durante la edición de cantidades
-    const updateTotal = useCallback((newTotalUSD: number) => {
-        setTotalInUSD(newTotalUSD);
+    const updateTotal = useCallback((newTotal: number) => {
+        setTotalInMain(newTotal);
         setRows(prev => {
             if (prev.length === 1) {
                 const firstRow = prev[0];
-                const r = getRate(firstRow.currency);
-                const newAmount = newTotalUSD * r;
+                const newAmount = convert(newTotal, mainCurrency, firstRow.currency);
                 return [{
                     ...firstRow,
-                    amount: Number(newAmount.toFixed(2))
+                    amount: firstRow.currency === 'COP' ? Math.round(newAmount) : Number(newAmount.toFixed(2))
                 }];
             }
             return prev;
         });
-    }, [getRate]);
+    }, [mainCurrency, convert]);
 
-    // Convertir una fila a USD (referencia base)
-    const toUSD = useCallback((row: PaymentMethodRow): number => {
-        const r = getRate(row.currency);
-        return r > 0 ? row.amount / r : row.amount;
-    }, [getRate]);
+    // Convertir una fila a la moneda base
+    const toBase = useCallback((row: PaymentMethodRow): number => {
+        return convert(row.amount, row.currency, mainCurrency);
+    }, [convert, mainCurrency]);
 
-    // paidTotal en USD y COP
-    const paidTotalInUSD = useMemo(() =>
-        rows.reduce((sum, r) => sum + toUSD(r), 0),
-    [rows, toUSD]);
+    // Totales en moneda base
+    const paidTotalInBase = useMemo(() =>
+        rows.reduce((sum, r) => sum + toBase(r), 0),
+    [rows, toBase]);
 
-    const paidTotalInCOP = useMemo(() => paidTotalInUSD * usdRate, [paidTotalInUSD, usdRate]);
-    const totalInCOP = useMemo(() => totalInUSD * usdRate, [totalInUSD, usdRate]);
+    const remainingInBase = useMemo(() =>
+        Math.max(0, totalInMain - paidTotalInBase),
+    [totalInMain, paidTotalInBase]);
 
-    const remainingInUSD = useMemo(() =>
-        Math.max(0, totalInUSD - paidTotalInUSD),
-    [totalInUSD, paidTotalInUSD]);
+    const changeInBase = useMemo(() =>
+        paidTotalInBase - totalInMain,
+    [totalInMain, paidTotalInBase]);
 
-    const remainingInCOP = useMemo(() => remainingInUSD * usdRate, [remainingInUSD, usdRate]);
+    const isChangeOver = changeInBase > 0.01;
 
-    const changeInUSD = useMemo(() =>
-        paidTotalInUSD - totalInUSD,
-    [totalInUSD, paidTotalInUSD]);
-
-    const changeInCOP = useMemo(() => changeInUSD * usdRate, [changeInUSD, usdRate]);
-
-    const isChangeOver = changeInUSD > 0.01;
-
-    // puede confirmar si pagó al menos el total (con tolerancia de 1 centavo USD)
+    // Puede confirmar si pagó al menos el total (con tolerancia de 0.01 unidades de moneda base)
     const canConfirm = useMemo(() =>
-        paidTotalInUSD >= (totalInUSD - 0.01),
-    [paidTotalInUSD, totalInUSD]);
+        paidTotalInBase >= (totalInMain - 0.01),
+    [paidTotalInBase, totalInMain]);
+
+    // Campos calculados retrocompatibles
+    const totalInUSD = useMemo(() => convert(totalInMain, mainCurrency, 'USD'), [convert, totalInMain, mainCurrency]);
+    const totalInCOP = useMemo(() => convert(totalInMain, mainCurrency, 'COP'), [convert, totalInMain, mainCurrency]);
+    const paidTotalInUSD = useMemo(() => convert(paidTotalInBase, mainCurrency, 'USD'), [convert, paidTotalInBase, mainCurrency]);
+    const paidTotalInCOP = useMemo(() => convert(paidTotalInBase, mainCurrency, 'COP'), [convert, paidTotalInBase, mainCurrency]);
+    const remainingInUSD = useMemo(() => convert(remainingInBase, mainCurrency, 'USD'), [convert, remainingInBase, mainCurrency]);
+    const remainingInCOP = useMemo(() => convert(remainingInBase, mainCurrency, 'COP'), [convert, remainingInBase, mainCurrency]);
+    const changeInUSD = useMemo(() => convert(Math.max(0, changeInBase), mainCurrency, 'USD'), [convert, changeInBase, mainCurrency]);
+    const changeInCOP = useMemo(() => convert(Math.max(0, changeInBase), mainCurrency, 'COP'), [convert, changeInBase, mainCurrency]);
 
     const lastChangeRow = useMemo<PaymentMethodRow | null>(() => {
         const cashRows = rows.filter(r => r.type === 'cash');
@@ -130,43 +145,48 @@ export function usePayment(
         setRows(prev => [...prev, {
             key: crypto.randomUUID(),
             type: 'cash',
-            currency: 'USD',
+            currency: (mainCurrency || 'USD').toUpperCase(),
             amount: 0,
         }]);
-    }, []);
+    }, [mainCurrency]);
 
     // Dividir total equitativamente en N partes (ej: 50/50 o en 3 partes)
     const splitEvenly = useCallback((parts: number) => {
-        if (parts < 2 || totalInUSD <= 0) return;
-        const partUSD = Number((totalInUSD / parts).toFixed(2));
+        if (parts < 2 || totalInMain <= 0) return;
+        const partInBase = totalInMain / parts;
+        const main = (mainCurrency || 'USD').toUpperCase();
 
         const newRows: PaymentMethodRow[] = Array.from({ length: parts }).map((_, idx) => {
             if (idx === 0) {
                 return {
                     key: crypto.randomUUID(),
                     type: 'cash',
-                    currency: 'USD',
-                    amount: partUSD,
+                    currency: main,
+                    amount: main === 'COP' ? Math.round(partInBase) : Number(partInBase.toFixed(2)),
                 };
             }
             if (idx === 1) {
+                const cur = main === 'VES' ? 'USD' : 'VES';
+                const amt = convert(partInBase, main, cur);
                 return {
                     key: crypto.randomUUID(),
-                    type: 'transfer',
-                    currency: 'VES',
-                    amount: Number((partUSD * vesRate).toFixed(2)),
+                    type: cur === 'VES' ? 'transfer' : 'cash',
+                    currency: cur,
+                    amount: cur === 'COP' ? Math.round(amt) : Number(amt.toFixed(2)),
                 };
             }
+            const cur = main === 'USD' ? 'VES' : 'USD';
+            const amt = convert(partInBase, main, cur);
             return {
                 key: crypto.randomUUID(),
                 type: 'card',
-                currency: 'VES',
-                amount: Number((partUSD * vesRate).toFixed(2)),
+                currency: cur,
+                amount: cur === 'COP' ? Math.round(amt) : Number(amt.toFixed(2)),
             };
         });
 
         setRows(newRows);
-    }, [totalInUSD, vesRate]);
+    }, [totalInMain, mainCurrency, convert]);
 
     const updateRow = useCallback((
         key: string,
@@ -176,12 +196,12 @@ export function usePayment(
             const idx = prev.findIndex(r => r.key === key);
             if (idx === -1) return prev;
 
-            const otherRowsUSD = prev.reduce((sum, r, i) => {
+            const otherRowsInBase = prev.reduce((sum, r, i) => {
                 if (i === idx) return sum;
-                return sum + toUSD(r);
+                return sum + toBase(r);
             }, 0);
 
-            const remainingUSD = Math.max(0, totalInUSD - otherRowsUSD);
+            const remainingInBase = Math.max(0, totalInMain - otherRowsInBase);
 
             return prev.map((r, i) => {
                 if (i !== idx) return r;
@@ -190,19 +210,18 @@ export function usePayment(
 
                 if (updates.type && !updates.currency) {
                     const opt = DEFAULT_PAYMENT_OPTIONS.find(o => o.type === updates.type);
-                    next.currency = opt?.currency || 'USD';
+                    next.currency = opt?.currency || mainCurrency;
                 }
 
                 if (updates.type || updates.currency) {
-                    const r = getRate(next.currency);
-                    const newAmount = remainingUSD * r;
-                    next.amount = Number(newAmount.toFixed(2));
+                    const newAmount = convert(remainingInBase, mainCurrency, next.currency);
+                    next.amount = next.currency === 'COP' ? Math.round(newAmount) : Number(newAmount.toFixed(2));
                 }
 
                 return next;
             });
         });
-    }, [totalInUSD, toUSD, getRate]);
+    }, [totalInMain, toBase, mainCurrency, convert]);
 
     const removeRow = useCallback((key: string) => {
         setRows(prev => {
@@ -219,9 +238,9 @@ export function usePayment(
                 type: r.type,
                 amount: r.amount,
                 currency: r.currency,
-                exchangeRate: getRate(r.currency),
+                exchangeRate: r.currency === mainCurrency ? 1 : Number(rates[r.currency] || 1),
             })),
-    [rows, getRate]);
+    [rows, mainCurrency, rates]);
 
     return {
         rows,

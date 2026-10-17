@@ -32,11 +32,11 @@ interface PaymentDialogProps {
 function WeightItemRow({
     item,
     onUpdateQty,
-    fmtCOP,
+    fmtMain,
 }: {
     item: CartItem;
     onUpdateQty: (productId: string, presentationId: string | undefined, newQty: number) => void;
-    fmtCOP: (n: number) => string;
+    fmtMain: (n: number) => string;
 }) {
     const [inputValue, setInputValue] = useState<string>(item.qty.toString());
     const [isFocused, setIsFocused] = useState(false);
@@ -59,7 +59,7 @@ function WeightItemRow({
         <div className="flex items-center justify-between gap-2 text-xs bg-white p-2.5 rounded-xl border border-indigo-200 shadow-2xs">
             <div className="flex flex-col flex-1 min-w-0">
                 <span className="font-black text-slate-900 truncate text-xs">{item.name}</span>
-                <span className="text-[10px] text-slate-600 font-bold">Precio: {fmtCOP(item.currentPrice)} / {item.baseUnit}</span>
+                <span className="text-[10px] text-slate-600 font-bold">Precio: {fmtMain(item.currentPrice)} / {item.baseUnit}</span>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
                 <Input
@@ -114,7 +114,7 @@ export function PaymentDialog({
         reset,
         updateTotal,
         getPayload,
-    } = usePayment(rates, fmtCOP);
+    } = usePayment(rates, fmtCOP, mainCurrency, convert);
 
     const [prevOpen, setPrevOpen] = useState(open);
 
@@ -206,9 +206,9 @@ export function PaymentDialog({
     }, [cartItems]);
 
     // Totales en las 3 monedas
-    const totalUSD = total;
-    const totalVES = fromUSD(total, 'VES');
-    const totalCOP = fromUSD(total, 'COP');
+    const totalUSD = convert(total, mainCurrency, 'USD');
+    const totalVES = convert(total, mainCurrency, 'VES');
+    const totalCOP = convert(total, mainCurrency, 'COP');
 
     // Vuelto en USD
     const changeUSD = Math.max(0, changeInUSD);
@@ -245,12 +245,12 @@ export function PaymentDialog({
     const changeCashOptions = useMemo(() => {
         if (!hasCashPayment || changeUSD <= 0.005) return null;
         const inUSD = Math.round(changeUSD);
-        const inCOP = Math.round(fromUSD(changeUSD, 'COP'));
+        const inCOP = Math.round(convert(changeUSD, 'USD', 'COP'));
         return {
             usd: `$ ${inUSD} USD`,
             cop: `$ ${inCOP.toLocaleString('es-CO')} COP`,
         };
-    }, [hasCashPayment, changeUSD, fromUSD]);
+    }, [hasCashPayment, changeUSD, convert]);
 
     // Generante de billetes rápidos dinámico por moneda específica
     const getQuickBills = (currency: string) => {
@@ -401,7 +401,7 @@ export function PaymentDialog({
                                             key={`${item.id}-${item.presentationId}`}
                                             item={item}
                                             onUpdateQty={onUpdateQty}
-                                            fmtCOP={fmtCOP}
+                                            fmtMain={config.fmtMain || fmtCOP}
                                         />
                                     ))}
                                 </div>
