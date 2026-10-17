@@ -8,6 +8,7 @@ interface CreateSupplierInput {
     email?: string;
     telefono?: string;
     address?: string;
+    category?: string;
 }
 
 interface UpdateSupplierInput {
@@ -16,20 +17,25 @@ interface UpdateSupplierInput {
     email?: string;
     telefono?: string;
     address?: string;
+    category?: string;
     isActive?: boolean;
 }
 
-export const getAllSuppliers = async (filters?: { isActive?: boolean; search?: string }) => {
+export const getAllSuppliers = async (filters?: { isActive?: boolean; search?: string; category?: string }) => {
     const where: any = {};
     
     if (filters?.isActive !== undefined) {
         where.isActive = filters.isActive;
+    }
+    if (filters?.category) {
+        where.category = filters.category;
     }
     if (filters?.search) {
         where.OR = [
             { name: ciContains(filters.search) },
             { email: ciContains(filters.search) },
             { rut: ciContains(filters.search) },
+            { category: ciContains(filters.search) },
         ];
     }
 
@@ -58,15 +64,32 @@ export const getSupplierById = async (id: string) => {
 };
 
 export const createSupplier = async (data: CreateSupplierInput) => {
+    const cleanData: any = {
+        name: data.name.trim(),
+        rut: data.rut?.trim() || null,
+        email: data.email?.trim() || null,
+        telefono: data.telefono?.trim() || null,
+        address: data.address?.trim() || null,
+        category: data.category?.trim() || 'Varios',
+    };
     return prisma.supplier.create({
-        data,
+        data: cleanData,
     });
 };
 
 export const updateSupplier = async (id: string, data: UpdateSupplierInput) => {
+    const cleanData: any = {};
+    if (data.name !== undefined) cleanData.name = data.name.trim();
+    if (data.rut !== undefined) cleanData.rut = data.rut?.trim() || null;
+    if (data.email !== undefined) cleanData.email = data.email?.trim() || null;
+    if (data.telefono !== undefined) cleanData.telefono = data.telefono?.trim() || null;
+    if (data.address !== undefined) cleanData.address = data.address?.trim() || null;
+    if (data.category !== undefined) cleanData.category = data.category?.trim() || 'Varios';
+    if (data.isActive !== undefined) cleanData.isActive = data.isActive;
+
     return prisma.supplier.update({
         where: { id },
-        data,
+        data: cleanData,
     });
 };
 

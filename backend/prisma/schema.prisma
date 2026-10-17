@@ -431,6 +431,7 @@ model Supplier {
   email     String?
   telefono  String?
   address   String?
+  category  String?  @default("Varios")
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now()) @db.Timestamptz
   updatedAt DateTime @updatedAt @db.Timestamptz

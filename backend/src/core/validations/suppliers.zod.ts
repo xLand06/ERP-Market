@@ -15,7 +15,7 @@ export const createSupplierSchema = z.object({
     email: z.string().email('Email inválido').optional().or(z.literal('')),
     telefono: z.string().max(20, 'Teléfono demasiado largo').optional().or(z.literal('')),
     address: z.string().max(255, 'Dirección demasiado larga').optional().or(z.literal('')),
-    category: z.string().max(50).optional().or(z.literal('Varios')),
+    category: z.string().max(50).optional().or(z.literal('')),
 });
 
 /**
