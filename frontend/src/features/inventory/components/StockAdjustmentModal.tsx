@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { normalizeText } from '@/lib/utils';
 import { CameraBarcodeScannerModal } from '@/components/scanner/CameraBarcodeScannerModal';
+import { useConfigStore } from '@/hooks/useConfigStore';
 import toast from 'react-hot-toast';
 
 export interface ProductCatalog {
@@ -25,6 +26,7 @@ interface StockAdjustmentModalProps {
 }
 
 export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentModalProps) {
+    const { fmtMain } = useConfigStore();
     const [search, setSearch] = useState('');
     const [selectedProduct, setSelectedProduct] = useState<ProductCatalog | null>(null);
     const [stock, setStock] = useState<number | ''>('');
@@ -167,7 +169,7 @@ export function StockAdjustmentModal({ open, onClose, onSave }: StockAdjustmentM
                                                     <div className="font-semibold text-sm text-slate-900 truncate">{p.name}</div>
                                                     <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
                                                         {p.barcode && <span className="font-mono">{p.barcode}</span>}
-                                                        <span className="text-emerald-600 font-medium">${p.price.toFixed(2)}</span>
+                                                        <span className="text-emerald-600 font-medium">{fmtMain(p.price)}</span>
                                                     </div>
                                                 </div>
                                                 <div className="w-6 h-6 rounded-full border border-slate-300 flex items-center justify-center group-hover:border-indigo-400 group-hover:bg-indigo-50 shrink-0">

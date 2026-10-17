@@ -49,40 +49,36 @@ function formatInWords(value: number): string {
 // ─── Sub-componente: Campo de precio con conversión multi-moneda ─────────────
 function PriceField({
     label,
-    valueCOP,
+    value,
     onChange,
     required,
     colorClass = 'border-emerald-200 focus:ring-emerald-500/50',
     id,
 }: {
     label: string;
-    valueCOP: number | '';
-    onChange: (cop: number | '') => void;
+    value: number | '';
+    onChange: (val: number | '') => void;
     required?: boolean;
     colorClass?: string;
     id: string;
 }) {
-    const { rates, fmtCOP } = useConfigStore();
-    const usdRate = rates['USD'] || rates['COP'] || 3600;
-    const vesRate = rates['VES'] || 5.5;
+    const { mainCurrency, convert, fmtMain } = useConfigStore();
+    const main = (mainCurrency || 'USD').toUpperCase();
+    const valNum = value === '' ? 0 : Number(value);
 
-    const copNum = valueCOP === '' ? 0 : Number(valueCOP);
-    const usdVal = copNum > 0 ? (copNum / usdRate).toFixed(2) : '';
-    const vesVal = copNum > 0 ? ((copNum / usdRate) * vesRate).toFixed(2) : '';
+    // Divisas secundarias de referencia (ej: si la base es COP, mostrar USD y VES)
+    const secondaryCurrencies = ['USD', 'COP', 'VES'].filter(c => c !== main);
 
-    const handleUsdChange = (v: string) => {
-        const n = parseFloat(v);
+    const handleSecondaryChange = (curr: string, inputVal: string) => {
+        const n = parseFloat(inputVal);
         if (isNaN(n)) { onChange(''); return; }
-        onChange(Math.max(0, Math.round(n * usdRate)));
+        const inMain = convert(n, curr, main);
+        onChange(main === 'COP' ? Math.max(0, Math.round(inMain)) : Math.max(0, Number(inMain.toFixed(2))));
     };
 
-    const handleVesChange = (v: string) => {
-        const n = parseFloat(v);
-        if (isNaN(n)) { onChange(''); return; }
-        onChange(Math.max(0, Math.round((n / vesRate) * usdRate)));
-    };
-
-    const friendlyText = copNum > 0 ? `${fmtCOP(copNum)} (${formatInWords(copNum)})` : '';
+    const friendlyText = valNum > 0
+        ? (main === 'COP' ? `${fmtMain(valNum)} (${formatInWords(valNum)})` : fmtMain(valNum))
+        : '';
 
     return (
         <div>
@@ -91,19 +87,19 @@ function PriceField({
                     {label}{required && <span className="text-red-500 ml-0.5">*</span>}
                 </label>
             )}
-            {/* COP — campo principal */}
+            {/* Campo en la moneda principal */}
             <div className="relative mb-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded pointer-events-none">COP</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded pointer-events-none">{main}</span>
                 <input
                     id={id}
                     type="number"
-                    step="1"
+                    step={main === 'COP' ? '1' : '0.01'}
                     min="0"
-                    value={valueCOP}
+                    value={value}
                     onChange={(e) => {
                         const val = e.target.value;
                         if (val === '' || parseFloat(val) >= 0) {
-                            onChange(val === '' ? '' : Math.max(0, Math.round(Number(val))));
+                            onChange(val === '' ? '' : (main === 'COP' ? Math.max(0, Math.round(Number(val))) : Math.max(0, Number(val))));
                         }
                     }}
                     className={`w-full pl-16 pr-3 sm:pr-4 py-3 border rounded-xl focus:ring-2 outline-none text-sm font-bold tabular-nums ${colorClass}`}
@@ -116,32 +112,25 @@ function PriceField({
                     {friendlyText}
                 </div>
             )}
-            {/* USD y VES — campos secundarios de referencia/entrada */}
+            {/* Divisas secundarias de referencia / entrada */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div className="relative">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 bg-slate-50 px-1 rounded pointer-events-none">USD</span>
-                    <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={usdVal}
-                        onChange={(e) => handleUsdChange(e.target.value)}
-                        className="w-full pl-12 pr-2 py-1.5 border border-slate-100 rounded-lg text-[11px] text-slate-500 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200 tabular-nums bg-slate-50"
-                        placeholder="0.00"
-                    />
-                </div>
-                <div className="relative">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 bg-slate-50 px-1 rounded pointer-events-none">VES</span>
-                    <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={vesVal}
-                        onChange={(e) => handleVesChange(e.target.value)}
-                        className="w-full pl-12 pr-2 py-1.5 border border-slate-100 rounded-lg text-[11px] text-slate-500 outline-none focus:border-amber-300 focus:ring-1 focus:ring-amber-200 tabular-nums bg-slate-50"
-                        placeholder="0.00"
-                    />
-                </div>
+                {secondaryCurrencies.map(curr => {
+                    const convertedVal = valNum > 0 ? convert(valNum, main, curr).toFixed(curr === 'COP' ? 0 : 2) : '';
+                    return (
+                        <div key={curr} className="relative">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 bg-slate-50 px-1 rounded pointer-events-none">{curr}</span>
+                            <input
+                                type="number"
+                                step={curr === 'COP' ? '1' : '0.01'}
+                                min="0"
+                                value={convertedVal}
+                                onChange={(e) => handleSecondaryChange(curr, e.target.value)}
+                                className="w-full pl-12 pr-2 py-1.5 border border-slate-100 rounded-lg text-[11px] text-slate-500 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200 tabular-nums bg-slate-50"
+                                placeholder={curr === 'COP' ? '0' : '0.00'}
+                            />
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
@@ -149,7 +138,7 @@ function PriceField({
 
 // ─── Modal Principal ──────────────────────────────────────────────────────────
 export function ProductFormModal({ open, onClose, product, groups, subgroups, onSuccess }: ProductFormModalProps) {
-    const { fmtCOP } = useConfigStore();
+    const { fmtMain, mainCurrency } = useConfigStore();
 
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -377,7 +366,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
     // ── Auto-precio desde costo ───────────────────────────────────────────────
     const suggestPrice = () => {
         if (costNum > 0) {
-            setPrice(Math.round(costNum * 1.30)); // margen sugerido 30%
+            setPrice(mainCurrency === 'COP' ? Math.round(costNum * 1.30) : Number((costNum * 1.30).toFixed(2))); // margen sugerido 30%
         }
     };
 
@@ -680,7 +669,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                             <div className="flex items-center justify-between">
                                 <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                                     <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
-                                    Precios en COP (moneda principal)
+                                    Precios en {mainCurrency || 'COP'} (moneda principal)
                                 </h3>
                                 {margin !== null && (
                                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${Number(margin) >= 20 ? 'bg-emerald-100 text-emerald-700' : Number(margin) >= 10 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
@@ -694,7 +683,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                 <PriceField
                                     id="cost"
                                     label="Costo de Compra"
-                                    valueCOP={cost}
+                                    value={cost}
                                     onChange={setCost}
                                     colorClass="border-slate-200 focus:ring-slate-400/50"
                                 />
@@ -719,7 +708,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                     <PriceField
                                         id="price"
                                         label=""
-                                        valueCOP={price}
+                                        value={price}
                                         onChange={setPrice}
                                         required
                                         colorClass="border-emerald-200 focus:ring-emerald-500/50"
@@ -942,19 +931,19 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                     </button>
                                                 </div>
                                             </div>
-                                            {/* Precio de la presentación en COP con conversión */}
+                                            {/* Precio de la presentación en moneda principal con conversión */}
                                             <div className="mt-2">
-                                                <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Precio en COP</label>
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Precio en {mainCurrency || 'COP'}</label>
                                                 <PriceField
                                                     id={`pres-price-${idx}`}
                                                     label=""
-                                                    valueCOP={p.price}
+                                                    value={p.price}
                                                     onChange={(v) => updatePresentation(idx, 'price', v === '' ? 0 : v)}
                                                     colorClass="border-emerald-100 focus:ring-emerald-500/30"
                                                 />
                                                 {priceNum > 0 && Number(p.multiplier) > 0 && (
                                                     <p className="text-[10px] text-slate-400 mt-1">
-                                                        Sugerido: {fmtCOP(priceNum * Number(p.multiplier))} ({p.multiplier}x precio base)
+                                                        Sugerido: {fmtMain(priceNum * Number(p.multiplier))} ({p.multiplier}x precio base)
                                                     </p>
                                                 )}
                                             </div>
@@ -1017,7 +1006,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                             className="w-full flex items-center justify-between gap-2 px-3 py-3 min-h-[44px] text-left hover:bg-amber-50 transition-colors"
                                                         >
                                                             <span className="text-xs font-semibold text-slate-700 truncate">{p.name}</span>
-                                                            <span className="text-[11px] font-bold text-emerald-600 shrink-0">{fmtCOP(Number(p.price || 0))}</span>
+                                                            <span className="text-[11px] font-bold text-emerald-600 shrink-0">{fmtMain(Number(p.price || 0))}</span>
                                                         </button>
                                                     ))
                                                 )}
@@ -1036,7 +1025,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
                                                 <div key={idx} className="grid grid-cols-12 gap-2 items-center p-2.5 bg-white border border-slate-200 rounded-xl">
                                                     <div className="col-span-5 sm:col-span-6 min-w-0">
                                                         <p className="text-xs font-bold text-slate-700 truncate">{row.product?.name || 'Producto desconocido'}</p>
-                                                        <p className="text-[10px] text-slate-400">{fmtCOP(Number(row.product?.price || 0))} c/u</p>
+                                                        <p className="text-[10px] text-slate-400">{fmtMain(Number(row.product?.price || 0))} c/u</p>
                                                     </div>
                                                     <div className="col-span-5 sm:col-span-4">
                                                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">Cantidad</label>
@@ -1067,7 +1056,7 @@ export function ProductFormModal({ open, onClose, product, groups, subgroups, on
 
                                     {kitRows.length > 0 && (
                                         <p className="text-[11px] text-slate-400">
-                                            Costo de componentes: <span className="font-bold text-slate-600">{fmtCOP(kitComponentsSum)}</span>. El kit se vende a su propio precio (campo Precio de Venta); el stock se descuenta por componente.
+                                            Costo de componentes: <span className="font-bold text-slate-600">{fmtMain(kitComponentsSum)}</span>. El kit se vende a su propio precio (campo Precio de Venta); el stock se descuenta por componente.
                                         </p>
                                     )}
                                 </>

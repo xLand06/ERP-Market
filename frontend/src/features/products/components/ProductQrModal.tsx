@@ -37,7 +37,7 @@ interface ProductQrModalProps {
 }
 
 export function ProductQrModal({ open, onClose, product, productsList, catalogSlug }: ProductQrModalProps) {
-    const { fmtCOP } = useConfigStore();
+    const { fmtMain } = useConfigStore();
     const [copied, setCopied] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
 
@@ -105,7 +105,7 @@ export function ProductQrModal({ open, onClose, product, productsList, catalogSl
 
     if (!itemsToPrint.length || !activeProduct) return null;
 
-    const formattedPrice = activeProduct.price ? fmtCOP(Number(activeProduct.price)) : null;
+    const formattedPrice = activeProduct.price ? fmtMain(Number(activeProduct.price)) : null;
     const activeRawCode = activeProduct.barcode || activeProduct.id || '';
     const totalLabelsCount = itemsToPrint.length * copies;
 
@@ -163,7 +163,7 @@ export function ProductQrModal({ open, onClose, product, productsList, catalogSl
             const dim = THERMAL_DIMENSIONS[thermalSize];
 
             const renderSingleLabelHtml = (prod: Product, qrUrl: string, isCard = false) => {
-                const priceStr = prod.price ? fmtCOP(Number(prod.price)) : '';
+                const priceStr = prod.price ? fmtMain(Number(prod.price)) : '';
                 const codeStr = prod.barcode || prod.id || '';
                 return `
                     <div class="${isCard ? 'sticker-card' : 'sticker-thermal'}">

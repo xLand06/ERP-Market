@@ -43,7 +43,7 @@ export default function ProductsPage() {
     const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
     const [batchProducts, setBatchProducts] = useState<Product[] | null>(null);
 
-    const { fmtCOP, catalogSlug } = useConfigStore();
+    const { fmtMain, catalogSlug } = useConfigStore();
     const user = useAuthStore(s => s.user);
     const isOwner = user?.role === 'OWNER';
 
@@ -257,7 +257,7 @@ export default function ProductsPage() {
             header: 'Costo',
             cell: prod => (
                 <span className="text-sm font-medium text-slate-500">
-                    {prod.cost ? fmtCOP(Number(prod.cost)) : '—'}
+                    {prod.cost ? fmtMain(Number(prod.cost)) : '—'}
                 </span>
             ),
             className: 'text-right',
@@ -269,7 +269,7 @@ export default function ProductsPage() {
             header: 'Precio Venta',
             cell: prod => (
                 <span className="text-sm font-bold text-emerald-600">
-                    {fmtCOP(Number(prod.price || 0))}
+                    {fmtMain(Number(prod.price || 0))}
                 </span>
             ),
             className: 'text-right',

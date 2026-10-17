@@ -13,6 +13,7 @@ import { StockEntryModal } from '../components/StockEntryModal';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { useInventory, useUpdatePrice, useUpdateStock } from '../hooks';
 import { useBarcodeScanner } from '@/hooks/hardware/useBarcodeScanner';
+import { useConfigStore } from '@/hooks/useConfigStore';
 import type { InventoryProduct } from '../types';
 import { getStockLevel, getStockBadgeVariant } from '../types';
 import { api } from '@/lib/api';
@@ -55,6 +56,7 @@ const handleExport = async (branchId: string | null, branchName?: string) => {
 };
 
 export default function InventoryPage() {
+    const { fmtMain } = useConfigStore();
     const [search, setSearch]       = useState('');
     const [filterGroup, setFilterGroup] = useState<string>('all');
     const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -263,7 +265,7 @@ export default function InventoryPage() {
         {
             key: 'cost',
             header: 'P. Costo',
-            cell: p => <span className="text-sm tabular-nums text-slate-600">${p.cost.toFixed(2)}</span>,
+            cell: p => <span className="text-sm tabular-nums text-slate-600">{p.cost ? fmtMain(p.cost) : '—'}</span>,
             className: 'text-right',
             headerClassName: 'text-right tabular-nums',
             hideBelow: 'md',
@@ -307,7 +309,7 @@ export default function InventoryPage() {
                 }
                 return (
                     <div className="flex items-center justify-end gap-1 group">
-                        <span className="tabular-nums text-sm font-medium text-slate-900">${p.price.toFixed(2)}</span>
+                        <span className="tabular-nums text-sm font-medium text-slate-900">{fmtMain(p.price)}</span>
                         <button onClick={() => startEdit(p)} className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-slate-400 hover:text-blue-500 transition-all">
                             <Pencil className="w-3 h-3" />
                         </button>

@@ -51,14 +51,57 @@ const CURRENCY_LABELS: Record<Currency, string>  = { COP: 'COP (Pesos)', USD: 'U
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, branchId }: StockEntryModalProps) {
-    const { rates, fmtCOP } = useConfigStore();
+    const { rates, fmtMain, mainCurrency, convert } = useConfigStore();
+    const main = (mainCurrency || 'COP') as Currency;
     const selectedBranch = useAuthStore(s => s.selectedBranch);
     const effectiveBranchId = branchId || (selectedBranch !== 'all' ? selectedBranch : '');
 
-    const defaultUSDRate = rates['USD'] || 3600;
-    const defaultVESRate = rates['VES'] || 5.5;
+    const getDefaultRate = useCallback((cur: Currency, base: Currency): number => {
+        if (cur === base) return 1;
+        if (base === 'COP') {
+            if (cur === 'USD') return Math.round(convert(1, 'USD', 'COP') * 100) / 100 || 2857.15;
+            if (cur === 'VES') return Number(rates['VES']) || 0.308;
+        }
+        if (base === 'USD') {
+            if (cur === 'COP') return Number(rates['COP']) || 2857.15;
+            if (cur === 'VES') return Number(rates['VES']) || 880.12;
+        }
+        if (base === 'VES') {
+            if (cur === 'USD') return Number(rates['USD']) || 880.12;
+            if (cur === 'COP') return Number(rates['COP']) || 1;
+        }
+        return 1;
+    }, [rates, convert]);
 
-    const [currency, setCurrency]         = useState<Currency>('COP');
+    const getRateLabel = (cur: Currency, base: Currency): string => {
+        if (base === 'COP') {
+            return cur === 'USD' ? 'Tasa: COP por 1 USD' : 'Tasa: Bs. por 1 COP';
+        }
+        if (base === 'USD') {
+            return cur === 'COP' ? 'Tasa: COP por 1 USD' : 'Tasa: Bs. por 1 USD';
+        }
+        if (base === 'VES') {
+            return cur === 'USD' ? 'Tasa: Bs. por 1 USD' : 'Tasa: Bs. por 1 COP';
+        }
+        return `Tasa: ${base} por 1 ${cur}`;
+    };
+
+    const toMain = useCallback((cost: number, cur: Currency, r: number, base: Currency): number => {
+        if (cur === base || !r) return cost;
+        if (base === 'COP') {
+            if (cur === 'USD') return cost * r;
+            if (cur === 'VES') return cost / r;
+        }
+        if (base === 'USD') {
+            return cost / r;
+        }
+        if (base === 'VES') {
+            return cost * r;
+        }
+        return cost;
+    }, []);
+
+    const [currency, setCurrency]         = useState<Currency>(main);
     const [customRate, setCustomRate]     = useState<string>('1');
     const [items, setItems]               = useState<StockEntryItem[]>([]);
     const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -86,10 +129,8 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
     }, [open]);
 
     useEffect(() => {
-        if (currency === 'COP') setCustomRate('1');
-        else if (currency === 'USD') setCustomRate(String(defaultUSDRate));
-        else if (currency === 'VES') setCustomRate(String(defaultVESRate));
-    }, [currency, defaultUSDRate, defaultVESRate]);
+        setCustomRate(String(getDefaultRate(currency, main)));
+    }, [currency, main, getDefaultRate]);
 
     const { inventory: allProducts = [] } = useInventory(effectiveBranchId || '');
 
@@ -100,7 +141,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
             setNotes('');
             setProductSearch('');
             setScanCode('');
-            setCurrency('COP');
+            setCurrency(main);
             return;
         }
         if (preloadedItems && preloadedItems.length > 0) {
@@ -114,19 +155,12 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                 hasBatch: false,
             })));
         }
-    }, [open, preloadedItems]);
-
-    const toCOP = useCallback((cost: number, cur: Currency, rate: number): number => {
-        if (cur === 'COP') return cost;
-        if (cur === 'USD') return cost * rate;
-        if (cur === 'VES') return cost / rate;
-        return cost;
-    }, []);
+    }, [open, preloadedItems, main]);
 
     const rate = parseFloat(customRate) || 1;
 
     const totalInCurrency = useMemo(() => items.reduce((s, i) => s + i.unitCost * i.quantity, 0), [items]);
-    const totalInCOP      = useMemo(() => items.reduce((s, i) => s + toCOP(i.unitCost, currency, rate) * i.quantity, 0), [items, currency, rate, toCOP]);
+    const totalInMain     = useMemo(() => items.reduce((s, i) => s + toMain(i.unitCost, currency, rate, main) * i.quantity, 0), [items, currency, rate, main, toMain]);
 
     // Product search debounce
     useEffect(() => {
@@ -261,7 +295,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
             const apiItems = items.map(item => ({
                 productId: item.productId,
                 quantity: item.quantity,
-                unitPrice: currency === 'COP' ? item.unitCost : toCOP(item.unitCost, currency, rate),
+                unitPrice: currency === main ? item.unitCost : (main === 'COP' ? Math.round(toMain(item.unitCost, currency, rate, main)) : Number(toMain(item.unitCost, currency, rate, main).toFixed(2))),
                 // Solo enviar si el toggle está activo y los campos están completos
                 ...(item.hasBatch && item.batchCode && item.expiryDate ? {
                     batchCode: item.batchCode.trim(),
@@ -326,24 +360,24 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                                 </button>
                             ))}
                         </div>
-                        {currency !== 'COP' && (
+                        {currency !== main && (
                             <div className="flex items-center gap-3">
                                 <div className="flex-1">
                                     <label className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider mb-1 block">
-                                        {currency === 'USD' ? 'Tasa: COP por 1 USD' : 'Tasa: COP por 1 VES'}
+                                        {getRateLabel(currency, main)}
                                     </label>
                                     <Input
-                                        type="number" step="0.01" min="0.01"
+                                        type="number" step="0.000001" min="0.000001"
                                         value={customRate}
                                         onChange={e => setCustomRate(e.target.value)}
                                         className="font-mono font-bold bg-white border-indigo-200 focus:border-indigo-400"
-                                        placeholder="Ej: 3700"
+                                        placeholder={`Ej: ${getDefaultRate(currency, main)}`}
                                     />
                                 </div>
                                 <div className="text-right text-xs text-indigo-500">
                                     <p className="font-medium">Tasa del sistema</p>
                                     <p className="font-black text-indigo-700">
-                                        {currency === 'USD' ? defaultUSDRate.toLocaleString() : defaultVESRate.toLocaleString()}
+                                        {getDefaultRate(currency, main).toLocaleString(undefined, { maximumFractionDigits: 6 })}
                                     </p>
                                 </div>
                             </div>
@@ -418,7 +452,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                                         >
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-semibold text-slate-800 truncate">{p.name}</p>
-                                                <p className="text-xs text-slate-400">Stock: {Number(p.stock ?? 0)} · Costo: {fmtCOP(Number(p.cost || 0))}</p>
+                                                <p className="text-xs text-slate-400">Stock: {Number(p.stock ?? 0)} · Costo: {fmtMain(Number(p.cost || 0))}</p>
                                             </div>
                                             <ChevronDown className="w-3 h-3 text-slate-300 rotate-[-90deg]" />
                                         </button>
@@ -448,7 +482,7 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                                         <div className="min-w-0">
                                             <p className="text-sm font-semibold text-slate-800 truncate">{item.productName}</p>
                                             <p className="text-[10px] text-slate-400">
-                                                ≈ {fmtCOP(toCOP(item.unitCost, currency, rate))} COP c/u
+                                                ≈ {fmtMain(toMain(item.unitCost, currency, rate, main))} c/u
                                             </p>
                                         </div>
                                         <input
@@ -601,10 +635,10 @@ export function StockEntryModal({ open, onClose, onSuccess, preloadedItems, bran
                                 {CURRENCY_SYMBOLS[currency]}{totalInCurrency.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                         </div>
-                        {currency !== 'COP' && (
+                        {currency !== main && (
                             <div className="flex justify-between items-center text-xs text-slate-400">
-                                <span>Equivalente en COP</span>
-                                <span className="font-bold text-slate-600 tabular-nums">{fmtCOP(totalInCOP)}</span>
+                                <span>Equivalente en {main}</span>
+                                <span className="font-bold text-slate-600 tabular-nums">{fmtMain(totalInMain)}</span>
                             </div>
                         )}
                         {items.some(i => i.hasBatch) && (
